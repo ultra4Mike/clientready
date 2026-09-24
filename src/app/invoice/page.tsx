@@ -144,7 +144,15 @@ export default function NewInvoicePage() {
           />
         </form>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white"
+        >
+          Print / Save PDF
+        </button>
+        
+        <div id="preview" className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-sm uppercase tracking-wide text-slate-500">Invoice</p>
