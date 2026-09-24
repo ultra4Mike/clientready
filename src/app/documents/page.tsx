@@ -10,6 +10,8 @@ type SavedDocument = {
   createdAt: string;
   data?: {
     status?: string;
+    style?: string;
+    [key: string]: unknown;
   };
 };
 
@@ -23,6 +25,11 @@ export default function DocumentsPage() {
     }
   }, []);
 
+  function saveList(next: SavedDocument[]) {
+    setDocuments(next);
+    window.localStorage.setItem("clientready-documents", JSON.stringify(next));
+  }
+
   function openDocument(doc: SavedDocument) {
     window.localStorage.setItem("clientready-open-document", doc.id);
     if (doc.type === "invoice") {
@@ -32,12 +39,24 @@ export default function DocumentsPage() {
     }
   }
 
+  function duplicateDocument(doc: SavedDocument) {
+    const copy: SavedDocument = {
+      ...doc,
+      id: Date.now().toString(),
+      title: `${doc.title} copy`,
+      createdAt: new Date().toLocaleDateString(),
+      data: {
+        ...(doc.data || {}),
+        status: "draft",
+      },
+    };
+    saveList([copy, ...documents]);
+  }
+
   function removeDocument(id: string) {
     const ok = window.confirm("Are you sure you want to delete this document?");
     if (!ok) return;
-    const next = documents.filter((doc) => doc.id !== id);
-    setDocuments(next);
-    window.localStorage.setItem("clientready-documents", JSON.stringify(next));
+    saveList(documents.filter((doc) => doc.id !== id));
   }
 
   return (
@@ -54,7 +73,7 @@ export default function DocumentsPage() {
       <section className="mx-auto max-w-6xl px-6 py-8">
         <h1 className="text-2xl font-semibold">Saved documents</h1>
         <p className="mt-2 text-slate-600">
-          Open an invoice or proposal you already saved.
+          Open, duplicate, or remove a saved invoice or proposal.
         </p>
 
         <div className="mt-8 space-y-3">
@@ -83,6 +102,13 @@ export default function DocumentsPage() {
                   className="text-sm font-medium"
                 >
                   Open
+                </button>
+                <button
+                  type="button"
+                  onClick={() => duplicateDocument(doc)}
+                  className="text-sm font-medium"
+                >
+                  Duplicate
                 </button>
                 <button
                   type="button"

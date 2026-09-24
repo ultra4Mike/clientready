@@ -64,16 +64,25 @@ export default function NewInvoicePage() {
   }, []);
 
   useEffect(() => {
-    const raw = window.localStorage.getItem("clientready-clients");
-    if (raw) {
-      setSavedClients(JSON.parse(raw));
-    }
-  }, []);
-
-  useEffect(() => {
     const openId = window.localStorage.getItem("clientready-open-document");
-    if (!openId) return;
     const raw = window.localStorage.getItem("clientready-documents");
+
+    if (!openId) {
+      const docs = raw ? (JSON.parse(raw) as SavedDocument[]) : [];
+      let highest = 1000;
+      docs.forEach((doc) => {
+        if (doc.type !== "invoice") return;
+        const value = String(doc.data?.invoiceNumber || doc.title || "");
+        const match = value.match(/(\d+)/);
+        if (match) {
+          const num = Number(match[1]);
+          if (num > highest) highest = num;
+        }
+      });
+      setInvoiceNumber(`INV-${highest + 1}`);
+      return;
+    }
+
     if (!raw) return;
     const docs = JSON.parse(raw) as SavedDocument[];
     const doc = docs.find((item) => item.id === openId && item.type === "invoice");
@@ -117,6 +126,22 @@ export default function NewInvoicePage() {
     return text.includes(clientSearch.toLowerCase());
   });
 
+  function getNextInvoiceNumber() {
+    const raw = window.localStorage.getItem("clientready-documents");
+    const docs = raw ? (JSON.parse(raw) as SavedDocument[]) : [];
+    let highest = 1000;
+    docs.forEach((doc) => {
+      if (doc.type !== "invoice") return;
+      const value = String(doc.data?.invoiceNumber || doc.title || "");
+      const match = value.match(/(\d+)/);
+      if (match) {
+        const num = Number(match[1]);
+        if (num > highest) highest = num;
+      }
+    });
+    return `INV-${highest + 1}`;
+  }
+
   function chooseClient(client: SavedClient) {
     setClientName(client.name || "");
     setClientCompany(client.company || "");
@@ -124,6 +149,42 @@ export default function NewInvoicePage() {
     setClientPhone(client.phone || "");
     setClientAddress(client.address || "");
     setClientSearch(client.name || "");
+  }
+
+  function saveClientFromForm() {
+    if (!clientName.trim()) {
+      setSaveMessage("Add a client name first");
+      return;
+    }
+
+    const raw = window.localStorage.getItem("clientready-clients");
+    const clients: SavedClient[] = raw ? JSON.parse(raw) : [];
+    const alreadySaved = clients.some((client) => {
+      if (clientEmail && client.email) {
+        return client.email.toLowerCase() === clientEmail.toLowerCase();
+      }
+      return client.name.toLowerCase() === clientName.toLowerCase();
+    });
+
+    if (alreadySaved) {
+      setSaveMessage("That client is already saved");
+      setTimeout(() => setSaveMessage(""), 2000);
+      return;
+    }
+
+    const nextClient: SavedClient = {
+      id: Date.now().toString(),
+      name: clientName,
+      company: clientCompany,
+      email: clientEmail,
+      phone: clientPhone,
+      address: clientAddress,
+    };
+    const next = [...clients, nextClient];
+    window.localStorage.setItem("clientready-clients", JSON.stringify(next));
+    setSavedClients(next);
+    setSaveMessage("Client saved");
+    setTimeout(() => setSaveMessage(""), 2000);
   }
 
   function clearForm() {
@@ -134,7 +195,7 @@ export default function NewInvoicePage() {
     setClientEmail("");
     setClientPhone("");
     setClientAddress("");
-    setInvoiceNumber("INV-1001");
+    setInvoiceNumber(getNextInvoiceNumber());
     setInvoiceDate("");
     setDueDate("");
     setNotes("Payment is due within 14 days.");
@@ -275,6 +336,13 @@ export default function NewInvoicePage() {
             value={clientAddress}
             onChange={(event) => setClientAddress(event.target.value)}
           />
+          <button
+            type="button"
+            onClick={saveClientFromForm}
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
+          >
+            Save as client
+          </button>
           <input
             className="w-full rounded-lg border border-slate-300 px-3 py-2"
             placeholder="Invoice number"
