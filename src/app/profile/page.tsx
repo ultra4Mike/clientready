@@ -1,0 +1,113 @@
+"use client";
+
+import { FormEvent, useEffect, useState } from "react";
+
+const emptyProfile = {
+  businessName: "",
+  ownerName: "",
+  email: "",
+  phone: "",
+  address: "",
+  website: "",
+  paymentTerms: "Payment is due within 14 days.",
+  taxId: "",
+};
+
+export default function ProfilePage() {
+  const [profile, setProfile] = useState(emptyProfile);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    const raw = window.localStorage.getItem("clientready-profile");
+    if (raw) {
+      setProfile({ ...emptyProfile, ...JSON.parse(raw) });
+    }
+  }, []);
+
+  function update(field: keyof typeof emptyProfile, value: string) {
+    setProfile((current) => ({ ...current, [field]: value }));
+  }
+
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    window.localStorage.setItem("clientready-profile", JSON.stringify(profile));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-50 text-slate-900">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <a href="/dashboard" className="text-sm text-slate-600">
+            Back to dashboard
+          </a>
+          <div className="font-semibold">Business profile</div>
+        </div>
+      </header>
+
+      <form
+        onSubmit={handleSubmit}
+        className="mx-auto mt-8 max-w-2xl space-y-4 rounded-2xl border border-slate-200 bg-white p-6"
+      >
+        <h1 className="text-xl font-semibold">Your business details</h1>
+
+        <input
+          className="w-full rounded-lg border border-slate-300 px-3 py-2"
+          placeholder="Business name"
+          value={profile.businessName}
+          onChange={(event) => update("businessName", event.target.value)}
+        />
+        <input
+          className="w-full rounded-lg border border-slate-300 px-3 py-2"
+          placeholder="Your name"
+          value={profile.ownerName}
+          onChange={(event) => update("ownerName", event.target.value)}
+        />
+        <input
+          className="w-full rounded-lg border border-slate-300 px-3 py-2"
+          placeholder="Email"
+          value={profile.email}
+          onChange={(event) => update("email", event.target.value)}
+        />
+        <input
+          className="w-full rounded-lg border border-slate-300 px-3 py-2"
+          placeholder="Phone"
+          value={profile.phone}
+          onChange={(event) => update("phone", event.target.value)}
+        />
+        <input
+          className="w-full rounded-lg border border-slate-300 px-3 py-2"
+          placeholder="Address"
+          value={profile.address}
+          onChange={(event) => update("address", event.target.value)}
+        />
+        <input
+          className="w-full rounded-lg border border-slate-300 px-3 py-2"
+          placeholder="Website"
+          value={profile.website}
+          onChange={(event) => update("website", event.target.value)}
+        />
+        <input
+          className="w-full rounded-lg border border-slate-300 px-3 py-2"
+          placeholder="Tax ID / EIN"
+          value={profile.taxId}
+          onChange={(event) => update("taxId", event.target.value)}
+        />
+        <textarea
+          className="min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2"
+          placeholder="Default payment terms"
+          value={profile.paymentTerms}
+          onChange={(event) => update("paymentTerms", event.target.value)}
+        />
+
+        <button
+          type="submit"
+          className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white"
+        >
+          {saved ? "Saved" : "Save profile"}
+        </button>
+      </form>
+    </main>
+  );
+}

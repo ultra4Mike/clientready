@@ -9,6 +9,9 @@ export default function DashboardPage() {
           <a href="/" className="text-sm text-slate-600">
             Home
           </a>
+          <a href="/profile" className="text-sm font-medium text-slate-700">
+            Business profile
+          </a>
         </div>
       </header>
 

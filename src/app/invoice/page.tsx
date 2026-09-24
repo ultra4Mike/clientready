@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type LineItem = {
   description: string;
@@ -19,6 +19,20 @@ export default function NewInvoicePage() {
   const [notes, setNotes] = useState("Payment is due within 14 days.");
   const [taxPercent, setTaxPercent] = useState("0");
   const [items, setItems] = useState<LineItem[]>([{ ...emptyItem }]);
+  const [businessName, setBusinessName] = useState("Your business");
+  const [ownerName, setOwnerName] = useState("");
+  const [businessEmail, setBusinessEmail] = useState("");
+  const [businessPhone, setBusinessPhone] = useState("");
+
+  useEffect(() => {
+    const raw = window.localStorage.getItem("clientready-profile");
+    if (!raw) return;
+    const profile = JSON.parse(raw);
+    setBusinessName(profile.businessName || "Your business");
+    setOwnerName(profile.ownerName || "");
+    setBusinessEmail(profile.email || "");
+    setBusinessPhone(profile.phone || "");
+  }, []);
 
   function updateItem(index: number, field: keyof LineItem, value: string) {
     setItems((current) =>
@@ -160,6 +174,15 @@ export default function NewInvoicePage() {
                 {invoiceNumber || "INV-0000"}
               </h2>
             </div>
+
+          <div className="mt-4 text-sm text-slate-600">
+            <p className="font-medium text-slate-900">
+               {businessName}</p>
+            <p>{ownerName}</p>
+            <p>{businessEmail}</p>
+            <p>{businessPhone}</p>
+          </div>
+
             <div className="text-right text-sm text-slate-600">
               <div>Date: {invoiceDate || "—"}</div>
               <div>Due: {dueDate || "—"}</div>

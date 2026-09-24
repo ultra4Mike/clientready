@@ -133,6 +133,14 @@ export default function ProposalPage() {
             </p>
           </div>
 
+          <div className="mt-4 text-sm text-slate-600">
+            <p className="text-sm text-slate-500">Prepared by</p>
+            <p className="font-medium text-slate-900">{businessName}</p>
+            <p>{ownerName}</p>
+            <p>{businessEmail}</p>
+            <p>{businessPhone}</p>
+          </div>
+
           <div className="mt-8 space-y-4 text-sm leading-6 text-slate-700">
             <div>
               <h3 className="font-semibold text-slate-900">Description</h3>
