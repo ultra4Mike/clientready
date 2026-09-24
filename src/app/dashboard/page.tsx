@@ -26,7 +26,7 @@ export default function DashboardPage() {
             New proposal
           </a>
           <a
-            href="/documents/new?type=invoice"
+            href="/invoice"
             className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-sm hover:border-slate-300"
           >
             New invoice
