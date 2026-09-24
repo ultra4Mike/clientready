@@ -17,9 +17,19 @@ type SavedClient = {
   address: string;
 };
 
+type SavedDocument = {
+  id: string;
+  type: "invoice" | "proposal";
+  title: string;
+  clientName: string;
+  createdAt: string;
+  data: Record<string, unknown>;
+};
+
 const emptyItem: LineItem = { description: "", qty: "1", rate: "" };
 
 export default function NewInvoicePage() {
+  const [docId, setDocId] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientCompany, setClientCompany] = useState("");
   const [clientEmail, setClientEmail] = useState("");
@@ -37,6 +47,7 @@ export default function NewInvoicePage() {
   const [businessPhone, setBusinessPhone] = useState("");
   const [savedClients, setSavedClients] = useState<SavedClient[]>([]);
   const [clientSearch, setClientSearch] = useState("");
+  const [saveMessage, setSaveMessage] = useState("");
 
   useEffect(() => {
     const raw = window.localStorage.getItem("clientready-profile");
@@ -55,6 +66,43 @@ export default function NewInvoicePage() {
     }
   }, []);
 
+  useEffect(() => {
+    const openId = window.localStorage.getItem("clientready-open-document");
+    if (!openId) return;
+    const raw = window.localStorage.getItem("clientready-documents");
+    if (!raw) return;
+    const docs = JSON.parse(raw) as SavedDocument[];
+    const doc = docs.find((item) => item.id === openId && item.type === "invoice");
+    window.localStorage.removeItem("clientready-open-document");
+    if (!doc) return;
+    const data = doc.data as {
+      clientName?: string;
+      clientCompany?: string;
+      clientEmail?: string;
+      clientPhone?: string;
+      clientAddress?: string;
+      invoiceNumber?: string;
+      invoiceDate?: string;
+      dueDate?: string;
+      notes?: string;
+      taxPercent?: string;
+      items?: LineItem[];
+    };
+    setDocId(doc.id);
+    setClientName(data.clientName || "");
+    setClientCompany(data.clientCompany || "");
+    setClientEmail(data.clientEmail || "");
+    setClientPhone(data.clientPhone || "");
+    setClientAddress(data.clientAddress || "");
+    setInvoiceNumber(data.invoiceNumber || "INV-1001");
+    setInvoiceDate(data.invoiceDate || "");
+    setDueDate(data.dueDate || "");
+    setNotes(data.notes || "Payment is due within 14 days.");
+    setTaxPercent(data.taxPercent || "0");
+    setItems(data.items?.length ? data.items : [{ ...emptyItem }]);
+    setClientSearch(data.clientName || "");
+  }, []);
+
   const filteredClients = savedClients.filter((client) => {
     if (!clientSearch.trim()) return false;
     const text = `${client.name} ${client.company} ${client.email}`.toLowerCase();
@@ -71,6 +119,7 @@ export default function NewInvoicePage() {
   }
 
   function clearForm() {
+    setDocId("");
     setClientSearch("");
     setClientName("");
     setClientCompany("");
@@ -83,6 +132,38 @@ export default function NewInvoicePage() {
     setNotes("Payment is due within 14 days.");
     setTaxPercent("0");
     setItems([{ ...emptyItem }]);
+    setSaveMessage("");
+  }
+
+  function saveDocument() {
+    const raw = window.localStorage.getItem("clientready-documents");
+    const docs: SavedDocument[] = raw ? JSON.parse(raw) : [];
+    const id = docId || Date.now().toString();
+    const nextDoc: SavedDocument = {
+      id,
+      type: "invoice",
+      title: invoiceNumber || "Invoice",
+      clientName: clientName || "No client",
+      createdAt: new Date().toLocaleDateString(),
+      data: {
+        clientName,
+        clientCompany,
+        clientEmail,
+        clientPhone,
+        clientAddress,
+        invoiceNumber,
+        invoiceDate,
+        dueDate,
+        notes,
+        taxPercent,
+        items,
+      },
+    };
+    const next = [...docs.filter((item) => item.id !== id), nextDoc];
+    window.localStorage.setItem("clientready-documents", JSON.stringify(next));
+    setDocId(id);
+    setSaveMessage("Invoice saved");
+    setTimeout(() => setSaveMessage(""), 2000);
   }
 
   function updateItem(index: number, field: keyof LineItem, value: string) {
@@ -252,13 +333,23 @@ export default function NewInvoicePage() {
             onChange={(event) => setNotes(event.target.value)}
           />
 
-          <button
-            type="button"
-            onClick={clearForm}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
-          >
-            Clear form
-          </button>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={saveDocument}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white"
+            >
+              Save document
+            </button>
+            <button
+              type="button"
+              onClick={clearForm}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
+            >
+              Clear form
+            </button>
+          </div>
+          {saveMessage && <p className="text-sm text-slate-600">{saveMessage}</p>}
         </form>
 
         <div>

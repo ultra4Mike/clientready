@@ -29,6 +29,7 @@ export default function DashboardPage() {
           <div className="flex gap-4 text-sm text-slate-600">
             <a href="/profile">Profile</a>
             <a href="/clients">Clients</a>
+            <a href="/documents">Documents</a>
           </div>
         </div>
       </header>

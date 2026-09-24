@@ -11,7 +11,17 @@ type SavedClient = {
   address: string;
 };
 
+type SavedDocument = {
+  id: string;
+  type: "invoice" | "proposal";
+  title: string;
+  clientName: string;
+  createdAt: string;
+  data: Record<string, unknown>;
+};
+
 export default function ProposalPage() {
+  const [docId, setDocId] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientCompany, setClientCompany] = useState("");
   const [clientEmail, setClientEmail] = useState("");
@@ -33,6 +43,7 @@ export default function ProposalPage() {
   const [businessPhone, setBusinessPhone] = useState("");
   const [savedClients, setSavedClients] = useState<SavedClient[]>([]);
   const [clientSearch, setClientSearch] = useState("");
+  const [saveMessage, setSaveMessage] = useState("");
 
   useEffect(() => {
     const raw = window.localStorage.getItem("clientready-profile");
@@ -51,6 +62,47 @@ export default function ProposalPage() {
     }
   }, []);
 
+  useEffect(() => {
+    const openId = window.localStorage.getItem("clientready-open-document");
+    if (!openId) return;
+    const raw = window.localStorage.getItem("clientready-documents");
+    if (!raw) return;
+    const docs = JSON.parse(raw) as SavedDocument[];
+    const doc = docs.find((item) => item.id === openId && item.type === "proposal");
+    window.localStorage.removeItem("clientready-open-document");
+    if (!doc) return;
+    const data = doc.data as {
+      clientName?: string;
+      clientCompany?: string;
+      clientEmail?: string;
+      clientPhone?: string;
+      clientAddress?: string;
+      projectTitle?: string;
+      description?: string;
+      scope?: string;
+      notIncluded?: string;
+      timeline?: string;
+      price?: string;
+      paymentTerms?: string;
+      validUntil?: string;
+    };
+    setDocId(doc.id);
+    setClientName(data.clientName || "");
+    setClientCompany(data.clientCompany || "");
+    setClientEmail(data.clientEmail || "");
+    setClientPhone(data.clientPhone || "");
+    setClientAddress(data.clientAddress || "");
+    setProjectTitle(data.projectTitle || "");
+    setDescription(data.description || "");
+    setScope(data.scope || "");
+    setNotIncluded(data.notIncluded || "");
+    setTimeline(data.timeline || "");
+    setPrice(data.price || "");
+    setPaymentTerms(data.paymentTerms || "50% to start, 50% on completion.");
+    setValidUntil(data.validUntil || "");
+    setClientSearch(data.clientName || "");
+  }, []);
+
   const filteredClients = savedClients.filter((client) => {
     if (!clientSearch.trim()) return false;
     const text = `${client.name} ${client.company} ${client.email}`.toLowerCase();
@@ -67,6 +119,7 @@ export default function ProposalPage() {
   }
 
   function clearForm() {
+    setDocId("");
     setClientSearch("");
     setClientName("");
     setClientCompany("");
@@ -81,6 +134,40 @@ export default function ProposalPage() {
     setPrice("");
     setPaymentTerms("50% to start, 50% on completion.");
     setValidUntil("");
+    setSaveMessage("");
+  }
+
+  function saveDocument() {
+    const raw = window.localStorage.getItem("clientready-documents");
+    const docs: SavedDocument[] = raw ? JSON.parse(raw) : [];
+    const id = docId || Date.now().toString();
+    const nextDoc: SavedDocument = {
+      id,
+      type: "proposal",
+      title: projectTitle || "Proposal",
+      clientName: clientName || "No client",
+      createdAt: new Date().toLocaleDateString(),
+      data: {
+        clientName,
+        clientCompany,
+        clientEmail,
+        clientPhone,
+        clientAddress,
+        projectTitle,
+        description,
+        scope,
+        notIncluded,
+        timeline,
+        price,
+        paymentTerms,
+        validUntil,
+      },
+    };
+    const next = [...docs.filter((item) => item.id !== id), nextDoc];
+    window.localStorage.setItem("clientready-documents", JSON.stringify(next));
+    setDocId(id);
+    setSaveMessage("Proposal saved");
+    setTimeout(() => setSaveMessage(""), 2000);
   }
 
   return (
@@ -206,13 +293,23 @@ export default function ProposalPage() {
             />
           </label>
 
-          <button
-            type="button"
-            onClick={clearForm}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
-          >
-            Clear form
-          </button>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={saveDocument}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white"
+            >
+              Save document
+            </button>
+            <button
+              type="button"
+              onClick={clearForm}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
+            >
+              Clear form
+            </button>
+          </div>
+          {saveMessage && <p className="text-sm text-slate-600">{saveMessage}</p>}
         </form>
 
         <div>
