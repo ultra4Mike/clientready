@@ -36,7 +36,6 @@ export default function NewInvoicePage() {
   const [businessEmail, setBusinessEmail] = useState("");
   const [businessPhone, setBusinessPhone] = useState("");
   const [savedClients, setSavedClients] = useState<SavedClient[]>([]);
-  const [selectedClientId, setSelectedClientId] = useState("");
   const [clientSearch, setClientSearch] = useState("");
 
   useEffect(() => {
@@ -57,40 +56,27 @@ export default function NewInvoicePage() {
   }, []);
 
   const filteredClients = savedClients.filter((client) => {
+    if (!clientSearch.trim()) return false;
     const text = `${client.name} ${client.company} ${client.email}`.toLowerCase();
     return text.includes(clientSearch.toLowerCase());
   });
 
-  function clearClientFields() {
-    setSelectedClientId("");
-    setClientName("");
-    setClientCompany("");
-    setClientEmail("");
-    setClientPhone("");
-    setClientAddress("");
-  }
-
-  function chooseClient(id: string) {
-    setSelectedClientId(id);
-    if (!id) {
-      clearClientFields();
-      return;
-    }
-    const client = savedClients.find((item) => item.id === id);
-    if (!client) {
-      clearClientFields();
-      return;
-    }
+  function chooseClient(client: SavedClient) {
     setClientName(client.name || "");
     setClientCompany(client.company || "");
     setClientEmail(client.email || "");
     setClientPhone(client.phone || "");
     setClientAddress(client.address || "");
+    setClientSearch(client.name || "");
   }
 
   function clearForm() {
-    clearClientFields();
     setClientSearch("");
+    setClientName("");
+    setClientCompany("");
+    setClientEmail("");
+    setClientPhone("");
+    setClientAddress("");
     setInvoiceNumber("INV-1001");
     setInvoiceDate("");
     setDueDate("");
@@ -132,26 +118,31 @@ export default function NewInvoicePage() {
         <form className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
           <h1 className="text-xl font-semibold">Invoice details</h1>
 
-          <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="Search clients by name"
-            value={clientSearch}
-            onChange={(event) => setClientSearch(event.target.value)}
-          />
-
-          <select
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            value={selectedClientId}
-            onChange={(event) => chooseClient(event.target.value)}
-          >
-            <option value="">Choose a saved client</option>
-            {filteredClients.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.name}
-                {client.company ? ` - ${client.company}` : ""}
-              </option>
-            ))}
-          </select>
+          <div>
+            <input
+              className="w-full rounded-lg border border-slate-300 px-3 py-2"
+              placeholder="Search clients by name"
+              value={clientSearch}
+              onChange={(event) => setClientSearch(event.target.value)}
+            />
+            {filteredClients.length > 0 && (
+              <div className="mt-2 overflow-hidden rounded-lg border border-slate-200 bg-white">
+                {filteredClients.map((client) => (
+                  <button
+                    key={client.id}
+                    type="button"
+                    onClick={() => chooseClient(client)}
+                    className="block w-full border-b border-slate-100 px-3 py-2 text-left hover:bg-slate-50"
+                  >
+                    <span className="block font-medium">{client.name}</span>
+                    <span className="block text-sm text-slate-500">
+                      {client.company || client.email}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <input
             className="w-full rounded-lg border border-slate-300 px-3 py-2"
