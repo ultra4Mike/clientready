@@ -20,7 +20,7 @@ export default function DashboardPage() {
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <a
-            href="/documents/new?type=proposal"
+            href="/proposal"
             className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-sm hover:border-slate-300"
           >
             New proposal
@@ -32,13 +32,13 @@ export default function DashboardPage() {
             New invoice
           </a>
           <a
-            href="/documents/new?type=email"
+            href="/email"
             className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-sm hover:border-slate-300"
           >
             New client email
           </a>
           <a
-            href="/documents/new?type=report"
+            href="/report"
             className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-sm hover:border-slate-300"
           >
             New report
