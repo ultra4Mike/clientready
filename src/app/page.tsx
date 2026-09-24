@@ -1,69 +1,118 @@
-import Image from "next/image";
+const documents = [
+  {
+    title: "Proposals",
+    text: "Send a clear quote with scope, timeline, and pricing.",
+  },
+  {
+    title: "Invoices",
+    text: "Create numbered invoices and mark them sent or paid.",
+  },
+  {
+    title: "Client emails",
+    text: "Build follow-ups, updates, and reminders you can copy and send.",
+  },
+  {
+    title: "Reports",
+    text: "Turn finished work into a simple status report.",
+  },
+];
 
-export default function Home() {
+export default function HomePage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
+    <main>
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <div className="text-lg font-semibold tracking-tight">ClientReady</div>
+          <div className="flex items-center gap-3">
+            <a href="/login" className="text-sm text-slate-600 hover:text-slate-900">
+              Log in
+            </a>
             <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              href="/signup"
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              Get started
+            </a>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
+      </header>
+
+      <section className="mx-auto max-w-6xl px-6 py-20">
+        <p className="mb-4 text-sm font-medium uppercase tracking-wide text-slate-500">
+          For freelancers and one-person businesses
+        </p>
+        <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
+          Professional client documents without starting from a blank page.
+        </h1>
+        <p className="mt-6 max-w-2xl text-lg leading-7 text-slate-600">
+          Fill in a short form. ClientReady assembles a polished proposal, invoice,
+          email, or report you can download and send.
+        </p>
+        <div className="mt-8 flex flex-wrap gap-3">
           <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/signup"
+            className="rounded-lg bg-slate-900 px-5 py-3 text-sm font-medium text-white hover:bg-slate-700"
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
+            Start free
           </a>
           <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="#pricing"
+            className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100"
           >
-            Documentation
+            See pricing
           </a>
         </div>
-      </main>
-    </div>
+        <p className="mt-4 text-sm text-slate-500">3 free documents. No AI required.</p>
+      </section>
+
+      <section className="border-y border-slate-200 bg-white">
+        <div className="mx-auto grid max-w-6xl gap-6 px-6 py-16 sm:grid-cols-2 lg:grid-cols-4">
+          {documents.map((item) => (
+            <div key={item.title} className="rounded-2xl border border-slate-200 p-5">
+              <h2 className="font-semibold text-slate-900">{item.title}</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{item.text}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section id="pricing" className="mx-auto max-w-6xl px-6 py-20">
+        <h2 className="text-3xl font-semibold tracking-tight">Simple pricing</h2>
+        <p className="mt-3 max-w-xl text-slate-600">
+          Use 3 documents free. Upgrade when you are ready to use it every week.
+        </p>
+        <div className="mt-10 grid gap-6 md:grid-cols-2">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <h3 className="text-lg font-semibold">Monthly</h3>
+            <p className="mt-4 text-4xl font-semibold">$7.99</p>
+            <p className="mt-1 text-sm text-slate-500">per month</p>
+            <ul className="mt-6 space-y-2 text-sm text-slate-600">
+              <li>Unlimited documents</li>
+              <li>Saved clients and logos</li>
+              <li>Invoice tracking</li>
+              <li>PDF downloads</li>
+            </ul>
+          </div>
+          <div className="rounded-2xl border border-slate-900 bg-slate-900 p-6 text-white">
+            <h3 className="text-lg font-semibold">3 months</h3>
+            <p className="mt-4 text-4xl font-semibold">$19.99</p>
+            <p className="mt-1 text-sm text-slate-300">save vs monthly</p>
+            <ul className="mt-6 space-y-2 text-sm text-slate-200">
+              <li>Everything in monthly</li>
+              <li>Better rate for regular use</li>
+              <li>Cancel anytime at period end</li>
+              <li>Same documents and tools</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <footer className="border-t border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-6xl justify-between px-6 py-6 text-sm text-slate-500">
+          <span>ClientReady</span>
+          <span>Professional documents for solo businesses</span>
+        </div>
+      </footer>
+    </main>
   );
 }
