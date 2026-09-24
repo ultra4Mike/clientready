@@ -8,11 +8,23 @@ type LineItem = {
   rate: string;
 };
 
+type SavedClient = {
+  id: string;
+  name: string;
+  company: string;
+  email: string;
+  phone: string;
+  address: string;
+};
+
 const emptyItem: LineItem = { description: "", qty: "1", rate: "" };
 
 export default function NewInvoicePage() {
   const [clientName, setClientName] = useState("");
+  const [clientCompany, setClientCompany] = useState("");
   const [clientEmail, setClientEmail] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
+  const [clientAddress, setClientAddress] = useState("");
   const [invoiceNumber, setInvoiceNumber] = useState("INV-1001");
   const [invoiceDate, setInvoiceDate] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -23,6 +35,9 @@ export default function NewInvoicePage() {
   const [ownerName, setOwnerName] = useState("");
   const [businessEmail, setBusinessEmail] = useState("");
   const [businessPhone, setBusinessPhone] = useState("");
+  const [savedClients, setSavedClients] = useState<SavedClient[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState("");
+  const [clientSearch, setClientSearch] = useState("");
 
   useEffect(() => {
     const raw = window.localStorage.getItem("clientready-profile");
@@ -33,6 +48,56 @@ export default function NewInvoicePage() {
     setBusinessEmail(profile.email || "");
     setBusinessPhone(profile.phone || "");
   }, []);
+
+  useEffect(() => {
+    const raw = window.localStorage.getItem("clientready-clients");
+    if (raw) {
+      setSavedClients(JSON.parse(raw));
+    }
+  }, []);
+
+  const filteredClients = savedClients.filter((client) => {
+    const text = `${client.name} ${client.company} ${client.email}`.toLowerCase();
+    return text.includes(clientSearch.toLowerCase());
+  });
+
+  function clearClientFields() {
+    setSelectedClientId("");
+    setClientName("");
+    setClientCompany("");
+    setClientEmail("");
+    setClientPhone("");
+    setClientAddress("");
+  }
+
+  function chooseClient(id: string) {
+    setSelectedClientId(id);
+    if (!id) {
+      clearClientFields();
+      return;
+    }
+    const client = savedClients.find((item) => item.id === id);
+    if (!client) {
+      clearClientFields();
+      return;
+    }
+    setClientName(client.name || "");
+    setClientCompany(client.company || "");
+    setClientEmail(client.email || "");
+    setClientPhone(client.phone || "");
+    setClientAddress(client.address || "");
+  }
+
+  function clearForm() {
+    clearClientFields();
+    setClientSearch("");
+    setInvoiceNumber("INV-1001");
+    setInvoiceDate("");
+    setDueDate("");
+    setNotes("Payment is due within 14 days.");
+    setTaxPercent("0");
+    setItems([{ ...emptyItem }]);
+  }
 
   function updateItem(index: number, field: keyof LineItem, value: string) {
     setItems((current) =>
@@ -69,15 +134,54 @@ export default function NewInvoicePage() {
 
           <input
             className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            placeholder="Search clients by name"
+            value={clientSearch}
+            onChange={(event) => setClientSearch(event.target.value)}
+          />
+
+          <select
+            className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            value={selectedClientId}
+            onChange={(event) => chooseClient(event.target.value)}
+          >
+            <option value="">Choose a saved client</option>
+            {filteredClients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.name}
+                {client.company ? ` - ${client.company}` : ""}
+              </option>
+            ))}
+          </select>
+
+          <input
+            className="w-full rounded-lg border border-slate-300 px-3 py-2"
             placeholder="Client name"
             value={clientName}
             onChange={(event) => setClientName(event.target.value)}
           />
           <input
             className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            placeholder="Client company"
+            value={clientCompany}
+            onChange={(event) => setClientCompany(event.target.value)}
+          />
+          <input
+            className="w-full rounded-lg border border-slate-300 px-3 py-2"
             placeholder="Client email"
             value={clientEmail}
             onChange={(event) => setClientEmail(event.target.value)}
+          />
+          <input
+            className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            placeholder="Client phone"
+            value={clientPhone}
+            onChange={(event) => setClientPhone(event.target.value)}
+          />
+          <input
+            className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            placeholder="Client address"
+            value={clientAddress}
+            onChange={(event) => setClientAddress(event.target.value)}
           />
           <input
             className="w-full rounded-lg border border-slate-300 px-3 py-2"
@@ -156,73 +260,92 @@ export default function NewInvoicePage() {
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
           />
+
+          <button
+            type="button"
+            onClick={clearForm}
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
+          >
+            Clear form
+          </button>
         </form>
 
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white"
-        >
-          Print / Save PDF
-        </button>
-        
-        <div id="preview" className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm uppercase tracking-wide text-slate-500">Invoice</p>
-              <h2 className="mt-1 text-2xl font-semibold">
-                {invoiceNumber || "INV-0000"}
-              </h2>
-            </div>
+        <div>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="mb-4 rounded-lg bg-slate-900 px-4 py-2 text-sm text-white"
+          >
+            Print / Save PDF
+          </button>
 
-          <div className="mt-4 text-sm text-slate-600">
-            <p className="font-medium text-slate-900">
-               {businessName}</p>
-            <p>{ownerName}</p>
-            <p>{businessEmail}</p>
-            <p>{businessPhone}</p>
-          </div>
-
-            <div className="text-right text-sm text-slate-600">
-              <div>Date: {invoiceDate || "—"}</div>
-              <div>Due: {dueDate || "—"}</div>
-            </div>
-          </div>
-
-          <div className="mt-8">
-            <p className="text-sm text-slate-500">Bill to</p>
-            <p className="font-medium">{clientName || "Client name"}</p>
-            <p className="text-sm text-slate-600">{clientEmail || "client@email.com"}</p>
-          </div>
-
-          <div className="mt-8 border-t border-slate-200 pt-4">
-            {items.map((item, index) => {
-              const amount = (Number(item.qty) || 0) * (Number(item.rate) || 0);
-              return (
-                <div key={index} className="flex justify-between py-2 text-sm">
-                  <span>{item.description || "Item"}</span>
-                  <span>${amount.toFixed(2)}</span>
+          <div
+            id="preview"
+            className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm uppercase tracking-wide text-slate-500">
+                  Invoice
+                </p>
+                <h2 className="mt-1 text-2xl font-semibold">
+                  {invoiceNumber || "INV-0000"}
+                </h2>
+                <div className="mt-4 text-sm text-slate-600">
+                  <p className="font-medium text-slate-900">{businessName}</p>
+                  <p>{ownerName}</p>
+                  <p>{businessEmail}</p>
+                  <p>{businessPhone}</p>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+              <div className="text-right text-sm text-slate-600">
+                <div>Date: {invoiceDate || "-"}</div>
+                <div>Due: {dueDate || "-"}</div>
+              </div>
+            </div>
 
-          <div className="mt-6 space-y-1 border-t border-slate-200 pt-4 text-sm">
-            <div className="flex justify-between">
-              <span>Subtotal</span>
-              <span>${totals.subtotal.toFixed(2)}</span>
+            <div className="mt-8">
+              <p className="text-sm text-slate-500">Bill to</p>
+              <p className="font-medium">{clientName || "Client name"}</p>
+              <p className="text-sm text-slate-600">
+                {clientCompany || "Company"}
+              </p>
+              <p className="text-sm text-slate-600">
+                {clientEmail || "client@email.com"}
+              </p>
+              <p className="text-sm text-slate-600">{clientPhone}</p>
+              <p className="text-sm text-slate-600">{clientAddress}</p>
             </div>
-            <div className="flex justify-between">
-              <span>Tax</span>
-              <span>${totals.tax.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-base font-semibold">
-              <span>Total</span>
-              <span>${totals.total.toFixed(2)}</span>
-            </div>
-          </div>
 
-          <p className="mt-8 text-sm text-slate-600">{notes}</p>
+            <div className="mt-8 border-t border-slate-200 pt-4">
+              {items.map((item, index) => {
+                const amount = (Number(item.qty) || 0) * (Number(item.rate) || 0);
+                return (
+                  <div key={index} className="flex justify-between py-2 text-sm">
+                    <span>{item.description || "Item"}</span>
+                    <span>${amount.toFixed(2)}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-6 space-y-1 border-t border-slate-200 pt-4 text-sm">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span>${totals.subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Tax</span>
+                <span>${totals.tax.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-base font-semibold">
+                <span>Total</span>
+                <span>${totals.total.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <p className="mt-8 text-sm text-slate-600">{notes}</p>
+          </div>
         </div>
       </section>
     </main>
