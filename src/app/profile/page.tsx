@@ -11,6 +11,7 @@ const emptyProfile = {
   website: "",
   paymentTerms: "Payment is due within 14 days.",
   taxId: "",
+  logo: "",
 };
 
 export default function ProfilePage() {
@@ -26,6 +27,15 @@ export default function ProfilePage() {
 
   function update(field: keyof typeof emptyProfile, value: string) {
     setProfile((current) => ({ ...current, [field]: value }));
+  }
+
+  function handleLogo(file: File | undefined) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      update("logo", String(reader.result || ""));
+    };
+    reader.readAsDataURL(file);
   }
 
   function handleSubmit(event: FormEvent) {
@@ -100,6 +110,20 @@ export default function ProfilePage() {
           value={profile.paymentTerms}
           onChange={(event) => update("paymentTerms", event.target.value)}
         />
+
+        <label className="block text-sm text-slate-600">
+          Logo
+          <input
+            type="file"
+            accept="image/*"
+            className="mt-1 block w-full text-sm"
+            onChange={(event) => handleLogo(event.target.files?.[0])}
+          />
+        </label>
+
+        {profile.logo && (
+          <img src={profile.logo} alt="Business logo" className="h-16 w-auto" />
+        )}
 
         <button
           type="submit"

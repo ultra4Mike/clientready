@@ -21,6 +21,7 @@ type SavedDocument = {
 };
 
 export default function ProposalPage() {
+  const [logo, setLogo] = useState("");
   const [docId, setDocId] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientCompany, setClientCompany] = useState("");
@@ -49,6 +50,7 @@ export default function ProposalPage() {
     const raw = window.localStorage.getItem("clientready-profile");
     if (!raw) return;
     const profile = JSON.parse(raw);
+    setLogo(profile.logo || "");
     setBusinessName(profile.businessName || "Your business");
     setOwnerName(profile.ownerName || "");
     setBusinessEmail(profile.email || "");
@@ -326,6 +328,9 @@ export default function ProposalPage() {
             className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"
           >
             <p className="text-sm uppercase tracking-wide text-slate-500">
+            {logo && (
+              <img src={logo} alt="Business logo" className="mb-3 h-14 w-auto" />
+            )}  
               Proposal
             </p>
             <h2 className="mt-1 text-2xl font-semibold">

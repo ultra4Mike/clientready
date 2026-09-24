@@ -51,6 +51,8 @@ export default function ClientsPage() {
   }
 
   function removeClient(id: string) {
+    const ok = window.confirm("Are you sure you want to delete this client?");
+    if (!ok) return;
     saveClients(clients.filter((client) => client.id !== id));
   }
 

@@ -8,6 +8,9 @@ type SavedDocument = {
   title: string;
   clientName: string;
   createdAt: string;
+  data?: {
+    status?: string;
+  };
 };
 
 export default function DocumentsPage() {
@@ -30,6 +33,8 @@ export default function DocumentsPage() {
   }
 
   function removeDocument(id: string) {
+    const ok = window.confirm("Are you sure you want to delete this document?");
+    if (!ok) return;
     const next = documents.filter((doc) => doc.id !== id);
     setDocuments(next);
     window.localStorage.setItem("clientready-documents", JSON.stringify(next));
@@ -68,6 +73,7 @@ export default function DocumentsPage() {
                 <p className="font-medium">{doc.title}</p>
                 <p className="text-sm text-slate-600">
                   {doc.type} · {doc.clientName || "No client"} · {doc.createdAt}
+                  {doc.data?.status ? ` · ${doc.data.status}` : ""}
                 </p>
               </div>
               <div className="flex gap-3">

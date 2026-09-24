@@ -48,6 +48,8 @@ export default function NewInvoicePage() {
   const [savedClients, setSavedClients] = useState<SavedClient[]>([]);
   const [clientSearch, setClientSearch] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
+  const [status, setStatus] = useState("draft");
+  const [logo, setLogo] = useState("");
 
   useEffect(() => {
     const raw = window.localStorage.getItem("clientready-profile");
@@ -57,6 +59,7 @@ export default function NewInvoicePage() {
     setOwnerName(profile.ownerName || "");
     setBusinessEmail(profile.email || "");
     setBusinessPhone(profile.phone || "");
+    setLogo(profile.logo || "");
   }, []);
 
   useEffect(() => {
@@ -87,6 +90,7 @@ export default function NewInvoicePage() {
       notes?: string;
       taxPercent?: string;
       items?: LineItem[];
+      status?: string;
     };
     setDocId(doc.id);
     setClientName(data.clientName || "");
@@ -101,6 +105,7 @@ export default function NewInvoicePage() {
     setTaxPercent(data.taxPercent || "0");
     setItems(data.items?.length ? data.items : [{ ...emptyItem }]);
     setClientSearch(data.clientName || "");
+    setStatus(data.status || "draft");
   }, []);
 
   const filteredClients = savedClients.filter((client) => {
@@ -133,6 +138,7 @@ export default function NewInvoicePage() {
     setTaxPercent("0");
     setItems([{ ...emptyItem }]);
     setSaveMessage("");
+    setStatus("draft");
   }
 
   function saveDocument() {
@@ -157,6 +163,7 @@ export default function NewInvoicePage() {
         notes,
         taxPercent,
         items,
+        status,
       },
     };
     const next = [...docs.filter((item) => item.id !== id), nextDoc];
@@ -261,6 +268,17 @@ export default function NewInvoicePage() {
             value={invoiceNumber}
             onChange={(event) => setInvoiceNumber(event.target.value)}
           />
+
+          <select
+            className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+          >
+            <option value="draft">Draft</option>
+            <option value="sent">Sent</option>
+            <option value="paid">Paid</option>
+            <option value="overdue">Overdue</option>
+          </select>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="text-sm text-slate-600">
@@ -368,6 +386,9 @@ export default function NewInvoicePage() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm uppercase tracking-wide text-slate-500">
+                {logo && (
+                  <img src={logo} alt="Business logo" className="mb-3 h-14 w-auto" />
+                )} 
                   Invoice
                 </p>
                 <h2 className="mt-1 text-2xl font-semibold">
