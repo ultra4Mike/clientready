@@ -50,6 +50,7 @@ export default function NewInvoicePage() {
   const [saveMessage, setSaveMessage] = useState("");
   const [status, setStatus] = useState("draft");
   const [logo, setLogo] = useState("");
+  const [style, setStyle] = useState("clean");
 
   useEffect(() => {
     const raw = window.localStorage.getItem("clientready-profile");
@@ -91,6 +92,7 @@ export default function NewInvoicePage() {
       taxPercent?: string;
       items?: LineItem[];
       status?: string;
+      style?: string;
     };
     setDocId(doc.id);
     setClientName(data.clientName || "");
@@ -106,6 +108,7 @@ export default function NewInvoicePage() {
     setItems(data.items?.length ? data.items : [{ ...emptyItem }]);
     setClientSearch(data.clientName || "");
     setStatus(data.status || "draft");
+    setStyle(data.style || "clean");
   }, []);
 
   const filteredClients = savedClients.filter((client) => {
@@ -139,6 +142,7 @@ export default function NewInvoicePage() {
     setItems([{ ...emptyItem }]);
     setSaveMessage("");
     setStatus("draft");
+    setStyle("clean");
   }
 
   function saveDocument() {
@@ -164,6 +168,7 @@ export default function NewInvoicePage() {
         taxPercent,
         items,
         status,
+        style,
       },
     };
     const next = [...docs.filter((item) => item.id !== id), nextDoc];
@@ -190,6 +195,14 @@ export default function NewInvoicePage() {
     const tax = subtotal * ((Number(taxPercent) || 0) / 100);
     return { subtotal, tax, total: subtotal + tax };
   }, [items, taxPercent]);
+
+  const previewClass =
+    style === "bold"
+      ? "rounded-2xl border border-slate-900 bg-slate-900 p-8 text-white shadow-sm"
+      : "rounded-2xl border border-slate-200 bg-white p-8 text-slate-900 shadow-sm";
+
+  const mutedClass = style === "bold" ? "text-slate-300" : "text-slate-600";
+  const labelClass = style === "bold" ? "text-slate-400" : "text-slate-500";
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
@@ -278,6 +291,15 @@ export default function NewInvoicePage() {
             <option value="sent">Sent</option>
             <option value="paid">Paid</option>
             <option value="overdue">Overdue</option>
+          </select>
+
+          <select
+            className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            value={style}
+            onChange={(event) => setStyle(event.target.value)}
+          >
+            <option value="clean">Clean professional</option>
+            <option value="bold">Bold modern</option>
           </select>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -379,48 +401,45 @@ export default function NewInvoicePage() {
             Print / Save PDF
           </button>
 
-          <div
-            id="preview"
-            className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"
-          >
+          <div id="preview" className={previewClass}>
+            {logo && (
+              <img src={logo} alt="Business logo" className="mb-3 h-14 w-auto" />
+            )}
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm uppercase tracking-wide text-slate-500">
-                {logo && (
-                  <img src={logo} alt="Business logo" className="mb-3 h-14 w-auto" />
-                )} 
+                <p className={`text-sm uppercase tracking-wide ${labelClass}`}>
                   Invoice
                 </p>
                 <h2 className="mt-1 text-2xl font-semibold">
                   {invoiceNumber || "INV-0000"}
                 </h2>
-                <div className="mt-4 text-sm text-slate-600">
-                  <p className="font-medium text-slate-900">{businessName}</p>
+                <div className={`mt-4 text-sm ${mutedClass}`}>
+                  <p className="font-medium">{businessName}</p>
                   <p>{ownerName}</p>
                   <p>{businessEmail}</p>
                   <p>{businessPhone}</p>
                 </div>
               </div>
-              <div className="text-right text-sm text-slate-600">
+              <div className={`text-right text-sm ${mutedClass}`}>
                 <div>Date: {invoiceDate || "-"}</div>
                 <div>Due: {dueDate || "-"}</div>
               </div>
             </div>
 
             <div className="mt-8">
-              <p className="text-sm text-slate-500">Bill to</p>
+              <p className={`text-sm ${labelClass}`}>Bill to</p>
               <p className="font-medium">{clientName || "Client name"}</p>
-              <p className="text-sm text-slate-600">
+              <p className={`text-sm ${mutedClass}`}>
                 {clientCompany || "Company"}
               </p>
-              <p className="text-sm text-slate-600">
+              <p className={`text-sm ${mutedClass}`}>
                 {clientEmail || "client@email.com"}
               </p>
-              <p className="text-sm text-slate-600">{clientPhone}</p>
-              <p className="text-sm text-slate-600">{clientAddress}</p>
+              <p className={`text-sm ${mutedClass}`}>{clientPhone}</p>
+              <p className={`text-sm ${mutedClass}`}>{clientAddress}</p>
             </div>
 
-            <div className="mt-8 border-t border-slate-200 pt-4">
+            <div className="mt-8 border-t border-slate-500 pt-4">
               {items.map((item, index) => {
                 const amount = (Number(item.qty) || 0) * (Number(item.rate) || 0);
                 return (
@@ -432,7 +451,7 @@ export default function NewInvoicePage() {
               })}
             </div>
 
-            <div className="mt-6 space-y-1 border-t border-slate-200 pt-4 text-sm">
+            <div className="mt-6 space-y-1 border-t border-slate-500 pt-4 text-sm">
               <div className="flex justify-between">
                 <span>Subtotal</span>
                 <span>${totals.subtotal.toFixed(2)}</span>
@@ -447,7 +466,7 @@ export default function NewInvoicePage() {
               </div>
             </div>
 
-            <p className="mt-8 text-sm text-slate-600">{notes}</p>
+            <p className={`mt-8 text-sm ${mutedClass}`}>{notes}</p>
           </div>
         </div>
       </section>

@@ -21,7 +21,6 @@ type SavedDocument = {
 };
 
 export default function ProposalPage() {
-  const [logo, setLogo] = useState("");
   const [docId, setDocId] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientCompany, setClientCompany] = useState("");
@@ -45,16 +44,18 @@ export default function ProposalPage() {
   const [savedClients, setSavedClients] = useState<SavedClient[]>([]);
   const [clientSearch, setClientSearch] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
+  const [logo, setLogo] = useState("");
+  const [style, setStyle] = useState("clean");
 
   useEffect(() => {
     const raw = window.localStorage.getItem("clientready-profile");
     if (!raw) return;
     const profile = JSON.parse(raw);
-    setLogo(profile.logo || "");
     setBusinessName(profile.businessName || "Your business");
     setOwnerName(profile.ownerName || "");
     setBusinessEmail(profile.email || "");
     setBusinessPhone(profile.phone || "");
+    setLogo(profile.logo || "");
   }, []);
 
   useEffect(() => {
@@ -87,6 +88,7 @@ export default function ProposalPage() {
       price?: string;
       paymentTerms?: string;
       validUntil?: string;
+      style?: string;
     };
     setDocId(doc.id);
     setClientName(data.clientName || "");
@@ -103,6 +105,7 @@ export default function ProposalPage() {
     setPaymentTerms(data.paymentTerms || "50% to start, 50% on completion.");
     setValidUntil(data.validUntil || "");
     setClientSearch(data.clientName || "");
+    setStyle(data.style || "clean");
   }, []);
 
   const filteredClients = savedClients.filter((client) => {
@@ -137,6 +140,7 @@ export default function ProposalPage() {
     setPaymentTerms("50% to start, 50% on completion.");
     setValidUntil("");
     setSaveMessage("");
+    setStyle("clean");
   }
 
   function saveDocument() {
@@ -163,6 +167,7 @@ export default function ProposalPage() {
         price,
         paymentTerms,
         validUntil,
+        style,
       },
     };
     const next = [...docs.filter((item) => item.id !== id), nextDoc];
@@ -171,6 +176,13 @@ export default function ProposalPage() {
     setSaveMessage("Proposal saved");
     setTimeout(() => setSaveMessage(""), 2000);
   }
+
+  const previewClass =
+    style === "bold"
+      ? "rounded-2xl border border-slate-900 bg-slate-900 p-8 text-white shadow-sm"
+      : "rounded-2xl border border-slate-200 bg-white p-8 text-slate-900 shadow-sm";
+  const mutedClass = style === "bold" ? "text-slate-300" : "text-slate-600";
+  const labelClass = style === "bold" ? "text-slate-400" : "text-slate-500";
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
@@ -186,6 +198,15 @@ export default function ProposalPage() {
       <section className="mx-auto grid max-w-6xl gap-8 px-6 py-8 lg:grid-cols-2">
         <form className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
           <h1 className="text-xl font-semibold">Proposal details</h1>
+
+          <select
+            className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            value={style}
+            onChange={(event) => setStyle(event.target.value)}
+          >
+            <option value="clean">Clean professional</option>
+            <option value="bold">Bold modern</option>
+          </select>
 
           <div>
             <input
@@ -323,71 +344,68 @@ export default function ProposalPage() {
             Print / Save PDF
           </button>
 
-          <div
-            id="preview"
-            className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"
-          >
-            <p className="text-sm uppercase tracking-wide text-slate-500">
+          <div id="preview" className={previewClass}>
             {logo && (
               <img src={logo} alt="Business logo" className="mb-3 h-14 w-auto" />
-            )}  
+            )}
+            <p className={`text-sm uppercase tracking-wide ${labelClass}`}>
               Proposal
             </p>
             <h2 className="mt-1 text-2xl font-semibold">
               {projectTitle || "Project title"}
             </h2>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className={`mt-2 text-sm ${mutedClass}`}>
               Valid until: {validUntil || "-"}
             </p>
 
             <div className="mt-8">
-              <p className="text-sm text-slate-500">Prepared for</p>
+              <p className={`text-sm ${labelClass}`}>Prepared for</p>
               <p className="font-medium">{clientName || "Client name"}</p>
-              <p className="text-sm text-slate-600">
+              <p className={`text-sm ${mutedClass}`}>
                 {clientCompany || "Company"}
               </p>
-              <p className="text-sm text-slate-600">
+              <p className={`text-sm ${mutedClass}`}>
                 {clientEmail || "client@email.com"}
               </p>
-              <p className="text-sm text-slate-600">{clientPhone}</p>
-              <p className="text-sm text-slate-600">{clientAddress}</p>
+              <p className={`text-sm ${mutedClass}`}>{clientPhone}</p>
+              <p className={`text-sm ${mutedClass}`}>{clientAddress}</p>
             </div>
 
-            <div className="mt-4 text-sm text-slate-600">
-              <p className="text-sm text-slate-500">Prepared by</p>
-              <p className="font-medium text-slate-900">{businessName}</p>
+            <div className={`mt-4 text-sm ${mutedClass}`}>
+              <p className={labelClass}>Prepared by</p>
+              <p className="font-medium">{businessName}</p>
               <p>{ownerName}</p>
               <p>{businessEmail}</p>
               <p>{businessPhone}</p>
             </div>
 
-            <div className="mt-8 space-y-4 text-sm leading-6 text-slate-700">
+            <div className="mt-8 space-y-4 text-sm leading-6">
               <div>
-                <h3 className="font-semibold text-slate-900">Description</h3>
+                <h3 className="font-semibold">Description</h3>
                 <p className="whitespace-pre-wrap">
                   {description || "Project description will appear here."}
                 </p>
               </div>
               <div>
-                <h3 className="font-semibold text-slate-900">Included</h3>
+                <h3 className="font-semibold">Included</h3>
                 <p className="whitespace-pre-wrap">
                   {scope || "Scope will appear here."}
                 </p>
               </div>
               <div>
-                <h3 className="font-semibold text-slate-900">Not included</h3>
+                <h3 className="font-semibold">Not included</h3>
                 <p className="whitespace-pre-wrap">{notIncluded || "-"}</p>
               </div>
               <div>
-                <h3 className="font-semibold text-slate-900">Timeline</h3>
+                <h3 className="font-semibold">Timeline</h3>
                 <p>{timeline || "-"}</p>
               </div>
               <div>
-                <h3 className="font-semibold text-slate-900">Investment</h3>
+                <h3 className="font-semibold">Investment</h3>
                 <p className="text-lg font-semibold">{price || "$0.00"}</p>
                 <p className="mt-1">{paymentTerms}</p>
               </div>
-              <p className="pt-4 text-xs text-slate-500">
+              <p className={`pt-4 text-xs ${labelClass}`}>
                 This proposal is for planning purposes and is not a signed
                 contract.
               </p>
