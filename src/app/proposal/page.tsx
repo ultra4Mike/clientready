@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function ProposalPage() {
+  const [validUntil, setValidUntil] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientCompany, setClientCompany] = useState("");
   const [clientEmail, setClientEmail] = useState("");
@@ -15,7 +16,20 @@ export default function ProposalPage() {
   const [paymentTerms, setPaymentTerms] = useState(
     "50% to start, 50% on completion."
   );
-  const [validUntil, setValidUntil] = useState("");
+  const [businessName, setBusinessName] = useState("Your business");
+  const [ownerName, setOwnerName] = useState("");
+  const [businessEmail, setBusinessEmail] = useState("");
+  const [businessPhone, setBusinessPhone] = useState("");
+
+  useEffect(() => {
+    const raw = window.localStorage.getItem("clientready-profile");
+    if (!raw) return;
+    const profile = JSON.parse(raw);
+    setBusinessName(profile.businessName || "Your business");
+    setOwnerName(profile.ownerName || "");
+    setBusinessEmail(profile.email || "");
+    setBusinessPhone(profile.phone || "");
+  }, []);
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
@@ -135,7 +149,8 @@ export default function ProposalPage() {
 
           <div className="mt-4 text-sm text-slate-600">
             <p className="text-sm text-slate-500">Prepared by</p>
-            <p className="font-medium text-slate-900">{businessName}</p>
+            <p className="font-medium text-slate-900">
+               {businessName}</p>
             <p>{ownerName}</p>
             <p>{businessEmail}</p>
             <p>{businessPhone}</p>
