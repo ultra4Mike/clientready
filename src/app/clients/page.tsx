@@ -10,6 +10,7 @@ type Client = {
   phone: string;
   address: string;
   nextVisit: string;
+  visitTime: string;
   notes: string;
 };
 
@@ -20,6 +21,7 @@ const emptyClient = {
   phone: "",
   address: "",
   nextVisit: "",
+  visitTime: "",
   notes: "",
 };
 
@@ -80,6 +82,7 @@ export default function ClientsPage() {
       phone: client.phone || "",
       address: client.address || "",
       nextVisit: client.nextVisit || "",
+      visitTime: client.visitTime || "",
       notes: client.notes || "",
     });
   }
@@ -162,6 +165,17 @@ export default function ClientsPage() {
               }
             />
           </label>
+          <label className="text-sm text-slate-600">
+            Start time
+            <input
+              type="time"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+              value={form.visitTime}
+              onChange={(event) =>
+                setForm({ ...form, visitTime: event.target.value })
+              }
+            />
+          </label>
           <textarea
             className="min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2"
             placeholder="Notes"
@@ -202,6 +216,11 @@ export default function ClientsPage() {
               {client.nextVisit && (
                 <p className="mt-2 text-sm font-medium">
                   Next visit: {client.nextVisit}
+                </p>
+              )}
+              {client.visitTime && (
+                <p className="text-sm text-slate-600">
+                  Time: {client.visitTime}
                 </p>
               )}
               {client.notes && (

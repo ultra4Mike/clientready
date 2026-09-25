@@ -2,13 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-type Client = {
-  id: string;
-  name: string;
-  nextVisit?: string;
-  notes?: string;
-};
-
 type LineItem = {
   description?: string;
   qty?: string;
@@ -25,6 +18,7 @@ type SavedDocument = {
     status?: string;
     outcome?: string;
     taxPercent?: string;
+    jobTime?: string;
     items?: LineItem[];
   };
 };
@@ -34,8 +28,9 @@ type CalendarEvent = {
   date: string;
   title: string;
   detail: string;
-  kind: "visit" | "invoice";
-  documentId?: string;
+  kind: "invoice";
+  documentId: string;
+  jobTime?: string;
 };
 
 function monthLabel(date: Date) {
@@ -44,6 +39,14 @@ function monthLabel(date: Date) {
 
 function ymd(date: Date) {
   return date.toISOString().slice(0, 10);
+}
+
+function agendaLabel(date: string) {
+  return new Date(date + "T00:00:00").toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 function invoiceTotal(doc: SavedDocument) {
@@ -59,48 +62,35 @@ export default function CalendarPage() {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
-  const [clients, setClients] = useState<Client[]>([]);
   const [documents, setDocuments] = useState<SavedDocument[]>([]);
   const [selectedDate, setSelectedDate] = useState("");
+  const [timeById, setTimeById] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    const clientsRaw = window.localStorage.getItem("clientready-clients");
     const docsRaw = window.localStorage.getItem("clientready-documents");
-    if (clientsRaw) setClients(JSON.parse(clientsRaw));
     if (docsRaw) setDocuments(JSON.parse(docsRaw));
   }, []);
 
   const events = useMemo(() => {
     const list: CalendarEvent[] = [];
-
-    clients.forEach((client) => {
-      if (!client.nextVisit) return;
-      list.push({
-        id: `visit-${client.id}`,
-        date: client.nextVisit,
-        title: client.name,
-        detail: client.notes || "Scheduled visit",
-        kind: "visit",
-      });
-    });
-
     documents.forEach((doc) => {
       if (doc.type !== "invoice" || !doc.data?.dueDate) return;
       const itemNames = (doc.data.items || [])
         .map((item) => item.description || "Item")
         .join(", ");
+      const jobTime = doc.data.jobTime || "";
       list.push({
         id: `invoice-${doc.id}`,
         date: doc.data.dueDate,
-        title: `${doc.title} · ${doc.clientName || "Client"}`,
+        title: `${jobTime ? jobTime + " · " : ""}${doc.title} · ${doc.clientName || "Client"}`,
         detail: `${doc.data.status || "draft"} · $${invoiceTotal(doc).toFixed(2)} · ${itemNames}`,
         kind: "invoice",
         documentId: doc.id,
+        jobTime,
       });
     });
-
     return list;
-  }, [clients, documents]);
+  }, [documents]);
 
   const days = useMemo(() => {
     const year = monthDate.getFullYear();
@@ -125,13 +115,26 @@ export default function CalendarPage() {
     setSelectedDate("");
   }
 
-  function openEvent(event: CalendarEvent) {
-    if (event.kind === "invoice" && event.documentId) {
-      window.localStorage.setItem("clientready-open-document", event.documentId);
-      window.location.href = "/invoice-view";
-      return;
-    }
-    window.location.href = "/clients";
+  function openView(id: string) {
+    window.localStorage.setItem("clientready-open-document", id);
+    window.location.href = "/invoice-view";
+  }
+
+  function saveTime(id: string) {
+    const jobTime = timeById[id];
+    if (!jobTime) return;
+    const next = documents.map((doc) => {
+      if (doc.id !== id) return doc;
+      return {
+        ...doc,
+        data: {
+          ...(doc.data || {}),
+          jobTime,
+        },
+      };
+    });
+    setDocuments(next);
+    window.localStorage.setItem("clientready-documents", JSON.stringify(next));
   }
 
   return (
@@ -157,8 +160,7 @@ export default function CalendarPage() {
         </div>
 
         <p className="mt-2 text-sm text-slate-600">
-          Green = scheduled visit. Blue = invoice due. Click a day, then click an
-          item to open it.
+          Click a day, then set the time on that invoice.
         </p>
 
         <div className="mt-6 grid grid-cols-7 gap-2 text-center text-sm font-medium text-slate-500">
@@ -189,14 +191,12 @@ export default function CalendarPage() {
               >
                 <div className="text-sm font-medium">{cell.day}</div>
                 <div className="mt-2 space-y-1">
-                  {dayEvents.slice(0, 3).map((event) => (
+                  {dayEvents.slice(0, 3).map((item) => (
                     <div
-                      key={event.id}
-                      className={`truncate rounded px-1 text-xs text-white ${
-                        event.kind === "visit" ? "bg-emerald-700" : "bg-sky-700"
-                      }`}
+                      key={item.id}
+                      className="truncate rounded bg-sky-700 px-1 text-xs text-white"
                     >
-                      {event.title}
+                      {item.title}
                     </div>
                   ))}
                 </div>
@@ -207,23 +207,52 @@ export default function CalendarPage() {
 
         <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-5">
           <h2 className="font-semibold">
-            {selectedDate ? `Agenda for ${selectedDate}` : "Select a day"}
+            {selectedDate ? `Agenda for ${agendaLabel(selectedDate)}` : "Select a day"}
           </h2>
+
           {selectedDate && selectedEvents.length === 0 && (
-            <p className="mt-2 text-sm text-slate-600">Nothing scheduled.</p>
+            <p className="mt-4 text-sm text-slate-600">
+              No invoices on this day.
+            </p>
           )}
+
           {selectedEvents.map((event) => (
-            <button
+            <div
               key={event.id}
-              type="button"
-              onClick={() => openEvent(event)}
-              className="mt-3 block w-full rounded-xl border border-slate-200 p-3 text-left"
+              className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3"
             >
-              <p className="font-medium">{event.title}</p>
-              <p className="text-sm text-slate-600">
-                {event.kind === "visit" ? "Visit" : "Invoice due"} · {event.detail}
-              </p>
-            </button>
+              <div>
+                <p className="font-medium">{event.title}</p>
+                <p className="text-sm text-slate-600">{event.detail}</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  type="time"
+                  className="rounded-lg border border-slate-300 px-3 py-2"
+                  value={timeById[event.documentId] || event.jobTime || ""}
+                  onChange={(change) =>
+                    setTimeById({
+                      ...timeById,
+                      [event.documentId]: change.target.value,
+                    })
+                  }
+                />
+                <button
+                  type="button"
+                  onClick={() => saveTime(event.documentId)}
+                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white"
+                >
+                  Save time
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openView(event.documentId)}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
+                >
+                  View invoice
+                </button>
+              </div>
+            </div>
           ))}
         </div>
       </section>
