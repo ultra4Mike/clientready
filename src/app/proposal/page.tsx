@@ -46,6 +46,7 @@ export default function ProposalPage() {
   const [saveMessage, setSaveMessage] = useState("");
   const [logo, setLogo] = useState("");
   const [style, setStyle] = useState("clean");
+  const [outcome, setOutcome] = useState("pending");
 
   useEffect(() => {
     const raw = window.localStorage.getItem("clientready-profile");
@@ -89,6 +90,7 @@ export default function ProposalPage() {
       paymentTerms?: string;
       validUntil?: string;
       style?: string;
+      outcome?: string;
     };
     setDocId(doc.id);
     setClientName(data.clientName || "");
@@ -106,6 +108,7 @@ export default function ProposalPage() {
     setValidUntil(data.validUntil || "");
     setClientSearch(data.clientName || "");
     setStyle(data.style || "clean");
+    setOutcome(data.outcome || "pending");
   }, []);
 
   const filteredClients = savedClients.filter((client) => {
@@ -141,6 +144,61 @@ export default function ProposalPage() {
     setValidUntil("");
     setSaveMessage("");
     setStyle("clean");
+    setOutcome("pending");
+  }
+
+  function createInvoiceFromProposal() {
+    const raw = window.localStorage.getItem("clientready-documents");
+    const docs = raw ? JSON.parse(raw) : [];
+    let highest = 1000;
+    docs.forEach((doc: { type?: string; title?: string; data?: { invoiceNumber?: string } }) => {
+      if (doc.type !== "invoice") return;
+      const value = String(doc.data?.invoiceNumber || doc.title || "");
+      const match = value.match(/(\d+)/);
+      if (match) {
+        const num = Number(match[1]);
+        if (num > highest) highest = num;
+      }
+    });
+
+    const invoiceNumber = `INV-${highest + 1}`;
+    const id = Date.now().toString();
+    const nextDoc = {
+      id,
+      type: "invoice",
+      title: invoiceNumber,
+      clientName: clientName || "No client",
+      createdAt: new Date().toLocaleDateString(),
+      data: {
+        clientName,
+        clientCompany,
+        clientEmail,
+        clientPhone,
+        clientAddress,
+        invoiceNumber,
+        invoiceDate: new Date().toISOString().slice(0, 10),
+        dueDate: "",
+        notes: paymentTerms || "Payment is due within 14 days.",
+        taxPercent: "0",
+        items: [
+          {
+            description: projectTitle || "Work from proposal",
+            qty: "1",
+            rate: String(price || "0"),
+          },
+        ],
+        status: "draft",
+        style,
+      },
+    };
+
+    window.localStorage.setItem(
+      "clientready-documents",
+      JSON.stringify([...docs, nextDoc])
+    );
+    setOutcome("won");
+    window.localStorage.setItem("clientready-open-document", id);
+    window.location.href = "/invoice";
   }
 
   function saveDocument() {
@@ -168,6 +226,7 @@ export default function ProposalPage() {
         paymentTerms,
         validUntil,
         style,
+        outcome,
       },
     };
     const next = [...docs.filter((item) => item.id !== id), nextDoc];
@@ -206,6 +265,16 @@ export default function ProposalPage() {
           >
             <option value="clean">Clean professional</option>
             <option value="bold">Bold modern</option>
+          </select>
+
+          <select
+            className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            value={outcome}
+            onChange={(event) => setOutcome(event.target.value)}
+          >
+            <option value="pending">Pending</option>
+            <option value="won">Won</option>
+            <option value="lost">Lost</option>
           </select>
 
           <div>
@@ -323,6 +392,13 @@ export default function ProposalPage() {
               className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white"
             >
               Save document
+            </button>
+            <button
+              type="button"
+              onClick={createInvoiceFromProposal}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
+            >
+              Create invoice
             </button>
             <button
               type="button"

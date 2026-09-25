@@ -11,6 +11,7 @@ type SavedDocument = {
   data?: {
     status?: string;
     style?: string;
+    outcome?: string;
     [key: string]: unknown;
   };
 };
@@ -70,15 +71,9 @@ export default function DocumentsPage() {
     });
 
     return filtered.sort((a, b) => {
-      if (sortBy === "client") {
-        return a.clientName.localeCompare(b.clientName);
-      }
-      if (sortBy === "type") {
-        return a.type.localeCompare(b.type);
-      }
-      if (sortBy === "oldest") {
-        return Number(a.id) - Number(b.id);
-      }
+      if (sortBy === "client") return a.clientName.localeCompare(b.clientName);
+      if (sortBy === "type") return a.type.localeCompare(b.type);
+      if (sortBy === "oldest") return Number(a.id) - Number(b.id);
       return Number(b.id) - Number(a.id);
     });
   }, [documents, typeFilter, sortBy, search]);
@@ -147,6 +142,7 @@ export default function DocumentsPage() {
                 <p className="text-sm text-slate-600">
                   {doc.type} · {doc.clientName || "No client"} · {doc.createdAt}
                   {doc.data?.status ? ` · ${doc.data.status}` : ""}
+                  {doc.data?.outcome ? ` · ${doc.data.outcome}` : ""}
                 </p>
               </div>
               <div className="flex gap-3">
