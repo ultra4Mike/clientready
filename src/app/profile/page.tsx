@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 const emptyProfile = {
   businessName: "",
@@ -12,17 +13,47 @@ const emptyProfile = {
   paymentTerms: "Payment is due within 14 days.",
   taxId: "",
   logo: "",
+  paymentLink: "",
 };
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState(emptyProfile);
   const [saved, setSaved] = useState(false);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
-    const raw = window.localStorage.getItem("clientready-profile");
-    if (raw) {
-      setProfile({ ...emptyProfile, ...JSON.parse(raw) });
+    async function load() {
+      const raw = window.localStorage.getItem("clientready-profile");
+      if (raw) {
+        setProfile({ ...emptyProfile, ...JSON.parse(raw) });
+      }
+
+      const { data } = await supabase.auth.getUser();
+      const user = data.user;
+      if (!user) return;
+
+      const { data: row } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!row) return;
+      setProfile({
+        businessName: row.business_name || "",
+        ownerName: row.owner_name || "",
+        email: row.email || "",
+        phone: row.phone || "",
+        address: row.address || "",
+        website: row.website || "",
+        paymentTerms: row.payment_terms || "Payment is due within 14 days.",
+        taxId: row.tax_id || "",
+        logo: row.logo || "",
+        paymentLink: row.payment_link || "",
+      });
     }
+
+    load();
   }, []);
 
   function update(field: keyof typeof emptyProfile, value: string) {
@@ -38,11 +69,39 @@ export default function ProfilePage() {
     reader.readAsDataURL(file);
   }
 
-  function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     window.localStorage.setItem("clientready-profile", JSON.stringify(profile));
+
+    const { data } = await supabase.auth.getUser();
+    const user = data.user;
+    if (user) {
+      const { error } = await supabase.from("profiles").upsert({
+        id: user.id,
+        business_name: profile.businessName,
+        owner_name: profile.ownerName,
+        email: profile.email,
+        phone: profile.phone,
+        address: profile.address,
+        website: profile.website,
+        tax_id: profile.taxId,
+        payment_terms: profile.paymentTerms,
+        payment_link: profile.paymentLink,
+        logo: profile.logo,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) {
+        setMessage("Saved on this computer. Cloud save failed: " + error.message);
+        setSaved(true);
+        return;
+      }
+      setMessage("Saved on this computer and in your account.");
+    } else {
+      setMessage("Saved on this computer. Log in to save to your account.");
+    }
+
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setTimeout(() => setSaved(false), 2500);
   }
 
   return (
@@ -110,6 +169,12 @@ export default function ProfilePage() {
           value={profile.paymentTerms}
           onChange={(event) => update("paymentTerms", event.target.value)}
         />
+        <input
+          className="w-full rounded-lg border border-slate-300 px-3 py-2"
+          placeholder="Payment link or instructions"
+          value={profile.paymentLink}
+          onChange={(event) => update("paymentLink", event.target.value)}
+        />
 
         <label className="block text-sm text-slate-600">
           Logo
@@ -131,6 +196,7 @@ export default function ProfilePage() {
         >
           {saved ? "Saved" : "Save profile"}
         </button>
+        {message && <p className="text-sm text-slate-600">{message}</p>}
       </form>
     </main>
   );

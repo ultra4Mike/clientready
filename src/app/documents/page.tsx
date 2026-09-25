@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { loadCloudDocuments, deleteCloudDocument } from "@/lib/cloud-docs";
 
 type SavedDocument = {
   id: string;
@@ -9,10 +10,10 @@ type SavedDocument = {
   clientName: string;
   createdAt: string;
   data?: {
-    status?: string;
-    style?: string;
-    outcome?: string;
-    [key: string]: unknown;
+  status?: string;
+  style?: string;
+  outcome?: string;
+  [key: string]: unknown;
   };
 };
 
@@ -22,11 +23,27 @@ export default function DocumentsPage() {
   const [sortBy, setSortBy] = useState("newest");
   const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    const raw = window.localStorage.getItem("clientready-documents");
-    if (raw) {
-      setDocuments(JSON.parse(raw));
+    useEffect(() => {
+    async function load() {
+      const raw = window.localStorage.getItem("clientready-documents");
+      const local = raw ? JSON.parse(raw) : [];
+      if (local.length) setDocuments(local);
+
+      const cloud = await loadCloudDocuments();
+      if (!cloud.length) return;
+
+      const byId = new Map();
+      [...local, ...cloud].forEach((doc: { id: string }) => {
+        byId.set(doc.id, doc);
+      });
+      const merged = Array.from(byId.values());
+      setDocuments(merged);
+      window.localStorage.setItem(
+        "clientready-documents",
+        JSON.stringify(merged)
+      );
     }
+    load();
   }, []);
 
   function saveList(next: SavedDocument[]) {
@@ -60,6 +77,7 @@ export default function DocumentsPage() {
     const ok = window.confirm("Are you sure you want to delete this document?");
     if (!ok) return;
     saveList(documents.filter((doc) => doc.id !== id));
+    deleteCloudDocument(id);
   }
 
   const visibleDocs = useMemo(() => {

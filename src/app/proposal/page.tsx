@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { saveCloudDocument } from "@/lib/cloud-docs";
+import { supabase } from "@/lib/supabase";
 
 type SavedClient = {
   id: string;
@@ -64,6 +66,38 @@ export default function ProposalPage() {
     if (raw) {
       setSavedClients(JSON.parse(raw));
     }
+  }, []);
+
+  useEffect(() => {
+    async function loadClients() {
+      const raw = window.localStorage.getItem("clientready-clients");
+      if (raw) {
+        setSavedClients(JSON.parse(raw));
+      }
+
+      const { data } = await supabase.auth.getUser();
+      const user = data.user;
+      if (!user) return;
+
+      const { data: rows } = await supabase
+        .from("clients")
+        .select("*")
+        .eq("user_id", user.id);
+
+      if (!rows) return;
+      const next = rows.map((row) => ({
+        id: row.id,
+        name: row.name || "",
+        company: row.company || "",
+        email: row.email || "",
+        phone: row.phone || "",
+        address: row.address || "",
+      }));
+      setSavedClients(next);
+      window.localStorage.setItem("clientready-clients", JSON.stringify(next));
+    }
+
+    loadClients();
   }, []);
 
   useEffect(() => {
@@ -201,12 +235,12 @@ export default function ProposalPage() {
     window.location.href = "/invoice";
   }
 
-  function saveDocument() {
+async function saveDocument() {
     const raw = window.localStorage.getItem("clientready-documents");
-    const docs: SavedDocument[] = raw ? JSON.parse(raw) : [];
-    const id = docId || Date.now().toString();
-    const nextDoc: SavedDocument = {
-      id,
+    const docs = raw ? JSON.parse(raw) : [];
+    const localId = docId || Date.now().toString();
+    const nextDoc = {
+      id: localId,
       type: "proposal",
       title: projectTitle || "Proposal",
       clientName: clientName || "No client",
@@ -229,9 +263,16 @@ export default function ProposalPage() {
         outcome,
       },
     };
-    const next = [...docs.filter((item) => item.id !== id), nextDoc];
+    const cloudId = await saveCloudDocument(nextDoc);
+    nextDoc.id = cloudId;
+    const next = [
+      ...docs.filter(
+        (item: { id: string }) => item.id !== localId && item.id !== cloudId
+      ),
+      nextDoc,
+    ];
     window.localStorage.setItem("clientready-documents", JSON.stringify(next));
-    setDocId(id);
+    setDocId(cloudId);
     setSaveMessage("Proposal saved");
     setTimeout(() => setSaveMessage(""), 2000);
   }

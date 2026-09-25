@@ -32,6 +32,8 @@ export default function InvoiceViewPage() {
   const [status, setStatus] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [logo, setLogo] = useState("");
+  const [jobTime, setJobTime] = useState("");
+  const [paymentLink, setPaymentLink] = useState("");
 
   useEffect(() => {
     const profileRaw = window.localStorage.getItem("clientready-profile");
@@ -39,6 +41,7 @@ export default function InvoiceViewPage() {
       const profile = JSON.parse(profileRaw);
       setBusinessName(profile.businessName || "");
       setLogo(profile.logo || "");
+      setPaymentLink(profile.paymentLink || "");
     }
 
     const openId = window.localStorage.getItem("clientready-open-document");
@@ -60,6 +63,7 @@ export default function InvoiceViewPage() {
       taxPercent?: string;
       items?: LineItem[];
       status?: string;
+      jobTime?: string;
     };
     setDocId(doc.id);
     setInvoiceNumber(data.invoiceNumber || doc.title);
@@ -74,6 +78,7 @@ export default function InvoiceViewPage() {
     setTaxPercent(data.taxPercent || "0");
     setItems(data.items || []);
     setStatus(data.status || "draft");
+    setJobTime(data.jobTime || "");
   }, []);
 
   const totals = useMemo(() => {
@@ -123,6 +128,9 @@ export default function InvoiceViewPage() {
           <p className="mt-4 text-sm text-slate-600">{businessName}</p>
           <p className="text-sm text-slate-600">Date: {invoiceDate || "-"}</p>
           <p className="text-sm text-slate-600">Due: {dueDate || "-"}</p>
+          {jobTime && (
+            <p className="text-sm text-slate-600">Scheduled time: {jobTime}</p>
+          )}
 
           <div className="mt-8">
             <p className="text-sm text-slate-500">Bill to</p>
@@ -163,6 +171,11 @@ export default function InvoiceViewPage() {
           </div>
 
           <p className="mt-8 text-sm text-slate-600">{notes}</p>
+          {paymentLink && (
+            <p className="mt-4 text-sm text-slate-600">
+              Pay here: {paymentLink}
+            </p>
+          )}
         </div>
       </section>
     </main>

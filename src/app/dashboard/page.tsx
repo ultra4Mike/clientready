@@ -73,10 +73,12 @@ export default function DashboardPage() {
           <div className="flex gap-4 text-sm text-slate-600">
             <a href="/profile">Profile</a>
             <a href="/calendar">Calendar</a>
+            <a href="/upcoming">This week</a>
             <a href="/clients">Clients</a>
             <a href="/documents">Documents</a>
             <a href="/collect">Collect</a>
             <a href="/history">History</a>
+            <a href="/backup">Backup</a>
           </div>
         </div>
       </header>

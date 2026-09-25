@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { saveCloudDocument } from "@/lib/cloud-docs";
+import { supabase } from "@/lib/supabase";
 
 type LineItem = {
   description: string;
@@ -51,6 +53,8 @@ export default function NewInvoicePage() {
   const [status, setStatus] = useState("draft");
   const [logo, setLogo] = useState("");
   const [style, setStyle] = useState("clean");
+  const [paymentLink, setPaymentLink] = useState("");
+  const [jobTime, setJobTime] = useState("");
 
   useEffect(() => {
     const raw = window.localStorage.getItem("clientready-profile");
@@ -60,7 +64,40 @@ export default function NewInvoicePage() {
     setOwnerName(profile.ownerName || "");
     setBusinessEmail(profile.email || "");
     setBusinessPhone(profile.phone || "");
+    setPaymentLink(profile.paymentLink || "");
     setLogo(profile.logo || "");
+  }, []);
+
+  useEffect(() => {
+    async function loadClients() {
+      const raw = window.localStorage.getItem("clientready-clients");
+      if (raw) {
+        setSavedClients(JSON.parse(raw));
+      }
+
+      const { data } = await supabase.auth.getUser();
+      const user = data.user;
+      if (!user) return;
+
+      const { data: rows } = await supabase
+        .from("clients")
+        .select("*")
+        .eq("user_id", user.id);
+
+      if (!rows) return;
+      const next = rows.map((row) => ({
+        id: row.id,
+        name: row.name || "",
+        company: row.company || "",
+        email: row.email || "",
+        phone: row.phone || "",
+        address: row.address || "",
+      }));
+      setSavedClients(next);
+      window.localStorage.setItem("clientready-clients", JSON.stringify(next));
+    }
+
+    loadClients();
   }, []);
 
   useEffect(() => {
@@ -206,12 +243,12 @@ export default function NewInvoicePage() {
     setStyle("clean");
   }
 
-  function saveDocument() {
+async function saveDocument() {
     const raw = window.localStorage.getItem("clientready-documents");
-    const docs: SavedDocument[] = raw ? JSON.parse(raw) : [];
-    const id = docId || Date.now().toString();
-    const nextDoc: SavedDocument = {
-      id,
+    const docs = raw ? JSON.parse(raw) : [];
+    const localId = docId || Date.now().toString();
+    const nextDoc = {
+      id: localId,
       type: "invoice",
       title: invoiceNumber || "Invoice",
       clientName: clientName || "No client",
@@ -230,11 +267,19 @@ export default function NewInvoicePage() {
         items,
         status,
         style,
+        jobTime: "",
       },
     };
-    const next = [...docs.filter((item) => item.id !== id), nextDoc];
+    const cloudId = await saveCloudDocument(nextDoc);
+    nextDoc.id = cloudId;
+    const next = [
+      ...docs.filter(
+        (item: { id: string }) => item.id !== localId && item.id !== cloudId
+      ),
+      nextDoc,
+    ];
     window.localStorage.setItem("clientready-documents", JSON.stringify(next));
-    setDocId(id);
+    setDocId(cloudId);
     setSaveMessage("Invoice saved");
     setTimeout(() => setSaveMessage(""), 2000);
   }
@@ -535,6 +580,11 @@ export default function NewInvoicePage() {
             </div>
 
             <p className={`mt-8 text-sm ${mutedClass}`}>{notes}</p>
+            {paymentLink && (
+              <p className="mt-4 text-sm text-slate-600">
+                Pay here: {paymentLink}
+              </p>
+            )}
           </div>
         </div>
       </section>

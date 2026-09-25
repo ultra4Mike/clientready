@@ -113,6 +113,11 @@ export default function HomePage() {
           <span>Professional documents for solo businesses</span>
         </div>
       </footer>
+      
+      <footer className="border-t border-slate-200 px-6 py-6 text-center text-sm text-slate-500">
+        <a href="/privacy" className="px-3">Privacy</a>
+        <a href="/terms" className="px-3">Terms</a>
+      </footer>
     </main>
   );
 }

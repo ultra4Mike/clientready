@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { saveCloudDocument } from "@/lib/cloud-docs";
 
 type SavedClient = {
   id: string;
@@ -125,12 +126,12 @@ export default function ReportPage() {
     setTimeout(() => setSaveMessage(""), 2000);
   }
 
-  function saveDocument() {
+async function saveDocument() {
     const raw = window.localStorage.getItem("clientready-documents");
-    const docs: SavedDocument[] = raw ? JSON.parse(raw) : [];
-    const id = docId || Date.now().toString();
-    const nextDoc: SavedDocument = {
-      id,
+    const docs = raw ? JSON.parse(raw) : [];
+    const localId = docId || Date.now().toString();
+    const nextDoc = {
+      id: localId,
       type: "report",
       title: title || "Report",
       clientName: clientName || "No client",
@@ -147,9 +148,16 @@ export default function ReportPage() {
         issues,
       },
     };
-    const next = [...docs.filter((item) => item.id !== id), nextDoc];
+    const cloudId = await saveCloudDocument(nextDoc);
+    nextDoc.id = cloudId;
+    const next = [
+      ...docs.filter(
+        (item: { id: string }) => item.id !== localId && item.id !== cloudId
+      ),
+      nextDoc,
+    ];
     window.localStorage.setItem("clientready-documents", JSON.stringify(next));
-    setDocId(id);
+    setDocId(cloudId);
     setSaveMessage("Report saved");
     setTimeout(() => setSaveMessage(""), 2000);
   }
