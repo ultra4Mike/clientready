@@ -28,3 +28,21 @@ a {
     border: none !important;
   }
 }
+
+@media print {
+  header,
+  form,
+  button {
+    display: none !important;
+  }
+
+  #preview {
+    box-shadow: none !important;
+    border: none !important;
+  }
+}
+
+a.bg-slate-900,
+button.bg-slate-900 {
+  color: #ffffff !important;
+}
