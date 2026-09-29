@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { saveCloudDocument } from "@/lib/cloud-docs";
 import { supabase } from "@/lib/supabase";
+import AppShell from "@/components/AppShell";
 
 type LineItem = {
   description: string;
@@ -311,15 +312,7 @@ async function saveDocument() {
   const labelClass = style === "bold" ? "text-slate-400" : "text-slate-500";
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <a href="/dashboard" className="text-sm text-slate-600">
-            Back to dashboard
-          </a>
-          <div className="font-semibold">New invoice</div>
-        </div>
-      </header>
+    <AppShell title="New invoice">
 
       <section className="mx-auto grid max-w-6xl gap-8 px-6 py-8 lg:grid-cols-2">
         <form className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
@@ -588,6 +581,6 @@ async function saveDocument() {
           </div>
         </div>
       </section>
-    </main>
+    </AppShell>
   );
 }

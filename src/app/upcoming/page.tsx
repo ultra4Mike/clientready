@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import AppShell from "@/components/AppShell";
 
 type LineItem = {
   description?: string;
@@ -71,17 +72,7 @@ export default function UpcomingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <a href="/dashboard" className="text-sm text-slate-600">
-            Back to dashboard
-          </a>
-          <a href="/calendar" className="text-sm text-slate-600">
-            Calendar
-          </a>
-        </div>
-      </header>
+    <AppShell title="Upcoming">
 
       <section className="mx-auto max-w-6xl px-6 py-8">
         <h1 className="text-2xl font-semibold">This week</h1>
@@ -115,6 +106,6 @@ export default function UpcomingPage() {
           ))}
         </div>
       </section>
-    </main>
+    </AppShell>
   );
 }

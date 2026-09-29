@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import AppShell from "@/components/AppShell";
 
 function read(key: string) {
   const raw = window.localStorage.getItem(key);

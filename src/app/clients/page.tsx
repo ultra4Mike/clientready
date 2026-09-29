@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import AppShell from "@/components/AppShell";
 
 type Client = {
   id: string;
@@ -181,17 +182,7 @@ export default function ClientsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <a href="/dashboard" className="text-sm text-slate-600">
-            Back to dashboard
-          </a>
-          <a href="/history" className="text-sm text-slate-600">
-            View client history
-          </a>
-        </div>
-      </header>
+    <AppShell title="Clients">
 
       <section className="mx-auto grid max-w-6xl gap-8 px-6 py-8 lg:grid-cols-2">
         <form
@@ -326,6 +317,6 @@ export default function ClientsPage() {
           ))}
         </div>
       </section>
-    </main>
+    </AppShell>
   );
 }

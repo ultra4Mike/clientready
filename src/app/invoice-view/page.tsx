@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import AppShell from "@/components/AppShell";
 
 type LineItem = {
   description: string;
@@ -96,7 +97,7 @@ export default function InvoiceViewPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
+    <AppShell title="Invoice">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <a href="/calendar" className="text-sm text-slate-600">
@@ -178,6 +179,6 @@ export default function InvoiceViewPage() {
           )}
         </div>
       </section>
-    </main>
+    </AppShell>
   );
 }

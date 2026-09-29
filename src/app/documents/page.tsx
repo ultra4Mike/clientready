@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { loadCloudDocuments, deleteCloudDocument } from "@/lib/cloud-docs";
+import AppShell from "@/components/AppShell";
 
 type SavedDocument = {
   id: string;
@@ -97,15 +98,7 @@ export default function DocumentsPage() {
   }, [documents, typeFilter, sortBy, search]);
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <a href="/dashboard" className="text-sm text-slate-600">
-            Back to dashboard
-          </a>
-          <div className="font-semibold">Documents</div>
-        </div>
-      </header>
+    <AppShell title="Documents">
 
       <section className="mx-auto max-w-6xl px-6 py-8">
         <h1 className="text-2xl font-semibold">Saved documents</h1>
@@ -190,6 +183,6 @@ export default function DocumentsPage() {
           ))}
         </div>
       </section>
-    </main>
+    </AppShell>
   );
 }
