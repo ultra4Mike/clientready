@@ -48,16 +48,16 @@ export default function HomePage() {
           Fill in a short form. ClientReady assembles a polished proposal, invoice,
           email, or report you can download and send.
         </p>
-        <div className="mt-8 flex flex-wrap gap-3">
+        <div className="mt-8 flex flex-wrap items-center gap-3">
           <a
             href="/signup"
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white"
+            className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-3 text-sm font-medium text-white"
           >
             Start free
           </a>
           <a
             href="#pricing"
-            className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-900"
           >
             See pricing
           </a>
