@@ -28,11 +28,11 @@ export default function HomePage() {
               Log in
             </a>
             <a
-              href="/signup"
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
-            >
-              Get started
-            </a>
+            href="/signup"
+            className="rounded-lg bg-slate-900 px-5 py-3 text-sm font-medium text-white"
+          >
+            Get started
+          </a>
           </div>
         </div>
       </header>
@@ -51,7 +51,7 @@ export default function HomePage() {
         <div className="mt-8 flex flex-wrap gap-3">
           <a
             href="/signup"
-            className="rounded-lg bg-slate-900 px-5 py-3 text-sm font-medium text-white hover:bg-slate-700"
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white"
           >
             Start free
           </a>
