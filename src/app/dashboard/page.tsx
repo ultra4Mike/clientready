@@ -72,19 +72,11 @@ async function logOut() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <a href="/dashboard" className="font-semibold">
-            ClientReady
-          </a>
-          <div className="flex flex-wrap gap-4 text-sm text-slate-600">
-            <a href="/profile">Profile</a>
-            <a href="/calendar">Calendar</a>
-            <a href="/upcoming">This week</a>
-            <a href="/clients">Clients</a>
-            <a href="/documents">Documents</a>
-            <a href="/collect">Collect</a>
-            <a href="/history">History</a>
-            <a href="/backup">Backup</a>
+        <div className="mx-auto max-w-6xl px-4 py-4">
+          <div className="flex items-center justify-between">
+            <a href="/dashboard" className="font-semibold">
+              ClientReady
+            </a>
             <button
               type="button"
               onClick={logOut}
@@ -93,6 +85,16 @@ async function logOut() {
               Log out
             </button>
           </div>
+          <nav className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-600">
+            <a href="/profile">Profile</a>
+            <a href="/calendar">Calendar</a>
+            <a href="/upcoming">This week</a>
+            <a href="/clients">Clients</a>
+            <a href="/documents">Documents</a>
+            <a href="/collect">Collect</a>
+            <a href="/history">History</a>
+            <a href="/backup">Backup</a>
+          </nav>
         </div>
       </header>
 
