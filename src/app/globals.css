@@ -1,5 +1,50 @@
 @import "tailwindcss";
 
+:root,
+html.light {
+  --cr-bg: #f4fbfb;
+  --cr-panel: #ffffff;
+  --cr-text: #0f172a;
+  --cr-muted: #475569;
+  --cr-card: #ffffff;
+}
+
+html.dark {
+  --cr-bg: #061418;
+  --cr-panel: #0b1f24;
+  --cr-text: #e2f6f4;
+  --cr-muted: #94b8b4;
+  --cr-card: #10262c;
+}
+
+html.dark body {
+  background: var(--cr-bg);
+  color: var(--cr-text);
+}
+
+@media print {
+  header,
+  form,
+  button,
+  aside,
+  nav {
+    display: none !important;
+  }
+
+  #preview {
+    box-shadow: none !important;
+    border: none !important;
+    background: white !important;
+    color: black !important;
+  }
+}
+
+a.bg-slate-900,
+button.bg-slate-900,
+a.bg-teal-400 {
+  color: #042f2e !important;
+}
+
 html,
 body {
   min-height: 100%;

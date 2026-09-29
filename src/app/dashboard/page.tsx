@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import AppShell from "@/components/AppShell";
 
 type Client = {
   id: string;
@@ -32,12 +32,9 @@ type SavedDocument = {
 function invoiceTotal(doc: SavedDocument) {
   const items = doc.data?.items || [];
   const subtotal = items.reduce((sum, item) => {
-    const qty = Number(item.qty) || 0;
-    const rate = Number(item.rate) || 0;
-    return sum + qty * rate;
+    return sum + (Number(item.qty) || 0) * (Number(item.rate) || 0);
   }, 0);
-  const tax = subtotal * ((Number(doc.data?.taxPercent) || 0) / 100);
-  return subtotal + tax;
+  return subtotal + subtotal * ((Number(doc.data?.taxPercent) || 0) / 100);
 }
 
 export default function DashboardPage() {
@@ -57,115 +54,68 @@ export default function DashboardPage() {
     const paid = invoices
       .filter((doc) => doc.data?.status === "paid")
       .reduce((sum, doc) => sum + invoiceTotal(doc), 0);
-    return {
-      invoiceCount: invoices.length,
-      invoiced,
-      paid,
-    };
+    return { invoiceCount: invoices.length, invoiced, paid };
   }, [documents]);
 
-async function logOut() {
-    await supabase.auth.signOut();
-    window.location.href = "/";
-  }
-
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-6xl px-4 py-4">
-          <div className="flex items-center justify-between">
-            <a href="/dashboard" className="font-semibold">
-              ClientReady
-            </a>
-            <button
-              type="button"
-              onClick={logOut}
-              className="text-sm text-slate-600"
-            >
-              Log out
-            </button>
-          </div>
-          <nav className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-600">
-            <a href="/profile">Profile</a>
-            <a href="/calendar">Calendar</a>
-            <a href="/upcoming">This week</a>
-            <a href="/clients">Clients</a>
-            <a href="/documents">Documents</a>
-            <a href="/collect">Collect</a>
-            <a href="/history">History</a>
-            <a href="/backup">Backup</a>
-          </nav>
+    <AppShell title="Dashboard">
+      <p className="text-[var(--cr-muted)]">
+        Create a document or review your client book.
+      </p>
+
+      <div className="mt-8 grid gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+          <p className="text-sm text-[var(--cr-muted)]">Invoices created</p>
+          <p className="mt-2 text-2xl font-semibold">{stats.invoiceCount}</p>
         </div>
-      </header>
-
-      <section className="mx-auto max-w-6xl px-6 py-10">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p className="mt-2 text-slate-600">
-          Create a document or review your client book.
-        </p>
-
-        <div className="mt-8 grid gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <p className="text-sm text-slate-500">Invoices created</p>
-            <p className="mt-2 text-2xl font-semibold">{stats.invoiceCount}</p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <p className="text-sm text-slate-500">Amount invoiced</p>
-            <p className="mt-2 text-2xl font-semibold">
-              ${stats.invoiced.toFixed(2)}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <p className="text-sm text-slate-500">Amount marked paid</p>
-            <p className="mt-2 text-2xl font-semibold">
-              ${stats.paid.toFixed(2)}
-            </p>
-          </div>
+        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+          <p className="text-sm text-[var(--cr-muted)]">Amount invoiced</p>
+          <p className="mt-2 text-2xl font-semibold">
+            ${stats.invoiced.toFixed(2)}
+          </p>
         </div>
-
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <a href="/proposal" className="rounded-2xl border border-slate-200 bg-white p-5">
-            New proposal
-          </a>
-          <a href="/invoice" className="rounded-2xl border border-slate-200 bg-white p-5">
-            New invoice
-          </a>
-          <a href="/email" className="rounded-2xl border border-slate-200 bg-white p-5">
-            New client email
-          </a>
-          <a href="/report" className="rounded-2xl border border-slate-200 bg-white p-5">
-            New report
-          </a>
+        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+          <p className="text-sm text-[var(--cr-muted)]">Amount marked paid</p>
+          <p className="mt-2 text-2xl font-semibold">${stats.paid.toFixed(2)}</p>
         </div>
+      </div>
 
-        <div className="mt-12">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Client book</h2>
-            <a href="/clients" className="text-sm text-slate-600">
-              Manage clients
-            </a>
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <a href="/proposal" className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+          New proposal
+        </a>
+        <a href="/invoice" className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+          New invoice
+        </a>
+        <a href="/email" className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+          New client email
+        </a>
+        <a href="/report" className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+          New report
+        </a>
+      </div>
+
+      <div className="mt-12">
+        <h2 className="mb-4 text-lg font-semibold">Client book</h2>
+        {clients.length === 0 ? (
+          <p className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 text-[var(--cr-muted)]">
+            No clients saved yet.
+          </p>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2">
+            {clients.map((client) => (
+              <div
+                key={client.id}
+                className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5"
+              >
+                <p className="font-medium">{client.name}</p>
+                <p className="text-sm text-[var(--cr-muted)]">{client.company}</p>
+                <p className="text-sm text-[var(--cr-muted)]">{client.email}</p>
+              </div>
+            ))}
           </div>
-
-          {clients.length === 0 ? (
-            <p className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-600">
-              No clients saved yet. Add one on the Clients page.
-            </p>
-          ) : (
-            <div className="grid gap-3 md:grid-cols-2">
-              {clients.map((client) => (
-                <div
-                  key={client.id}
-                  className="rounded-2xl border border-slate-200 bg-white p-5"
-                >
-                  <p className="font-medium">{client.name}</p>
-                  <p className="text-sm text-slate-600">{client.company}</p>
-                  <p className="text-sm text-slate-600">{client.email}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-    </main>
+        )}
+      </div>
+    </AppShell>
   );
 }
