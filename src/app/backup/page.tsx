@@ -70,15 +70,7 @@ export default function BackupPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <a href="/dashboard" className="text-sm text-slate-600">
-            Back to dashboard
-          </a>
-          <div className="font-semibold">Backup</div>
-        </div>
-      </header>
+    <AppShell title="Backup">
 
       <section className="mx-auto max-w-2xl px-6 py-10">
         <h1 className="text-2xl font-semibold">Backup your data</h1>
@@ -109,6 +101,6 @@ export default function BackupPage() {
           {message && <p className="text-sm text-slate-600">{message}</p>}
         </div>
       </section>
-    </main>
+    </AppShell>
   );
 }
