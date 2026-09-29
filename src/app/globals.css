@@ -17,6 +17,59 @@ html.dark {
   --cr-card: #10262c;
 }
 
+html.dark body,
+html.dark p,
+html.dark h1,
+html.dark h2,
+html.dark h3,
+html.dark label,
+html.dark span,
+html.dark a,
+html.dark li,
+html.dark td,
+html.dark th,
+html.dark button {
+  color: #e2f6f4;
+}
+
+html.dark .text-slate-500,
+html.dark .text-slate-600,
+html.dark .text-slate-700,
+html.dark .text-slate-800,
+html.dark .text-slate-900 {
+  color: #d7f4f0 !important;
+}
+
+html.dark .bg-white,
+html.dark .bg-slate-50,
+html.dark .bg-slate-100 {
+  background-color: #10262c !important;
+}
+
+html.dark .border-slate-200,
+html.dark .border-slate-300,
+html.dark .border-slate-400 {
+  border-color: rgba(45, 212, 191, 0.3) !important;
+}
+
+html.dark input,
+html.dark textarea,
+html.dark select,
+html.dark option {
+  background-color: #10262c !important;
+  color: #e2f6f4 !important;
+  border-color: rgba(45, 212, 191, 0.35) !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #9ec9c4 !important;
+}
+
+html.dark select option {
+  background-color: #10262c;
+  color: #e2f6f4;
+}
 html.dark body {
   background: var(--cr-bg);
   color: var(--cr-text);
@@ -48,8 +101,8 @@ a.bg-teal-400 {
 html,
 body {
   min-height: 100%;
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--cr-bg);
+  color: var(--cr-text);
 }
 
 a {
