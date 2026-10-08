@@ -75,6 +75,25 @@ html.dark body {
   color: var(--cr-text);
 }
 
+html.dark .owner-costs,
+html.dark .owner-costs h2,
+html.dark .owner-costs p,
+html.dark .owner-costs label,
+html.dark .owner-costs span {
+  color: #0f172a !important;
+}
+
+html.dark .owner-costs input,
+html.dark .owner-costs textarea {
+  background-color: #10262c !important;
+  color: #e2f6f4 !important;
+}
+
+html.dark .owner-costs input::placeholder,
+html.dark .owner-costs textarea::placeholder {
+  color: #d7f4f0 !important;
+}
+
 @media print {
   header,
   form,
