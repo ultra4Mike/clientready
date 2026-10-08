@@ -20,9 +20,15 @@ type SavedDocument = {
     dueDate?: string;
     taxPercent?: string;
     items?: LineItem[];
+    paymentMethod?: string;
+    paymentDate?: string;
+    paymentAmount?: string;
+    paymentRef?: string;
     [key: string]: unknown;
   };
 };
+
+const methods = ["Cash", "Check", "Venmo", "Cash App", "Zelle", "Bank", "Card", "Other"];
 
 function invoiceTotal(doc: SavedDocument) {
   const items = doc.data?.items || [];
@@ -40,8 +46,20 @@ function isOverdue(doc: SavedDocument) {
   return new Date(`${due}T23:59:59`) < new Date();
 }
 
+function today() {
+  const date = new Date();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 export default function CollectPage() {
   const [documents, setDocuments] = useState<SavedDocument[]>([]);
+  const [payingId, setPayingId] = useState("");
+  const [method, setMethod] = useState("Cash");
+  const [paidDate, setPaidDate] = useState(today());
+  const [amount, setAmount] = useState("");
+  const [paymentRef, setPaymentRef] = useState("");
 
   useEffect(() => {
     const raw = window.localStorage.getItem("clientready-documents");
@@ -53,28 +71,67 @@ export default function CollectPage() {
     window.localStorage.setItem("clientready-documents", JSON.stringify(next));
   }
 
-async function setStatus(id: string, status: string) {
+  async function saveCloud(doc: SavedDocument) {
+    await saveCloudDocument({
+      id: doc.id,
+      type: doc.type,
+      title: doc.title,
+      clientName: doc.clientName,
+      createdAt: doc.createdAt,
+      data: doc.data || {},
+    });
+  }
+
+  async function setStatus(id: string, status: string) {
     const next = documents.map((doc) => {
       if (doc.id !== id) return doc;
+      return { ...doc, data: { ...(doc.data || {}), status } };
+    });
+    saveDocs(next);
+    const updated = next.find((doc) => doc.id === id);
+    if (updated) await saveCloud(updated);
+  }
+
+  function startPaid(doc: SavedDocument) {
+    setPayingId(doc.id);
+    setMethod("Cash");
+    setPaidDate(today());
+    setAmount(invoiceTotal(doc).toFixed(2));
+    setPaymentRef("");
+  }
+
+  async function savePaid(doc: SavedDocument) {
+    const next = documents.map((item) => {
+      if (item.id !== doc.id) return item;
       return {
-        ...doc,
+        ...item,
         data: {
-          ...(doc.data || {}),
-          status,
+          ...(item.data || {}),
+          status: "paid",
+          paymentMethod: method,
+          paymentDate: paidDate,
+          paymentAmount: amount,
+          paymentRef,
         },
       };
     });
     saveDocs(next);
-    const updated = next.find((doc) => doc.id === id);
-    if (!updated) return;
-    await saveCloudDocument({
-      id: updated.id,
-      type: updated.type,
-      title: updated.title,
-      clientName: updated.clientName,
-      createdAt: updated.createdAt,
-      data: updated.data || {},
-    });
+    const updated = next.find((item) => item.id === doc.id);
+    if (updated) await saveCloud(updated);
+    setPayingId("");
+    if (method === "Cash" && updated) {
+      window.localStorage.setItem(
+        "clientready-receipt",
+        JSON.stringify({
+          invoiceNumber: updated.title,
+          clientName: updated.clientName,
+          amount,
+          date: paidDate,
+          method,
+        })
+      );
+      window.location.href = "/receipt";
+    }
   }
 
   function openInvoice(id: string) {
@@ -87,11 +144,18 @@ async function setStatus(id: string, status: string) {
 
   const totals = useMemo(() => {
     const openAmount = unpaid.reduce((sum, doc) => sum + invoiceTotal(doc), 0);
-    const overdueAmount = unpaid
-      .filter(isOverdue)
-      .reduce((sum, doc) => sum + invoiceTotal(doc), 0);
+    const overdueAmount = unpaid.filter(isOverdue).reduce((sum, doc) => sum + invoiceTotal(doc), 0);
     return { openAmount, overdueAmount, unpaidCount: unpaid.length };
   }, [unpaid]);
+
+  const refLabel =
+    method === "Check"
+      ? "Check number"
+      : method === "Card"
+        ? "Last 4 only"
+        : method === "Cash"
+          ? "From name, optional"
+          : "Confirmation or note";
 
   return (
     <AppShell title="Collect">
@@ -120,38 +184,78 @@ async function setStatus(id: string, status: string) {
         )}
 
         {unpaid.map((doc) => (
-          <div
-            key={doc.id}
-            className="flex flex-col gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <div>
-              <p className="font-medium">{doc.title}</p>
-              <p className="text-sm text-[var(--cr-muted)]">
-                {doc.clientName || "No client"} · {doc.data?.status || "draft"}
-                {doc.data?.dueDate ? ` · due ${doc.data.dueDate}` : ""}
-                {isOverdue(doc) ? " · overdue" : ""}
-              </p>
-              <p className="mt-1 font-semibold">${invoiceTotal(doc).toFixed(2)}</p>
+          <div key={doc.id} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-medium">{doc.title}</p>
+                <p className="text-sm text-[var(--cr-muted)]">
+                  {doc.clientName || "No client"} · {doc.data?.status || "draft"}
+                  {doc.data?.dueDate ? ` · due ${doc.data.dueDate}` : ""}
+                  {isOverdue(doc) ? " · overdue" : ""}
+                </p>
+                <p className="mt-1 font-semibold">${invoiceTotal(doc).toFixed(2)}</p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <button type="button" onClick={() => openInvoice(doc.id)} className="text-sm font-medium">
+                  Open
+                </button>
+                <button type="button" onClick={() => setStatus(doc.id, "sent")} className="text-sm font-medium">
+                  Mark sent
+                </button>
+                <button type="button" onClick={() => startPaid(doc)} className="text-sm font-medium">
+                  Mark paid
+                </button>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <button type="button" onClick={() => openInvoice(doc.id)} className="text-sm font-medium">
-                Open
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatus(doc.id, "sent")}
-                className="text-sm font-medium"
-              >
-                Mark sent
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatus(doc.id, "paid")}
-                className="text-sm font-medium"
-              >
-                Mark paid
-              </button>
-            </div>
+
+            {payingId === doc.id && (
+              <div className="mt-4 grid gap-3 border-t border-teal-500/20 pt-4 sm:grid-cols-2">
+                <select
+                  className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2"
+                  value={method}
+                  onChange={(event) => setMethod(event.target.value)}
+                >
+                  {methods.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="date"
+                  className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2"
+                  value={paidDate}
+                  onChange={(event) => setPaidDate(event.target.value)}
+                />
+                <input
+                  className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2"
+                  placeholder="Amount"
+                  value={amount}
+                  onChange={(event) => setAmount(event.target.value)}
+                />
+                <input
+                  className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2"
+                  placeholder={refLabel}
+                  value={paymentRef}
+                  onChange={(event) => setPaymentRef(event.target.value)}
+                />
+                <p className="text-sm text-[var(--cr-muted)] sm:col-span-2">
+                  Do not enter a full card, account, or routing number.
+                </p>
+                <div className="flex gap-3 sm:col-span-2">
+                  <button
+                    type="button"
+                    onClick={() => savePaid(doc)}
+                    className="rounded-lg bg-teal-400 px-4 py-2 text-sm font-medium text-slate-950"
+                  >
+                    {method === "Cash" ? "Save and print receipt" : "Save paid"}
+                  </button>
+                  <button type="button" onClick={() => setPayingId("")} className="text-sm">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
