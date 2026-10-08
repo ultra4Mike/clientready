@@ -40,6 +40,27 @@ type JobCosts = {
   notes: string;
 };
 
+type Employee = {
+  id: string;
+  name: string;
+  rate: string;
+  active: boolean;
+};
+
+type CrewRow = {
+  id: string;
+  employeeId: string;
+  name: string;
+  rate: string;
+  hours: string;
+  startTime: string;
+  endTime: string;
+  workDate: string;
+  note: string;
+  paidToWorker: boolean;
+  paidDate: string;
+};
+
 const emptyItem: LineItem = { description: "", qty: "1", rate: "" };
 const emptyCosts: JobCosts = {
   parts: "",
@@ -69,6 +90,15 @@ function money(value: string) {
   return Number(String(value).replace(/[^0-9.]/g, "")) || 0;
 }
 
+function hoursBetween(start: string, end: string) {
+  if (!start || !end) return "";
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  const mins = eh * 60 + em - (sh * 60 + sm);
+  if (mins <= 0) return "";
+  return (mins / 60).toFixed(2);
+}
+
 export default function NewInvoicePage() {
   const [docId, setDocId] = useState("");
   const [clientName, setClientName] = useState("");
@@ -96,6 +126,9 @@ export default function NewInvoicePage() {
   const [jobTime, setJobTime] = useState("");
   const [costs, setCosts] = useState<JobCosts>(emptyCosts);
   const [setAsidePercent, setSetAsidePercent] = useState("30");
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [crew, setCrew] = useState<CrewRow[]>([]);
+  const [pickedEmployee, setPickedEmployee] = useState("");
 
   useEffect(() => {
     const raw = window.localStorage.getItem("clientready-profile");
@@ -111,14 +144,17 @@ export default function NewInvoicePage() {
   }, []);
 
   useEffect(() => {
+    const raw = window.localStorage.getItem("clientready-employees");
+    if (raw) setEmployees(JSON.parse(raw));
+  }, []);
+
+  useEffect(() => {
     async function loadClients() {
       const raw = window.localStorage.getItem("clientready-clients");
       if (raw) setSavedClients(JSON.parse(raw));
-
       const { data } = await supabase.auth.getUser();
       const user = data.user;
       if (!user) return;
-
       const { data: rows } = await supabase.from("clients").select("*").eq("user_id", user.id);
       if (!rows) return;
       const next = rows.map((row) => ({
@@ -138,7 +174,6 @@ export default function NewInvoicePage() {
   useEffect(() => {
     const openId = window.localStorage.getItem("clientready-open-document");
     const raw = window.localStorage.getItem("clientready-documents");
-
     if (!openId) {
       const docs = raw ? (JSON.parse(raw) as SavedDocument[]) : [];
       let highest = 1000;
@@ -156,7 +191,6 @@ export default function NewInvoicePage() {
       setDueDate(plusDays(14));
       return;
     }
-
     if (!raw) return;
     const docs = JSON.parse(raw) as SavedDocument[];
     const doc = docs.find((item) => item.id === openId && item.type === "invoice");
@@ -178,6 +212,7 @@ export default function NewInvoicePage() {
       style?: string;
       jobTime?: string;
       jobCosts?: JobCosts;
+      crew?: CrewRow[];
     };
     setDocId(doc.id);
     setClientName(data.clientName || "");
@@ -196,7 +231,14 @@ export default function NewInvoicePage() {
     setStyle(data.style || "clean");
     setJobTime(data.jobTime || "");
     setCosts({ ...emptyCosts, ...(data.jobCosts || {}) });
+    setCrew(data.crew || []);
   }, []);
+
+  useEffect(() => {
+    if (!crew.length) return;
+    const labor = crew.reduce((sum, row) => sum + money(row.hours) * money(row.rate), 0);
+    setCosts((current) => ({ ...current, labor: labor.toFixed(2) }));
+  }, [crew]);
 
   const filteredClients = savedClients.filter((client) => {
     if (!clientSearch.trim()) return false;
@@ -245,21 +287,59 @@ export default function NewInvoicePage() {
       setTimeout(() => setSaveMessage(""), 2000);
       return;
     }
-    const next = [
-      ...clients,
-      {
-        id: Date.now().toString(),
-        name: clientName,
-        company: clientCompany,
-        email: clientEmail,
-        phone: clientPhone,
-        address: clientAddress,
-      },
-    ];
+    const next = [...clients, { id: Date.now().toString(), name: clientName, company: clientCompany, email: clientEmail, phone: clientPhone, address: clientAddress }];
     window.localStorage.setItem("clientready-clients", JSON.stringify(next));
     setSavedClients(next);
     setSaveMessage("Client saved");
     setTimeout(() => setSaveMessage(""), 2000);
+  }
+
+  function allowCrewChange() {
+    if (status !== "paid") return true;
+    return window.confirm("This invoice is paid. Changing crew pay can make the year log wrong. Continue?");
+  }
+
+  function addCrew() {
+    const person = employees.find((item) => item.id === pickedEmployee && item.active);
+    if (!person) return;
+    if (!allowCrewChange()) return;
+    setCrew((current) => [
+      ...current,
+      {
+        id: Date.now().toString(),
+        employeeId: person.id,
+        name: person.name,
+        rate: person.rate,
+        hours: "",
+        startTime: "",
+        endTime: "",
+        workDate: invoiceDate,
+        note: "",
+        paidToWorker: false,
+        paidDate: "",
+      },
+    ]);
+    setPickedEmployee("");
+  }
+
+  function updateCrew(id: string, patch: Partial<CrewRow>) {
+    if (!allowCrewChange()) return;
+    setCrew((current) =>
+      current.map((row) => {
+        if (row.id !== id) return row;
+        const next = { ...row, ...patch };
+        if (patch.startTime || patch.endTime) {
+          const hours = hoursBetween(next.startTime, next.endTime);
+          if (hours) next.hours = hours;
+        }
+        return next;
+      })
+    );
+  }
+
+  function removeCrew(id: string) {
+    if (!allowCrewChange()) return;
+    setCrew((current) => current.filter((row) => row.id !== id));
   }
 
   function clearForm() {
@@ -281,12 +361,16 @@ export default function NewInvoicePage() {
     setStyle("clean");
     setJobTime("");
     setCosts(emptyCosts);
+    setCrew([]);
   }
 
   async function saveDocument() {
     const raw = window.localStorage.getItem("clientready-documents");
     const docs = raw ? JSON.parse(raw) : [];
     const localId = docId || Date.now().toString();
+    const labor = crew.length
+      ? crew.reduce((sum, row) => sum + money(row.hours) * money(row.rate), 0).toFixed(2)
+      : costs.labor;
     const nextDoc = {
       id: localId,
       type: "invoice",
@@ -308,15 +392,13 @@ export default function NewInvoicePage() {
         status,
         style,
         jobTime,
-        jobCosts: costs,
+        jobCosts: { ...costs, labor },
+        crew,
       },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
-    const next = [
-      ...docs.filter((item: { id: string }) => item.id !== localId && item.id !== cloudId),
-      nextDoc,
-    ];
+    const next = [...docs.filter((item: { id: string }) => item.id !== localId && item.id !== cloudId), nextDoc];
     window.localStorage.setItem("clientready-documents", JSON.stringify(next));
     setDocId(cloudId);
     setSaveMessage("Invoice saved");
@@ -338,9 +420,7 @@ export default function NewInvoicePage() {
   }
 
   function updateItem(index: number, field: keyof LineItem, value: string) {
-    setItems((current) =>
-      current.map((item, itemIndex) => (itemIndex === index ? { ...item, [field]: value } : item))
-    );
+    setItems((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, [field]: value } : item)));
   }
 
   const totals = useMemo(() => {
@@ -350,25 +430,16 @@ export default function NewInvoicePage() {
   }, [items, taxPercent]);
 
   const jobMath = useMemo(() => {
-    const jobCost =
-      money(costs.parts) +
-      money(costs.gas) +
-      money(costs.driveTime) +
-      money(costs.labor) +
-      money(costs.tools) +
-      money(costs.lunch) +
-      money(costs.other);
+    const jobCost = money(costs.parts) + money(costs.gas) + money(costs.driveTime) + money(costs.labor) + money(costs.tools) + money(costs.lunch) + money(costs.other);
     const leftOver = totals.total - jobCost;
     const setAside = leftOver > 0 ? leftOver * ((Number(setAsidePercent) || 0) / 100) : 0;
     return { jobCost, leftOver, setAside, yours: leftOver - setAside };
   }, [costs, totals.total, setAsidePercent]);
 
-  const previewClass =
-    style === "bold"
-      ? "rounded-2xl border border-slate-900 bg-slate-900 p-8 text-white shadow-sm"
-      : "rounded-2xl border border-slate-200 bg-white p-8 text-slate-900 shadow-sm";
+  const previewClass = style === "bold" ? "rounded-2xl border border-slate-900 bg-slate-900 p-8 text-white shadow-sm" : "rounded-2xl border border-slate-200 bg-white p-8 text-slate-900 shadow-sm";
   const mutedClass = style === "bold" ? "text-slate-300" : "text-slate-600";
   const labelClass = style === "bold" ? "text-slate-400" : "text-slate-500";
+  const activeEmployees = employees.filter((person) => person.active);
 
   return (
     <AppShell title="New invoice">
@@ -376,21 +447,11 @@ export default function NewInvoicePage() {
         <form className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
           <h1 className="text-xl font-semibold">Invoice details</h1>
           <div>
-            <input
-              className="w-full rounded-lg border border-slate-300 px-3 py-2"
-              placeholder="Search clients by name"
-              value={clientSearch}
-              onChange={(event) => setClientSearch(event.target.value)}
-            />
+            <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Search clients by name" value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} />
             {filteredClients.length > 0 && (
               <div className="mt-2 overflow-hidden rounded-lg border border-slate-200 bg-white">
                 {filteredClients.map((client) => (
-                  <button
-                    key={client.id}
-                    type="button"
-                    onClick={() => chooseClient(client)}
-                    className="block w-full border-b border-slate-100 px-3 py-2 text-left hover:bg-slate-50"
-                  >
+                  <button key={client.id} type="button" onClick={() => chooseClient(client)} className="block w-full border-b border-slate-100 px-3 py-2 text-left hover:bg-slate-50">
                     <span className="block font-medium">{client.name}</span>
                     <span className="block text-sm text-slate-500">{client.company || client.email}</span>
                   </button>
@@ -416,14 +477,8 @@ export default function NewInvoicePage() {
             <option value="bold">Bold modern</option>
           </select>
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="text-sm text-slate-600">
-              Invoice date
-              <input type="date" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} />
-            </label>
-            <label className="text-sm text-slate-600">
-              Due date
-              <input type="date" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
-            </label>
+            <label className="text-sm text-slate-600">Invoice date<input type="date" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} /></label>
+            <label className="text-sm text-slate-600">Due date<input type="date" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></label>
           </div>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -441,43 +496,51 @@ export default function NewInvoicePage() {
           <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Tax percent" value={taxPercent} onChange={(event) => setTaxPercent(event.target.value)} />
           <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
 
-<div className="owner-costs space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-slate-900">
+          <div className="owner-costs space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-slate-900">
             <h2 className="font-medium">Your costs only</h2>
-            <p className="text-sm text-slate-600">Hidden from the customer PDF. Use this to price the job.</p>
+            <p className="text-sm text-slate-600">Hidden from the customer PDF. Crew pay is saved on this invoice.</p>
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="text-sm text-slate-700">
-                Parts
-                <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.parts} onChange={(event) => setCosts({ ...costs, parts: event.target.value })} />
-              </label>
-              <label className="text-sm text-slate-700">
-                Gas / mileage
-                <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.gas} onChange={(event) => setCosts({ ...costs, gas: event.target.value })} />
-              </label>
-              <label className="text-sm text-slate-700">
-                Drive time
-                <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.driveTime} onChange={(event) => setCosts({ ...costs, driveTime: event.target.value })} />
-              </label>
-              <label className="text-sm text-slate-700">
-                Labor / wages
-                <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.labor} onChange={(event) => setCosts({ ...costs, labor: event.target.value })} />
-              </label>
-              <label className="text-sm text-slate-700">
-                Tools
-                <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.tools} onChange={(event) => setCosts({ ...costs, tools: event.target.value })} />
-              </label>
-              <label className="text-sm text-slate-700">
-                Lunch / meals
-                <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.lunch} onChange={(event) => setCosts({ ...costs, lunch: event.target.value })} />
-              </label>
-              <label className="text-sm text-slate-700">
-                Other
-                <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.other} onChange={(event) => setCosts({ ...costs, other: event.target.value })} />
-              </label>
+              <label className="text-sm text-slate-700">Parts<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.parts} onChange={(event) => setCosts({ ...costs, parts: event.target.value })} /></label>
+              <label className="text-sm text-slate-700">Gas / mileage<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.gas} onChange={(event) => setCosts({ ...costs, gas: event.target.value })} /></label>
+              <label className="text-sm text-slate-700">Drive time<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.driveTime} onChange={(event) => setCosts({ ...costs, driveTime: event.target.value })} /></label>
+              <label className="text-sm text-slate-700">Labor / wages<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.labor} readOnly={crew.length > 0} onChange={(event) => setCosts({ ...costs, labor: event.target.value })} /></label>
+              <label className="text-sm text-slate-700">Tools<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.tools} onChange={(event) => setCosts({ ...costs, tools: event.target.value })} /></label>
+              <label className="text-sm text-slate-700">Lunch / meals<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.lunch} onChange={(event) => setCosts({ ...costs, lunch: event.target.value })} /></label>
+              <label className="text-sm text-slate-700">Other<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.other} onChange={(event) => setCosts({ ...costs, other: event.target.value })} /></label>
             </div>
-            <label className="block text-sm text-slate-700">
-              Cost notes
-              <textarea className="mt-1 min-h-16 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.notes} onChange={(event) => setCosts({ ...costs, notes: event.target.value })} />
-            </label>
+            <div className="rounded-lg border border-amber-200 p-3">
+              <p className="text-sm font-medium">Crew on this job</p>
+              <div className="mt-2 flex gap-2">
+                <select className="flex-1 rounded-lg border border-slate-300 px-3 py-2" value={pickedEmployee} onChange={(event) => setPickedEmployee(event.target.value)}>
+                  <option value="">Add an active employee</option>
+                  {activeEmployees.map((person) => (
+                    <option key={person.id} value={person.id}>{person.name} · ${Number(person.rate || 0).toFixed(2)}/hr</option>
+                  ))}
+                </select>
+                <button type="button" onClick={addCrew} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">Add</button>
+              </div>
+              {activeEmployees.length === 0 && <p className="mt-2 text-sm text-slate-600">Add employees under More first.</p>}
+              {crew.map((row) => (
+                <div key={row.id} className="mt-3 space-y-2 border-t border-amber-200 pt-3">
+                  <p className="text-sm font-medium">{row.name} · ${Number(row.rate || 0).toFixed(2)}/hr saved on this job</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <label className="text-sm">Work date<input type="date" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={row.workDate} onChange={(event) => updateCrew(row.id, { workDate: event.target.value })} /></label>
+                    <label className="text-sm">Hours<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={row.hours} onChange={(event) => updateCrew(row.id, { hours: event.target.value })} /></label>
+                    <label className="text-sm">Start<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={row.startTime} onChange={(event) => updateCrew(row.id, { startTime: event.target.value })} /></label>
+                    <label className="text-sm">End<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={row.endTime} onChange={(event) => updateCrew(row.id, { endTime: event.target.value })} /></label>
+                  </div>
+                  <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Note" value={row.note} onChange={(event) => updateCrew(row.id, { note: event.target.value })} />
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={row.paidToWorker} onChange={(event) => updateCrew(row.id, { paidToWorker: event.target.checked })} />
+                    Paid to worker
+                  </label>
+                  {row.paidToWorker && <input type="date" className="w-full rounded-lg border border-slate-300 px-3 py-2" value={row.paidDate} onChange={(event) => updateCrew(row.id, { paidDate: event.target.value })} />}
+                  <p className="text-sm">Pay: ${(money(row.hours) * money(row.rate)).toFixed(2)}</p>
+                  <button type="button" onClick={() => removeCrew(row.id)} className="text-sm text-slate-600">Remove from job</button>
+                </div>
+              ))}
+            </div>
+            <label className="block text-sm text-slate-700">Cost notes<textarea className="mt-1 min-h-16 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.notes} onChange={(event) => setCosts({ ...costs, notes: event.target.value })} /></label>
             <div className="space-y-1 text-sm">
               <p>Job cost: ${jobMath.jobCost.toFixed(2)}</p>
               <p>You charge: ${totals.total.toFixed(2)}</p>
