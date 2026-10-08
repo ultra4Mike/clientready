@@ -94,6 +94,12 @@ html.dark .owner-costs textarea::placeholder {
   color: #d7f4f0 !important;
 }
 
+html.dark .owner-costs button {
+  color: #042f2e !important;
+  background-color: #2dd4bf !important;
+  border: 1px solid #042f2e !important;
+}
+
 html.dark .sample-sheet,
 html.dark .sample-sheet h2,
 html.dark .sample-sheet p,

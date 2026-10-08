@@ -223,14 +223,35 @@ export default function NewInvoicePage() {
     return window.confirm("This invoice is paid. Changing crew pay can make the year log wrong. Continue?");
   }
 
-  function addCrew() {
-    const person = employees.find((item) => item.id === pickedEmployee && item.active);
-    if (!person || !allowCrewChange()) return;
-    setCrew((current) => [...current, {
-      id: Date.now().toString(), employeeId: person.id, name: person.name, rate: person.rate,
-      hours: "", startTime: jobStart, endTime: jobEnd, workDate: invoiceDate, note: "", bonus: "", paidToWorker: false, paidDate: "",
-    }]);
+function addCrew() {
+    const person = employees.find((item) => item.id === pickedEmployee);
+    if (!person) {
+      setSaveMessage("Pick an employee, then click Add");
+      return;
+    }
+    if (!allowCrewChange()) return;
+    const nextCrew = [
+      ...crew,
+      {
+        id: Date.now().toString(),
+        employeeId: person.id,
+        name: person.name,
+        rate: person.rate,
+        hours: "",
+        startTime: jobStart,
+        endTime: jobEnd,
+        workDate: invoiceDate,
+        note: "",
+        bonus: "",
+        paidToWorker: false,
+        paidDate: "",
+      },
+    ];
+    setCrew(nextCrew);
+    const labor = nextCrew.reduce((sum, row) => sum + rowPay(row), 0);
+    setCosts((current) => ({ ...current, labor: labor.toFixed(2) }));
     setPickedEmployee("");
+    setSaveMessage(`${person.name} added. Pick the next person and click Add again.`);
   }
 
   function updateCrew(id: string, patch: Partial<CrewRow>) {
@@ -354,28 +375,29 @@ export default function NewInvoicePage() {
               <label className="text-sm">Lunch / meals<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.lunch} onChange={(event) => setCosts({ ...costs, lunch: event.target.value })} /></label>
               <label className="text-sm">Other<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.other} onChange={(event) => setCosts({ ...costs, other: event.target.value })} /></label>
             </div>
-            <div className="rounded-lg border border-amber-200 p-3">
-              <p className="text-sm font-medium">Crew on this job</p>
+<div className="rounded-lg border border-amber-200 bg-white p-3 text-slate-900">
+              <p className="text-sm font-medium text-slate-900">Crew on this job ({crew.length})</p>
               <div className="mt-2 flex gap-2">
-                <select className="flex-1 rounded-lg border border-slate-300 px-3 py-2" value={pickedEmployee} onChange={(event) => setPickedEmployee(event.target.value)}>
-                  <option value="">Add an active employee</option>
-                  {employees.filter((person) => person.active).map((person) => <option key={person.id} value={person.id}>{person.name} · ${Number(person.rate || 0).toFixed(2)}/hr</option>)}
+                <select className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" value={pickedEmployee} onChange={(event) => setPickedEmployee(event.target.value)}>
+                  <option value="">Add an employee</option>
+                  {employees.filter((person) => person.active !== false).map((person) => (
+                    <option key={person.id} value={person.id}>{person.name} · ${Number(person.rate || 0).toFixed(2)}/hr</option>
+                  ))}
                 </select>
-                <button type="button" onClick={addCrew} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">Add</button>
+                <button type="button" onClick={addCrew} className="rounded-lg bg-teal-400 px-4 py-2 text-sm font-medium text-slate-950">Add</button>
               </div>
               {crew.map((row) => (
-                <div key={row.id} className="mt-3 space-y-2 border-t border-amber-200 pt-3">
-                  <p className="text-sm font-medium">{row.name} · ${Number(row.rate || 0).toFixed(2)}/hr saved on this job</p>
+                <div key={row.id} className="mt-3 space-y-2 border-t border-amber-200 pt-3 text-slate-900">
+                  <p className="text-sm font-medium text-slate-900">{row.name} · ${Number(row.rate || 0).toFixed(2)}/hr saved on this job</p>
                   <div className="grid gap-2 sm:grid-cols-2">
-                    <label className="text-sm">Work date<input type="date" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={row.workDate} onChange={(event) => updateCrew(row.id, { workDate: event.target.value })} /></label>
-                    <label className="text-sm">Hours<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={row.hours} onChange={(event) => updateCrew(row.id, { hours: event.target.value })} /></label>
-                    <label className="text-sm">Start<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={row.startTime} onChange={(event) => updateCrew(row.id, { startTime: event.target.value })} /></label>
-                    <label className="text-sm">End<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={row.endTime} onChange={(event) => updateCrew(row.id, { endTime: event.target.value })} /></label>
-                    <label className="text-sm sm:col-span-2">Extra pay for this job<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="100" value={row.bonus} onChange={(event) => updateCrew(row.id, { bonus: event.target.value })} /></label>
+                    <label className="text-sm text-slate-900">Work date<input type="date" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" value={row.workDate} onChange={(event) => updateCrew(row.id, { workDate: event.target.value })} /></label>
+                    <label className="text-sm text-slate-900">Hours<input className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" value={row.hours} onChange={(event) => updateCrew(row.id, { hours: event.target.value })} /></label>
+                    <label className="text-sm text-slate-900">Start<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" value={row.startTime} onChange={(event) => updateCrew(row.id, { startTime: event.target.value })} /></label>
+                    <label className="text-sm text-slate-900">End<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" value={row.endTime} onChange={(event) => updateCrew(row.id, { endTime: event.target.value })} /></label>
+                    <label className="text-sm text-slate-900 sm:col-span-2">Extra pay for this job<input className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" placeholder="100" value={row.bonus} onChange={(event) => updateCrew(row.id, { bonus: event.target.value })} /></label>
                   </div>
-                  <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Note, optional" value={row.note} onChange={(event) => updateCrew(row.id, { note: event.target.value })} />
-                  <p className="text-sm">Paid this job: ${rowPay(row).toFixed(2)}</p>
-                  <button type="button" onClick={() => allowCrewChange() && setCrew((current) => current.filter((item) => item.id !== row.id))} className="text-sm text-slate-600">Remove from job</button>
+                  <p className="text-sm text-slate-900">Paid this job: ${rowPay(row).toFixed(2)}</p>
+                  <button type="button" onClick={() => allowCrewChange() && setCrew((current) => current.filter((item) => item.id !== row.id))} className="text-sm text-slate-700">Remove from job</button>
                 </div>
               ))}
             </div>
