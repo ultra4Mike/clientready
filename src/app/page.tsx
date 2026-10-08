@@ -60,7 +60,7 @@ export default function HomePage() {
         </div>
 
         <div className="mt-10 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm">
+          <div className="sample-sheet rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm">
             <p className="text-xs uppercase tracking-wide text-slate-500">What the customer sees</p>
             <div className="mt-2 flex items-start justify-between">
               <div>
@@ -88,7 +88,7 @@ export default function HomePage() {
             <p className="mt-4 text-sm text-slate-600">Pay here: Venmo @northyard</p>
           </div>
 
-          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-6 text-slate-900">
+          <div className="sample-sheet rounded-2xl border border-amber-300 bg-amber-50 p-6 text-slate-900">
             <p className="text-xs uppercase tracking-wide text-amber-800">What you see</p>
             <h2 className="mt-2 text-xl font-semibold">Your costs only</h2>
             <p className="mt-1 text-sm text-slate-600">Hidden from the customer PDF.</p>

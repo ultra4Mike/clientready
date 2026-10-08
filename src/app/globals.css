@@ -94,6 +94,22 @@ html.dark .owner-costs textarea::placeholder {
   color: #d7f4f0 !important;
 }
 
+html.dark .sample-sheet,
+html.dark .sample-sheet h2,
+html.dark .sample-sheet p,
+html.dark .sample-sheet span,
+html.dark .sample-sheet div {
+  color: #0f172a !important;
+}
+
+html.dark .sample-sheet.bg-white {
+  background-color: #ffffff !important;
+}
+
+html.dark .sample-sheet.bg-amber-50 {
+  background-color: #fffbeb !important;
+}
+
 @media print {
   header,
   form,
