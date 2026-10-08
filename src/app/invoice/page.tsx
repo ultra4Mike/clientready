@@ -31,6 +31,19 @@ type SavedDocument = {
 
 const emptyItem: LineItem = { description: "", qty: "1", rate: "" };
 
+function ymd(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function plusDays(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return ymd(date);
+}
+
 export default function NewInvoicePage() {
   const [docId, setDocId] = useState("");
   const [clientName, setClientName] = useState("");
@@ -72,9 +85,7 @@ export default function NewInvoicePage() {
   useEffect(() => {
     async function loadClients() {
       const raw = window.localStorage.getItem("clientready-clients");
-      if (raw) {
-        setSavedClients(JSON.parse(raw));
-      }
+      if (raw) setSavedClients(JSON.parse(raw));
 
       const { data } = await supabase.auth.getUser();
       const user = data.user;
@@ -97,7 +108,6 @@ export default function NewInvoicePage() {
       setSavedClients(next);
       window.localStorage.setItem("clientready-clients", JSON.stringify(next));
     }
-
     loadClients();
   }, []);
 
@@ -118,6 +128,8 @@ export default function NewInvoicePage() {
         }
       });
       setInvoiceNumber(`INV-${highest + 1}`);
+      setInvoiceDate(ymd(new Date()));
+      setDueDate(plusDays(14));
       return;
     }
 
@@ -140,6 +152,7 @@ export default function NewInvoicePage() {
       items?: LineItem[];
       status?: string;
       style?: string;
+      jobTime?: string;
     };
     setDocId(doc.id);
     setClientName(data.clientName || "");
@@ -148,14 +161,15 @@ export default function NewInvoicePage() {
     setClientPhone(data.clientPhone || "");
     setClientAddress(data.clientAddress || "");
     setInvoiceNumber(data.invoiceNumber || "INV-1001");
-    setInvoiceDate(data.invoiceDate || "");
-    setDueDate(data.dueDate || "");
+    setInvoiceDate(data.invoiceDate || ymd(new Date()));
+    setDueDate(data.dueDate || plusDays(14));
     setNotes(data.notes || "Payment is due within 14 days.");
     setTaxPercent(data.taxPercent || "0");
     setItems(data.items?.length ? data.items : [{ ...emptyItem }]);
     setClientSearch(data.clientName || "");
     setStatus(data.status || "draft");
     setStyle(data.style || "clean");
+    setJobTime(data.jobTime || "");
   }, []);
 
   const filteredClients = savedClients.filter((client) => {
@@ -234,17 +248,18 @@ export default function NewInvoicePage() {
     setClientPhone("");
     setClientAddress("");
     setInvoiceNumber(getNextInvoiceNumber());
-    setInvoiceDate("");
-    setDueDate("");
+    setInvoiceDate(ymd(new Date()));
+    setDueDate(plusDays(14));
     setNotes("Payment is due within 14 days.");
     setTaxPercent("0");
     setItems([{ ...emptyItem }]);
     setSaveMessage("");
     setStatus("draft");
     setStyle("clean");
+    setJobTime("");
   }
 
-async function saveDocument() {
+  async function saveDocument() {
     const raw = window.localStorage.getItem("clientready-documents");
     const docs = raw ? JSON.parse(raw) : [];
     const localId = docId || Date.now().toString();
@@ -268,7 +283,7 @@ async function saveDocument() {
         items,
         status,
         style,
-        jobTime: "",
+        jobTime,
       },
     };
     const cloudId = await saveCloudDocument(nextDoc);
@@ -282,6 +297,20 @@ async function saveDocument() {
     window.localStorage.setItem("clientready-documents", JSON.stringify(next));
     setDocId(cloudId);
     setSaveMessage("Invoice saved");
+    setTimeout(() => setSaveMessage(""), 2000);
+  }
+
+  async function copyPayLink() {
+    if (!paymentLink.trim()) {
+      window.location.href = "/profile";
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(paymentLink);
+      setSaveMessage("Pay link copied");
+    } catch {
+      setSaveMessage(paymentLink);
+    }
     setTimeout(() => setSaveMessage(""), 2000);
   }
 
@@ -313,7 +342,6 @@ async function saveDocument() {
 
   return (
     <AppShell title="New invoice">
-
       <section className="mx-auto grid max-w-6xl gap-8 px-6 py-8 lg:grid-cols-2">
         <form className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
           <h1 className="text-xl font-semibold">Invoice details</h1>
@@ -474,12 +502,12 @@ async function saveDocument() {
           />
           <textarea
             className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="Notes / payment instructions"
+            placeholder="Notes"
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
           />
 
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <button
               type="button"
               onClick={saveDocument}
@@ -499,13 +527,24 @@ async function saveDocument() {
         </form>
 
         <div>
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="mb-4 rounded-lg bg-slate-900 px-4 py-2 text-sm text-white"
-          >
-            Print / Save PDF
-          </button>
+          <div className="mb-4 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white"
+            >
+              Print / Save PDF
+            </button>
+            {status !== "paid" && (
+              <button
+                type="button"
+                onClick={copyPayLink}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
+              >
+                {paymentLink.trim() ? "Pay / Copy pay link" : "Add how to pay"}
+              </button>
+            )}
+          </div>
 
           <div id="preview" className={previewClass}>
             {logo && (
@@ -513,12 +552,8 @@ async function saveDocument() {
             )}
             <div className="flex items-start justify-between">
               <div>
-                <p className={`text-sm uppercase tracking-wide ${labelClass}`}>
-                  Invoice
-                </p>
-                <h2 className="mt-1 text-2xl font-semibold">
-                  {invoiceNumber || "INV-0000"}
-                </h2>
+                <p className={`text-sm uppercase tracking-wide ${labelClass}`}>Invoice</p>
+                <h2 className="mt-1 text-2xl font-semibold">{invoiceNumber || "INV-0000"}</h2>
                 <div className={`mt-4 text-sm ${mutedClass}`}>
                   <p className="font-medium">{businessName}</p>
                   <p>{ownerName}</p>
@@ -529,20 +564,17 @@ async function saveDocument() {
               <div className={`text-right text-sm ${mutedClass}`}>
                 <div>Date: {invoiceDate || "-"}</div>
                 <div>Due: {dueDate || "-"}</div>
+                {jobTime && <div>Time: {jobTime}</div>}
               </div>
             </div>
 
             <div className="mt-8">
               <p className={`text-sm ${labelClass}`}>Bill to</p>
               <p className="font-medium">{clientName || "Client name"}</p>
-              <p className={`text-sm ${mutedClass}`}>
-                {clientCompany || "Company"}
-              </p>
-              <p className={`text-sm ${mutedClass}`}>
-                {clientEmail || "client@email.com"}
-              </p>
-              <p className={`text-sm ${mutedClass}`}>{clientPhone}</p>
-              <p className={`text-sm ${mutedClass}`}>{clientAddress}</p>
+              {clientCompany && <p className={`text-sm ${mutedClass}`}>{clientCompany}</p>}
+              {clientEmail && <p className={`text-sm ${mutedClass}`}>{clientEmail}</p>}
+              {clientPhone && <p className={`text-sm ${mutedClass}`}>{clientPhone}</p>}
+              {clientAddress && <p className={`text-sm ${mutedClass}`}>{clientAddress}</p>}
             </div>
 
             <div className="mt-8 border-t border-slate-500 pt-4">
@@ -574,9 +606,7 @@ async function saveDocument() {
 
             <p className={`mt-8 text-sm ${mutedClass}`}>{notes}</p>
             {paymentLink && (
-              <p className="mt-4 text-sm text-slate-600">
-                Pay here: {paymentLink}
-              </p>
+              <p className={`mt-4 text-sm ${mutedClass}`}>Pay here: {paymentLink}</p>
             )}
           </div>
         </div>

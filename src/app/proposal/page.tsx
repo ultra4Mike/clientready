@@ -23,6 +23,19 @@ type SavedDocument = {
   data: Record<string, unknown>;
 };
 
+function ymd(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function plusDays(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return ymd(date);
+}
+
 export default function ProposalPage() {
   const [docId, setDocId] = useState("");
   const [clientName, setClientName] = useState("");
@@ -36,9 +49,7 @@ export default function ProposalPage() {
   const [notIncluded, setNotIncluded] = useState("");
   const [timeline, setTimeline] = useState("");
   const [price, setPrice] = useState("");
-  const [paymentTerms, setPaymentTerms] = useState(
-    "50% to start, 50% on completion."
-  );
+  const [paymentTerms, setPaymentTerms] = useState("50% to start, 50% on completion.");
   const [validUntil, setValidUntil] = useState("");
   const [businessName, setBusinessName] = useState("Your business");
   const [ownerName, setOwnerName] = useState("");
@@ -50,6 +61,7 @@ export default function ProposalPage() {
   const [logo, setLogo] = useState("");
   const [style, setStyle] = useState("clean");
   const [outcome, setOutcome] = useState("pending");
+  const [paymentLink, setPaymentLink] = useState("");
 
   useEffect(() => {
     const raw = window.localStorage.getItem("clientready-profile");
@@ -60,21 +72,13 @@ export default function ProposalPage() {
     setBusinessEmail(profile.email || "");
     setBusinessPhone(profile.phone || "");
     setLogo(profile.logo || "");
-  }, []);
-
-  useEffect(() => {
-    const raw = window.localStorage.getItem("clientready-clients");
-    if (raw) {
-      setSavedClients(JSON.parse(raw));
-    }
+    setPaymentLink(profile.paymentLink || "");
   }, []);
 
   useEffect(() => {
     async function loadClients() {
       const raw = window.localStorage.getItem("clientready-clients");
-      if (raw) {
-        setSavedClients(JSON.parse(raw));
-      }
+      if (raw) setSavedClients(JSON.parse(raw));
 
       const { data } = await supabase.auth.getUser();
       const user = data.user;
@@ -97,13 +101,15 @@ export default function ProposalPage() {
       setSavedClients(next);
       window.localStorage.setItem("clientready-clients", JSON.stringify(next));
     }
-
     loadClients();
   }, []);
 
   useEffect(() => {
     const openId = window.localStorage.getItem("clientready-open-document");
-    if (!openId) return;
+    if (!openId) {
+      setValidUntil(plusDays(30));
+      return;
+    }
     const raw = window.localStorage.getItem("clientready-documents");
     if (!raw) return;
     const docs = JSON.parse(raw) as SavedDocument[];
@@ -140,7 +146,7 @@ export default function ProposalPage() {
     setTimeline(data.timeline || "");
     setPrice(data.price || "");
     setPaymentTerms(data.paymentTerms || "50% to start, 50% on completion.");
-    setValidUntil(data.validUntil || "");
+    setValidUntil(data.validUntil || plusDays(30));
     setClientSearch(data.clientName || "");
     setStyle(data.style || "clean");
     setOutcome(data.outcome || "pending");
@@ -176,13 +182,13 @@ export default function ProposalPage() {
     setTimeline("");
     setPrice("");
     setPaymentTerms("50% to start, 50% on completion.");
-    setValidUntil("");
+    setValidUntil(plusDays(30));
     setSaveMessage("");
     setStyle("clean");
     setOutcome("pending");
   }
 
-  function createInvoiceFromProposal() {
+  async function createInvoiceFromProposal() {
     const raw = window.localStorage.getItem("clientready-documents");
     const docs = raw ? JSON.parse(raw) : [];
     let highest = 1000;
@@ -197,9 +203,9 @@ export default function ProposalPage() {
     });
 
     const invoiceNumber = `INV-${highest + 1}`;
-    const id = Date.now().toString();
+    const localId = Date.now().toString();
     const nextDoc = {
-      id,
+      id: localId,
       type: "invoice",
       title: invoiceNumber,
       clientName: clientName || "No client",
@@ -211,8 +217,8 @@ export default function ProposalPage() {
         clientPhone,
         clientAddress,
         invoiceNumber,
-        invoiceDate: new Date().toISOString().slice(0, 10),
-        dueDate: "",
+        invoiceDate: ymd(new Date()),
+        dueDate: plusDays(14),
         notes: paymentTerms || "Payment is due within 14 days.",
         taxPercent: "0",
         items: [
@@ -224,19 +230,21 @@ export default function ProposalPage() {
         ],
         status: "draft",
         style,
+        jobTime: "",
       },
     };
-
+    const cloudId = await saveCloudDocument(nextDoc);
+    nextDoc.id = cloudId;
     window.localStorage.setItem(
       "clientready-documents",
       JSON.stringify([...docs, nextDoc])
     );
     setOutcome("won");
-    window.localStorage.setItem("clientready-open-document", id);
+    window.localStorage.setItem("clientready-open-document", cloudId);
     window.location.href = "/invoice";
   }
 
-async function saveDocument() {
+  async function saveDocument() {
     const raw = window.localStorage.getItem("clientready-documents");
     const docs = raw ? JSON.parse(raw) : [];
     const localId = docId || Date.now().toString();
@@ -284,10 +292,14 @@ async function saveDocument() {
       : "rounded-2xl border border-slate-200 bg-white p-8 text-slate-900 shadow-sm";
   const mutedClass = style === "bold" ? "text-slate-300" : "text-slate-600";
   const labelClass = style === "bold" ? "text-slate-400" : "text-slate-500";
+  const priceLabel = price
+    ? price.trim().startsWith("$")
+      ? price
+      : `$${Number(price).toFixed(2)}`
+    : "$0.00";
 
   return (
     <AppShell title="New proposal">
-
       <section className="mx-auto grid max-w-6xl gap-8 px-6 py-8 lg:grid-cols-2">
         <form className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
           <h1 className="text-xl font-semibold">Proposal details</h1>
@@ -419,7 +431,7 @@ async function saveDocument() {
             />
           </label>
 
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <button
               type="button"
               onClick={saveDocument}
@@ -455,30 +467,18 @@ async function saveDocument() {
           </button>
 
           <div id="preview" className={previewClass}>
-            {logo && (
-              <img src={logo} alt="Business logo" className="mb-3 h-14 w-auto" />
-            )}
-            <p className={`text-sm uppercase tracking-wide ${labelClass}`}>
-              Proposal
-            </p>
-            <h2 className="mt-1 text-2xl font-semibold">
-              {projectTitle || "Project title"}
-            </h2>
-            <p className={`mt-2 text-sm ${mutedClass}`}>
-              Valid until: {validUntil || "-"}
-            </p>
+            {logo && <img src={logo} alt="Business logo" className="mb-3 h-14 w-auto" />}
+            <p className={`text-sm uppercase tracking-wide ${labelClass}`}>Proposal</p>
+            <h2 className="mt-1 text-2xl font-semibold">{projectTitle || "Project title"}</h2>
+            <p className={`mt-2 text-sm ${mutedClass}`}>Valid until: {validUntil || "-"}</p>
 
             <div className="mt-8">
               <p className={`text-sm ${labelClass}`}>Prepared for</p>
               <p className="font-medium">{clientName || "Client name"}</p>
-              <p className={`text-sm ${mutedClass}`}>
-                {clientCompany || "Company"}
-              </p>
-              <p className={`text-sm ${mutedClass}`}>
-                {clientEmail || "client@email.com"}
-              </p>
-              <p className={`text-sm ${mutedClass}`}>{clientPhone}</p>
-              <p className={`text-sm ${mutedClass}`}>{clientAddress}</p>
+              {clientCompany && <p className={`text-sm ${mutedClass}`}>{clientCompany}</p>}
+              {clientEmail && <p className={`text-sm ${mutedClass}`}>{clientEmail}</p>}
+              {clientPhone && <p className={`text-sm ${mutedClass}`}>{clientPhone}</p>}
+              {clientAddress && <p className={`text-sm ${mutedClass}`}>{clientAddress}</p>}
             </div>
 
             <div className={`mt-4 text-sm ${mutedClass}`}>
@@ -492,15 +492,11 @@ async function saveDocument() {
             <div className="mt-8 space-y-4 text-sm leading-6">
               <div>
                 <h3 className="font-semibold">Description</h3>
-                <p className="whitespace-pre-wrap">
-                  {description || "Project description will appear here."}
-                </p>
+                <p className="whitespace-pre-wrap">{description || "Project description will appear here."}</p>
               </div>
               <div>
                 <h3 className="font-semibold">Included</h3>
-                <p className="whitespace-pre-wrap">
-                  {scope || "Scope will appear here."}
-                </p>
+                <p className="whitespace-pre-wrap">{scope || "Scope will appear here."}</p>
               </div>
               <div>
                 <h3 className="font-semibold">Not included</h3>
@@ -512,12 +508,12 @@ async function saveDocument() {
               </div>
               <div>
                 <h3 className="font-semibold">Investment</h3>
-                <p className="text-lg font-semibold">{price || "$0.00"}</p>
+                <p className="text-lg font-semibold">{priceLabel}</p>
                 <p className="mt-1">{paymentTerms}</p>
+                {paymentLink && <p className="mt-2">Pay here: {paymentLink}</p>}
               </div>
               <p className={`pt-4 text-xs ${labelClass}`}>
-                This proposal is for planning purposes and is not a signed
-                contract.
+                This proposal is for planning purposes and is not a signed contract.
               </p>
             </div>
           </div>

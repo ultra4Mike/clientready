@@ -35,6 +35,7 @@ export default function InvoiceViewPage() {
   const [logo, setLogo] = useState("");
   const [jobTime, setJobTime] = useState("");
   const [paymentLink, setPaymentLink] = useState("");
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     const profileRaw = window.localStorage.getItem("clientready-profile");
@@ -96,13 +97,43 @@ export default function InvoiceViewPage() {
     window.location.href = "/invoice";
   }
 
+  async function copyPayLink() {
+    if (!paymentLink.trim()) {
+      window.location.href = "/profile";
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(paymentLink);
+      setMessage("Pay link copied");
+    } catch {
+      setMessage(paymentLink);
+    }
+    setTimeout(() => setMessage(""), 2000);
+  }
+
   return (
     <AppShell title="Invoice">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <a href="/calendar" className="text-sm text-slate-600">
-            Back to calendar
-          </a>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <a href="/documents" className="text-sm text-[var(--cr-muted)]">
+          Back to documents
+        </a>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
+          >
+            Print / Save PDF
+          </button>
+          {status !== "paid" && (
+            <button
+              type="button"
+              onClick={copyPayLink}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
+            >
+              {paymentLink.trim() ? "Pay / Copy pay link" : "Add how to pay"}
+            </button>
+          )}
           <button
             type="button"
             onClick={editInvoice}
@@ -111,35 +142,27 @@ export default function InvoiceViewPage() {
             Edit invoice
           </button>
         </div>
-      </header>
+      </div>
+      {message && <p className="mb-3 text-sm text-[var(--cr-muted)]">{message}</p>}
 
-      <section className="mx-auto max-w-3xl px-6 py-8">
-        <div
-          id="preview"
-          className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"
-        >
-          {logo && (
-            <img src={logo} alt="Business logo" className="mb-3 h-14 w-auto" />
-          )}
+      <section className="mx-auto max-w-3xl">
+        <div id="preview" className="rounded-2xl border border-slate-200 bg-white p-8 text-slate-900 shadow-sm">
+          {logo && <img src={logo} alt="Business logo" className="mb-3 h-14 w-auto" />}
           <p className="text-sm uppercase tracking-wide text-slate-500">Invoice</p>
-          <h1 className="mt-1 text-2xl font-semibold">
-            {invoiceNumber || "Invoice"}
-          </h1>
+          <h1 className="mt-1 text-2xl font-semibold">{invoiceNumber || "Invoice"}</h1>
           <p className="mt-1 text-sm text-slate-600">{status}</p>
           <p className="mt-4 text-sm text-slate-600">{businessName}</p>
           <p className="text-sm text-slate-600">Date: {invoiceDate || "-"}</p>
           <p className="text-sm text-slate-600">Due: {dueDate || "-"}</p>
-          {jobTime && (
-            <p className="text-sm text-slate-600">Scheduled time: {jobTime}</p>
-          )}
+          {jobTime && <p className="text-sm text-slate-600">Scheduled time: {jobTime}</p>}
 
           <div className="mt-8">
             <p className="text-sm text-slate-500">Bill to</p>
             <p className="font-medium">{clientName || "Client"}</p>
-            <p className="text-sm text-slate-600">{clientCompany}</p>
-            <p className="text-sm text-slate-600">{clientEmail}</p>
-            <p className="text-sm text-slate-600">{clientPhone}</p>
-            <p className="text-sm text-slate-600">{clientAddress}</p>
+            {clientCompany && <p className="text-sm text-slate-600">{clientCompany}</p>}
+            {clientEmail && <p className="text-sm text-slate-600">{clientEmail}</p>}
+            {clientPhone && <p className="text-sm text-slate-600">{clientPhone}</p>}
+            {clientAddress && <p className="text-sm text-slate-600">{clientAddress}</p>}
           </div>
 
           <div className="mt-8 border-t border-slate-200 pt-4">
@@ -171,11 +194,9 @@ export default function InvoiceViewPage() {
             </div>
           </div>
 
-          <p className="mt-8 text-sm text-slate-600">{notes}</p>
+          {notes && <p className="mt-8 text-sm text-slate-600">{notes}</p>}
           {paymentLink && (
-            <p className="mt-4 text-sm text-slate-600">
-              Pay here: {paymentLink}
-            </p>
+            <p className="mt-4 text-sm text-slate-600">Pay here: {paymentLink}</p>
           )}
         </div>
       </section>

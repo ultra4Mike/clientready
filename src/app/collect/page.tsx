@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
+import { saveCloudDocument } from "@/lib/cloud-docs";
 
 type LineItem = {
   qty?: string;
@@ -19,6 +20,7 @@ type SavedDocument = {
     dueDate?: string;
     taxPercent?: string;
     items?: LineItem[];
+    [key: string]: unknown;
   };
 };
 
@@ -34,7 +36,8 @@ function isOverdue(doc: SavedDocument) {
   const due = doc.data?.dueDate;
   const status = doc.data?.status || "draft";
   if (!due || status === "paid") return false;
-  return new Date(due) < new Date();
+  if (status === "overdue") return true;
+  return new Date(`${due}T23:59:59`) < new Date();
 }
 
 export default function CollectPage() {
@@ -50,18 +53,20 @@ export default function CollectPage() {
     window.localStorage.setItem("clientready-documents", JSON.stringify(next));
   }
 
-  function markPaid(id: string) {
+  async function setStatus(id: string, status: string) {
     const next = documents.map((doc) => {
       if (doc.id !== id) return doc;
       return {
         ...doc,
         data: {
           ...(doc.data || {}),
-          status: "paid",
+          status,
         },
       };
     });
     saveDocs(next);
+    const updated = next.find((doc) => doc.id === id);
+    if (updated) await saveCloudDocument(updated);
   }
 
   function openInvoice(id: string) {
@@ -82,75 +87,66 @@ export default function CollectPage() {
 
   return (
     <AppShell title="Collect">
-      
-      <section className="mx-auto max-w-6xl px-6 py-8">
-        <h1 className="text-2xl font-semibold">Money to collect</h1>
-        <p className="mt-2 text-slate-600">
-          Unpaid invoices and overdue amounts.
-        </p>
+      <p className="text-[var(--cr-muted)]">Unpaid invoices and overdue amounts.</p>
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <p className="text-sm text-slate-500">Unpaid invoices</p>
-            <p className="mt-2 text-2xl font-semibold">{totals.unpaidCount}</p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <p className="text-sm text-slate-500">Open amount</p>
-            <p className="mt-2 text-2xl font-semibold">
-              ${totals.openAmount.toFixed(2)}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <p className="text-sm text-slate-500">Overdue</p>
-            <p className="mt-2 text-2xl font-semibold">
-              ${totals.overdueAmount.toFixed(2)}
-            </p>
-          </div>
+      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+          <p className="text-sm text-[var(--cr-muted)]">Unpaid invoices</p>
+          <p className="mt-2 text-2xl font-semibold">{totals.unpaidCount}</p>
         </div>
+        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+          <p className="text-sm text-[var(--cr-muted)]">Open amount</p>
+          <p className="mt-2 text-2xl font-semibold">${totals.openAmount.toFixed(2)}</p>
+        </div>
+        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+          <p className="text-sm text-[var(--cr-muted)]">Overdue</p>
+          <p className="mt-2 text-2xl font-semibold">${totals.overdueAmount.toFixed(2)}</p>
+        </div>
+      </div>
 
-        <div className="mt-8 space-y-3">
-          {unpaid.length === 0 && (
-            <p className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-600">
-              Nothing to collect. Unpaid invoices will show here.
-            </p>
-          )}
+      <div className="mt-8 space-y-3">
+        {unpaid.length === 0 && (
+          <p className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 text-[var(--cr-muted)]">
+            Nothing to collect. Unpaid invoices will show here.
+          </p>
+        )}
 
-          {unpaid.map((doc) => (
-            <div
-              key={doc.id}
-              className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5"
-            >
-              <div>
-                <p className="font-medium">{doc.title}</p>
-                <p className="text-sm text-slate-600">
-                  {doc.clientName || "No client"} · {doc.data?.status || "draft"}
-                  {doc.data?.dueDate ? ` · due ${doc.data.dueDate}` : ""}
-                  {isOverdue(doc) ? " · overdue" : ""}
-                </p>
-                <p className="mt-1 font-semibold">
-                  ${invoiceTotal(doc).toFixed(2)}
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => openInvoice(doc.id)}
-                  className="text-sm font-medium"
-                >
-                  Open
-                </button>
-                <button
-                  type="button"
-                  onClick={() => markPaid(doc.id)}
-                  className="text-sm font-medium"
-                >
-                  Mark paid
-                </button>
-              </div>
+        {unpaid.map((doc) => (
+          <div
+            key={doc.id}
+            className="flex flex-col gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div>
+              <p className="font-medium">{doc.title}</p>
+              <p className="text-sm text-[var(--cr-muted)]">
+                {doc.clientName || "No client"} · {doc.data?.status || "draft"}
+                {doc.data?.dueDate ? ` · due ${doc.data.dueDate}` : ""}
+                {isOverdue(doc) ? " · overdue" : ""}
+              </p>
+              <p className="mt-1 font-semibold">${invoiceTotal(doc).toFixed(2)}</p>
             </div>
-          ))}
-        </div>
-      </section>
+            <div className="flex flex-wrap gap-3">
+              <button type="button" onClick={() => openInvoice(doc.id)} className="text-sm font-medium">
+                Open
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatus(doc.id, "sent")}
+                className="text-sm font-medium"
+              >
+                Mark sent
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatus(doc.id, "paid")}
+                className="text-sm font-medium"
+              >
+                Mark paid
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
     </AppShell>
   );
 }
