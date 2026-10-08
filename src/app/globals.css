@@ -75,31 +75,34 @@ html.dark body {
   color: var(--cr-text);
 }
 
-html.dark .owner-costs,
+html.dark .owner-costs {
+  background-color: #10262c !important;
+  color: #e2f6f4 !important;
+  border-color: rgba(45, 212, 191, 0.35) !important;
+}
+
 html.dark .owner-costs h2,
 html.dark .owner-costs p,
 html.dark .owner-costs label,
-html.dark .owner-costs span {
-  color: #0f172a !important;
+html.dark .owner-costs span,
+html.dark .owner-costs div {
+  color: #e2f6f4 !important;
 }
 
 html.dark .owner-costs .bg-white,
 html.dark .owner-costs .bg-white p,
 html.dark .owner-costs .bg-white label,
 html.dark .owner-costs .bg-white span {
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-}
-
-html.dark .owner-costs input,
-html.dark .owner-costs textarea {
-  background-color: #10262c !important;
+  background-color: #0b1f24 !important;
   color: #e2f6f4 !important;
 }
 
-html.dark .owner-costs input::placeholder,
-html.dark .owner-costs textarea::placeholder {
-  color: #d7f4f0 !important;
+html.dark .owner-costs input,
+html.dark .owner-costs textarea,
+html.dark .owner-costs select {
+  background-color: #061418 !important;
+  color: #e2f6f4 !important;
+  border-color: rgba(45, 212, 191, 0.35) !important;
 }
 
 html.dark .owner-costs button {
