@@ -42,52 +42,73 @@ export default function HomePage() {
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 lg:grid-cols-2">
-        <div>
-          <p className="text-sm uppercase tracking-wide text-teal-400">For one-person businesses</p>
-          <h1 className="mt-3 text-4xl font-semibold leading-tight md:text-5xl">
-            Get paid. Stay client-ready.
-          </h1>
-          <p className="mt-4 max-w-xl text-[var(--cr-muted)]">
-            Write the proposal, send the invoice, mark it paid, and keep a year log.
-            No blank page. No card required to start.
-          </p>
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <a href="/signup" className="rounded-lg bg-teal-400 px-5 py-3 text-sm font-medium text-slate-950">
-              Start free
-            </a>
-            <a href="#pricing" className="rounded-lg border border-teal-400/40 px-5 py-3 text-sm">
-              See pricing
-            </a>
-          </div>
+      <section className="mx-auto max-w-6xl px-4 py-16">
+        <p className="text-sm uppercase tracking-wide text-teal-400">For one-person businesses</p>
+        <h1 className="mt-3 max-w-3xl text-4xl font-semibold leading-tight md:text-5xl">
+          Get paid. Stay client-ready.
+        </h1>
+        <p className="mt-4 max-w-2xl text-[var(--cr-muted)]">
+          The customer gets a clean invoice. You keep the job costs, the pay record, and the year log.
+        </p>
+        <div className="mt-8 flex flex-wrap items-center gap-3">
+          <a href="/signup" className="rounded-lg bg-teal-400 px-5 py-3 text-sm font-medium text-slate-950">
+            Start free
+          </a>
+          <a href="#pricing" className="rounded-lg border border-teal-400/40 px-5 py-3 text-sm">
+            See pricing
+          </a>
         </div>
 
-        <div id="preview" className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Sample invoice</p>
-          <div className="mt-2 flex items-start justify-between">
-            <div>
-              <h2 className="text-2xl font-semibold">INV-1042</h2>
-              <p className="mt-2 text-sm text-slate-600">North Yard Co.</p>
-              <p className="text-sm text-slate-600">Bill to: Lena Ortiz</p>
+        <div className="mt-10 grid gap-4 lg:grid-cols-2">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm">
+            <p className="text-xs uppercase tracking-wide text-slate-500">What the customer sees</p>
+            <div className="mt-2 flex items-start justify-between">
+              <div>
+                <h2 className="text-2xl font-semibold">INV-1042</h2>
+                <p className="mt-2 text-sm text-slate-600">North Yard Co.</p>
+                <p className="text-sm text-slate-600">Bill to: Lena Ortiz</p>
+              </div>
+              <div className="text-right text-sm text-slate-600">
+                <p>Date: 2026-10-01</p>
+                <p>Due: 2026-10-15</p>
+              </div>
             </div>
-            <div className="text-right text-sm text-slate-600">
-              <p>Date: 2026-10-01</p>
-              <p>Due: 2026-10-15</p>
+            <div className="mt-6 flex justify-between border-t border-slate-200 pt-3 text-sm">
+              <span>Fall cleanup</span>
+              <span>$240.00</span>
+            </div>
+            <div className="mt-2 flex justify-between text-sm">
+              <span>Haul away</span>
+              <span>$80.00</span>
+            </div>
+            <div className="mt-4 flex justify-between border-t border-slate-200 pt-3 font-semibold">
+              <span>Total</span>
+              <span>$320.00</span>
+            </div>
+            <p className="mt-4 text-sm text-slate-600">Pay here: Venmo @northyard</p>
+          </div>
+
+          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-6 text-slate-900">
+            <p className="text-xs uppercase tracking-wide text-amber-800">What you see</p>
+            <h2 className="mt-2 text-xl font-semibold">Your costs only</h2>
+            <p className="mt-1 text-sm text-slate-600">Hidden from the customer PDF.</p>
+            <div className="mt-4 space-y-2 text-sm">
+              <div className="flex justify-between"><span>Parts</span><span>$40.00</span></div>
+              <div className="flex justify-between"><span>Gas / mileage</span><span>$18.00</span></div>
+              <div className="flex justify-between"><span>Drive time</span><span>$25.00</span></div>
+              <div className="flex justify-between"><span>Labor / wages</span><span>$90.00</span></div>
+              <div className="flex justify-between"><span>Tools</span><span>$0.00</span></div>
+              <div className="flex justify-between"><span>Lunch / meals</span><span>$12.00</span></div>
+              <div className="flex justify-between"><span>Other</span><span>$0.00</span></div>
+            </div>
+            <div className="mt-4 space-y-1 border-t border-amber-200 pt-3 text-sm">
+              <div className="flex justify-between"><span>Job cost</span><span>$185.00</span></div>
+              <div className="flex justify-between"><span>You charge</span><span>$320.00</span></div>
+              <div className="flex justify-between"><span>Left over</span><span>$135.00</span></div>
+              <div className="flex justify-between"><span>Set aside 30%</span><span>$40.50</span></div>
+              <div className="flex justify-between font-semibold"><span>Yours after set-aside</span><span>$94.50</span></div>
             </div>
           </div>
-          <div className="mt-6 flex justify-between border-t border-slate-200 pt-3 text-sm">
-            <span>Fall cleanup</span>
-            <span>$240.00</span>
-          </div>
-          <div className="mt-2 flex justify-between text-sm">
-            <span>Haul away</span>
-            <span>$80.00</span>
-          </div>
-          <div className="mt-4 flex justify-between border-t border-slate-200 pt-3 font-semibold">
-            <span>Total</span>
-            <span>$320.00</span>
-          </div>
-          <p className="mt-4 text-sm text-slate-600">Pay here: Venmo @northyard</p>
         </div>
       </section>
 
