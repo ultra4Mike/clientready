@@ -53,7 +53,7 @@ export default function CollectPage() {
     window.localStorage.setItem("clientready-documents", JSON.stringify(next));
   }
 
-  async function setStatus(id: string, status: string) {
+async function setStatus(id: string, status: string) {
     const next = documents.map((doc) => {
       if (doc.id !== id) return doc;
       return {
@@ -66,7 +66,15 @@ export default function CollectPage() {
     });
     saveDocs(next);
     const updated = next.find((doc) => doc.id === id);
-    if (updated) await saveCloudDocument(updated);
+    if (!updated) return;
+    await saveCloudDocument({
+      id: updated.id,
+      type: updated.type,
+      title: updated.title,
+      clientName: updated.clientName,
+      createdAt: updated.createdAt,
+      data: updated.data || {},
+    });
   }
 
   function openInvoice(id: string) {
