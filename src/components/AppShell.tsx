@@ -14,6 +14,7 @@ const mainLinks = [
 const moreLinks = [
   { href: "/upcoming", label: "This week" },
   { href: "/history", label: "History" },
+  { href: "/employees", label: "Employees" },
   { href: "/year", label: "Year packet" },
   { href: "/backup", label: "Backup" },
 ];
