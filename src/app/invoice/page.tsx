@@ -29,7 +29,28 @@ type SavedDocument = {
   data: Record<string, unknown>;
 };
 
+type JobCosts = {
+  parts: string;
+  gas: string;
+  driveTime: string;
+  labor: string;
+  tools: string;
+  lunch: string;
+  other: string;
+  notes: string;
+};
+
 const emptyItem: LineItem = { description: "", qty: "1", rate: "" };
+const emptyCosts: JobCosts = {
+  parts: "",
+  gas: "",
+  driveTime: "",
+  labor: "",
+  tools: "",
+  lunch: "",
+  other: "",
+  notes: "",
+};
 
 function ymd(date: Date) {
   const year = date.getFullYear();
@@ -42,6 +63,10 @@ function plusDays(days: number) {
   const date = new Date();
   date.setDate(date.getDate() + days);
   return ymd(date);
+}
+
+function money(value: string) {
+  return Number(String(value).replace(/[^0-9.]/g, "")) || 0;
 }
 
 export default function NewInvoicePage() {
@@ -69,6 +94,8 @@ export default function NewInvoicePage() {
   const [style, setStyle] = useState("clean");
   const [paymentLink, setPaymentLink] = useState("");
   const [jobTime, setJobTime] = useState("");
+  const [costs, setCosts] = useState<JobCosts>(emptyCosts);
+  const [setAsidePercent, setSetAsidePercent] = useState("30");
 
   useEffect(() => {
     const raw = window.localStorage.getItem("clientready-profile");
@@ -80,6 +107,7 @@ export default function NewInvoicePage() {
     setBusinessPhone(profile.phone || "");
     setPaymentLink(profile.paymentLink || "");
     setLogo(profile.logo || "");
+    setSetAsidePercent(profile.setAsidePercent || "30");
   }, []);
 
   useEffect(() => {
@@ -91,11 +119,7 @@ export default function NewInvoicePage() {
       const user = data.user;
       if (!user) return;
 
-      const { data: rows } = await supabase
-        .from("clients")
-        .select("*")
-        .eq("user_id", user.id);
-
+      const { data: rows } = await supabase.from("clients").select("*").eq("user_id", user.id);
       if (!rows) return;
       const next = rows.map((row) => ({
         id: row.id,
@@ -153,6 +177,7 @@ export default function NewInvoicePage() {
       status?: string;
       style?: string;
       jobTime?: string;
+      jobCosts?: JobCosts;
     };
     setDocId(doc.id);
     setClientName(data.clientName || "");
@@ -170,6 +195,7 @@ export default function NewInvoicePage() {
     setStatus(data.status || "draft");
     setStyle(data.style || "clean");
     setJobTime(data.jobTime || "");
+    setCosts({ ...emptyCosts, ...(data.jobCosts || {}) });
   }, []);
 
   const filteredClients = savedClients.filter((client) => {
@@ -208,31 +234,28 @@ export default function NewInvoicePage() {
       setSaveMessage("Add a client name first");
       return;
     }
-
     const raw = window.localStorage.getItem("clientready-clients");
     const clients: SavedClient[] = raw ? JSON.parse(raw) : [];
     const alreadySaved = clients.some((client) => {
-      if (clientEmail && client.email) {
-        return client.email.toLowerCase() === clientEmail.toLowerCase();
-      }
+      if (clientEmail && client.email) return client.email.toLowerCase() === clientEmail.toLowerCase();
       return client.name.toLowerCase() === clientName.toLowerCase();
     });
-
     if (alreadySaved) {
       setSaveMessage("That client is already saved");
       setTimeout(() => setSaveMessage(""), 2000);
       return;
     }
-
-    const nextClient: SavedClient = {
-      id: Date.now().toString(),
-      name: clientName,
-      company: clientCompany,
-      email: clientEmail,
-      phone: clientPhone,
-      address: clientAddress,
-    };
-    const next = [...clients, nextClient];
+    const next = [
+      ...clients,
+      {
+        id: Date.now().toString(),
+        name: clientName,
+        company: clientCompany,
+        email: clientEmail,
+        phone: clientPhone,
+        address: clientAddress,
+      },
+    ];
     window.localStorage.setItem("clientready-clients", JSON.stringify(next));
     setSavedClients(next);
     setSaveMessage("Client saved");
@@ -257,6 +280,7 @@ export default function NewInvoicePage() {
     setStatus("draft");
     setStyle("clean");
     setJobTime("");
+    setCosts(emptyCosts);
   }
 
   async function saveDocument() {
@@ -284,14 +308,13 @@ export default function NewInvoicePage() {
         status,
         style,
         jobTime,
+        jobCosts: costs,
       },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
     const next = [
-      ...docs.filter(
-        (item: { id: string }) => item.id !== localId && item.id !== cloudId
-      ),
+      ...docs.filter((item: { id: string }) => item.id !== localId && item.id !== cloudId),
       nextDoc,
     ];
     window.localStorage.setItem("clientready-documents", JSON.stringify(next));
@@ -316,27 +339,34 @@ export default function NewInvoicePage() {
 
   function updateItem(index: number, field: keyof LineItem, value: string) {
     setItems((current) =>
-      current.map((item, itemIndex) =>
-        itemIndex === index ? { ...item, [field]: value } : item
-      )
+      current.map((item, itemIndex) => (itemIndex === index ? { ...item, [field]: value } : item))
     );
   }
 
   const totals = useMemo(() => {
-    const subtotal = items.reduce((sum, item) => {
-      const qty = Number(item.qty) || 0;
-      const rate = Number(item.rate) || 0;
-      return sum + qty * rate;
-    }, 0);
+    const subtotal = items.reduce((sum, item) => sum + (Number(item.qty) || 0) * (Number(item.rate) || 0), 0);
     const tax = subtotal * ((Number(taxPercent) || 0) / 100);
     return { subtotal, tax, total: subtotal + tax };
   }, [items, taxPercent]);
+
+  const jobMath = useMemo(() => {
+    const jobCost =
+      money(costs.parts) +
+      money(costs.gas) +
+      money(costs.driveTime) +
+      money(costs.labor) +
+      money(costs.tools) +
+      money(costs.lunch) +
+      money(costs.other);
+    const leftOver = totals.total - jobCost;
+    const setAside = leftOver > 0 ? leftOver * ((Number(setAsidePercent) || 0) / 100) : 0;
+    return { jobCost, leftOver, setAside, yours: leftOver - setAside };
+  }, [costs, totals.total, setAsidePercent]);
 
   const previewClass =
     style === "bold"
       ? "rounded-2xl border border-slate-900 bg-slate-900 p-8 text-white shadow-sm"
       : "rounded-2xl border border-slate-200 bg-white p-8 text-slate-900 shadow-sm";
-
   const mutedClass = style === "bold" ? "text-slate-300" : "text-slate-600";
   const labelClass = style === "bold" ? "text-slate-400" : "text-slate-500";
 
@@ -345,7 +375,6 @@ export default function NewInvoicePage() {
       <section className="mx-auto grid max-w-6xl gap-8 px-6 py-8 lg:grid-cols-2">
         <form className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
           <h1 className="text-xl font-semibold">Invoice details</h1>
-
           <div>
             <input
               className="w-full rounded-lg border border-slate-300 px-3 py-2"
@@ -363,193 +392,95 @@ export default function NewInvoicePage() {
                     className="block w-full border-b border-slate-100 px-3 py-2 text-left hover:bg-slate-50"
                   >
                     <span className="block font-medium">{client.name}</span>
-                    <span className="block text-sm text-slate-500">
-                      {client.company || client.email}
-                    </span>
+                    <span className="block text-sm text-slate-500">{client.company || client.email}</span>
                   </button>
                 ))}
               </div>
             )}
           </div>
-
-          <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="Client name"
-            value={clientName}
-            onChange={(event) => setClientName(event.target.value)}
-          />
-          <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="Client company"
-            value={clientCompany}
-            onChange={(event) => setClientCompany(event.target.value)}
-          />
-          <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="Client email"
-            value={clientEmail}
-            onChange={(event) => setClientEmail(event.target.value)}
-          />
-          <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="Client phone"
-            value={clientPhone}
-            onChange={(event) => setClientPhone(event.target.value)}
-          />
-          <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="Client address"
-            value={clientAddress}
-            onChange={(event) => setClientAddress(event.target.value)}
-          />
-          <button
-            type="button"
-            onClick={saveClientFromForm}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
-          >
-            Save as client
-          </button>
-          <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="Invoice number"
-            value={invoiceNumber}
-            onChange={(event) => setInvoiceNumber(event.target.value)}
-          />
-
-          <select
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            value={status}
-            onChange={(event) => setStatus(event.target.value)}
-          >
+          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client name" value={clientName} onChange={(event) => setClientName(event.target.value)} />
+          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client company" value={clientCompany} onChange={(event) => setClientCompany(event.target.value)} />
+          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client email" value={clientEmail} onChange={(event) => setClientEmail(event.target.value)} />
+          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client phone" value={clientPhone} onChange={(event) => setClientPhone(event.target.value)} />
+          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client address" value={clientAddress} onChange={(event) => setClientAddress(event.target.value)} />
+          <button type="button" onClick={saveClientFromForm} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Save as client</button>
+          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Invoice number" value={invoiceNumber} onChange={(event) => setInvoiceNumber(event.target.value)} />
+          <select className="w-full rounded-lg border border-slate-300 px-3 py-2" value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="draft">Draft</option>
             <option value="sent">Sent</option>
             <option value="paid">Paid</option>
             <option value="overdue">Overdue</option>
           </select>
-
-          <select
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            value={style}
-            onChange={(event) => setStyle(event.target.value)}
-          >
+          <select className="w-full rounded-lg border border-slate-300 px-3 py-2" value={style} onChange={(event) => setStyle(event.target.value)}>
             <option value="clean">Clean professional</option>
             <option value="bold">Bold modern</option>
           </select>
-
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="text-sm text-slate-600">
               Invoice date
-              <input
-                type="date"
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-                value={invoiceDate}
-                onChange={(event) => setInvoiceDate(event.target.value)}
-              />
+              <input type="date" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} />
             </label>
             <label className="text-sm text-slate-600">
               Due date
-              <input
-                type="date"
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-                value={dueDate}
-                onChange={(event) => setDueDate(event.target.value)}
-              />
+              <input type="date" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
             </label>
           </div>
-
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="font-medium">Line items</h2>
-              <button
-                type="button"
-                className="text-sm text-slate-700"
-                onClick={() => setItems((current) => [...current, { ...emptyItem }])}
-              >
-                Add item
-              </button>
+              <button type="button" className="text-sm text-slate-700" onClick={() => setItems((current) => [...current, { ...emptyItem }])}>Add item</button>
             </div>
             {items.map((item, index) => (
               <div key={index} className="grid gap-2 sm:grid-cols-3">
-                <input
-                  className="rounded-lg border border-slate-300 px-3 py-2"
-                  placeholder="Description"
-                  value={item.description}
-                  onChange={(event) =>
-                    updateItem(index, "description", event.target.value)
-                  }
-                />
-                <input
-                  className="rounded-lg border border-slate-300 px-3 py-2"
-                  placeholder="Qty"
-                  value={item.qty}
-                  onChange={(event) => updateItem(index, "qty", event.target.value)}
-                />
-                <input
-                  className="rounded-lg border border-slate-300 px-3 py-2"
-                  placeholder="Rate"
-                  value={item.rate}
-                  onChange={(event) => updateItem(index, "rate", event.target.value)}
-                />
+                <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Description" value={item.description} onChange={(event) => updateItem(index, "description", event.target.value)} />
+                <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Qty" value={item.qty} onChange={(event) => updateItem(index, "qty", event.target.value)} />
+                <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Rate" value={item.rate} onChange={(event) => updateItem(index, "rate", event.target.value)} />
               </div>
             ))}
           </div>
+          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Tax percent" value={taxPercent} onChange={(event) => setTaxPercent(event.target.value)} />
+          <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
 
-          <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="Tax percent"
-            value={taxPercent}
-            onChange={(event) => setTaxPercent(event.target.value)}
-          />
-          <textarea
-            className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="Notes"
-            value={notes}
-            onChange={(event) => setNotes(event.target.value)}
-          />
+          <div className="owner-costs space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-slate-900">
+            <h2 className="font-medium">Your costs only</h2>
+            <p className="text-sm text-slate-600">Hidden from the customer PDF. Use this to price the job.</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Parts" value={costs.parts} onChange={(event) => setCosts({ ...costs, parts: event.target.value })} />
+              <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Gas / mileage" value={costs.gas} onChange={(event) => setCosts({ ...costs, gas: event.target.value })} />
+              <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Drive time" value={costs.driveTime} onChange={(event) => setCosts({ ...costs, driveTime: event.target.value })} />
+              <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Labor / wages" value={costs.labor} onChange={(event) => setCosts({ ...costs, labor: event.target.value })} />
+              <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Tools" value={costs.tools} onChange={(event) => setCosts({ ...costs, tools: event.target.value })} />
+              <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Lunch / meals" value={costs.lunch} onChange={(event) => setCosts({ ...costs, lunch: event.target.value })} />
+              <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Other" value={costs.other} onChange={(event) => setCosts({ ...costs, other: event.target.value })} />
+            </div>
+            <textarea className="min-h-16 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Cost notes" value={costs.notes} onChange={(event) => setCosts({ ...costs, notes: event.target.value })} />
+            <div className="space-y-1 text-sm">
+              <p>Job cost: ${jobMath.jobCost.toFixed(2)}</p>
+              <p>You charge: ${totals.total.toFixed(2)}</p>
+              <p>Left over: ${jobMath.leftOver.toFixed(2)}</p>
+              <p>Set aside ({setAsidePercent}%): ${jobMath.setAside.toFixed(2)}</p>
+              <p className="font-semibold">Yours after set-aside: ${jobMath.yours.toFixed(2)}</p>
+            </div>
+          </div>
 
           <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={saveDocument}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white"
-            >
-              Save document
-            </button>
-            <button
-              type="button"
-              onClick={clearForm}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
-            >
-              Clear form
-            </button>
+            <button type="button" onClick={saveDocument} className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white">Save document</button>
+            <button type="button" onClick={clearForm} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Clear form</button>
           </div>
           {saveMessage && <p className="text-sm text-slate-600">{saveMessage}</p>}
         </form>
 
         <div>
           <div className="mb-4 flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white"
-            >
-              Print / Save PDF
-            </button>
+            <button type="button" onClick={() => window.print()} className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white">Print / Save PDF</button>
             {status !== "paid" && (
-              <button
-                type="button"
-                onClick={copyPayLink}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
-              >
+              <button type="button" onClick={copyPayLink} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">
                 {paymentLink.trim() ? "Pay / Copy pay link" : "Add how to pay"}
               </button>
             )}
           </div>
-
           <div id="preview" className={previewClass}>
-            {logo && (
-              <img src={logo} alt="Business logo" className="mb-3 h-14 w-auto" />
-            )}
+            {logo && <img src={logo} alt="Business logo" className="mb-3 h-14 w-auto" />}
             <div className="flex items-start justify-between">
               <div>
                 <p className={`text-sm uppercase tracking-wide ${labelClass}`}>Invoice</p>
@@ -567,7 +498,6 @@ export default function NewInvoicePage() {
                 {jobTime && <div>Time: {jobTime}</div>}
               </div>
             </div>
-
             <div className="mt-8">
               <p className={`text-sm ${labelClass}`}>Bill to</p>
               <p className="font-medium">{clientName || "Client name"}</p>
@@ -576,7 +506,6 @@ export default function NewInvoicePage() {
               {clientPhone && <p className={`text-sm ${mutedClass}`}>{clientPhone}</p>}
               {clientAddress && <p className={`text-sm ${mutedClass}`}>{clientAddress}</p>}
             </div>
-
             <div className="mt-8 border-t border-slate-500 pt-4">
               {items.map((item, index) => {
                 const amount = (Number(item.qty) || 0) * (Number(item.rate) || 0);
@@ -588,26 +517,13 @@ export default function NewInvoicePage() {
                 );
               })}
             </div>
-
             <div className="mt-6 space-y-1 border-t border-slate-500 pt-4 text-sm">
-              <div className="flex justify-between">
-                <span>Subtotal</span>
-                <span>${totals.subtotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Tax</span>
-                <span>${totals.tax.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-base font-semibold">
-                <span>Total</span>
-                <span>${totals.total.toFixed(2)}</span>
-              </div>
+              <div className="flex justify-between"><span>Subtotal</span><span>${totals.subtotal.toFixed(2)}</span></div>
+              <div className="flex justify-between"><span>Tax</span><span>${totals.tax.toFixed(2)}</span></div>
+              <div className="flex justify-between text-base font-semibold"><span>Total</span><span>${totals.total.toFixed(2)}</span></div>
             </div>
-
             <p className={`mt-8 text-sm ${mutedClass}`}>{notes}</p>
-            {paymentLink && (
-              <p className={`mt-4 text-sm ${mutedClass}`}>Pay here: {paymentLink}</p>
-            )}
+            {paymentLink && <p className={`mt-4 text-sm ${mutedClass}`}>Pay here: {paymentLink}</p>}
           </div>
         </div>
       </section>

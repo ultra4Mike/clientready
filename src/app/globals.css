@@ -83,7 +83,10 @@ html.dark body {
   nav {
     display: none !important;
   }
-
+  .owner-costs {
+    display: none !important;
+  }
+  
   #preview {
     box-shadow: none !important;
     border: none !important;

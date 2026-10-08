@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { saveCloudDocument } from "@/lib/cloud-docs";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
@@ -23,6 +23,28 @@ type SavedDocument = {
   data: Record<string, unknown>;
 };
 
+type JobCosts = {
+  parts: string;
+  gas: string;
+  driveTime: string;
+  labor: string;
+  tools: string;
+  lunch: string;
+  other: string;
+  notes: string;
+};
+
+const emptyCosts: JobCosts = {
+  parts: "",
+  gas: "",
+  driveTime: "",
+  labor: "",
+  tools: "",
+  lunch: "",
+  other: "",
+  notes: "",
+};
+
 function ymd(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -34,6 +56,10 @@ function plusDays(days: number) {
   const date = new Date();
   date.setDate(date.getDate() + days);
   return ymd(date);
+}
+
+function money(value: string) {
+  return Number(String(value).replace(/[^0-9.]/g, "")) || 0;
 }
 
 export default function ProposalPage() {
@@ -62,6 +88,8 @@ export default function ProposalPage() {
   const [style, setStyle] = useState("clean");
   const [outcome, setOutcome] = useState("pending");
   const [paymentLink, setPaymentLink] = useState("");
+  const [costs, setCosts] = useState<JobCosts>(emptyCosts);
+  const [setAsidePercent, setSetAsidePercent] = useState("30");
 
   useEffect(() => {
     const raw = window.localStorage.getItem("clientready-profile");
@@ -73,22 +101,17 @@ export default function ProposalPage() {
     setBusinessPhone(profile.phone || "");
     setLogo(profile.logo || "");
     setPaymentLink(profile.paymentLink || "");
+    setSetAsidePercent(profile.setAsidePercent || "30");
   }, []);
 
   useEffect(() => {
     async function loadClients() {
       const raw = window.localStorage.getItem("clientready-clients");
       if (raw) setSavedClients(JSON.parse(raw));
-
       const { data } = await supabase.auth.getUser();
       const user = data.user;
       if (!user) return;
-
-      const { data: rows } = await supabase
-        .from("clients")
-        .select("*")
-        .eq("user_id", user.id);
-
+      const { data: rows } = await supabase.from("clients").select("*").eq("user_id", user.id);
       if (!rows) return;
       const next = rows.map((row) => ({
         id: row.id,
@@ -132,6 +155,7 @@ export default function ProposalPage() {
       validUntil?: string;
       style?: string;
       outcome?: string;
+      jobCosts?: JobCosts;
     };
     setDocId(doc.id);
     setClientName(data.clientName || "");
@@ -150,6 +174,7 @@ export default function ProposalPage() {
     setClientSearch(data.clientName || "");
     setStyle(data.style || "clean");
     setOutcome(data.outcome || "pending");
+    setCosts({ ...emptyCosts, ...(data.jobCosts || {}) });
   }, []);
 
   const filteredClients = savedClients.filter((client) => {
@@ -186,7 +211,23 @@ export default function ProposalPage() {
     setSaveMessage("");
     setStyle("clean");
     setOutcome("pending");
+    setCosts(emptyCosts);
   }
+
+  const jobMath = useMemo(() => {
+    const charge = money(price);
+    const jobCost =
+      money(costs.parts) +
+      money(costs.gas) +
+      money(costs.driveTime) +
+      money(costs.labor) +
+      money(costs.tools) +
+      money(costs.lunch) +
+      money(costs.other);
+    const leftOver = charge - jobCost;
+    const setAside = leftOver > 0 ? leftOver * ((Number(setAsidePercent) || 0) / 100) : 0;
+    return { charge, jobCost, leftOver, setAside, yours: leftOver - setAside };
+  }, [costs, price, setAsidePercent]);
 
   async function createInvoiceFromProposal() {
     const raw = window.localStorage.getItem("clientready-documents");
@@ -201,7 +242,6 @@ export default function ProposalPage() {
         if (num > highest) highest = num;
       }
     });
-
     const invoiceNumber = `INV-${highest + 1}`;
     const localId = Date.now().toString();
     const nextDoc = {
@@ -221,24 +261,16 @@ export default function ProposalPage() {
         dueDate: plusDays(14),
         notes: paymentTerms || "Payment is due within 14 days.",
         taxPercent: "0",
-        items: [
-          {
-            description: projectTitle || "Work from proposal",
-            qty: "1",
-            rate: String(price || "0"),
-          },
-        ],
+        items: [{ description: projectTitle || "Work from proposal", qty: "1", rate: String(money(price)) }],
         status: "draft",
         style,
         jobTime: "",
+        jobCosts: costs,
       },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
-    window.localStorage.setItem(
-      "clientready-documents",
-      JSON.stringify([...docs, nextDoc])
-    );
+    window.localStorage.setItem("clientready-documents", JSON.stringify([...docs, nextDoc]));
     setOutcome("won");
     window.localStorage.setItem("clientready-open-document", cloudId);
     window.location.href = "/invoice";
@@ -270,14 +302,13 @@ export default function ProposalPage() {
         validUntil,
         style,
         outcome,
+        jobCosts: costs,
       },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
     const next = [
-      ...docs.filter(
-        (item: { id: string }) => item.id !== localId && item.id !== cloudId
-      ),
+      ...docs.filter((item: { id: string }) => item.id !== localId && item.id !== cloudId),
       nextDoc,
     ];
     window.localStorage.setItem("clientready-documents", JSON.stringify(next));
@@ -292,186 +323,89 @@ export default function ProposalPage() {
       : "rounded-2xl border border-slate-200 bg-white p-8 text-slate-900 shadow-sm";
   const mutedClass = style === "bold" ? "text-slate-300" : "text-slate-600";
   const labelClass = style === "bold" ? "text-slate-400" : "text-slate-500";
-  const priceLabel = price
-    ? price.trim().startsWith("$")
-      ? price
-      : `$${Number(price).toFixed(2)}`
-    : "$0.00";
+  const priceLabel = price ? (price.trim().startsWith("$") ? price : `$${money(price).toFixed(2)}`) : "$0.00";
 
   return (
     <AppShell title="New proposal">
       <section className="mx-auto grid max-w-6xl gap-8 px-6 py-8 lg:grid-cols-2">
         <form className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
           <h1 className="text-xl font-semibold">Proposal details</h1>
-
-          <select
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            value={style}
-            onChange={(event) => setStyle(event.target.value)}
-          >
+          <select className="w-full rounded-lg border border-slate-300 px-3 py-2" value={style} onChange={(event) => setStyle(event.target.value)}>
             <option value="clean">Clean professional</option>
             <option value="bold">Bold modern</option>
           </select>
-
-          <select
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            value={outcome}
-            onChange={(event) => setOutcome(event.target.value)}
-          >
+          <select className="w-full rounded-lg border border-slate-300 px-3 py-2" value={outcome} onChange={(event) => setOutcome(event.target.value)}>
             <option value="pending">Pending</option>
             <option value="won">Won</option>
             <option value="lost">Lost</option>
           </select>
-
           <div>
-            <input
-              className="w-full rounded-lg border border-slate-300 px-3 py-2"
-              placeholder="Search clients by name"
-              value={clientSearch}
-              onChange={(event) => setClientSearch(event.target.value)}
-            />
+            <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Search clients by name" value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} />
             {filteredClients.length > 0 && (
               <div className="mt-2 overflow-hidden rounded-lg border border-slate-200 bg-white">
                 {filteredClients.map((client) => (
-                  <button
-                    key={client.id}
-                    type="button"
-                    onClick={() => chooseClient(client)}
-                    className="block w-full border-b border-slate-100 px-3 py-2 text-left hover:bg-slate-50"
-                  >
+                  <button key={client.id} type="button" onClick={() => chooseClient(client)} className="block w-full border-b border-slate-100 px-3 py-2 text-left hover:bg-slate-50">
                     <span className="block font-medium">{client.name}</span>
-                    <span className="block text-sm text-slate-500">
-                      {client.company || client.email}
-                    </span>
+                    <span className="block text-sm text-slate-500">{client.company || client.email}</span>
                   </button>
                 ))}
               </div>
             )}
           </div>
-
-          <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="Client name"
-            value={clientName}
-            onChange={(event) => setClientName(event.target.value)}
-          />
-          <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="Client company"
-            value={clientCompany}
-            onChange={(event) => setClientCompany(event.target.value)}
-          />
-          <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="Client email"
-            value={clientEmail}
-            onChange={(event) => setClientEmail(event.target.value)}
-          />
-          <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="Client phone"
-            value={clientPhone}
-            onChange={(event) => setClientPhone(event.target.value)}
-          />
-          <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="Client address"
-            value={clientAddress}
-            onChange={(event) => setClientAddress(event.target.value)}
-          />
-          <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="Project title"
-            value={projectTitle}
-            onChange={(event) => setProjectTitle(event.target.value)}
-          />
-          <textarea
-            className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="Project description"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-          />
-          <textarea
-            className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="What's included"
-            value={scope}
-            onChange={(event) => setScope(event.target.value)}
-          />
-          <textarea
-            className="min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="What's not included"
-            value={notIncluded}
-            onChange={(event) => setNotIncluded(event.target.value)}
-          />
-          <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="Timeline"
-            value={timeline}
-            onChange={(event) => setTimeline(event.target.value)}
-          />
-          <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="Price"
-            value={price}
-            onChange={(event) => setPrice(event.target.value)}
-          />
-          <textarea
-            className="min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="Payment terms"
-            value={paymentTerms}
-            onChange={(event) => setPaymentTerms(event.target.value)}
-          />
+          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client name" value={clientName} onChange={(event) => setClientName(event.target.value)} />
+          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client company" value={clientCompany} onChange={(event) => setClientCompany(event.target.value)} />
+          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client email" value={clientEmail} onChange={(event) => setClientEmail(event.target.value)} />
+          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client phone" value={clientPhone} onChange={(event) => setClientPhone(event.target.value)} />
+          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client address" value={clientAddress} onChange={(event) => setClientAddress(event.target.value)} />
+          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Project title" value={projectTitle} onChange={(event) => setProjectTitle(event.target.value)} />
+          <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Project description" value={description} onChange={(event) => setDescription(event.target.value)} />
+          <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="What's included" value={scope} onChange={(event) => setScope(event.target.value)} />
+          <textarea className="min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="What's not included" value={notIncluded} onChange={(event) => setNotIncluded(event.target.value)} />
+          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Timeline" value={timeline} onChange={(event) => setTimeline(event.target.value)} />
+          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Price" value={price} onChange={(event) => setPrice(event.target.value)} />
+          <textarea className="min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Payment terms" value={paymentTerms} onChange={(event) => setPaymentTerms(event.target.value)} />
           <label className="text-sm text-slate-600">
             Valid until
-            <input
-              type="date"
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-              value={validUntil}
-              onChange={(event) => setValidUntil(event.target.value)}
-            />
+            <input type="date" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} />
           </label>
 
+          <div className="owner-costs space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-slate-900">
+            <h2 className="font-medium">Your costs only</h2>
+            <p className="text-sm text-slate-600">Hidden from the customer PDF. Use this before you send the price.</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Parts" value={costs.parts} onChange={(event) => setCosts({ ...costs, parts: event.target.value })} />
+              <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Gas / mileage" value={costs.gas} onChange={(event) => setCosts({ ...costs, gas: event.target.value })} />
+              <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Drive time" value={costs.driveTime} onChange={(event) => setCosts({ ...costs, driveTime: event.target.value })} />
+              <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Labor / wages" value={costs.labor} onChange={(event) => setCosts({ ...costs, labor: event.target.value })} />
+              <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Tools" value={costs.tools} onChange={(event) => setCosts({ ...costs, tools: event.target.value })} />
+              <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Lunch / meals" value={costs.lunch} onChange={(event) => setCosts({ ...costs, lunch: event.target.value })} />
+              <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Other" value={costs.other} onChange={(event) => setCosts({ ...costs, other: event.target.value })} />
+            </div>
+            <textarea className="min-h-16 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Cost notes" value={costs.notes} onChange={(event) => setCosts({ ...costs, notes: event.target.value })} />
+            <div className="space-y-1 text-sm">
+              <p>Job cost: ${jobMath.jobCost.toFixed(2)}</p>
+              <p>You charge: ${jobMath.charge.toFixed(2)}</p>
+              <p>Left over: ${jobMath.leftOver.toFixed(2)}</p>
+              <p>Set aside ({setAsidePercent}%): ${jobMath.setAside.toFixed(2)}</p>
+              <p className="font-semibold">Yours after set-aside: ${jobMath.yours.toFixed(2)}</p>
+            </div>
+          </div>
+
           <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={saveDocument}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white"
-            >
-              Save document
-            </button>
-            <button
-              type="button"
-              onClick={createInvoiceFromProposal}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
-            >
-              Create invoice
-            </button>
-            <button
-              type="button"
-              onClick={clearForm}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
-            >
-              Clear form
-            </button>
+            <button type="button" onClick={saveDocument} className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white">Save document</button>
+            <button type="button" onClick={createInvoiceFromProposal} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Create invoice</button>
+            <button type="button" onClick={clearForm} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Clear form</button>
           </div>
           {saveMessage && <p className="text-sm text-slate-600">{saveMessage}</p>}
         </form>
 
         <div>
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="mb-4 rounded-lg bg-slate-900 px-4 py-2 text-sm text-white"
-          >
-            Print / Save PDF
-          </button>
-
+          <button type="button" onClick={() => window.print()} className="mb-4 rounded-lg bg-slate-900 px-4 py-2 text-sm text-white">Print / Save PDF</button>
           <div id="preview" className={previewClass}>
             {logo && <img src={logo} alt="Business logo" className="mb-3 h-14 w-auto" />}
             <p className={`text-sm uppercase tracking-wide ${labelClass}`}>Proposal</p>
             <h2 className="mt-1 text-2xl font-semibold">{projectTitle || "Project title"}</h2>
             <p className={`mt-2 text-sm ${mutedClass}`}>Valid until: {validUntil || "-"}</p>
-
             <div className="mt-8">
               <p className={`text-sm ${labelClass}`}>Prepared for</p>
               <p className="font-medium">{clientName || "Client name"}</p>
@@ -480,7 +414,6 @@ export default function ProposalPage() {
               {clientPhone && <p className={`text-sm ${mutedClass}`}>{clientPhone}</p>}
               {clientAddress && <p className={`text-sm ${mutedClass}`}>{clientAddress}</p>}
             </div>
-
             <div className={`mt-4 text-sm ${mutedClass}`}>
               <p className={labelClass}>Prepared by</p>
               <p className="font-medium">{businessName}</p>
@@ -488,7 +421,6 @@ export default function ProposalPage() {
               <p>{businessEmail}</p>
               <p>{businessPhone}</p>
             </div>
-
             <div className="mt-8 space-y-4 text-sm leading-6">
               <div>
                 <h3 className="font-semibold">Description</h3>
@@ -512,9 +444,7 @@ export default function ProposalPage() {
                 <p className="mt-1">{paymentTerms}</p>
                 {paymentLink && <p className="mt-2">Pay here: {paymentLink}</p>}
               </div>
-              <p className={`pt-4 text-xs ${labelClass}`}>
-                This proposal is for planning purposes and is not a signed contract.
-              </p>
+              <p className={`pt-4 text-xs ${labelClass}`}>This proposal is for planning purposes and is not a signed contract.</p>
             </div>
           </div>
         </div>
