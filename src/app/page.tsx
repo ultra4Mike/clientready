@@ -48,8 +48,14 @@ export default function HomePage() {
           Get paid. Stay client-ready.
         </h1>
         <p className="mt-4 max-w-2xl text-[var(--cr-muted)]">
-          The customer gets a clean invoice. You keep the job costs, the pay record, and the year log.
+          ClientReady is for a one-person business. Write the proposal, send the invoice, and mark it paid.
+          The customer gets a clean copy. You keep the job costs, the cash receipt, and a year log you can hand to a preparer.
         </p>
+        <ul className="mt-4 max-w-2xl space-y-1 text-sm text-[var(--cr-muted)]">
+          <li>Proposals and invoices, with your costs hidden from the customer.</li>
+          <li>Collect what is unpaid, then record cash, check, or an app payment.</li>
+          <li>Year packet totals for receipts, expenses, and a set-aside. Not a tax return.</li>
+        </ul>
         <div className="mt-8 flex flex-wrap items-center gap-3">
           <a href="/signup" className="rounded-lg bg-teal-400 px-5 py-3 text-sm font-medium text-slate-950">
             Start free
