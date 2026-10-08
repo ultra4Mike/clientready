@@ -83,6 +83,14 @@ html.dark .owner-costs span {
   color: #0f172a !important;
 }
 
+html.dark .owner-costs .bg-white,
+html.dark .owner-costs .bg-white p,
+html.dark .owner-costs .bg-white label,
+html.dark .owner-costs .bg-white span {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
 html.dark .owner-costs input,
 html.dark .owner-costs textarea {
   background-color: #10262c !important;
