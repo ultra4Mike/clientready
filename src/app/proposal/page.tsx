@@ -369,19 +369,43 @@ export default function ProposalPage() {
             <input type="date" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} />
           </label>
 
-          <div className="owner-costs space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-slate-900">
+<div className="owner-costs space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-slate-900">
             <h2 className="font-medium">Your costs only</h2>
             <p className="text-sm text-slate-600">Hidden from the customer PDF. Use this before you send the price.</p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Parts" value={costs.parts} onChange={(event) => setCosts({ ...costs, parts: event.target.value })} />
-              <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Gas / mileage" value={costs.gas} onChange={(event) => setCosts({ ...costs, gas: event.target.value })} />
-              <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Drive time" value={costs.driveTime} onChange={(event) => setCosts({ ...costs, driveTime: event.target.value })} />
-              <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Labor / wages" value={costs.labor} onChange={(event) => setCosts({ ...costs, labor: event.target.value })} />
-              <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Tools" value={costs.tools} onChange={(event) => setCosts({ ...costs, tools: event.target.value })} />
-              <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Lunch / meals" value={costs.lunch} onChange={(event) => setCosts({ ...costs, lunch: event.target.value })} />
-              <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Other" value={costs.other} onChange={(event) => setCosts({ ...costs, other: event.target.value })} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-sm text-slate-700">
+                Parts
+                <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.parts} onChange={(event) => setCosts({ ...costs, parts: event.target.value })} />
+              </label>
+              <label className="text-sm text-slate-700">
+                Gas / mileage
+                <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.gas} onChange={(event) => setCosts({ ...costs, gas: event.target.value })} />
+              </label>
+              <label className="text-sm text-slate-700">
+                Drive time
+                <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.driveTime} onChange={(event) => setCosts({ ...costs, driveTime: event.target.value })} />
+              </label>
+              <label className="text-sm text-slate-700">
+                Labor / wages
+                <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.labor} onChange={(event) => setCosts({ ...costs, labor: event.target.value })} />
+              </label>
+              <label className="text-sm text-slate-700">
+                Tools
+                <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.tools} onChange={(event) => setCosts({ ...costs, tools: event.target.value })} />
+              </label>
+              <label className="text-sm text-slate-700">
+                Lunch / meals
+                <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.lunch} onChange={(event) => setCosts({ ...costs, lunch: event.target.value })} />
+              </label>
+              <label className="text-sm text-slate-700">
+                Other
+                <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.other} onChange={(event) => setCosts({ ...costs, other: event.target.value })} />
+              </label>
             </div>
-            <textarea className="min-h-16 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Cost notes" value={costs.notes} onChange={(event) => setCosts({ ...costs, notes: event.target.value })} />
+            <label className="block text-sm text-slate-700">
+              Cost notes
+              <textarea className="mt-1 min-h-16 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.notes} onChange={(event) => setCosts({ ...costs, notes: event.target.value })} />
+            </label>
             <div className="space-y-1 text-sm">
               <p>Job cost: ${jobMath.jobCost.toFixed(2)}</p>
               <p>You charge: ${jobMath.charge.toFixed(2)}</p>
