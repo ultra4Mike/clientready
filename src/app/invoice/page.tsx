@@ -5,48 +5,11 @@ import { saveCloudDocument } from "@/lib/cloud-docs";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
 
-type LineItem = {
-  description: string;
-  qty: string;
-  rate: string;
-};
-
-type SavedClient = {
-  id: string;
-  name: string;
-  company: string;
-  email: string;
-  phone: string;
-  address: string;
-};
-
-type SavedDocument = {
-  id: string;
-  type: "invoice" | "proposal";
-  title: string;
-  clientName: string;
-  createdAt: string;
-  data: Record<string, unknown>;
-};
-
-type JobCosts = {
-  parts: string;
-  gas: string;
-  driveTime: string;
-  labor: string;
-  tools: string;
-  lunch: string;
-  other: string;
-  notes: string;
-};
-
-type Employee = {
-  id: string;
-  name: string;
-  rate: string;
-  active: boolean;
-};
-
+type LineItem = { description: string; qty: string; rate: string };
+type SavedClient = { id: string; name: string; company: string; email: string; phone: string; address: string };
+type SavedDocument = { id: string; type: "invoice" | "proposal"; title: string; clientName: string; createdAt: string; data: Record<string, unknown> };
+type JobCosts = { parts: string; gas: string; driveTime: string; labor: string; tools: string; lunch: string; other: string; notes: string };
+type Employee = { id: string; name: string; rate: string; active: boolean };
 type CrewRow = {
   id: string;
   employeeId: string;
@@ -57,39 +20,25 @@ type CrewRow = {
   endTime: string;
   workDate: string;
   note: string;
+  bonus: string;
   paidToWorker: boolean;
   paidDate: string;
 };
 
 const emptyItem: LineItem = { description: "", qty: "1", rate: "" };
-const emptyCosts: JobCosts = {
-  parts: "",
-  gas: "",
-  driveTime: "",
-  labor: "",
-  tools: "",
-  lunch: "",
-  other: "",
-  notes: "",
-};
+const emptyCosts: JobCosts = { parts: "", gas: "", driveTime: "", labor: "", tools: "", lunch: "", other: "", notes: "" };
 
 function ymd(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
-
 function plusDays(days: number) {
   const date = new Date();
   date.setDate(date.getDate() + days);
   return ymd(date);
 }
-
 function money(value: string) {
-  return Number(String(value).replace(/[^0-9.]/g, "")) || 0;
+  return Number(String(value).replace(/[^0-9.-]/g, "")) || 0;
 }
-
 function hoursBetween(start: string, end: string) {
   if (!start || !end) return "";
   const [sh, sm] = start.split(":").map(Number);
@@ -97,6 +46,9 @@ function hoursBetween(start: string, end: string) {
   const mins = eh * 60 + em - (sh * 60 + sm);
   if (mins <= 0) return "";
   return (mins / 60).toFixed(2);
+}
+function rowPay(row: CrewRow) {
+  return money(row.hours) * money(row.rate) + money(row.bonus);
 }
 
 export default function NewInvoicePage() {
@@ -109,6 +61,8 @@ export default function NewInvoicePage() {
   const [invoiceNumber, setInvoiceNumber] = useState("INV-1001");
   const [invoiceDate, setInvoiceDate] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [jobStart, setJobStart] = useState("");
+  const [jobEnd, setJobEnd] = useState("");
   const [notes, setNotes] = useState("Payment is due within 14 days.");
   const [taxPercent, setTaxPercent] = useState("0");
   const [items, setItems] = useState<LineItem[]>([{ ...emptyItem }]);
@@ -181,10 +135,7 @@ export default function NewInvoicePage() {
         if (doc.type !== "invoice") return;
         const value = String(doc.data?.invoiceNumber || doc.title || "");
         const match = value.match(/(\d+)/);
-        if (match) {
-          const num = Number(match[1]);
-          if (num > highest) highest = num;
-        }
+        if (match && Number(match[1]) > highest) highest = Number(match[1]);
       });
       setInvoiceNumber(`INV-${highest + 1}`);
       setInvoiceDate(ymd(new Date()));
@@ -197,22 +148,9 @@ export default function NewInvoicePage() {
     window.localStorage.removeItem("clientready-open-document");
     if (!doc) return;
     const data = doc.data as {
-      clientName?: string;
-      clientCompany?: string;
-      clientEmail?: string;
-      clientPhone?: string;
-      clientAddress?: string;
-      invoiceNumber?: string;
-      invoiceDate?: string;
-      dueDate?: string;
-      notes?: string;
-      taxPercent?: string;
-      items?: LineItem[];
-      status?: string;
-      style?: string;
-      jobTime?: string;
-      jobCosts?: JobCosts;
-      crew?: CrewRow[];
+      clientName?: string; clientCompany?: string; clientEmail?: string; clientPhone?: string; clientAddress?: string;
+      invoiceNumber?: string; invoiceDate?: string; dueDate?: string; jobStart?: string; jobEnd?: string; notes?: string;
+      taxPercent?: string; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
     };
     setDocId(doc.id);
     setClientName(data.clientName || "");
@@ -223,6 +161,8 @@ export default function NewInvoicePage() {
     setInvoiceNumber(data.invoiceNumber || "INV-1001");
     setInvoiceDate(data.invoiceDate || ymd(new Date()));
     setDueDate(data.dueDate || plusDays(14));
+    setJobStart(data.jobStart || "");
+    setJobEnd(data.jobEnd || "");
     setNotes(data.notes || "Payment is due within 14 days.");
     setTaxPercent(data.taxPercent || "0");
     setItems(data.items?.length ? data.items : [{ ...emptyItem }]);
@@ -231,19 +171,18 @@ export default function NewInvoicePage() {
     setStyle(data.style || "clean");
     setJobTime(data.jobTime || "");
     setCosts({ ...emptyCosts, ...(data.jobCosts || {}) });
-    setCrew(data.crew || []);
+    setCrew((data.crew || []).map((row) => ({ ...row, bonus: row.bonus || "" })));
   }, []);
 
   useEffect(() => {
     if (!crew.length) return;
-    const labor = crew.reduce((sum, row) => sum + money(row.hours) * money(row.rate), 0);
+    const labor = crew.reduce((sum, row) => sum + rowPay(row), 0);
     setCosts((current) => ({ ...current, labor: labor.toFixed(2) }));
   }, [crew]);
 
   const filteredClients = savedClients.filter((client) => {
     if (!clientSearch.trim()) return false;
-    const text = `${client.name} ${client.company} ${client.email}`.toLowerCase();
-    return text.includes(clientSearch.toLowerCase());
+    return `${client.name} ${client.company} ${client.email}`.toLowerCase().includes(clientSearch.toLowerCase());
   });
 
   function getNextInvoiceNumber() {
@@ -252,12 +191,8 @@ export default function NewInvoicePage() {
     let highest = 1000;
     docs.forEach((doc) => {
       if (doc.type !== "invoice") return;
-      const value = String(doc.data?.invoiceNumber || doc.title || "");
-      const match = value.match(/(\d+)/);
-      if (match) {
-        const num = Number(match[1]);
-        if (num > highest) highest = num;
-      }
+      const match = String(doc.data?.invoiceNumber || doc.title || "").match(/(\d+)/);
+      if (match && Number(match[1]) > highest) highest = Number(match[1]);
     });
     return `INV-${highest + 1}`;
   }
@@ -272,26 +207,15 @@ export default function NewInvoicePage() {
   }
 
   function saveClientFromForm() {
-    if (!clientName.trim()) {
-      setSaveMessage("Add a client name first");
-      return;
-    }
+    if (!clientName.trim()) return setSaveMessage("Add a client name first");
     const raw = window.localStorage.getItem("clientready-clients");
     const clients: SavedClient[] = raw ? JSON.parse(raw) : [];
-    const alreadySaved = clients.some((client) => {
-      if (clientEmail && client.email) return client.email.toLowerCase() === clientEmail.toLowerCase();
-      return client.name.toLowerCase() === clientName.toLowerCase();
-    });
-    if (alreadySaved) {
-      setSaveMessage("That client is already saved");
-      setTimeout(() => setSaveMessage(""), 2000);
-      return;
-    }
+    const alreadySaved = clients.some((client) => clientEmail && client.email ? client.email.toLowerCase() === clientEmail.toLowerCase() : client.name.toLowerCase() === clientName.toLowerCase());
+    if (alreadySaved) return setSaveMessage("That client is already saved");
     const next = [...clients, { id: Date.now().toString(), name: clientName, company: clientCompany, email: clientEmail, phone: clientPhone, address: clientAddress }];
     window.localStorage.setItem("clientready-clients", JSON.stringify(next));
     setSavedClients(next);
     setSaveMessage("Client saved");
-    setTimeout(() => setSaveMessage(""), 2000);
   }
 
   function allowCrewChange() {
@@ -301,126 +225,57 @@ export default function NewInvoicePage() {
 
   function addCrew() {
     const person = employees.find((item) => item.id === pickedEmployee && item.active);
-    if (!person) return;
-    if (!allowCrewChange()) return;
-    setCrew((current) => [
-      ...current,
-      {
-        id: Date.now().toString(),
-        employeeId: person.id,
-        name: person.name,
-        rate: person.rate,
-        hours: "",
-        startTime: "",
-        endTime: "",
-        workDate: invoiceDate,
-        note: "",
-        paidToWorker: false,
-        paidDate: "",
-      },
-    ]);
+    if (!person || !allowCrewChange()) return;
+    setCrew((current) => [...current, {
+      id: Date.now().toString(), employeeId: person.id, name: person.name, rate: person.rate,
+      hours: "", startTime: jobStart, endTime: jobEnd, workDate: invoiceDate, note: "", bonus: "", paidToWorker: false, paidDate: "",
+    }]);
     setPickedEmployee("");
   }
 
   function updateCrew(id: string, patch: Partial<CrewRow>) {
     if (!allowCrewChange()) return;
-    setCrew((current) =>
-      current.map((row) => {
-        if (row.id !== id) return row;
-        const next = { ...row, ...patch };
-        if (patch.startTime || patch.endTime) {
-          const hours = hoursBetween(next.startTime, next.endTime);
-          if (hours) next.hours = hours;
-        }
-        return next;
-      })
-    );
-  }
-
-  function removeCrew(id: string) {
-    if (!allowCrewChange()) return;
-    setCrew((current) => current.filter((row) => row.id !== id));
+    setCrew((current) => current.map((row) => {
+      if (row.id !== id) return row;
+      const next = { ...row, ...patch };
+      if (patch.startTime || patch.endTime) {
+        const hours = hoursBetween(next.startTime, next.endTime);
+        if (hours) next.hours = hours;
+      }
+      return next;
+    }));
   }
 
   function clearForm() {
-    setDocId("");
-    setClientSearch("");
-    setClientName("");
-    setClientCompany("");
-    setClientEmail("");
-    setClientPhone("");
-    setClientAddress("");
-    setInvoiceNumber(getNextInvoiceNumber());
-    setInvoiceDate(ymd(new Date()));
-    setDueDate(plusDays(14));
-    setNotes("Payment is due within 14 days.");
-    setTaxPercent("0");
-    setItems([{ ...emptyItem }]);
-    setSaveMessage("");
-    setStatus("draft");
-    setStyle("clean");
-    setJobTime("");
-    setCosts(emptyCosts);
-    setCrew([]);
+    setDocId(""); setClientSearch(""); setClientName(""); setClientCompany(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
+    setInvoiceNumber(getNextInvoiceNumber()); setInvoiceDate(ymd(new Date())); setDueDate(plusDays(14)); setJobStart(""); setJobEnd("");
+    setNotes("Payment is due within 14 days."); setTaxPercent("0"); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
+    setStyle("clean"); setJobTime(""); setCosts(emptyCosts); setCrew([]);
   }
 
   async function saveDocument() {
     const raw = window.localStorage.getItem("clientready-documents");
     const docs = raw ? JSON.parse(raw) : [];
     const localId = docId || Date.now().toString();
-    const labor = crew.length
-      ? crew.reduce((sum, row) => sum + money(row.hours) * money(row.rate), 0).toFixed(2)
-      : costs.labor;
+    const labor = crew.length ? crew.reduce((sum, row) => sum + rowPay(row), 0).toFixed(2) : costs.labor;
     const nextDoc = {
-      id: localId,
-      type: "invoice",
-      title: invoiceNumber || "Invoice",
-      clientName: clientName || "No client",
-      createdAt: new Date().toLocaleDateString(),
-      data: {
-        clientName,
-        clientCompany,
-        clientEmail,
-        clientPhone,
-        clientAddress,
-        invoiceNumber,
-        invoiceDate,
-        dueDate,
-        notes,
-        taxPercent,
-        items,
-        status,
-        style,
-        jobTime,
-        jobCosts: { ...costs, labor },
-        crew,
-      },
+      id: localId, type: "invoice", title: invoiceNumber || "Invoice", clientName: clientName || "No client", createdAt: new Date().toLocaleDateString(),
+      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, items, status, style, jobTime, jobCosts: { ...costs, labor }, crew },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
-    const next = [...docs.filter((item: { id: string }) => item.id !== localId && item.id !== cloudId), nextDoc];
-    window.localStorage.setItem("clientready-documents", JSON.stringify(next));
+    window.localStorage.setItem("clientready-documents", JSON.stringify([...docs.filter((item: { id: string }) => item.id !== localId && item.id !== cloudId), nextDoc]));
     setDocId(cloudId);
     setSaveMessage("Invoice saved");
-    setTimeout(() => setSaveMessage(""), 2000);
   }
 
   async function copyPayLink() {
-    if (!paymentLink.trim()) {
-      window.location.href = "/profile";
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(paymentLink);
-      setSaveMessage("Pay link copied");
-    } catch {
-      setSaveMessage(paymentLink);
-    }
-    setTimeout(() => setSaveMessage(""), 2000);
+    if (!paymentLink.trim()) return (window.location.href = "/profile");
+    try { await navigator.clipboard.writeText(paymentLink); setSaveMessage("Pay link copied"); } catch { setSaveMessage(paymentLink); }
   }
 
   function updateItem(index: number, field: keyof LineItem, value: string) {
-    setItems((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, [field]: value } : item)));
+    setItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
   }
 
   const totals = useMemo(() => {
@@ -428,7 +283,6 @@ export default function NewInvoicePage() {
     const tax = subtotal * ((Number(taxPercent) || 0) / 100);
     return { subtotal, tax, total: subtotal + tax };
   }, [items, taxPercent]);
-
   const jobMath = useMemo(() => {
     const jobCost = money(costs.parts) + money(costs.gas) + money(costs.driveTime) + money(costs.labor) + money(costs.tools) + money(costs.lunch) + money(costs.other);
     const leftOver = totals.total - jobCost;
@@ -439,26 +293,23 @@ export default function NewInvoicePage() {
   const previewClass = style === "bold" ? "rounded-2xl border border-slate-900 bg-slate-900 p-8 text-white shadow-sm" : "rounded-2xl border border-slate-200 bg-white p-8 text-slate-900 shadow-sm";
   const mutedClass = style === "bold" ? "text-slate-300" : "text-slate-600";
   const labelClass = style === "bold" ? "text-slate-400" : "text-slate-500";
-  const activeEmployees = employees.filter((person) => person.active);
 
   return (
     <AppShell title="New invoice">
       <section className="mx-auto grid max-w-6xl gap-8 px-6 py-8 lg:grid-cols-2">
         <form className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
           <h1 className="text-xl font-semibold">Invoice details</h1>
-          <div>
-            <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Search clients by name" value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} />
-            {filteredClients.length > 0 && (
-              <div className="mt-2 overflow-hidden rounded-lg border border-slate-200 bg-white">
-                {filteredClients.map((client) => (
-                  <button key={client.id} type="button" onClick={() => chooseClient(client)} className="block w-full border-b border-slate-100 px-3 py-2 text-left hover:bg-slate-50">
-                    <span className="block font-medium">{client.name}</span>
-                    <span className="block text-sm text-slate-500">{client.company || client.email}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Search clients by name" value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} />
+          {filteredClients.length > 0 && (
+            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+              {filteredClients.map((client) => (
+                <button key={client.id} type="button" onClick={() => chooseClient(client)} className="block w-full border-b border-slate-100 px-3 py-2 text-left">
+                  <span className="block font-medium">{client.name}</span>
+                  <span className="block text-sm text-slate-500">{client.company || client.email}</span>
+                </button>
+              ))}
+            </div>
+          )}
           <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client name" value={clientName} onChange={(event) => setClientName(event.target.value)} />
           <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client company" value={clientCompany} onChange={(event) => setClientCompany(event.target.value)} />
           <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client email" value={clientEmail} onChange={(event) => setClientEmail(event.target.value)} />
@@ -467,24 +318,19 @@ export default function NewInvoicePage() {
           <button type="button" onClick={saveClientFromForm} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Save as client</button>
           <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Invoice number" value={invoiceNumber} onChange={(event) => setInvoiceNumber(event.target.value)} />
           <select className="w-full rounded-lg border border-slate-300 px-3 py-2" value={status} onChange={(event) => setStatus(event.target.value)}>
-            <option value="draft">Draft</option>
-            <option value="sent">Sent</option>
-            <option value="paid">Paid</option>
-            <option value="overdue">Overdue</option>
+            <option value="draft">Draft</option><option value="sent">Sent</option><option value="paid">Paid</option><option value="overdue">Overdue</option>
           </select>
           <select className="w-full rounded-lg border border-slate-300 px-3 py-2" value={style} onChange={(event) => setStyle(event.target.value)}>
-            <option value="clean">Clean professional</option>
-            <option value="bold">Bold modern</option>
+            <option value="clean">Clean professional</option><option value="bold">Bold modern</option>
           </select>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="text-sm text-slate-600">Invoice date<input type="date" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} /></label>
             <label className="text-sm text-slate-600">Due date<input type="date" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></label>
+            <label className="text-sm text-slate-600">Job start<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={jobStart} onChange={(event) => setJobStart(event.target.value)} /></label>
+            <label className="text-sm text-slate-600">Job end<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={jobEnd} onChange={(event) => setJobEnd(event.target.value)} /></label>
           </div>
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="font-medium">Line items</h2>
-              <button type="button" className="text-sm text-slate-700" onClick={() => setItems((current) => [...current, { ...emptyItem }])}>Add item</button>
-            </div>
+            <div className="flex items-center justify-between"><h2 className="font-medium">Line items</h2><button type="button" className="text-sm" onClick={() => setItems((current) => [...current, { ...emptyItem }])}>Add item</button></div>
             {items.map((item, index) => (
               <div key={index} className="grid gap-2 sm:grid-cols-3">
                 <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Description" value={item.description} onChange={(event) => updateItem(index, "description", event.target.value)} />
@@ -498,28 +344,25 @@ export default function NewInvoicePage() {
 
           <div className="owner-costs space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-slate-900">
             <h2 className="font-medium">Your costs only</h2>
-            <p className="text-sm text-slate-600">Hidden from the customer PDF. Crew pay is saved on this invoice.</p>
+            <p className="text-sm text-slate-600">Wages fill from hours times the saved rate, plus any extra pay.</p>
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="text-sm text-slate-700">Parts<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.parts} onChange={(event) => setCosts({ ...costs, parts: event.target.value })} /></label>
-              <label className="text-sm text-slate-700">Gas / mileage<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.gas} onChange={(event) => setCosts({ ...costs, gas: event.target.value })} /></label>
-              <label className="text-sm text-slate-700">Drive time<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.driveTime} onChange={(event) => setCosts({ ...costs, driveTime: event.target.value })} /></label>
-              <label className="text-sm text-slate-700">Labor / wages<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.labor} readOnly={crew.length > 0} onChange={(event) => setCosts({ ...costs, labor: event.target.value })} /></label>
-              <label className="text-sm text-slate-700">Tools<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.tools} onChange={(event) => setCosts({ ...costs, tools: event.target.value })} /></label>
-              <label className="text-sm text-slate-700">Lunch / meals<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.lunch} onChange={(event) => setCosts({ ...costs, lunch: event.target.value })} /></label>
-              <label className="text-sm text-slate-700">Other<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.other} onChange={(event) => setCosts({ ...costs, other: event.target.value })} /></label>
+              <label className="text-sm">Parts<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.parts} onChange={(event) => setCosts({ ...costs, parts: event.target.value })} /></label>
+              <label className="text-sm">Gas / mileage<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.gas} onChange={(event) => setCosts({ ...costs, gas: event.target.value })} /></label>
+              <label className="text-sm">Drive time<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.driveTime} onChange={(event) => setCosts({ ...costs, driveTime: event.target.value })} /></label>
+              <label className="text-sm">Labor / wages<input className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2" value={costs.labor} readOnly={crew.length > 0} onChange={(event) => setCosts({ ...costs, labor: event.target.value })} /></label>
+              <label className="text-sm">Tools<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.tools} onChange={(event) => setCosts({ ...costs, tools: event.target.value })} /></label>
+              <label className="text-sm">Lunch / meals<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.lunch} onChange={(event) => setCosts({ ...costs, lunch: event.target.value })} /></label>
+              <label className="text-sm">Other<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.other} onChange={(event) => setCosts({ ...costs, other: event.target.value })} /></label>
             </div>
             <div className="rounded-lg border border-amber-200 p-3">
               <p className="text-sm font-medium">Crew on this job</p>
               <div className="mt-2 flex gap-2">
                 <select className="flex-1 rounded-lg border border-slate-300 px-3 py-2" value={pickedEmployee} onChange={(event) => setPickedEmployee(event.target.value)}>
                   <option value="">Add an active employee</option>
-                  {activeEmployees.map((person) => (
-                    <option key={person.id} value={person.id}>{person.name} · ${Number(person.rate || 0).toFixed(2)}/hr</option>
-                  ))}
+                  {employees.filter((person) => person.active).map((person) => <option key={person.id} value={person.id}>{person.name} · ${Number(person.rate || 0).toFixed(2)}/hr</option>)}
                 </select>
                 <button type="button" onClick={addCrew} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">Add</button>
               </div>
-              {activeEmployees.length === 0 && <p className="mt-2 text-sm text-slate-600">Add employees under More first.</p>}
               {crew.map((row) => (
                 <div key={row.id} className="mt-3 space-y-2 border-t border-amber-200 pt-3">
                   <p className="text-sm font-medium">{row.name} · ${Number(row.rate || 0).toFixed(2)}/hr saved on this job</p>
@@ -528,19 +371,15 @@ export default function NewInvoicePage() {
                     <label className="text-sm">Hours<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={row.hours} onChange={(event) => updateCrew(row.id, { hours: event.target.value })} /></label>
                     <label className="text-sm">Start<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={row.startTime} onChange={(event) => updateCrew(row.id, { startTime: event.target.value })} /></label>
                     <label className="text-sm">End<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={row.endTime} onChange={(event) => updateCrew(row.id, { endTime: event.target.value })} /></label>
+                    <label className="text-sm sm:col-span-2">Extra pay for this job<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="100" value={row.bonus} onChange={(event) => updateCrew(row.id, { bonus: event.target.value })} /></label>
                   </div>
-                  <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Note" value={row.note} onChange={(event) => updateCrew(row.id, { note: event.target.value })} />
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={row.paidToWorker} onChange={(event) => updateCrew(row.id, { paidToWorker: event.target.checked })} />
-                    Paid to worker
-                  </label>
-                  {row.paidToWorker && <input type="date" className="w-full rounded-lg border border-slate-300 px-3 py-2" value={row.paidDate} onChange={(event) => updateCrew(row.id, { paidDate: event.target.value })} />}
-                  <p className="text-sm">Pay: ${(money(row.hours) * money(row.rate)).toFixed(2)}</p>
-                  <button type="button" onClick={() => removeCrew(row.id)} className="text-sm text-slate-600">Remove from job</button>
+                  <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Note, optional" value={row.note} onChange={(event) => updateCrew(row.id, { note: event.target.value })} />
+                  <p className="text-sm">Paid this job: ${rowPay(row).toFixed(2)}</p>
+                  <button type="button" onClick={() => allowCrewChange() && setCrew((current) => current.filter((item) => item.id !== row.id))} className="text-sm text-slate-600">Remove from job</button>
                 </div>
               ))}
             </div>
-            <label className="block text-sm text-slate-700">Cost notes<textarea className="mt-1 min-h-16 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.notes} onChange={(event) => setCosts({ ...costs, notes: event.target.value })} /></label>
+            <label className="block text-sm">Cost notes<textarea className="mt-1 min-h-16 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.notes} onChange={(event) => setCosts({ ...costs, notes: event.target.value })} /></label>
             <div className="space-y-1 text-sm">
               <p>Job cost: ${jobMath.jobCost.toFixed(2)}</p>
               <p>You charge: ${totals.total.toFixed(2)}</p>
@@ -549,22 +388,16 @@ export default function NewInvoicePage() {
               <p className="font-semibold">Yours after set-aside: ${jobMath.yours.toFixed(2)}</p>
             </div>
           </div>
-
           <div className="flex flex-wrap gap-3">
             <button type="button" onClick={saveDocument} className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white">Save document</button>
             <button type="button" onClick={clearForm} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Clear form</button>
           </div>
           {saveMessage && <p className="text-sm text-slate-600">{saveMessage}</p>}
         </form>
-
         <div>
           <div className="mb-4 flex flex-wrap gap-3">
             <button type="button" onClick={() => window.print()} className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white">Print / Save PDF</button>
-            {status !== "paid" && (
-              <button type="button" onClick={copyPayLink} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">
-                {paymentLink.trim() ? "Pay / Copy pay link" : "Add how to pay"}
-              </button>
-            )}
+            {status !== "paid" && <button type="button" onClick={copyPayLink} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">{paymentLink.trim() ? "Pay / Copy pay link" : "Add how to pay"}</button>}
           </div>
           <div id="preview" className={previewClass}>
             {logo && <img src={logo} alt="Business logo" className="mb-3 h-14 w-auto" />}
@@ -572,17 +405,12 @@ export default function NewInvoicePage() {
               <div>
                 <p className={`text-sm uppercase tracking-wide ${labelClass}`}>Invoice</p>
                 <h2 className="mt-1 text-2xl font-semibold">{invoiceNumber || "INV-0000"}</h2>
-                <div className={`mt-4 text-sm ${mutedClass}`}>
-                  <p className="font-medium">{businessName}</p>
-                  <p>{ownerName}</p>
-                  <p>{businessEmail}</p>
-                  <p>{businessPhone}</p>
-                </div>
+                <div className={`mt-4 text-sm ${mutedClass}`}><p className="font-medium">{businessName}</p><p>{ownerName}</p><p>{businessEmail}</p><p>{businessPhone}</p></div>
               </div>
               <div className={`text-right text-sm ${mutedClass}`}>
                 <div>Date: {invoiceDate || "-"}</div>
                 <div>Due: {dueDate || "-"}</div>
-                {jobTime && <div>Time: {jobTime}</div>}
+                {(jobStart || jobEnd) && <div>Time: {jobStart || "-"} to {jobEnd || "-"}</div>}
               </div>
             </div>
             <div className="mt-8">
@@ -596,12 +424,7 @@ export default function NewInvoicePage() {
             <div className="mt-8 border-t border-slate-500 pt-4">
               {items.map((item, index) => {
                 const amount = (Number(item.qty) || 0) * (Number(item.rate) || 0);
-                return (
-                  <div key={index} className="flex justify-between py-2 text-sm">
-                    <span>{item.description || "Item"}</span>
-                    <span>${amount.toFixed(2)}</span>
-                  </div>
-                );
+                return <div key={index} className="flex justify-between py-2 text-sm"><span>{item.description || "Item"}</span><span>${amount.toFixed(2)}</span></div>;
               })}
             </div>
             <div className="mt-6 space-y-1 border-t border-slate-500 pt-4 text-sm">
