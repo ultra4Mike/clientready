@@ -118,9 +118,8 @@ export default function DashboardPage() {
     const invoiced = invoices.reduce((sum, doc) => sum + invoiceTotal(doc), 0);
     const paidDocs = invoices.filter((doc) => doc.data?.status === "paid");
     const paid = paidDocs.reduce((sum, doc) => sum + invoiceTotal(doc), 0);
-    const overdue = invoices
-      .filter((doc) => doc.data?.status === "overdue")
-      .reduce((sum, doc) => sum + invoiceTotal(doc), 0);
+    const overdueDocs = invoices.filter((doc) => doc.data?.status === "overdue");
+    const overdue = overdueDocs.reduce((sum, doc) => sum + invoiceTotal(doc), 0);
     const paidRate = invoices.length
       ? Math.round((paidDocs.length / invoices.length) * 100)
       : 0;
@@ -128,6 +127,7 @@ export default function DashboardPage() {
       outstanding: Math.max(invoiced - paid, 0),
       paid,
       overdue,
+      overdueCount: overdueDocs.length,
       invoiceCount: invoices.length,
       paidRate,
     };
@@ -167,31 +167,50 @@ export default function DashboardPage() {
 
   function handleSearch(event: FormEvent) {
     event.preventDefault();
-    window.location.href = "/documents";
+    const query = search.trim();
+    window.location.href = query
+      ? `/documents?q=${encodeURIComponent(query)}`
+      : "/documents";
   }
+
+  const thirdAction =
+    stats.overdueCount > 0
+      ? {
+          href: "/collect",
+          icon: "!",
+          title: "Chase overdue",
+          text: `Follow up on ${stats.overdueCount} overdue invoice${stats.overdueCount === 1 ? "" : "s"}.`,
+        }
+      : {
+          href: "/clients",
+          icon: "+",
+          title: "Add client",
+          text: "Save a client so invoices fill in faster.",
+        };
 
   return (
     <AppShell title={`${hello}${ownerName ? `, ${ownerName}` : ""}.`}>
-      <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <p className="text-[var(--cr-muted)]">
-          Here is what is happening with your invoices today.
-        </p>
-        <div className="flex flex-wrap gap-3">
-          <form onSubmit={handleSearch}>
-            <input
-              className="min-w-56 rounded-full border border-teal-500/30 bg-[var(--cr-card)] px-4 py-2 text-sm"
-              placeholder="Search invoices, clients..."
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </form>
-          <a
-            href="/invoice"
-            className="rounded-full border border-teal-400 px-4 py-2 text-sm text-teal-300"
-          >
-            New invoice +
-          </a>
-        </div>
+      <p className="mb-6 text-[var(--cr-muted)]">
+        {stats.invoiceCount === 0
+          ? "Create your first invoice to see totals."
+          : "Here is what is happening with your invoices today."}
+      </p>
+
+      <div className="mb-6 flex flex-col gap-3 lg:flex-row">
+        <form onSubmit={handleSearch} className="flex-1">
+          <input
+            className="w-full rounded-full border border-teal-500/30 bg-[var(--cr-card)] px-4 py-2 text-sm"
+            placeholder="Search invoices, clients, documents..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </form>
+        <a
+          href="/invoice"
+          className="rounded-full border border-teal-400 px-4 py-2 text-center text-sm text-teal-300"
+        >
+          New invoice +
+        </a>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -201,21 +220,29 @@ export default function DashboardPage() {
             <IconWrap>$</IconWrap>
           </div>
           <p className="mt-3 text-2xl font-semibold">${stats.outstanding.toFixed(2)}</p>
+          <p className="mt-2 text-xs text-[var(--cr-muted)]">
+            {stats.outstanding === 0 ? "No outstanding invoices" : "Not marked paid"}
+          </p>
         </div>
         <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
           <div className="flex items-start justify-between">
             <p className="text-sm text-[var(--cr-muted)]">Paid</p>
-            <IconWrap>↗</IconWrap>
+            <IconWrap>✓</IconWrap>
           </div>
           <p className="mt-3 text-2xl font-semibold">${stats.paid.toFixed(2)}</p>
-          <p className="mt-2 text-xs text-teal-400">{stats.paidRate}% marked paid</p>
+          <p className="mt-2 text-xs text-[var(--cr-muted)]">
+            {stats.paid === 0 ? "No payments yet" : `${stats.paidRate}% marked paid`}
+          </p>
         </div>
         <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
           <div className="flex items-start justify-between">
             <p className="text-sm text-[var(--cr-muted)]">Overdue</p>
-            <IconWrap>⏱</IconWrap>
+            <IconWrap>!</IconWrap>
           </div>
           <p className="mt-3 text-2xl font-semibold">${stats.overdue.toFixed(2)}</p>
+          <p className="mt-2 text-xs text-[var(--cr-muted)]">
+            {stats.overdueCount === 0 ? "No overdue invoices" : `${stats.overdueCount} overdue`}
+          </p>
         </div>
         <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
           <div className="flex items-start justify-between">
@@ -223,11 +250,14 @@ export default function DashboardPage() {
             <IconWrap>☺</IconWrap>
           </div>
           <p className="mt-3 text-2xl font-semibold">{clients.length}</p>
+          <p className="mt-2 text-xs text-[var(--cr-muted)]">
+            {clients.length === 0 ? "No clients added" : "Saved clients"}
+          </p>
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 xl:grid-cols-3">
-        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 xl:col-span-2">
+      {stats.invoiceCount > 0 && (
+        <div className="mt-6 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-semibold">Invoice overview</h2>
             <span className="text-sm text-[var(--cr-muted)]">Last 6 months</span>
@@ -260,7 +290,7 @@ export default function DashboardPage() {
                   textAnchor="middle"
                   fontSize="10"
                   fill="currentColor"
-                  opacity="0.6"
+                  opacity="0.7"
                 >
                   {point.label}
                 </text>
@@ -268,35 +298,34 @@ export default function DashboardPage() {
             })}
           </svg>
         </div>
+      )}
 
-        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
-          <h2 className="font-semibold">Quick actions</h2>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <a href="/invoice" className="rounded-xl border border-teal-500/20 p-3 text-sm">
-              <IconWrap>+</IconWrap>
-              <p className="mt-2 font-medium">Create invoice</p>
-            </a>
-            <a href="/collect" className="rounded-xl border border-teal-500/20 p-3 text-sm">
-              <IconWrap>$</IconWrap>
-              <p className="mt-2 font-medium">Collect</p>
-            </a>
-            <a href="/profile" className="rounded-xl border border-teal-500/20 p-3 text-sm">
-              <IconWrap>⌘</IconWrap>
-              <p className="mt-2 font-medium">Payment link</p>
-            </a>
-            <a href="/calendar" className="rounded-xl border border-teal-500/20 p-3 text-sm">
-              <IconWrap>↻</IconWrap>
-              <p className="mt-2 font-medium">Calendar</p>
-            </a>
-          </div>
-        </div>
+      <h2 className="mt-8 text-sm font-semibold tracking-wide text-[var(--cr-muted)]">
+        QUICK ACTIONS
+      </h2>
+      <div className="mt-3 grid gap-3 md:grid-cols-3">
+        <a href="/invoice" className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4">
+          <IconWrap>+</IconWrap>
+          <p className="mt-3 font-medium">New invoice</p>
+          <p className="mt-1 text-sm text-[var(--cr-muted)]">Create an invoice and send it to a client.</p>
+        </a>
+        <a href="/proposal" className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4">
+          <IconWrap>✎</IconWrap>
+          <p className="mt-3 font-medium">New proposal</p>
+          <p className="mt-1 text-sm text-[var(--cr-muted)]">Create a proposal and share it with a prospect.</p>
+        </a>
+        <a href={thirdAction.href} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4">
+          <IconWrap>{thirdAction.icon}</IconWrap>
+          <p className="mt-3 font-medium">{thirdAction.title}</p>
+          <p className="mt-1 text-sm text-[var(--cr-muted)]">{thirdAction.text}</p>
+        </a>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
-        {stats.invoiceCount === 0
-          ? "The chart and cards work. They stay at $0 until you save invoices."
-          : `${stats.paidRate}% of your invoices are marked paid.`}
-      </div>
+      {stats.invoiceCount > 0 && (
+        <p className="mt-6 text-sm text-[var(--cr-muted)]">
+          {stats.paidRate}% of your invoices are marked paid.
+        </p>
+      )}
     </AppShell>
   );
 }
