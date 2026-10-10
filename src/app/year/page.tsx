@@ -3,14 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 
+type OtherFee = { id?: string; name?: string; amount?: string };
+
 type JobCosts = {
   parts?: string;
   gas?: string;
-  driveTime?: string;
+  driveHours?: string;
+  driveMinutes?: string;
   labor?: string;
   tools?: string;
   lunch?: string;
-  other?: string;
+  otherFees?: OtherFee[];
   notes?: string;
 };
 
@@ -25,11 +28,7 @@ type CrewRow = {
   note?: string;
 };
 
-type Employee = {
-  id: string;
-  name: string;
-  kind?: "employee" | "contractor";
-};
+type Employee = { id: string; name: string; kind?: "employee" | "contractor" };
 
 type SavedDocument = {
   id: string;
@@ -74,11 +73,9 @@ type Row = {
 const costLabels: { key: keyof JobCosts; label: string }[] = [
   { key: "parts", label: "Parts and materials" },
   { key: "gas", label: "Gas / diesel" },
-  { key: "driveTime", label: "Drive time" },
   { key: "labor", label: "Labor" },
   { key: "tools", label: "Job supplies" },
-  { key: "lunch", label: "Meals" },
-  { key: "other", label: "Other" },
+  { key: "lunch", label: "Lunch / meals cost" },
 ];
 
 function money(value: unknown) {
@@ -155,9 +152,8 @@ export default function YearPage() {
       if (costs) {
         const date = doc.data?.invoiceDate || doc.createdAt || "";
         if (String(date).includes(year) || String(doc.createdAt).includes(year)) {
-costLabels.forEach((item) => {
+          costLabels.forEach((item) => {
             if (item.key === "labor" && hasCrew) return;
-            if (item.key === "driveTime") return;
             const amount = money(costs[item.key]);
             if (!amount) return;
             list.push({
@@ -173,6 +169,24 @@ costLabels.forEach((item) => {
               method: "",
               ref: "",
               note: costs.notes || "",
+            });
+          });
+          (costs.otherFees || []).forEach((fee, index) => {
+            const amount = money(fee.amount);
+            if (!amount) return;
+            list.push({
+              id: `${doc.id}-fee-${fee.id || index}`,
+              docId: doc.id,
+              docType: doc.type,
+              kind: "out",
+              date,
+              client: doc.clientName || "No client",
+              number: doc.data?.invoiceNumber || doc.title,
+              category: "Other fees",
+              amount,
+              method: "",
+              ref: "",
+              note: fee.name || "Other fee",
             });
           });
         }
@@ -209,10 +223,7 @@ costLabels.forEach((item) => {
   const crewPeople = useMemo(() => {
     const names = Array.from(new Set(rows.filter((row) => row.worker).map((row) => row.worker as string)));
     return names
-      .map((name) => ({
-        name,
-        kind: rows.find((row) => row.worker === name)?.workerKind || "employee",
-      }))
+      .map((name) => ({ name, kind: rows.find((row) => row.worker === name)?.workerKind || "employee" }))
       .filter((person) => crewType === "all" || person.kind === crewType);
   }, [rows, crewType]);
 
@@ -266,24 +277,15 @@ costLabels.forEach((item) => {
       <div className="mb-4 grid gap-3 md:grid-cols-4">
         <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" value={year} onChange={(event) => setYear(event.target.value)} />
         <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" placeholder="Search client, invoice, worker" value={search} onChange={(event) => setSearch(event.target.value)} />
-        <select
-          className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2"
-          value={filter}
-          onChange={(event) => {
-            setFilter(event.target.value);
-            setCrewType("all");
-            setWorker("all");
-          }}
-        >
+        <select className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" value={filter} onChange={(event) => { setFilter(event.target.value); setCrewType("all"); setWorker("all"); }}>
           <option value="all">All rows</option>
           <option value="in">Money in</option>
           <option value="out">Money out</option>
           <option value="Parts and materials">Parts and materials</option>
-          <option value="Gas and mileage">Gas and mileage</option>
-          <option value="Drive time">Drive time</option>
-          <option value="Tools and supplies">Tools and supplies</option>
-          <option value="Meals">Meals</option>
-          <option value="Other">Other</option>
+          <option value="Gas / diesel">Gas / diesel</option>
+          <option value="Job supplies">Job supplies</option>
+          <option value="Lunch / meals cost">Lunch / meals cost</option>
+          <option value="Other fees">Other fees</option>
           <option value="employees">Employees</option>
         </select>
         <select className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
@@ -305,16 +307,12 @@ costLabels.forEach((item) => {
           </select>
           <select className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" value={worker} onChange={(event) => setWorker(event.target.value)}>
             <option value="all">All names</option>
-            {crewPeople.map((person) => (
-              <option key={person.name} value={person.name}>{person.name}</option>
-            ))}
+            {crewPeople.map((person) => <option key={person.name} value={person.name}>{person.name}</option>)}
           </select>
         </div>
       )}
 
-      <button type="button" onClick={() => window.print()} className="mb-4 rounded-lg bg-teal-400 px-4 py-2 text-sm font-medium text-slate-950">
-        Print / Save PDF
-      </button>
+      <button type="button" onClick={() => window.print()} className="mb-4 rounded-lg bg-teal-400 px-4 py-2 text-sm font-medium text-slate-950">Print / Save PDF</button>
 
       <div className="mb-6 space-y-2">
         {visible.length === 0 && <p className="text-[var(--cr-muted)]">No rows match that search.</p>}
@@ -356,23 +354,21 @@ costLabels.forEach((item) => {
         ))}
 
         <h2 className="mt-8 font-semibold">Other money out</h2>
-        {costLabels.filter((item) => item.key !== "labor").map((item) => {
-          const group = rows.filter((row) => row.category === item.label);
+        {["Parts and materials", "Gas / diesel", "Job supplies", "Lunch / meals cost", "Other fees"].map((label) => {
+          const group = rows.filter((row) => row.category === label);
           const total = group.reduce((sum, row) => sum + row.amount, 0);
           if (!group.length) return null;
           return (
-            <div key={item.key} className="mt-4">
-              <p className="font-medium">{item.label}: ${total.toFixed(2)}</p>
-              {group.map((row) => (
-                <p key={row.id} className="mt-1 text-sm">{row.date} · {row.number} · ${row.amount.toFixed(2)} · {row.note}</p>
-              ))}
+            <div key={label} className="mt-4">
+              <p className="font-medium">{label}: ${total.toFixed(2)}</p>
+              {group.map((row) => <p key={row.id} className="mt-1 text-sm">{row.date} · {row.number} · ${row.amount.toFixed(2)} · {row.note}</p>)}
             </div>
           );
         })}
 
         <p className="mt-8 text-xs text-slate-500">
           Sales and expense log. Not a tax return. Not tax advice. Meals may not be fully deductible.
-          Crew pay uses the rate saved on each job.
+          Crew pay uses the rate saved on each job. Drive time is not added as a cost.
         </p>
       </div>
     </AppShell>
