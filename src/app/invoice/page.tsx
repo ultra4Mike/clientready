@@ -389,15 +389,42 @@ export default function NewInvoicePage() {
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
+<div className="flex items-center gap-3">
                 <p className="text-sm font-medium">Other fees</p>
-                <button type="button" className="text-sm" onClick={() => setOtherFees((current) => [...current, { id: Date.now().toString(), name: "", amount: "" }])}>Add fee</button>
+                <button type="button" className="rounded-lg bg-teal-400 px-3 py-1 text-sm font-medium text-slate-950" onClick={() => setOtherFees((current) => [...current, { id: Date.now().toString(), name: "", amount: "" }])}>Add fee</button>
               </div>
               {otherFees.map((fee) => (
                 <div key={fee.id} className="grid gap-2 sm:grid-cols-[1fr_8rem_auto]">
                   <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Dump fee, permit, parking" value={fee.name} onChange={(event) => setOtherFees((current) => current.map((item) => item.id === fee.id ? { ...item, name: event.target.value } : item))} />
                   <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Cost" value={fee.amount} onChange={(event) => setOtherFees((current) => current.map((item) => item.id === fee.id ? { ...item, amount: event.target.value } : item))} />
                   <button type="button" className="text-sm" onClick={() => setOtherFees((current) => current.filter((item) => item.id !== fee.id))}>Remove</button>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-lg border border-amber-200 bg-white p-3 text-slate-900">
+              <p className="text-sm font-medium text-slate-900">Crew on this job ({crew.length})</p>
+              <div className="mt-2 flex gap-2">
+                <select className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" value={pickedEmployee} onChange={(event) => setPickedEmployee(event.target.value)}>
+                  <option value="">Add an employee</option>
+                  {employees.filter((person) => person.active !== false).map((person) => (
+                    <option key={person.id} value={person.id}>{person.name} · ${Number(person.rate || 0).toFixed(2)}/hr</option>
+                  ))}
+                </select>
+                <button type="button" onClick={addCrew} className="rounded-lg bg-teal-400 px-4 py-2 text-sm font-medium text-slate-950">Add</button>
+              </div>
+              {crew.map((row) => (
+                <div key={row.id} className="mt-3 space-y-2 border-t border-amber-200 pt-3 text-slate-900">
+                  <p className="text-sm font-medium text-slate-900">{row.name} · ${Number(row.rate || 0).toFixed(2)}/hr saved on this job</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <label className="text-sm text-slate-900">Work date<input type="date" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" value={row.workDate} onChange={(event) => updateCrew(row.id, { workDate: event.target.value })} /></label>
+                    <label className="text-sm text-slate-900">Hours<input className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" value={row.hours} onChange={(event) => updateCrew(row.id, { hours: event.target.value })} /></label>
+                    <label className="text-sm text-slate-900">Start<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" value={row.startTime} onChange={(event) => updateCrew(row.id, { startTime: event.target.value })} /></label>
+                    <label className="text-sm text-slate-900">End<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" value={row.endTime} onChange={(event) => updateCrew(row.id, { endTime: event.target.value })} /></label>
+                    <label className="text-sm text-slate-900 sm:col-span-2">Extra pay for this job<input className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" placeholder="100" value={row.bonus} onChange={(event) => updateCrew(row.id, { bonus: event.target.value })} /></label>
+                  </div>
+                  <p className="text-sm text-slate-900">Paid this job: ${rowPay(row).toFixed(2)}</p>
+                  <button type="button" onClick={() => allowCrewChange() && setCrew((current) => current.filter((item) => item.id !== row.id))} className="text-sm text-slate-700">Remove from job</button>
                 </div>
               ))}
             </div>
