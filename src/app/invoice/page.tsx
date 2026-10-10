@@ -386,8 +386,11 @@ export default function NewInvoicePage() {
     <AppShell title={isProposal ? "New proposal" : "New invoice"}>
       <section className="mx-auto grid max-w-6xl gap-8 px-6 py-8 lg:grid-cols-2">
         <form className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
-          {locked && (
-            <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-slate-900">
+{locked && (
+            <p
+              className="rounded-lg border p-3 text-sm"
+              style={{ background: "#fef3c7", color: "#0f172a", borderColor: "#f59e0b" }}
+            >
               Trial ended. You can view and print old documents. New saves are locked.
               $7.99 a month or $19.99 for 3 months.
             </p>
