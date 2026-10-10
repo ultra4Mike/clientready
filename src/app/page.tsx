@@ -40,14 +40,12 @@ export default function HomePage() {
         <p className="text-sm uppercase tracking-wide text-teal-400">For small businesses</p>
         <h1 className="mt-3 max-w-3xl text-4xl font-semibold leading-tight md:text-5xl">Get paid. Stay client-ready.</h1>
         <p className="mt-4 max-w-2xl text-[var(--cr-muted)]">
-          ClientReady keeps the customer copy clean and your numbers in one place. Write the proposal, send the invoice, add the crew, and keep a year log you can hand to a preparer.
+          The customer gets a clean invoice. You keep the crew, the job costs, and a year log in one place.
         </p>
         <ul className="mt-4 max-w-2xl space-y-1 text-sm text-[var(--cr-muted)]">
-          <li>Proposals and invoices, with job costs hidden from the customer.</li>
-          <li>Crew hours, saved rates, and extra pay fill the wage total for that job.</li>
-          <li>A raise changes the next job only. Older invoices stay as they were.</li>
-          <li>Collect unpaid invoices, then record cash, check, or an app payment.</li>
-          <li>Year packet totals for receipts, expenses, and pay. Not a tax return.</li>
+          <li>Proposals and invoices, with your costs hidden from the customer.</li>
+          <li>Crew hours and saved rates fill the wage total for that job.</li>
+          <li>Paid invoices, expenses, and pay in one year log.</li>
         </ul>
         <div className="mt-8 flex flex-wrap items-center gap-3">
           <a href="/signup" className="rounded-lg bg-teal-400 px-5 py-3 text-sm font-medium text-slate-950">Start free</a>
@@ -84,7 +82,6 @@ export default function HomePage() {
               <div className="flex justify-between"><span>Gas / mileage</span><span>$18.00</span></div>
               <div className="flex justify-between"><span>Roul · 4 hrs · $21/hr</span><span>$84.00</span></div>
               <div className="flex justify-between"><span>Henry · 4 hrs · $19/hr</span><span>$76.00</span></div>
-              <div className="flex justify-between"><span>Extra pay</span><span>$0.00</span></div>
               <div className="flex justify-between font-medium"><span>Labor / wages</span><span>$160.00</span></div>
             </div>
             <div className="mt-4 space-y-1 border-t border-amber-200 pt-3 text-sm">
@@ -100,16 +97,19 @@ export default function HomePage() {
 
       <section className="mx-auto grid max-w-6xl gap-4 px-4 pb-16 sm:grid-cols-3">
         <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
-          <h2 className="font-semibold">Proposals</h2>
+          <p className="text-sm text-teal-400">1</p>
+          <h2 className="mt-2 font-semibold">Write the proposal</h2>
           <p className="mt-2 text-sm text-[var(--cr-muted)]">Scope and price for the customer. Your costs stay on your side.</p>
         </div>
         <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
-          <h2 className="font-semibold">Crew</h2>
-          <p className="mt-2 text-sm text-[var(--cr-muted)]">Add the people on that job. Hours and extra pay fill the wage box.</p>
+          <p className="text-sm text-teal-400">2</p>
+          <h2 className="mt-2 font-semibold">Send the invoice</h2>
+          <p className="mt-2 text-sm text-[var(--cr-muted)]">Add the crew. Hours and the saved rate fill the wage total.</p>
         </div>
         <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
-          <h2 className="font-semibold">Year packet</h2>
-          <p className="mt-2 text-sm text-[var(--cr-muted)]">Receipts, expenses, and pay in one log. Not a tax return.</p>
+          <p className="text-sm text-teal-400">3</p>
+          <h2 className="mt-2 font-semibold">Mark it paid</h2>
+          <p className="mt-2 text-sm text-[var(--cr-muted)]">Record the payment. The year log keeps the receipt and the pay.</p>
         </div>
       </section>
 
@@ -124,19 +124,21 @@ export default function HomePage() {
           <div className="rounded-2xl border border-teal-400 bg-[var(--cr-card)] p-6">
             <p className="text-sm text-teal-400">Monthly</p>
             <p className="mt-2 text-3xl font-semibold">$7.99</p>
-            <p className="mt-3 text-sm text-[var(--cr-muted)]">After the 3 free documents. Checkout comes later.</p>
+            <p className="mt-3 text-sm text-[var(--cr-muted)]">After the 3 free documents.</p>
           </div>
           <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-6">
             <p className="text-sm text-[var(--cr-muted)]">3 months</p>
             <p className="mt-2 text-3xl font-semibold">$19.99</p>
-            <p className="mt-3 text-sm text-[var(--cr-muted)]">Same tools, paid ahead. Checkout comes later.</p>
+            <p className="mt-3 text-sm text-[var(--cr-muted)]">Same tools, paid ahead.</p>
           </div>
         </div>
+        <p className="mt-4 text-sm text-[var(--cr-muted)]">A raise changes the next job only. The year packet is a log, not a tax return.</p>
       </section>
 
       <footer className="border-t border-teal-500/20 px-4 py-6 text-center text-sm text-[var(--cr-muted)]">
         <a href="/login" className="px-3 sm:hidden">Log in</a>
         <a href="/privacy" className="px-3">Privacy</a>
+        <span>·</span>
         <a href="/terms" className="px-3">Terms</a>
       </footer>
     </main>
