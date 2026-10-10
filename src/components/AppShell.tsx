@@ -2,6 +2,7 @@
 
 import { ReactNode, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { clearLocalBusiness } from "@/lib/account-cache";
 
 const mainLinks = [
   { href: "/dashboard", label: "Dashboard" },
@@ -60,6 +61,7 @@ export default function AppShell({
   }
 
   async function logOut() {
+    clearLocalBusiness();
     await supabase.auth.signOut();
     window.location.href = "/";
   }
