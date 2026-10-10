@@ -9,13 +9,23 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resetMode, setResetMode] = useState(false);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     setMessage("");
+    const cleanEmail = email.trim().toLowerCase();
+    if (resetMode) {
+      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+        redirectTo: "https://clientready-six.vercel.app/reset-password",
+      });
+      setBusy(false);
+      setMessage(error ? error.message : "Reset link sent. Check inbox and spam.");
+      return;
+    }
     const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
+      email: cleanEmail,
       password,
     });
     if (error) {
@@ -30,15 +40,20 @@ export default function LoginPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
       <a href="/" className="mb-8 text-sm text-slate-500">Back to ClientReady</a>
-      <h1 className="text-2xl font-semibold">Log in</h1>
+      <h1 className="text-2xl font-semibold">{resetMode ? "Reset password" : "Log in"}</h1>
       <form onSubmit={handleSubmit} className="mt-8 space-y-4">
         <input type="email" required placeholder="Email" className="w-full rounded-lg border border-slate-300 px-3 py-2" value={email} onChange={(event) => setEmail(event.target.value)} />
-        <input type="password" required placeholder="Password" className="w-full rounded-lg border border-slate-300 px-3 py-2" value={password} onChange={(event) => setPassword(event.target.value)} />
+        {!resetMode && (
+          <input type="password" required placeholder="Password" className="w-full rounded-lg border border-slate-300 px-3 py-2" value={password} onChange={(event) => setPassword(event.target.value)} />
+        )}
         <button type="submit" disabled={busy} className="w-full rounded-lg bg-slate-900 px-4 py-2 text-white disabled:opacity-60">
-          {busy ? "Logging in" : "Log in"}
+          {busy ? "Working" : resetMode ? "Send reset link" : "Log in"}
         </button>
       </form>
       {message && <p className="mt-4 text-sm text-red-600">{message}</p>}
+      <button type="button" onClick={() => { setResetMode(!resetMode); setMessage(""); }} className="mt-4 text-sm text-slate-600">
+        {resetMode ? "Back to log in" : "Forgot password?"}
+      </button>
       <p className="mt-6 text-sm text-slate-600">
         New here? <a href="/signup" className="font-medium">Create an account</a>
       </p>
