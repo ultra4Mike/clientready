@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
-import { supabase } from "@/lib/supabase";
+import { loadAccountIntoCache } from "@/lib/account-cache";
 
 type Client = {
   id: string;
@@ -62,6 +62,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function load() {
+      await loadAccountIntoCache();
       const profileRaw = window.localStorage.getItem("clientready-profile");
       const clientsRaw = window.localStorage.getItem("clientready-clients");
       const docsRaw = window.localStorage.getItem("clientready-documents");
@@ -69,42 +70,8 @@ export default function DashboardPage() {
         const profile = JSON.parse(profileRaw);
         setOwnerName(profile.ownerName || profile.businessName || "");
       }
-      if (clientsRaw) setClients(JSON.parse(clientsRaw));
-      if (docsRaw) setDocuments(JSON.parse(docsRaw));
-
-      const { data } = await supabase.auth.getUser();
-      const user = data.user;
-      if (!user) return;
-
-      const { data: profileRow } = await supabase
-        .from("profiles")
-        .select("owner_name, business_name")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (profileRow) {
-        setOwnerName(profileRow.owner_name || profileRow.business_name || "");
-      }
-      const { data: clientRows } = await supabase
-        .from("clients")
-        .select("id, name, company, email")
-        .eq("user_id", user.id);
-      if (clientRows) setClients(clientRows as Client[]);
-      const { data: docRows } = await supabase
-        .from("documents")
-        .select("*")
-        .eq("user_id", user.id);
-      if (docRows) {
-        setDocuments(
-          docRows.map((row) => ({
-            id: row.id,
-            type: row.type,
-            title: row.title || "",
-            clientName: row.client_name || "",
-            createdAt: row.created_at || "",
-            data: row.data || {},
-          }))
-        );
-      }
+      setClients(clientsRaw ? JSON.parse(clientsRaw) : []);
+      setDocuments(docsRaw ? JSON.parse(docsRaw) : []);
     }
     load();
   }, []);
@@ -171,6 +138,11 @@ export default function DashboardPage() {
     window.location.href = query
       ? `/documents?q=${encodeURIComponent(query)}`
       : "/documents";
+  }
+
+  function newProposal() {
+    window.localStorage.setItem("clientready-new-type", "proposal");
+    window.location.href = "/invoice";
   }
 
   const thirdAction =
@@ -309,11 +281,11 @@ export default function DashboardPage() {
           <p className="mt-3 font-medium">New invoice</p>
           <p className="mt-1 text-sm text-[var(--cr-muted)]">Create an invoice and send it to a client.</p>
         </a>
-        <a href="/proposal" className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4">
+        <button type="button" onClick={newProposal} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 text-left">
           <IconWrap>✎</IconWrap>
           <p className="mt-3 font-medium">New proposal</p>
           <p className="mt-1 text-sm text-[var(--cr-muted)]">Create a proposal and share it with a prospect.</p>
-        </a>
+        </button>
         <a href={thirdAction.href} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4">
           <IconWrap>{thirdAction.icon}</IconWrap>
           <p className="mt-3 font-medium">{thirdAction.title}</p>
