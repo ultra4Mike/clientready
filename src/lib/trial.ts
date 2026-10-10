@@ -25,5 +25,5 @@ export async function getTrialState(): Promise<TrialState> {
   const started = new Date(user.created_at).getTime();
   const ends = started + 14 * 24 * 60 * 60 * 1000;
   const daysLeft = Math.max(Math.ceil((ends - Date.now()) / (24 * 60 * 60 * 1000)), 0);
-  return { expired: true, daysLeft: 0, plan };
+  return { expired: Date.now() > ends, daysLeft, plan };
 }
