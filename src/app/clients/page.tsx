@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
 
@@ -48,6 +48,7 @@ export default function ClientsPage() {
   const [userId, setUserId] = useState("");
   const [message, setMessage] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -85,6 +86,16 @@ export default function ClientsPage() {
     setClients(next);
     window.localStorage.setItem("clientready-clients", JSON.stringify(next));
   }
+
+  const visible = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return clients;
+    return clients.filter((client) =>
+      `${client.name} ${client.company} ${client.email} ${client.phone} ${client.address} ${client.notes}`
+        .toLowerCase()
+        .includes(query)
+    );
+  }, [clients, search]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -188,7 +199,7 @@ export default function ClientsPage() {
   return (
     <AppShell title="Clients">
       <section className="mx-auto max-w-6xl px-6 py-8">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-semibold">Client list</h1>
           <button
             type="button"
@@ -203,14 +214,19 @@ export default function ClientsPage() {
           </button>
         </div>
 
+        <input
+          className="mb-6 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2"
+          placeholder="Search name, company, email, or phone"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+
         {showForm && (
           <form
             onSubmit={handleSubmit}
             className="mb-8 max-w-xl space-y-4 rounded-2xl border border-slate-200 bg-white p-6"
           >
-            <h2 className="text-lg font-semibold">
-              {editingId ? "Edit client" : "Add a client"}
-            </h2>
+            <h2 className="text-lg font-semibold">{editingId ? "Edit client" : "Add a client"}</h2>
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Company" value={form.company} onChange={(event) => setForm({ ...form, company: event.target.value })} />
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
@@ -226,12 +242,8 @@ export default function ClientsPage() {
             </label>
             <textarea className="min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
             <div className="flex gap-3">
-              <button type="submit" className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white">
-                {editingId ? "Update client" : "Save client"}
-              </button>
-              <button type="button" onClick={cancelEdit} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">
-                Cancel
-              </button>
+              <button type="submit" className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white">{editingId ? "Update client" : "Save client"}</button>
+              <button type="button" onClick={cancelEdit} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Cancel</button>
             </div>
           </form>
         )}
@@ -240,7 +252,8 @@ export default function ClientsPage() {
 
         <div className="grid gap-3 md:grid-cols-2">
           {clients.length === 0 && <p className="text-slate-600">No saved clients yet.</p>}
-          {clients.map((client) => (
+          {clients.length > 0 && visible.length === 0 && <p className="text-slate-600">No clients match that search.</p>}
+          {visible.map((client) => (
             <div key={client.id} className="rounded-2xl border border-slate-200 bg-white p-5">
               <p className="font-medium">{client.name}</p>
               <p className="text-sm text-slate-600">{client.company}</p>
