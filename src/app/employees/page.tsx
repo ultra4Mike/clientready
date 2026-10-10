@@ -2,11 +2,9 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
+import { supabase } from "@/lib/supabase";
 
-type RateChange = {
-  rate: string;
-  effectiveDate: string;
-};
+type RateChange = { rate: string; effectiveDate: string };
 
 type Employee = {
   id: string;
@@ -29,6 +27,35 @@ const emptyForm = {
   hireDate: "",
 };
 
+function fromRow(row: Record<string, unknown>): Employee {
+  return {
+    id: String(row.id || ""),
+    name: String(row.name || ""),
+    phone: String(row.phone || ""),
+    role: String(row.role || ""),
+    kind: row.kind === "contractor" ? "contractor" : "employee",
+    rate: String(row.rate || ""),
+    hireDate: String(row.hire_date || ""),
+    active: row.active !== false,
+    rateHistory: Array.isArray(row.rate_history) ? (row.rate_history as RateChange[]) : [],
+  };
+}
+
+function toRow(person: Employee, userId: string) {
+  return {
+    user_id: userId,
+    id: person.id,
+    name: person.name,
+    phone: person.phone,
+    role: person.role,
+    kind: person.kind,
+    rate: person.rate,
+    hire_date: person.hireDate,
+    active: person.active,
+    rate_history: person.rateHistory,
+  };
+}
+
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [form, setForm] = useState(emptyForm);
@@ -36,44 +63,73 @@ export default function EmployeesPage() {
   const [raiseRate, setRaiseRate] = useState("");
   const [raiseDate, setRaiseDate] = useState("");
   const [message, setMessage] = useState("");
+  const [userId, setUserId] = useState("");
 
   useEffect(() => {
-    const raw = window.localStorage.getItem("clientready-employees");
-    if (raw) setEmployees(JSON.parse(raw));
+    async function load() {
+      const raw = window.localStorage.getItem("clientready-employees");
+      if (raw) setEmployees(JSON.parse(raw));
+      const { data } = await supabase.auth.getUser();
+      const user = data.user;
+      if (!user) return;
+      setUserId(user.id);
+      const { data: rows, error } = await supabase
+        .from("employees")
+        .select("*")
+        .eq("user_id", user.id);
+      if (error) {
+        setMessage("Cloud load failed: " + error.message);
+        return;
+      }
+      const next = (rows || []).map((row) => fromRow(row));
+      setEmployees(next);
+      window.localStorage.setItem("clientready-employees", JSON.stringify(next));
+    }
+    load();
   }, []);
 
-  function save(next: Employee[]) {
+  function saveLocal(next: Employee[]) {
     setEmployees(next);
     window.localStorage.setItem("clientready-employees", JSON.stringify(next));
   }
 
-  function handleSubmit(event: FormEvent) {
+  async function saveCloud(person: Employee) {
+    if (!userId) return;
+    const { error } = await supabase.from("employees").upsert(toRow(person, userId));
+    if (error) setMessage("Saved on this computer. Cloud save failed: " + error.message);
+  }
+
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!form.name.trim() || !form.rate.trim()) {
       setMessage("Name and hourly rate are required.");
       return;
     }
     if (editingId) {
-      const next = employees.map((person) =>
-        person.id === editingId ? { ...person, ...form } : person
-      );
-      save(next);
+      const current = employees.find((person) => person.id === editingId);
+      const nextPerson: Employee = {
+        ...(current as Employee),
+        ...form,
+        rateHistory: current?.rateHistory || [],
+      };
+      const next = employees.map((person) => (person.id === editingId ? nextPerson : person));
+      saveLocal(next);
+      await saveCloud(nextPerson);
       setEditingId("");
       setForm(emptyForm);
       setMessage("Employee updated. Past jobs were not changed.");
       return;
     }
-    save([
-      ...employees,
-      {
-        id: Date.now().toString(),
-        ...form,
-        active: true,
-        rateHistory: [{ rate: form.rate, effectiveDate: form.hireDate || new Date().toISOString().slice(0, 10) }],
-      },
-    ]);
+    const person: Employee = {
+      id: Date.now().toString(),
+      ...form,
+      active: true,
+      rateHistory: [{ rate: form.rate, effectiveDate: form.hireDate || new Date().toISOString().slice(0, 10) }],
+    };
+    saveLocal([...employees, person]);
+    await saveCloud(person);
     setForm(emptyForm);
-    setMessage("Employee saved.");
+    setMessage("Employee saved to your account.");
   }
 
   function edit(person: Employee) {
@@ -90,30 +146,31 @@ export default function EmployeesPage() {
     setRaiseDate("");
   }
 
-  function giveRaise(person: Employee) {
+  async function giveRaise(person: Employee) {
     if (!raiseRate.trim() || !raiseDate) {
       setMessage("A raise needs a new rate and the date it starts.");
       return;
     }
-    const next = employees.map((item) => {
-      if (item.id !== person.id) return item;
-      return {
-        ...item,
-        rate: raiseRate,
-        rateHistory: [...item.rateHistory, { rate: raiseRate, effectiveDate: raiseDate }],
-      };
-    });
-    save(next);
+    const nextPerson: Employee = {
+      ...person,
+      rate: raiseRate,
+      rateHistory: [...person.rateHistory, { rate: raiseRate, effectiveDate: raiseDate }],
+    };
+    const next = employees.map((item) => (item.id === person.id ? nextPerson : item));
+    saveLocal(next);
+    await saveCloud(nextPerson);
     setRaiseRate("");
     setRaiseDate("");
     setMessage("Raise saved for new jobs only. Older invoices stay at the old rate.");
   }
 
-  function setActive(person: Employee, active: boolean) {
-    save(employees.map((item) => (item.id === person.id ? { ...item, active } : item)));
+  async function setActive(person: Employee, active: boolean) {
+    const nextPerson = { ...person, active };
+    saveLocal(employees.map((item) => (item.id === person.id ? nextPerson : item)));
+    await saveCloud(nextPerson);
   }
 
-  function remove(person: Employee) {
+  async function remove(person: Employee) {
     const raw = window.localStorage.getItem("clientready-documents");
     const docs = raw ? JSON.parse(raw) : [];
     const used = docs.some((doc: { data?: { crew?: { employeeId?: string }[] } }) =>
@@ -125,14 +182,15 @@ export default function EmployeesPage() {
     }
     const ok = window.confirm("Are you sure you want to delete this employee?");
     if (!ok) return;
-    save(employees.filter((item) => item.id !== person.id));
+    saveLocal(employees.filter((item) => item.id !== person.id));
+    if (userId) {
+      await supabase.from("employees").delete().eq("user_id", userId).eq("id", person.id);
+    }
   }
 
   return (
     <AppShell title="Employees">
-      <p className="text-[var(--cr-muted)]">
-        Crew names and rates live here. A raise changes new jobs only.
-      </p>
+      <p className="text-[var(--cr-muted)]">Crew names and rates live here. A raise changes new jobs only.</p>
       <form onSubmit={handleSubmit} className="mt-6 grid gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 md:grid-cols-2">
         <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" placeholder="Name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
         <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" placeholder="Phone" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />

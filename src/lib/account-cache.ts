@@ -67,6 +67,28 @@ export async function loadAccountIntoCache() {
     )
   );
 
+const { data: people } = await supabase
+    .from("employees")
+    .select("*")
+    .eq("user_id", user.id);
+
+  window.localStorage.setItem(
+    "clientready-employees",
+    JSON.stringify(
+      (people || []).map((row) => ({
+        id: row.id,
+        name: row.name || "",
+        phone: row.phone || "",
+        role: row.role || "",
+        kind: row.kind === "contractor" ? "contractor" : "employee",
+        rate: row.rate || "",
+        hireDate: row.hire_date || "",
+        active: row.active !== false,
+        rateHistory: row.rate_history || [],
+      }))
+    )
+  );
+
   const docs = await loadCloudDocuments();
   window.localStorage.setItem("clientready-documents", JSON.stringify(docs || []));
 }
