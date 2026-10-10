@@ -53,7 +53,7 @@ export default function HomePage() {
         </div>
         <p className="mt-3 text-sm text-[var(--cr-muted)]">14-day trial. No card to start.</p>
 
-    <div className="mt-10 grid gap-4 lg:grid-cols-2">
+<div className="mt-10 grid gap-4 lg:grid-cols-2">
           <div className="sample-sheet rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <p className="muted text-xs uppercase tracking-wide">What the customer sees</p>
             <div className="mt-2 flex items-start justify-between">
@@ -68,9 +68,9 @@ export default function HomePage() {
                 <p>Time: 8:00 to 12:00</p>
               </div>
             </div>
-            <div className="mt-6 flex justify-between border-t border-slate-200 pt-3 text-sm"><span>Fall cleanup</span><span>$240.00</span></div>
-            <div className="mt-2 flex justify-between text-sm"><span>Haul away</span><span>$80.00</span></div>
-            <div className="mt-4 flex justify-between border-t border-slate-200 pt-3 font-semibold"><span>Total</span><span>$320.00</span></div>
+            <div className="mt-6 flex justify-between border-t border-slate-200 pt-3 text-sm"><span>Fall cleanup</span><span>$520.00</span></div>
+            <div className="mt-2 flex justify-between text-sm"><span>Haul away</span><span>$265.00</span></div>
+            <div className="mt-4 flex justify-between border-t border-slate-200 pt-3 font-semibold"><span>Total</span><span>$785.00</span></div>
             <p className="muted mt-4 text-sm">Pay here: Venmo @northyard</p>
           </div>
 
@@ -87,10 +87,10 @@ export default function HomePage() {
             </div>
             <div className="mt-4 space-y-1 border-t border-amber-200 pt-3 text-sm">
               <div className="flex justify-between"><span>Job cost</span><span>$178.00</span></div>
-              <div className="flex justify-between"><span>You charge</span><span>$320.00</span></div>
-              <div className="flex justify-between"><span>Left over</span><span>$142.00</span></div>
-              <div className="flex justify-between"><span>Set aside 30%</span><span>$42.60</span></div>
-              <div className="flex justify-between font-semibold"><span>Yours after set-aside</span><span>$99.40</span></div>
+              <div className="flex justify-between"><span>You charge</span><span>$785.00</span></div>
+              <div className="flex justify-between"><span>Left over</span><span>$607.00</span></div>
+              <div className="flex justify-between"><span>Set aside 30%</span><span>$182.10</span></div>
+              <div className="flex justify-between font-semibold"><span>Yours after set-aside</span><span>$424.90</span></div>
             </div>
           </div>
         </div>
