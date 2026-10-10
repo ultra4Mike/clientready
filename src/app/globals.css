@@ -199,3 +199,31 @@ a.bg-slate-900,
 button.bg-slate-900 {
   color: #ffffff !important;
 }
+
+.sample-sheet,
+.sample-sheet p,
+.sample-sheet span,
+.sample-sheet h2,
+.sample-sheet div {
+  color: #0f172a !important;
+}
+
+.sample-sheet .muted {
+  color: #475569 !important;
+}
+
+.sample-owner,
+.sample-owner p,
+.sample-owner span,
+.sample-owner h2,
+.sample-owner div {
+  color: #0f172a !important;
+}
+
+.sample-owner .muted {
+  color: #475569 !important;
+}
+
+.sample-owner .label {
+  color: #92400e !important;
+}

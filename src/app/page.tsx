@@ -53,31 +53,31 @@ export default function HomePage() {
         </div>
         <p className="mt-3 text-sm text-[var(--cr-muted)]">14-day trial. No card to start.</p>
 
-        <div className="mt-10 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-2xl border border-slate-200 p-6 shadow-sm" style={{ background: "#ffffff", color: "#0f172a" }}>
-            <p className="text-xs uppercase tracking-wide" style={{ color: "#64748b" }}>What the customer sees</p>
+    <div className="mt-10 grid gap-4 lg:grid-cols-2">
+          <div className="sample-sheet rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="muted text-xs uppercase tracking-wide">What the customer sees</p>
             <div className="mt-2 flex items-start justify-between">
               <div>
                 <h2 className="text-2xl font-semibold">INV-1042</h2>
-                <p className="mt-2 text-sm" style={{ color: "#475569" }}>North Yard Co.</p>
-                <p className="text-sm" style={{ color: "#475569" }}>Bill to: Lena Ortiz</p>
+                <p className="muted mt-2 text-sm">North Yard Co.</p>
+                <p className="muted text-sm">Bill to: Lena Ortiz</p>
               </div>
-              <div className="text-right text-sm" style={{ color: "#475569" }}>
+              <div className="muted text-right text-sm">
                 <p>Date: 2026-10-01</p>
                 <p>Due: 2026-10-15</p>
                 <p>Time: 8:00 to 12:00</p>
               </div>
             </div>
-            <div className="mt-6 flex justify-between border-t pt-3 text-sm" style={{ borderColor: "#e2e8f0" }}><span>Fall cleanup</span><span>$240.00</span></div>
+            <div className="mt-6 flex justify-between border-t border-slate-200 pt-3 text-sm"><span>Fall cleanup</span><span>$240.00</span></div>
             <div className="mt-2 flex justify-between text-sm"><span>Haul away</span><span>$80.00</span></div>
-            <div className="mt-4 flex justify-between border-t pt-3 font-semibold" style={{ borderColor: "#e2e8f0" }}><span>Total</span><span>$320.00</span></div>
-            <p className="mt-4 text-sm" style={{ color: "#475569" }}>Pay here: Venmo @northyard</p>
+            <div className="mt-4 flex justify-between border-t border-slate-200 pt-3 font-semibold"><span>Total</span><span>$320.00</span></div>
+            <p className="muted mt-4 text-sm">Pay here: Venmo @northyard</p>
           </div>
 
-          <div className="rounded-2xl border p-6" style={{ background: "#fffbeb", color: "#0f172a", borderColor: "#fcd34d" }}>
-            <p className="text-xs uppercase tracking-wide" style={{ color: "#92400e" }}>What you see</p>
+          <div className="sample-owner rounded-2xl border border-amber-300 bg-amber-50 p-6">
+            <p className="label text-xs uppercase tracking-wide">What you see</p>
             <h2 className="mt-2 text-xl font-semibold">Your costs and crew</h2>
-            <p className="mt-1 text-sm" style={{ color: "#475569" }}>Hidden from the customer PDF.</p>
+            <p className="muted mt-1 text-sm">Hidden from the customer PDF.</p>
             <div className="mt-4 space-y-2 text-sm">
               <div className="flex justify-between"><span>Gas / diesel</span><span>$18.00</span></div>
               <div className="flex justify-between"><span>Drive time</span><span>0 hrs 25 min</span></div>
@@ -85,7 +85,7 @@ export default function HomePage() {
               <div className="flex justify-between"><span>Henry · 4 hrs · $19/hr</span><span>$76.00</span></div>
               <div className="flex justify-between font-medium"><span>Labor / wages</span><span>$160.00</span></div>
             </div>
-            <div className="mt-4 space-y-1 border-t pt-3 text-sm" style={{ borderColor: "#fde68a" }}>
+            <div className="mt-4 space-y-1 border-t border-amber-200 pt-3 text-sm">
               <div className="flex justify-between"><span>Job cost</span><span>$178.00</span></div>
               <div className="flex justify-between"><span>You charge</span><span>$320.00</span></div>
               <div className="flex justify-between"><span>Left over</span><span>$142.00</span></div>
