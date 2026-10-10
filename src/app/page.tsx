@@ -43,48 +43,49 @@ export default function HomePage() {
           The customer gets a clean invoice. You keep the crew, the job costs, and a year log in one place.
         </p>
         <ul className="mt-4 max-w-2xl space-y-1 text-sm text-[var(--cr-muted)]">
-          <li>Proposals and invoices, with your costs hidden from the customer.</li>
-          <li>Crew hours and saved rates fill the wage total for that job.</li>
-          <li>Paid invoices, expenses, and pay in one year log.</li>
+          <li>One page for proposals and invoices. Turn a proposal into an invoice in one click.</li>
+          <li>Crew hours and the saved rate fill the wage total. A raise does not change old jobs.</li>
+          <li>Paid invoices, expenses, and pay in one year log. Your phone and computer share the account.</li>
         </ul>
         <div className="mt-8 flex flex-wrap items-center gap-3">
           <a href="/signup" className="rounded-lg bg-teal-400 px-5 py-3 text-sm font-medium text-slate-950">Start free</a>
           <a href="#pricing" className="rounded-lg border border-teal-400/40 px-5 py-3 text-sm">See pricing</a>
         </div>
-        <p className="mt-3 text-sm text-[var(--cr-muted)]">3 documents free. No card to start.</p>
+        <p className="mt-3 text-sm text-[var(--cr-muted)]">14-day trial. No card to start.</p>
 
         <div className="mt-10 grid gap-4 lg:grid-cols-2">
-          <div className="sample-sheet rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm">
-            <p className="text-xs uppercase tracking-wide text-slate-500">What the customer sees</p>
+          <div className="rounded-2xl border border-slate-200 p-6 shadow-sm" style={{ background: "#ffffff", color: "#0f172a" }}>
+            <p className="text-xs uppercase tracking-wide" style={{ color: "#64748b" }}>What the customer sees</p>
             <div className="mt-2 flex items-start justify-between">
               <div>
                 <h2 className="text-2xl font-semibold">INV-1042</h2>
-                <p className="mt-2 text-sm text-slate-600">North Yard Co.</p>
-                <p className="text-sm text-slate-600">Bill to: Lena Ortiz</p>
+                <p className="mt-2 text-sm" style={{ color: "#475569" }}>North Yard Co.</p>
+                <p className="text-sm" style={{ color: "#475569" }}>Bill to: Lena Ortiz</p>
               </div>
-              <div className="text-right text-sm text-slate-600">
+              <div className="text-right text-sm" style={{ color: "#475569" }}>
                 <p>Date: 2026-10-01</p>
                 <p>Due: 2026-10-15</p>
                 <p>Time: 8:00 to 12:00</p>
               </div>
             </div>
-            <div className="mt-6 flex justify-between border-t border-slate-200 pt-3 text-sm"><span>Fall cleanup</span><span>$240.00</span></div>
+            <div className="mt-6 flex justify-between border-t pt-3 text-sm" style={{ borderColor: "#e2e8f0" }}><span>Fall cleanup</span><span>$240.00</span></div>
             <div className="mt-2 flex justify-between text-sm"><span>Haul away</span><span>$80.00</span></div>
-            <div className="mt-4 flex justify-between border-t border-slate-200 pt-3 font-semibold"><span>Total</span><span>$320.00</span></div>
-            <p className="mt-4 text-sm text-slate-600">Pay here: Venmo @northyard</p>
+            <div className="mt-4 flex justify-between border-t pt-3 font-semibold" style={{ borderColor: "#e2e8f0" }}><span>Total</span><span>$320.00</span></div>
+            <p className="mt-4 text-sm" style={{ color: "#475569" }}>Pay here: Venmo @northyard</p>
           </div>
 
-          <div className="sample-sheet rounded-2xl border border-amber-300 bg-amber-50 p-6 text-slate-900">
-            <p className="text-xs uppercase tracking-wide text-amber-800">What you see</p>
+          <div className="rounded-2xl border p-6" style={{ background: "#fffbeb", color: "#0f172a", borderColor: "#fcd34d" }}>
+            <p className="text-xs uppercase tracking-wide" style={{ color: "#92400e" }}>What you see</p>
             <h2 className="mt-2 text-xl font-semibold">Your costs and crew</h2>
-            <p className="mt-1 text-sm text-slate-600">Hidden from the customer PDF.</p>
+            <p className="mt-1 text-sm" style={{ color: "#475569" }}>Hidden from the customer PDF.</p>
             <div className="mt-4 space-y-2 text-sm">
-              <div className="flex justify-between"><span>Gas / mileage</span><span>$18.00</span></div>
+              <div className="flex justify-between"><span>Gas / diesel</span><span>$18.00</span></div>
+              <div className="flex justify-between"><span>Drive time</span><span>0 hrs 25 min</span></div>
               <div className="flex justify-between"><span>Roul · 4 hrs · $21/hr</span><span>$84.00</span></div>
               <div className="flex justify-between"><span>Henry · 4 hrs · $19/hr</span><span>$76.00</span></div>
               <div className="flex justify-between font-medium"><span>Labor / wages</span><span>$160.00</span></div>
             </div>
-            <div className="mt-4 space-y-1 border-t border-amber-200 pt-3 text-sm">
+            <div className="mt-4 space-y-1 border-t pt-3 text-sm" style={{ borderColor: "#fde68a" }}>
               <div className="flex justify-between"><span>Job cost</span><span>$178.00</span></div>
               <div className="flex justify-between"><span>You charge</span><span>$320.00</span></div>
               <div className="flex justify-between"><span>Left over</span><span>$142.00</span></div>
@@ -99,7 +100,7 @@ export default function HomePage() {
         <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
           <p className="text-sm text-teal-400">1</p>
           <h2 className="mt-2 font-semibold">Write the proposal</h2>
-          <p className="mt-2 text-sm text-[var(--cr-muted)]">Scope and price for the customer. Your costs stay on your side.</p>
+          <p className="mt-2 text-sm text-[var(--cr-muted)]">Price the job. Your costs stay on your side. Turn it into an invoice when they say yes.</p>
         </div>
         <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
           <p className="text-sm text-teal-400">2</p>
@@ -117,14 +118,14 @@ export default function HomePage() {
         <h2 className="text-2xl font-semibold">Simple pricing</h2>
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-6">
-            <p className="text-sm text-[var(--cr-muted)]">Start</p>
-            <p className="mt-2 text-3xl font-semibold">Free</p>
-            <p className="mt-3 text-sm text-[var(--cr-muted)]">3 documents. No card.</p>
+            <p className="text-sm text-[var(--cr-muted)]">Trial</p>
+            <p className="mt-2 text-3xl font-semibold">14 days</p>
+            <p className="mt-3 text-sm text-[var(--cr-muted)]">Full tools. No card. Then old work stays viewable.</p>
           </div>
           <div className="rounded-2xl border border-teal-400 bg-[var(--cr-card)] p-6">
             <p className="text-sm text-teal-400">Monthly</p>
             <p className="mt-2 text-3xl font-semibold">$7.99</p>
-            <p className="mt-3 text-sm text-[var(--cr-muted)]">After the 3 free documents.</p>
+            <p className="mt-3 text-sm text-[var(--cr-muted)]">After the trial. Keep saving new jobs.</p>
           </div>
           <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-6">
             <p className="text-sm text-[var(--cr-muted)]">3 months</p>
@@ -132,7 +133,9 @@ export default function HomePage() {
             <p className="mt-3 text-sm text-[var(--cr-muted)]">Same tools, paid ahead.</p>
           </div>
         </div>
-        <p className="mt-4 text-sm text-[var(--cr-muted)]">A raise changes the next job only. The year packet is a log, not a tax return.</p>
+        <p className="mt-4 text-sm text-[var(--cr-muted)]">
+          A raise changes the next job only. The year packet is a log, not a tax return. Checkout comes later.
+        </p>
       </section>
 
       <footer className="border-t border-teal-500/20 px-4 py-6 text-center text-sm text-[var(--cr-muted)]">
