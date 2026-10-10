@@ -73,10 +73,10 @@ type Row = {
 
 const costLabels: { key: keyof JobCosts; label: string }[] = [
   { key: "parts", label: "Parts and materials" },
-  { key: "gas", label: "Gas and mileage" },
+  { key: "gas", label: "Gas / diesel" },
   { key: "driveTime", label: "Drive time" },
   { key: "labor", label: "Labor" },
-  { key: "tools", label: "Tools and supplies" },
+  { key: "tools", label: "Job supplies" },
   { key: "lunch", label: "Meals" },
   { key: "other", label: "Other" },
 ];
@@ -155,8 +155,9 @@ export default function YearPage() {
       if (costs) {
         const date = doc.data?.invoiceDate || doc.createdAt || "";
         if (String(date).includes(year) || String(doc.createdAt).includes(year)) {
-          costLabels.forEach((item) => {
+costLabels.forEach((item) => {
             if (item.key === "labor" && hasCrew) return;
+            if (item.key === "driveTime") return;
             const amount = money(costs[item.key]);
             if (!amount) return;
             list.push({

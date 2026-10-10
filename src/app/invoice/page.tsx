@@ -8,7 +8,17 @@ import AppShell from "@/components/AppShell";
 type LineItem = { description: string; qty: string; rate: string };
 type SavedClient = { id: string; name: string; company: string; email: string; phone: string; address: string };
 type SavedDocument = { id: string; type: "invoice" | "proposal"; title: string; clientName: string; createdAt: string; data: Record<string, unknown> };
-type JobCosts = { parts: string; gas: string; driveTime: string; labor: string; tools: string; lunch: string; other: string; notes: string };
+type JobCosts = {
+  parts: string;
+  gas: string;
+  driveTime: string;
+  labor: string;
+  tools: string;
+  lunch: string;
+  other: string;
+  otherNote: string;
+  notes: string;
+};
 type Employee = { id: string; name: string; rate: string; active: boolean };
 type CrewRow = {
   id: string;
@@ -24,9 +34,18 @@ type CrewRow = {
   paidToWorker: boolean;
   paidDate: string;
 };
-
+const emptyCosts: JobCosts = {
+  parts: "",
+  gas: "",
+  driveTime: "",
+  labor: "",
+  tools: "",
+  lunch: "",
+  other: "",
+  otherNote: "",
+  notes: "",
+};
 const emptyItem: LineItem = { description: "", qty: "1", rate: "" };
-const emptyCosts: JobCosts = { parts: "", gas: "", driveTime: "", labor: "", tools: "", lunch: "", other: "", notes: "" };
 
 function ymd(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -304,8 +323,14 @@ function addCrew() {
     const tax = subtotal * ((Number(taxPercent) || 0) / 100);
     return { subtotal, tax, total: subtotal + tax };
   }, [items, taxPercent]);
-  const jobMath = useMemo(() => {
-    const jobCost = money(costs.parts) + money(costs.gas) + money(costs.driveTime) + money(costs.labor) + money(costs.tools) + money(costs.lunch) + money(costs.other);
+const jobMath = useMemo(() => {
+    const jobCost =
+      money(costs.parts) +
+      money(costs.gas) +
+      money(costs.labor) +
+      money(costs.tools) +
+      money(costs.lunch) +
+      money(costs.other);
     const leftOver = totals.total - jobCost;
     const setAside = leftOver > 0 ? leftOver * ((Number(setAsidePercent) || 0) / 100) : 0;
     return { jobCost, leftOver, setAside, yours: leftOver - setAside };
@@ -366,14 +391,15 @@ function addCrew() {
           <div className="owner-costs space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-slate-900">
             <h2 className="font-medium">Your costs only</h2>
             <p className="text-sm text-slate-600">Wages fill from hours times the saved rate, plus any extra pay.</p>
-            <div className="grid gap-3 sm:grid-cols-2">
+<div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm">Parts<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.parts} onChange={(event) => setCosts({ ...costs, parts: event.target.value })} /></label>
-              <label className="text-sm">Gas / mileage<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.gas} onChange={(event) => setCosts({ ...costs, gas: event.target.value })} /></label>
-              <label className="text-sm">Drive time<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.driveTime} onChange={(event) => setCosts({ ...costs, driveTime: event.target.value })} /></label>
+              <label className="text-sm">Gas / diesel<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Receipt amount" value={costs.gas} onChange={(event) => setCosts({ ...costs, gas: event.target.value })} /></label>
+              <label className="text-sm">Drive time, hours<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="1.5" value={costs.driveTime} onChange={(event) => setCosts({ ...costs, driveTime: event.target.value })} /></label>
               <label className="text-sm">Labor / wages<input className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2" value={costs.labor} readOnly={crew.length > 0} onChange={(event) => setCosts({ ...costs, labor: event.target.value })} /></label>
-              <label className="text-sm">Tools<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.tools} onChange={(event) => setCosts({ ...costs, tools: event.target.value })} /></label>
+              <label className="text-sm">Job supplies<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Bags, blades, gloves" value={costs.tools} onChange={(event) => setCosts({ ...costs, tools: event.target.value })} /></label>
               <label className="text-sm">Lunch / meals<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.lunch} onChange={(event) => setCosts({ ...costs, lunch: event.target.value })} /></label>
-              <label className="text-sm">Other<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.other} onChange={(event) => setCosts({ ...costs, other: event.target.value })} /></label>
+              <label className="text-sm">Other<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Dump fee, permit, parking" value={costs.other} onChange={(event) => setCosts({ ...costs, other: event.target.value })} /></label>
+              <label className="text-sm">What was Other?<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Dump fee" value={costs.otherNote} onChange={(event) => setCosts({ ...costs, otherNote: event.target.value })} /></label>
             </div>
 <div className="rounded-lg border border-amber-200 bg-white p-3 text-slate-900">
               <p className="text-sm font-medium text-slate-900">Crew on this job ({crew.length})</p>
@@ -402,8 +428,9 @@ function addCrew() {
               ))}
             </div>
             <label className="block text-sm">Cost notes<textarea className="mt-1 min-h-16 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.notes} onChange={(event) => setCosts({ ...costs, notes: event.target.value })} /></label>
-            <div className="space-y-1 text-sm">
+<div className="space-y-1 text-sm">
               <p>Job cost: ${jobMath.jobCost.toFixed(2)}</p>
+              {costs.driveTime && <p>Drive time: {costs.driveTime} hrs, not added to job cost</p>}
               <p>You charge: ${totals.total.toFixed(2)}</p>
               <p>Left over: ${jobMath.leftOver.toFixed(2)}</p>
               <p>Set aside ({setAsidePercent}%): ${jobMath.setAside.toFixed(2)}</p>
