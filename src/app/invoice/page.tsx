@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { saveCloudDocument } from "@/lib/cloud-docs";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
+import { getTrialState } from "@/lib/trial";
 
 type LineItem = { description: string; qty: string; rate: string };
 type SavedClient = { id: string; name: string; company: string; email: string; phone: string; address: string };
@@ -118,6 +119,8 @@ export default function NewInvoicePage() {
   const [crew, setCrew] = useState<CrewRow[]>([]);
   const [pickedEmployee, setPickedEmployee] = useState("");
   const [otherFees, setOtherFees] = useState<OtherFee[]>([]);
+  const [locked, setLocked] = useState(false);
+  const [daysLeft, setDaysLeft] = useState(14);
 
   const isProposal = docKind === "proposal";
 
@@ -137,6 +140,13 @@ export default function NewInvoicePage() {
   useEffect(() => {
     const raw = window.localStorage.getItem("clientready-employees");
     if (raw) setEmployees(JSON.parse(raw));
+  }, []);
+
+  useEffect(() => {
+    getTrialState().then((trial) => {
+      setLocked(trial.expired);
+      setDaysLeft(trial.daysLeft);
+    });
   }, []);
 
   useEffect(() => {
@@ -223,6 +233,7 @@ export default function NewInvoicePage() {
   });
 
   function chooseKind(kind: DocKind) {
+    if (locked) return;
     setDocKind(kind);
     if (!docId) setInvoiceNumber(nextNumber(kind));
     if (kind === "proposal" && (status === "paid" || status === "overdue")) setStatus("sent");
@@ -283,6 +294,7 @@ export default function NewInvoicePage() {
   }
 
   function clearForm() {
+    if (locked) return;
     setDocId(""); setClientSearch(""); setClientName(""); setClientCompany(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
     setInvoiceNumber(nextNumber(docKind)); setInvoiceDate(ymd(new Date())); setDueDate(plusDays(14)); setJobStart(""); setJobEnd("");
     setNotes(isProposal ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
@@ -291,6 +303,10 @@ export default function NewInvoicePage() {
   }
 
   async function saveDocument() {
+    if (locked) {
+      setSaveMessage("Trial ended. Subscribe to save. $7.99/mo or $19.99 for 3 months.");
+      return;
+    }
     const raw = window.localStorage.getItem("clientready-documents");
     const docs = raw ? JSON.parse(raw) : [];
     const localId = docId || Date.now().toString();
@@ -308,6 +324,35 @@ export default function NewInvoicePage() {
     window.localStorage.setItem("clientready-documents", JSON.stringify([...docs.filter((item: { id: string }) => item.id !== localId && item.id !== cloudId), nextDoc]));
     setDocId(cloudId);
     setSaveMessage(isProposal ? "Proposal saved" : "Invoice saved");
+  }
+
+  async function createInvoiceFromProposal() {
+    if (locked) {
+      setSaveMessage("Trial ended. Subscribe to save. $7.99/mo or $19.99 for 3 months.");
+      return;
+    }
+    const raw = window.localStorage.getItem("clientready-documents");
+    const docs = raw ? JSON.parse(raw) : [];
+    const number = nextNumber("invoice");
+    const labor = crew.length ? crew.reduce((sum, row) => sum + rowPay(row), 0).toFixed(2) : costs.labor;
+    const nextDoc = {
+      id: Date.now().toString(),
+      type: "invoice",
+      title: number,
+      clientName: clientName || "No client",
+      createdAt: new Date().toLocaleDateString(),
+      data: {
+        clientName, clientCompany, clientEmail, clientPhone, clientAddress,
+        invoiceNumber: number, invoiceDate: ymd(new Date()), dueDate: plusDays(14),
+        jobStart, jobEnd, notes: "Payment is due within 14 days.", taxPercent, items,
+        status: "draft", style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew,
+      },
+    };
+    const cloudId = await saveCloudDocument(nextDoc);
+    nextDoc.id = cloudId;
+    window.localStorage.setItem("clientready-documents", JSON.stringify([...docs, nextDoc]));
+    window.localStorage.setItem("clientready-open-document", cloudId);
+    window.location.href = "/invoice";
   }
 
   async function copyPayLink() {
@@ -341,132 +386,145 @@ export default function NewInvoicePage() {
     <AppShell title={isProposal ? "New proposal" : "New invoice"}>
       <section className="mx-auto grid max-w-6xl gap-8 px-6 py-8 lg:grid-cols-2">
         <form className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
-          <div className="flex gap-2">
-            <button type="button" onClick={() => chooseKind("invoice")} className={`rounded-lg px-4 py-2 text-sm ${!isProposal ? "bg-slate-900 text-white" : "border border-slate-300"}`}>Invoice</button>
-            <button type="button" onClick={() => chooseKind("proposal")} className={`rounded-lg px-4 py-2 text-sm ${isProposal ? "bg-slate-900 text-white" : "border border-slate-300"}`}>Proposal</button>
-          </div>
-          <h1 className="text-xl font-semibold">{isProposal ? "Proposal details" : "Invoice details"}</h1>
-          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Search clients by name" value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} />
-          {filteredClients.length > 0 && (
-            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-              {filteredClients.map((client) => (
-                <button key={client.id} type="button" onClick={() => chooseClient(client)} className="block w-full border-b border-slate-100 px-3 py-2 text-left">
-                  <span className="block font-medium">{client.name}</span>
-                  <span className="block text-sm text-slate-500">{client.company || client.email}</span>
-                </button>
-              ))}
-            </div>
+          {locked && (
+            <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-slate-900">
+              Trial ended. You can view and print old documents. New saves are locked.
+              $7.99 a month or $19.99 for 3 months.
+            </p>
           )}
-          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client name" value={clientName} onChange={(event) => setClientName(event.target.value)} />
-          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client company" value={clientCompany} onChange={(event) => setClientCompany(event.target.value)} />
-          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client email" value={clientEmail} onChange={(event) => setClientEmail(event.target.value)} />
-          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client phone" value={clientPhone} onChange={(event) => setClientPhone(event.target.value)} />
-          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client address" value={clientAddress} onChange={(event) => setClientAddress(event.target.value)} />
-          <button type="button" onClick={saveClientFromForm} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Save as client</button>
-          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder={isProposal ? "Proposal number" : "Invoice number"} value={invoiceNumber} onChange={(event) => setInvoiceNumber(event.target.value)} />
-          <select className="w-full rounded-lg border border-slate-300 px-3 py-2" value={status} onChange={(event) => setStatus(event.target.value)}>
-            <option value="draft">Draft</option>
-            <option value="sent">Sent</option>
-            {isProposal ? <option value="accepted">Accepted</option> : <><option value="paid">Paid</option><option value="overdue">Overdue</option></>}
-          </select>
-          <select className="w-full rounded-lg border border-slate-300 px-3 py-2" value={style} onChange={(event) => setStyle(event.target.value)}>
-            <option value="clean">Clean professional</option><option value="bold">Bold modern</option>
-          </select>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="text-sm text-slate-600">{isProposal ? "Proposal date" : "Invoice date"}<input type="date" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} /></label>
-            <label className="text-sm text-slate-600">{isProposal ? "Valid until" : "Due date"}<input type="date" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></label>
-            <label className="text-sm text-slate-600">Job start<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={jobStart} onChange={(event) => setJobStart(event.target.value)} /></label>
-            <label className="text-sm text-slate-600">Job end<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={jobEnd} onChange={(event) => setJobEnd(event.target.value)} /></label>
-          </div>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between"><h2 className="font-medium">Line items</h2><button type="button" className="text-sm" onClick={() => setItems((current) => [...current, { ...emptyItem }])}>Add item</button></div>
-            {items.map((item, index) => (
-              <div key={index} className="grid gap-2 sm:grid-cols-3">
-                <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Description" value={item.description} onChange={(event) => updateItem(index, "description", event.target.value)} />
-                <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Qty" value={item.qty} onChange={(event) => updateItem(index, "qty", event.target.value)} />
-                <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Rate" value={item.rate} onChange={(event) => updateItem(index, "rate", event.target.value)} />
-              </div>
-            ))}
-          </div>
-          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Tax percent" value={taxPercent} onChange={(event) => setTaxPercent(event.target.value)} />
-          <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
-
-          <div className="owner-costs space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-slate-900">
-            <h2 className="font-medium">Your costs only</h2>
-            <p className="text-sm text-slate-600">Wages fill from hours times the saved rate, plus any extra pay.</p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="text-sm">Parts<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.parts} onChange={(event) => setCosts({ ...costs, parts: event.target.value })} /></label>
-              <label className="text-sm">Gas / diesel<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Receipt amount" value={costs.gas} onChange={(event) => setCosts({ ...costs, gas: event.target.value })} /></label>
-              <label className="text-sm">
-                Drive time
-                <div className="mt-1 grid grid-cols-2 gap-2">
-                  <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Hours" value={costs.driveHours} onChange={(event) => setCosts({ ...costs, driveHours: event.target.value })} />
-                  <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Minutes" value={costs.driveMinutes} onChange={(event) => setCosts({ ...costs, driveMinutes: event.target.value })} />
-                </div>
-              </label>
-              <label className="text-sm">Labor / wages<input className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2" value={costs.labor} readOnly={crew.length > 0} onChange={(event) => setCosts({ ...costs, labor: event.target.value })} /></label>
-              <label className="text-sm">Job supplies<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Bags, blades, gloves" value={costs.tools} onChange={(event) => setCosts({ ...costs, tools: event.target.value })} /></label>
-              <label className="text-sm">Lunch / meals cost<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.lunch} onChange={(event) => setCosts({ ...costs, lunch: event.target.value })} /></label>
+          {!locked && daysLeft <= 5 && (
+            <p className="text-sm text-slate-600">{daysLeft} day{daysLeft === 1 ? "" : "s"} left in the trial.</p>
+          )}
+          <fieldset disabled={locked} className="min-w-0 space-y-4">
+            <div className="flex gap-2">
+              <button type="button" onClick={() => chooseKind("invoice")} className={`rounded-lg px-4 py-2 text-sm ${!isProposal ? "bg-slate-900 text-white" : "border border-slate-300"}`}>Invoice</button>
+              <button type="button" onClick={() => chooseKind("proposal")} className={`rounded-lg px-4 py-2 text-sm ${isProposal ? "bg-slate-900 text-white" : "border border-slate-300"}`}>Proposal</button>
             </div>
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <p className="text-sm font-medium">Other fees</p>
-                <button type="button" className="rounded-lg bg-teal-400 px-3 py-1 text-sm font-medium text-slate-950" onClick={() => setOtherFees((current) => [...current, { id: Date.now().toString(), name: "", amount: "" }])}>Add fee</button>
+            <h1 className="text-xl font-semibold">{isProposal ? "Proposal details" : "Invoice details"}</h1>
+            <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Search clients by name" value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} />
+            {filteredClients.length > 0 && (
+              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                {filteredClients.map((client) => (
+                  <button key={client.id} type="button" onClick={() => chooseClient(client)} className="block w-full border-b border-slate-100 px-3 py-2 text-left">
+                    <span className="block font-medium">{client.name}</span>
+                    <span className="block text-sm text-slate-500">{client.company || client.email}</span>
+                  </button>
+                ))}
               </div>
-              {otherFees.map((fee) => (
-                <div key={fee.id} className="grid gap-2 sm:grid-cols-[1fr_8rem_auto]">
-                  <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Dump fee, permit, parking" value={fee.name} onChange={(event) => setOtherFees((current) => current.map((item) => item.id === fee.id ? { ...item, name: event.target.value } : item))} />
-                  <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Cost" value={fee.amount} onChange={(event) => setOtherFees((current) => current.map((item) => item.id === fee.id ? { ...item, amount: event.target.value } : item))} />
-                  <button type="button" className="text-sm" onClick={() => setOtherFees((current) => current.filter((item) => item.id !== fee.id))}>Remove</button>
+            )}
+            <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client name" value={clientName} onChange={(event) => setClientName(event.target.value)} />
+            <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client company" value={clientCompany} onChange={(event) => setClientCompany(event.target.value)} />
+            <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client email" value={clientEmail} onChange={(event) => setClientEmail(event.target.value)} />
+            <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client phone" value={clientPhone} onChange={(event) => setClientPhone(event.target.value)} />
+            <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client address" value={clientAddress} onChange={(event) => setClientAddress(event.target.value)} />
+            <button type="button" onClick={saveClientFromForm} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Save as client</button>
+            <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder={isProposal ? "Proposal number" : "Invoice number"} value={invoiceNumber} onChange={(event) => setInvoiceNumber(event.target.value)} />
+            <select className="w-full rounded-lg border border-slate-300 px-3 py-2" value={status} onChange={(event) => setStatus(event.target.value)}>
+              <option value="draft">Draft</option>
+              <option value="sent">Sent</option>
+              {isProposal ? <option value="accepted">Accepted</option> : <><option value="paid">Paid</option><option value="overdue">Overdue</option></>}
+            </select>
+            <select className="w-full rounded-lg border border-slate-300 px-3 py-2" value={style} onChange={(event) => setStyle(event.target.value)}>
+              <option value="clean">Clean professional</option><option value="bold">Bold modern</option>
+            </select>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="text-sm text-slate-600">{isProposal ? "Proposal date" : "Invoice date"}<input type="date" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} /></label>
+              <label className="text-sm text-slate-600">{isProposal ? "Valid until" : "Due date"}<input type="date" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></label>
+              <label className="text-sm text-slate-600">Job start<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={jobStart} onChange={(event) => setJobStart(event.target.value)} /></label>
+              <label className="text-sm text-slate-600">Job end<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={jobEnd} onChange={(event) => setJobEnd(event.target.value)} /></label>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between"><h2 className="font-medium">Line items</h2><button type="button" className="text-sm" onClick={() => setItems((current) => [...current, { ...emptyItem }])}>Add item</button></div>
+              {items.map((item, index) => (
+                <div key={index} className="grid gap-2 sm:grid-cols-3">
+                  <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Description" value={item.description} onChange={(event) => updateItem(index, "description", event.target.value)} />
+                  <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Qty" value={item.qty} onChange={(event) => updateItem(index, "qty", event.target.value)} />
+                  <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Rate" value={item.rate} onChange={(event) => updateItem(index, "rate", event.target.value)} />
                 </div>
               ))}
             </div>
-            <div className="rounded-lg border border-amber-200 bg-white p-3 text-slate-900">
-              <p className="text-sm font-medium text-slate-900">Crew on this job ({crew.length})</p>
-              <div className="mt-2 flex gap-2">
-                <select className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" value={pickedEmployee} onChange={(event) => setPickedEmployee(event.target.value)}>
-                  <option value="">Add an employee</option>
-                  {employees.filter((person) => person.active !== false).map((person) => (
-                    <option key={person.id} value={person.id}>{person.name} · ${Number(person.rate || 0).toFixed(2)}/hr</option>
-                  ))}
-                </select>
-                <button type="button" onClick={addCrew} className="rounded-lg bg-teal-400 px-4 py-2 text-sm font-medium text-slate-950">Add</button>
-              </div>
-              {crew.map((row) => (
-                <div key={row.id} className="mt-3 space-y-2 border-t border-amber-200 pt-3 text-slate-900">
-                  <p className="text-sm font-medium text-slate-900">{row.name} · ${Number(row.rate || 0).toFixed(2)}/hr saved on this job</p>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <label className="text-sm text-slate-900">Work date<input type="date" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" value={row.workDate} onChange={(event) => updateCrew(row.id, { workDate: event.target.value })} /></label>
-                    <label className="text-sm text-slate-900">Hours<input className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" value={row.hours} onChange={(event) => updateCrew(row.id, { hours: event.target.value })} /></label>
-                    <label className="text-sm text-slate-900">Start<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" value={row.startTime} onChange={(event) => updateCrew(row.id, { startTime: event.target.value })} /></label>
-                    <label className="text-sm text-slate-900">End<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" value={row.endTime} onChange={(event) => updateCrew(row.id, { endTime: event.target.value })} /></label>
-                    <label className="text-sm text-slate-900 sm:col-span-2">Extra pay for this job<input className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" placeholder="100" value={row.bonus} onChange={(event) => updateCrew(row.id, { bonus: event.target.value })} /></label>
+            <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Tax percent" value={taxPercent} onChange={(event) => setTaxPercent(event.target.value)} />
+            <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
+            <div className="owner-costs space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-slate-900">
+              <h2 className="font-medium">Your costs only</h2>
+              <p className="text-sm text-slate-600">Wages fill from hours times the saved rate, plus any extra pay.</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-sm">Parts<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.parts} onChange={(event) => setCosts({ ...costs, parts: event.target.value })} /></label>
+                <label className="text-sm">Gas / diesel<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Receipt amount" value={costs.gas} onChange={(event) => setCosts({ ...costs, gas: event.target.value })} /></label>
+                <label className="text-sm">
+                  Drive time
+                  <div className="mt-1 grid grid-cols-2 gap-2">
+                    <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Hours" value={costs.driveHours} onChange={(event) => setCosts({ ...costs, driveHours: event.target.value })} />
+                    <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Minutes" value={costs.driveMinutes} onChange={(event) => setCosts({ ...costs, driveMinutes: event.target.value })} />
                   </div>
-                  <p className="text-sm text-slate-900">Paid this job: ${rowPay(row).toFixed(2)}</p>
-                  <button type="button" onClick={() => allowCrewChange() && setCrew((current) => current.filter((item) => item.id !== row.id))} className="text-sm text-slate-700">Remove from job</button>
+                </label>
+                <label className="text-sm">Labor / wages<input className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2" value={costs.labor} readOnly={crew.length > 0} onChange={(event) => setCosts({ ...costs, labor: event.target.value })} /></label>
+                <label className="text-sm">Job supplies<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Bags, blades, gloves" value={costs.tools} onChange={(event) => setCosts({ ...costs, tools: event.target.value })} /></label>
+                <label className="text-sm">Lunch / meals cost<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.lunch} onChange={(event) => setCosts({ ...costs, lunch: event.target.value })} /></label>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <p className="text-sm font-medium">Other fees</p>
+                  <button type="button" className="rounded-lg bg-teal-400 px-3 py-1 text-sm font-medium text-slate-950" onClick={() => setOtherFees((current) => [...current, { id: Date.now().toString(), name: "", amount: "" }])}>Add fee</button>
                 </div>
-              ))}
+                {otherFees.map((fee) => (
+                  <div key={fee.id} className="grid gap-2 sm:grid-cols-[1fr_8rem_auto]">
+                    <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Dump fee, permit, parking" value={fee.name} onChange={(event) => setOtherFees((current) => current.map((item) => item.id === fee.id ? { ...item, name: event.target.value } : item))} />
+                    <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Cost" value={fee.amount} onChange={(event) => setOtherFees((current) => current.map((item) => item.id === fee.id ? { ...item, amount: event.target.value } : item))} />
+                    <button type="button" className="text-sm" onClick={() => setOtherFees((current) => current.filter((item) => item.id !== fee.id))}>Remove</button>
+                  </div>
+                ))}
+              </div>
+              <div className="rounded-lg border border-amber-200 bg-white p-3 text-slate-900">
+                <p className="text-sm font-medium text-slate-900">Crew on this job ({crew.length})</p>
+                <div className="mt-2 flex gap-2">
+                  <select className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" value={pickedEmployee} onChange={(event) => setPickedEmployee(event.target.value)}>
+                    <option value="">Add an employee</option>
+                    {employees.filter((person) => person.active !== false).map((person) => (
+                      <option key={person.id} value={person.id}>{person.name} · ${Number(person.rate || 0).toFixed(2)}/hr</option>
+                    ))}
+                  </select>
+                  <button type="button" onClick={addCrew} className="rounded-lg bg-teal-400 px-4 py-2 text-sm font-medium text-slate-950">Add</button>
+                </div>
+                {crew.map((row) => (
+                  <div key={row.id} className="mt-3 space-y-2 border-t border-amber-200 pt-3 text-slate-900">
+                    <p className="text-sm font-medium text-slate-900">{row.name} · ${Number(row.rate || 0).toFixed(2)}/hr saved on this job</p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <label className="text-sm text-slate-900">Work date<input type="date" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" value={row.workDate} onChange={(event) => updateCrew(row.id, { workDate: event.target.value })} /></label>
+                      <label className="text-sm text-slate-900">Hours<input className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" value={row.hours} onChange={(event) => updateCrew(row.id, { hours: event.target.value })} /></label>
+                      <label className="text-sm text-slate-900">Start<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" value={row.startTime} onChange={(event) => updateCrew(row.id, { startTime: event.target.value })} /></label>
+                      <label className="text-sm text-slate-900">End<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" value={row.endTime} onChange={(event) => updateCrew(row.id, { endTime: event.target.value })} /></label>
+                      <label className="text-sm text-slate-900 sm:col-span-2">Extra pay for this job<input className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" placeholder="100" value={row.bonus} onChange={(event) => updateCrew(row.id, { bonus: event.target.value })} /></label>
+                    </div>
+                    <p className="text-sm text-slate-900">Paid this job: ${rowPay(row).toFixed(2)}</p>
+                    <button type="button" onClick={() => allowCrewChange() && setCrew((current) => current.filter((item) => item.id !== row.id))} className="text-sm text-slate-700">Remove from job</button>
+                  </div>
+                ))}
+              </div>
+              <label className="block text-sm">Cost notes<textarea className="mt-1 min-h-16 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.notes} onChange={(event) => setCosts({ ...costs, notes: event.target.value })} /></label>
+              <div className="space-y-1 text-sm">
+                <p>Job cost: ${jobMath.jobCost.toFixed(2)}</p>
+                {(costs.driveHours || costs.driveMinutes) && <p>Drive time: {costs.driveHours || "0"} hrs {costs.driveMinutes || "0"} min, not added to job cost</p>}
+                <p>You charge: ${totals.total.toFixed(2)}</p>
+                <p>Left over: ${jobMath.leftOver.toFixed(2)}</p>
+                <p>Set aside ({setAsidePercent}%): ${jobMath.setAside.toFixed(2)}</p>
+                <p className="font-semibold">Yours after set-aside: ${jobMath.yours.toFixed(2)}</p>
+              </div>
             </div>
-            <label className="block text-sm">Cost notes<textarea className="mt-1 min-h-16 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.notes} onChange={(event) => setCosts({ ...costs, notes: event.target.value })} /></label>
-            <div className="space-y-1 text-sm">
-              <p>Job cost: ${jobMath.jobCost.toFixed(2)}</p>
-              {(costs.driveHours || costs.driveMinutes) && <p>Drive time: {costs.driveHours || "0"} hrs {costs.driveMinutes || "0"} min, not added to job cost</p>}
-              <p>You charge: ${totals.total.toFixed(2)}</p>
-              <p>Left over: ${jobMath.leftOver.toFixed(2)}</p>
-              <p>Set aside ({setAsidePercent}%): ${jobMath.setAside.toFixed(2)}</p>
-              <p className="font-semibold">Yours after set-aside: ${jobMath.yours.toFixed(2)}</p>
+            <div className="flex flex-wrap gap-3">
+              {!locked && <button type="button" onClick={saveDocument} className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white">Save document</button>}
+              {isProposal && !locked && (
+                <button type="button" onClick={createInvoiceFromProposal} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Create invoice</button>
+              )}
+              {!locked && <button type="button" onClick={clearForm} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Clear form</button>}
             </div>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={saveDocument} className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white">Save document</button>
-            <button type="button" onClick={clearForm} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Clear form</button>
-          </div>
-          {saveMessage && <p className="text-sm text-slate-600">{saveMessage}</p>}
+            {saveMessage && <p className="text-sm text-slate-600">{saveMessage}</p>}
+          </fieldset>
         </form>
         <div>
           <div className="mb-4 flex flex-wrap gap-3">
             <button type="button" onClick={() => window.print()} className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white">Print / Save PDF</button>
-            {!isProposal && status !== "paid" && <button type="button" onClick={copyPayLink} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">{paymentLink.trim() ? "Pay / Copy pay link" : "Add how to pay"}</button>}
+            {!locked && !isProposal && status !== "paid" && <button type="button" onClick={copyPayLink} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">{paymentLink.trim() ? "Pay / Copy pay link" : "Add how to pay"}</button>}
           </div>
           <div id="preview" className={previewClass}>
             {logo && <img src={logo} alt="Business logo" className="mb-3 h-14 w-auto" />}
