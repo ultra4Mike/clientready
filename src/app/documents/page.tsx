@@ -53,12 +53,9 @@ export default function DocumentsPage() {
     window.localStorage.setItem("clientready-documents", JSON.stringify(next));
   }
 
-  function openDocument(doc: SavedDocument) {
+    function openDocument(doc: SavedDocument) {
     window.localStorage.setItem("clientready-open-document", doc.id);
-    if (doc.type === "invoice") window.location.href = "/invoice";
-    else if (doc.type === "proposal") window.location.href = "/proposal";
-    else if (doc.type === "email") window.location.href = "/email";
-    else window.location.href = "/report";
+    window.location.href = "/invoice";
   }
 
   function duplicateDocument(doc: SavedDocument) {

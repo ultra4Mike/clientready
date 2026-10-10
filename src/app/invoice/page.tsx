@@ -35,6 +35,7 @@ type CrewRow = {
   paidToWorker: boolean;
   paidDate: string;
 };
+type DocKind = "invoice" | "proposal";
 
 const emptyItem: LineItem = { description: "", qty: "1", rate: "" };
 const emptyCosts: JobCosts = {
@@ -71,9 +72,21 @@ function hoursBetween(start: string, end: string) {
 function rowPay(row: CrewRow) {
   return money(row.hours) * money(row.rate) + money(row.bonus);
 }
+function nextNumber(kind: DocKind) {
+  const raw = window.localStorage.getItem("clientready-documents");
+  const docs = raw ? (JSON.parse(raw) as SavedDocument[]) : [];
+  let highest = 1000;
+  docs.forEach((doc) => {
+    if (doc.type !== kind) return;
+    const match = String(doc.data?.invoiceNumber || doc.title || "").match(/(\d+)/);
+    if (match && Number(match[1]) > highest) highest = Number(match[1]);
+  });
+  return `${kind === "proposal" ? "PROP" : "INV"}-${highest + 1}`;
+}
 
 export default function NewInvoicePage() {
   const [docId, setDocId] = useState("");
+  const [docKind, setDocKind] = useState<DocKind>("invoice");
   const [clientName, setClientName] = useState("");
   const [clientCompany, setClientCompany] = useState("");
   const [clientEmail, setClientEmail] = useState("");
@@ -105,6 +118,8 @@ export default function NewInvoicePage() {
   const [crew, setCrew] = useState<CrewRow[]>([]);
   const [pickedEmployee, setPickedEmployee] = useState("");
   const [otherFees, setOtherFees] = useState<OtherFee[]>([]);
+
+  const isProposal = docKind === "proposal";
 
   useEffect(() => {
     const raw = window.localStorage.getItem("clientready-profile");
@@ -150,22 +165,20 @@ export default function NewInvoicePage() {
   useEffect(() => {
     const openId = window.localStorage.getItem("clientready-open-document");
     const raw = window.localStorage.getItem("clientready-documents");
+    const wanted = window.localStorage.getItem("clientready-new-type");
     if (!openId) {
-      const docs = raw ? (JSON.parse(raw) as SavedDocument[]) : [];
-      let highest = 1000;
-      docs.forEach((doc) => {
-        if (doc.type !== "invoice") return;
-        const match = String(doc.data?.invoiceNumber || doc.title || "").match(/(\d+)/);
-        if (match && Number(match[1]) > highest) highest = Number(match[1]);
-      });
-      setInvoiceNumber(`INV-${highest + 1}`);
+      const kind: DocKind = wanted === "proposal" ? "proposal" : "invoice";
+      window.localStorage.removeItem("clientready-new-type");
+      setDocKind(kind);
+      setInvoiceNumber(nextNumber(kind));
       setInvoiceDate(ymd(new Date()));
       setDueDate(plusDays(14));
+      setNotes(kind === "proposal" ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
       return;
     }
     if (!raw) return;
     const docs = JSON.parse(raw) as SavedDocument[];
-    const doc = docs.find((item) => item.id === openId && item.type === "invoice");
+    const doc = docs.find((item) => item.id === openId && (item.type === "invoice" || item.type === "proposal"));
     window.localStorage.removeItem("clientready-open-document");
     if (!doc) return;
     const data = doc.data as {
@@ -173,18 +186,20 @@ export default function NewInvoicePage() {
       invoiceNumber?: string; invoiceDate?: string; dueDate?: string; jobStart?: string; jobEnd?: string; notes?: string;
       taxPercent?: string; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
     };
+    const kind: DocKind = doc.type === "proposal" ? "proposal" : "invoice";
+    setDocKind(kind);
     setDocId(doc.id);
     setClientName(data.clientName || "");
     setClientCompany(data.clientCompany || "");
     setClientEmail(data.clientEmail || "");
     setClientPhone(data.clientPhone || "");
     setClientAddress(data.clientAddress || "");
-    setInvoiceNumber(data.invoiceNumber || "INV-1001");
+    setInvoiceNumber(data.invoiceNumber || (kind === "proposal" ? "PROP-1001" : "INV-1001"));
     setInvoiceDate(data.invoiceDate || ymd(new Date()));
     setDueDate(data.dueDate || plusDays(14));
     setJobStart(data.jobStart || "");
     setJobEnd(data.jobEnd || "");
-    setNotes(data.notes || "Payment is due within 14 days.");
+    setNotes(data.notes || (kind === "proposal" ? "This proposal is valid for 14 days." : "Payment is due within 14 days."));
     setTaxPercent(data.taxPercent || "0");
     setItems(data.items?.length ? data.items : [{ ...emptyItem }]);
     setClientSearch(data.clientName || "");
@@ -207,16 +222,11 @@ export default function NewInvoicePage() {
     return `${client.name} ${client.company} ${client.email}`.toLowerCase().includes(clientSearch.toLowerCase());
   });
 
-  function getNextInvoiceNumber() {
-    const raw = window.localStorage.getItem("clientready-documents");
-    const docs = raw ? (JSON.parse(raw) as SavedDocument[]) : [];
-    let highest = 1000;
-    docs.forEach((doc) => {
-      if (doc.type !== "invoice") return;
-      const match = String(doc.data?.invoiceNumber || doc.title || "").match(/(\d+)/);
-      if (match && Number(match[1]) > highest) highest = Number(match[1]);
-    });
-    return `INV-${highest + 1}`;
+  function chooseKind(kind: DocKind) {
+    setDocKind(kind);
+    if (!docId) setInvoiceNumber(nextNumber(kind));
+    if (kind === "proposal" && (status === "paid" || status === "overdue")) setStatus("sent");
+    setNotes(kind === "proposal" ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
   }
 
   function chooseClient(client: SavedClient) {
@@ -274,8 +284,9 @@ export default function NewInvoicePage() {
 
   function clearForm() {
     setDocId(""); setClientSearch(""); setClientName(""); setClientCompany(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
-    setInvoiceNumber(getNextInvoiceNumber()); setInvoiceDate(ymd(new Date())); setDueDate(plusDays(14)); setJobStart(""); setJobEnd("");
-    setNotes("Payment is due within 14 days."); setTaxPercent("0"); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
+    setInvoiceNumber(nextNumber(docKind)); setInvoiceDate(ymd(new Date())); setDueDate(plusDays(14)); setJobStart(""); setJobEnd("");
+    setNotes(isProposal ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
+    setTaxPercent("0"); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
     setStyle("clean"); setJobTime(""); setCosts(emptyCosts); setCrew([]); setOtherFees([]);
   }
 
@@ -285,14 +296,18 @@ export default function NewInvoicePage() {
     const localId = docId || Date.now().toString();
     const labor = crew.length ? crew.reduce((sum, row) => sum + rowPay(row), 0).toFixed(2) : costs.labor;
     const nextDoc = {
-      id: localId, type: "invoice", title: invoiceNumber || "Invoice", clientName: clientName || "No client", createdAt: new Date().toLocaleDateString(),
+      id: localId,
+      type: docKind,
+      title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
+      clientName: clientName || "No client",
+      createdAt: new Date().toLocaleDateString(),
       data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
     window.localStorage.setItem("clientready-documents", JSON.stringify([...docs.filter((item: { id: string }) => item.id !== localId && item.id !== cloudId), nextDoc]));
     setDocId(cloudId);
-    setSaveMessage("Invoice saved");
+    setSaveMessage(isProposal ? "Proposal saved" : "Invoice saved");
   }
 
   async function copyPayLink() {
@@ -323,10 +338,14 @@ export default function NewInvoicePage() {
   const labelClass = style === "bold" ? "text-slate-400" : "text-slate-500";
 
   return (
-    <AppShell title="New invoice">
+    <AppShell title={isProposal ? "New proposal" : "New invoice"}>
       <section className="mx-auto grid max-w-6xl gap-8 px-6 py-8 lg:grid-cols-2">
         <form className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
-          <h1 className="text-xl font-semibold">Invoice details</h1>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => chooseKind("invoice")} className={`rounded-lg px-4 py-2 text-sm ${!isProposal ? "bg-slate-900 text-white" : "border border-slate-300"}`}>Invoice</button>
+            <button type="button" onClick={() => chooseKind("proposal")} className={`rounded-lg px-4 py-2 text-sm ${isProposal ? "bg-slate-900 text-white" : "border border-slate-300"}`}>Proposal</button>
+          </div>
+          <h1 className="text-xl font-semibold">{isProposal ? "Proposal details" : "Invoice details"}</h1>
           <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Search clients by name" value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} />
           {filteredClients.length > 0 && (
             <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
@@ -344,16 +363,18 @@ export default function NewInvoicePage() {
           <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client phone" value={clientPhone} onChange={(event) => setClientPhone(event.target.value)} />
           <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client address" value={clientAddress} onChange={(event) => setClientAddress(event.target.value)} />
           <button type="button" onClick={saveClientFromForm} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Save as client</button>
-          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Invoice number" value={invoiceNumber} onChange={(event) => setInvoiceNumber(event.target.value)} />
+          <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder={isProposal ? "Proposal number" : "Invoice number"} value={invoiceNumber} onChange={(event) => setInvoiceNumber(event.target.value)} />
           <select className="w-full rounded-lg border border-slate-300 px-3 py-2" value={status} onChange={(event) => setStatus(event.target.value)}>
-            <option value="draft">Draft</option><option value="sent">Sent</option><option value="paid">Paid</option><option value="overdue">Overdue</option>
+            <option value="draft">Draft</option>
+            <option value="sent">Sent</option>
+            {isProposal ? <option value="accepted">Accepted</option> : <><option value="paid">Paid</option><option value="overdue">Overdue</option></>}
           </select>
           <select className="w-full rounded-lg border border-slate-300 px-3 py-2" value={style} onChange={(event) => setStyle(event.target.value)}>
             <option value="clean">Clean professional</option><option value="bold">Bold modern</option>
           </select>
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="text-sm text-slate-600">Invoice date<input type="date" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} /></label>
-            <label className="text-sm text-slate-600">Due date<input type="date" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></label>
+            <label className="text-sm text-slate-600">{isProposal ? "Proposal date" : "Invoice date"}<input type="date" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} /></label>
+            <label className="text-sm text-slate-600">{isProposal ? "Valid until" : "Due date"}<input type="date" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></label>
             <label className="text-sm text-slate-600">Job start<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={jobStart} onChange={(event) => setJobStart(event.target.value)} /></label>
             <label className="text-sm text-slate-600">Job end<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={jobEnd} onChange={(event) => setJobEnd(event.target.value)} /></label>
           </div>
@@ -370,7 +391,7 @@ export default function NewInvoicePage() {
           <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Tax percent" value={taxPercent} onChange={(event) => setTaxPercent(event.target.value)} />
           <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
 
-<div className="owner-costs space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-slate-900">
+          <div className="owner-costs space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-slate-900">
             <h2 className="font-medium">Your costs only</h2>
             <p className="text-sm text-slate-600">Wages fill from hours times the saved rate, plus any extra pay.</p>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -387,9 +408,8 @@ export default function NewInvoicePage() {
               <label className="text-sm">Job supplies<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Bags, blades, gloves" value={costs.tools} onChange={(event) => setCosts({ ...costs, tools: event.target.value })} /></label>
               <label className="text-sm">Lunch / meals cost<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.lunch} onChange={(event) => setCosts({ ...costs, lunch: event.target.value })} /></label>
             </div>
-
             <div className="space-y-2">
-<div className="flex items-center gap-3">
+              <div className="flex items-center gap-3">
                 <p className="text-sm font-medium">Other fees</p>
                 <button type="button" className="rounded-lg bg-teal-400 px-3 py-1 text-sm font-medium text-slate-950" onClick={() => setOtherFees((current) => [...current, { id: Date.now().toString(), name: "", amount: "" }])}>Add fee</button>
               </div>
@@ -401,7 +421,6 @@ export default function NewInvoicePage() {
                 </div>
               ))}
             </div>
-
             <div className="rounded-lg border border-amber-200 bg-white p-3 text-slate-900">
               <p className="text-sm font-medium text-slate-900">Crew on this job ({crew.length})</p>
               <div className="mt-2 flex gap-2">
@@ -428,7 +447,6 @@ export default function NewInvoicePage() {
                 </div>
               ))}
             </div>
-
             <label className="block text-sm">Cost notes<textarea className="mt-1 min-h-16 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.notes} onChange={(event) => setCosts({ ...costs, notes: event.target.value })} /></label>
             <div className="space-y-1 text-sm">
               <p>Job cost: ${jobMath.jobCost.toFixed(2)}</p>
@@ -448,24 +466,24 @@ export default function NewInvoicePage() {
         <div>
           <div className="mb-4 flex flex-wrap gap-3">
             <button type="button" onClick={() => window.print()} className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white">Print / Save PDF</button>
-            {status !== "paid" && <button type="button" onClick={copyPayLink} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">{paymentLink.trim() ? "Pay / Copy pay link" : "Add how to pay"}</button>}
+            {!isProposal && status !== "paid" && <button type="button" onClick={copyPayLink} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">{paymentLink.trim() ? "Pay / Copy pay link" : "Add how to pay"}</button>}
           </div>
           <div id="preview" className={previewClass}>
             {logo && <img src={logo} alt="Business logo" className="mb-3 h-14 w-auto" />}
             <div className="flex items-start justify-between">
               <div>
-                <p className={`text-sm uppercase tracking-wide ${labelClass}`}>Invoice</p>
-                <h2 className="mt-1 text-2xl font-semibold">{invoiceNumber || "INV-0000"}</h2>
+                <p className={`text-sm uppercase tracking-wide ${labelClass}`}>{isProposal ? "Proposal" : "Invoice"}</p>
+                <h2 className="mt-1 text-2xl font-semibold">{invoiceNumber || (isProposal ? "PROP-0000" : "INV-0000")}</h2>
                 <div className={`mt-4 text-sm ${mutedClass}`}><p className="font-medium">{businessName}</p><p>{ownerName}</p><p>{businessEmail}</p><p>{businessPhone}</p></div>
               </div>
               <div className={`text-right text-sm ${mutedClass}`}>
                 <div>Date: {invoiceDate || "-"}</div>
-                <div>Due: {dueDate || "-"}</div>
+                <div>{isProposal ? "Valid until" : "Due"}: {dueDate || "-"}</div>
                 {(jobStart || jobEnd) && <div>Time: {jobStart || "-"} to {jobEnd || "-"}</div>}
               </div>
             </div>
             <div className="mt-8">
-              <p className={`text-sm ${labelClass}`}>Bill to</p>
+              <p className={`text-sm ${labelClass}`}>{isProposal ? "Prepared for" : "Bill to"}</p>
               <p className="font-medium">{clientName || "Client name"}</p>
               {clientCompany && <p className={`text-sm ${mutedClass}`}>{clientCompany}</p>}
               {clientEmail && <p className={`text-sm ${mutedClass}`}>{clientEmail}</p>}
@@ -484,7 +502,7 @@ export default function NewInvoicePage() {
               <div className="flex justify-between text-base font-semibold"><span>Total</span><span>${totals.total.toFixed(2)}</span></div>
             </div>
             <p className={`mt-8 text-sm ${mutedClass}`}>{notes}</p>
-            {paymentLink && <p className={`mt-4 text-sm ${mutedClass}`}>Pay here: {paymentLink}</p>}
+            {!isProposal && paymentLink && <p className={`mt-4 text-sm ${mutedClass}`}>Pay here: {paymentLink}</p>}
           </div>
         </div>
       </section>
