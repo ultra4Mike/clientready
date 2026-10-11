@@ -44,11 +44,8 @@ export async function saveCrewJobs(docId: string, invoiceNumber: string, crew: C
 export async function isCrewUser() {
   const { data } = await supabase.auth.getUser();
   const user = data.user;
-  if (!user?.email) return false;
-  const { data: person } = await supabase
-    .from("employees")
-    .select("id, user_id")
-    .ilike("email", user.email)
-    .limit(1);
-  return Boolean(person && person.length && person[0].user_id !== user.id);
+  if (!user) return false;
+  const { data: person } = await supabase.rpc("is_crew_email");
+  const row = Array.isArray(person) ? person[0] : person;
+  return Boolean(row && row.user_id && row.user_id !== user.id);
 }

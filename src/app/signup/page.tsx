@@ -26,13 +26,10 @@ export default function SignupPage() {
     }
     const { data: session } = await supabase.auth.getUser();
     const signedIn = session.user;
-    if (signedIn?.email) {
-      const { data: person } = await supabase
-        .from("employees")
-        .select("id, user_id")
-        .ilike("email", signedIn.email)
-        .limit(1);
-      if (person && person.length && person[0].user_id !== signedIn.id) {
+    if (signedIn) {
+      const { data: person } = await supabase.rpc("is_crew_email");
+      const row = Array.isArray(person) ? person[0] : person;
+      if (row && row.user_id && row.user_id !== signedIn.id) {
         window.location.href = "/crew";
         return;
       }
