@@ -45,8 +45,10 @@ export async function isCrewUser() {
   const { data } = await supabase.auth.getUser();
   const user = data.user;
   if (!user?.email) return false;
-  const { data: profile } = await supabase.from("profiles").select("id").eq("id", user.id).maybeSingle();
-  if (profile) return false;
-  const { data: person } = await supabase.from("employees").select("id").ilike("email", user.email).limit(1);
-  return Boolean(person && person.length);
+  const { data: person } = await supabase
+    .from("employees")
+    .select("id, user_id")
+    .ilike("email", user.email)
+    .limit(1);
+  return Boolean(person && person.length && person[0].user_id !== user.id);
 }

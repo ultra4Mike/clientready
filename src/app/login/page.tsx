@@ -33,6 +33,19 @@ export default function LoginPage() {
       setMessage(error.message);
       return;
     }
+    const { data: session } = await supabase.auth.getUser();
+    const signedIn = session.user;
+    if (signedIn?.email) {
+      const { data: person } = await supabase
+        .from("employees")
+        .select("id, user_id")
+        .ilike("email", signedIn.email)
+        .limit(1);
+      if (person && person.length && person[0].user_id !== signedIn.id) {
+        window.location.href = "/crew";
+        return;
+      }
+    }
     await loadAccountIntoCache();
     window.location.href = "/dashboard";
   }

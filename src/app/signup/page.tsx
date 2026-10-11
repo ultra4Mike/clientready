@@ -14,14 +14,28 @@ export default function SignupPage() {
     event.preventDefault();
     setBusy(true);
     setMessage("");
+    const cleanEmail = email.trim().toLowerCase();
     const { error } = await supabase.auth.signUp({
-      email: email.trim().toLowerCase(),
+      email: cleanEmail,
       password,
     });
     if (error) {
       setBusy(false);
       setMessage(error.message);
       return;
+    }
+    const { data: session } = await supabase.auth.getUser();
+    const signedIn = session.user;
+    if (signedIn?.email) {
+      const { data: person } = await supabase
+        .from("employees")
+        .select("id, user_id")
+        .ilike("email", signedIn.email)
+        .limit(1);
+      if (person && person.length && person[0].user_id !== signedIn.id) {
+        window.location.href = "/crew";
+        return;
+      }
     }
     await loadAccountIntoCache();
     window.location.href = "/dashboard";
@@ -31,30 +45,11 @@ export default function SignupPage() {
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
       <a href="/" className="mb-8 text-sm text-slate-500">Back to ClientReady</a>
       <h1 className="text-2xl font-semibold">Create your account</h1>
-      <p className="mt-2 text-sm text-slate-600">14-day trial. No card to start.</p>
+      <p className="mt-2 text-sm text-slate-600">14-day trial. No card to start. Crew use the email your boss saved.</p>
       <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-        <input
-          type="email"
-          required
-          placeholder="Email"
-          className="w-full rounded-lg border border-slate-300 px-3 py-2"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-        />
-        <input
-          type="password"
-          required
-          minLength={6}
-          placeholder="Password"
-          className="w-full rounded-lg border border-slate-300 px-3 py-2"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-        />
-        <button
-          type="submit"
-          disabled={busy}
-          className="w-full rounded-lg bg-slate-900 px-4 py-2 text-white disabled:opacity-60"
-        >
+        <input type="email" required placeholder="Email" className="w-full rounded-lg border border-slate-300 px-3 py-2" value={email} onChange={(event) => setEmail(event.target.value)} />
+        <input type="password" required minLength={6} placeholder="Password" className="w-full rounded-lg border border-slate-300 px-3 py-2" value={password} onChange={(event) => setPassword(event.target.value)} />
+        <button type="submit" disabled={busy} className="w-full rounded-lg bg-slate-900 px-4 py-2 text-white disabled:opacity-60">
           {busy ? "Creating account" : "Sign up"}
         </button>
       </form>
