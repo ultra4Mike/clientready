@@ -5,6 +5,7 @@ import { saveCloudDocument } from "@/lib/cloud-docs";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
 import { getTrialState } from "@/lib/trial";
+import { saveCrewJobs } from "@/lib/crew";
 
 type LineItem = { description: string; qty: string; rate: string };
 type SavedClient = { id: string; name: string; company: string; email: string; phone: string; address: string };
@@ -323,6 +324,7 @@ export default function NewInvoicePage() {
     nextDoc.id = cloudId;
     window.localStorage.setItem("clientready-documents", JSON.stringify([...docs.filter((item: { id: string }) => item.id !== localId && item.id !== cloudId), nextDoc]));
     setDocId(cloudId);
+    await saveCrewJobs(cloudId, invoiceNumber, crew);
     setSaveMessage(isProposal ? "Proposal saved" : "Invoice saved");
   }
 

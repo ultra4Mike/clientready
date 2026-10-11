@@ -3,6 +3,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { clearLocalBusiness } from "@/lib/account-cache";
+import { isCrewUser } from "@/lib/crew";
 
 const mainLinks = [
   { href: "/dashboard", label: "Dashboard" },
@@ -41,8 +42,7 @@ export default function AppShell({
   const [theme, setTheme] = useState("dark");
   const [wide, setWide] = useState(true);
   const [moreOpen, setMoreOpen] = useState(false);
-
-  useEffect(() => {
+useEffect(() => {
     const savedTheme = window.localStorage.getItem("clientready-theme") || "dark";
     setTheme(savedTheme);
     document.documentElement.classList.toggle("dark", savedTheme === "dark");
@@ -50,6 +50,9 @@ export default function AppShell({
     const onResize = () => setWide(window.innerWidth >= 900);
     onResize();
     window.addEventListener("resize", onResize);
+    isCrewUser().then((crew) => {
+      if (crew) window.location.href = "/crew";
+    });
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
