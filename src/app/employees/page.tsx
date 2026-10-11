@@ -9,6 +9,7 @@ type RateChange = { rate: string; effectiveDate: string };
 type Employee = {
   id: string;
   name: string;
+  email: string;
   phone: string;
   role: string;
   kind: "employee" | "contractor";
@@ -20,6 +21,7 @@ type Employee = {
 
 const emptyForm = {
   name: "",
+  email: "",
   phone: "",
   role: "",
   kind: "employee" as "employee" | "contractor",
@@ -31,6 +33,7 @@ function fromRow(row: Record<string, unknown>): Employee {
   return {
     id: String(row.id || ""),
     name: String(row.name || ""),
+    email: String(row.email || ""),
     phone: String(row.phone || ""),
     role: String(row.role || ""),
     kind: row.kind === "contractor" ? "contractor" : "employee",
@@ -46,6 +49,7 @@ function toRow(person: Employee, userId: string) {
     user_id: userId,
     id: person.id,
     name: person.name,
+    email: person.email,
     phone: person.phone,
     role: person.role,
     kind: person.kind,
@@ -73,10 +77,7 @@ export default function EmployeesPage() {
       const user = data.user;
       if (!user) return;
       setUserId(user.id);
-      const { data: rows, error } = await supabase
-        .from("employees")
-        .select("*")
-        .eq("user_id", user.id);
+      const { data: rows, error } = await supabase.from("employees").select("*").eq("user_id", user.id);
       if (error) {
         setMessage("Cloud load failed: " + error.message);
         return;
@@ -110,6 +111,7 @@ export default function EmployeesPage() {
       const nextPerson: Employee = {
         ...(current as Employee),
         ...form,
+        email: form.email.trim().toLowerCase(),
         rateHistory: current?.rateHistory || [],
       };
       const next = employees.map((person) => (person.id === editingId ? nextPerson : person));
@@ -123,19 +125,21 @@ export default function EmployeesPage() {
     const person: Employee = {
       id: Date.now().toString(),
       ...form,
+      email: form.email.trim().toLowerCase(),
       active: true,
       rateHistory: [{ rate: form.rate, effectiveDate: form.hireDate || new Date().toISOString().slice(0, 10) }],
     };
     saveLocal([...employees, person]);
     await saveCloud(person);
     setForm(emptyForm);
-    setMessage("Employee saved to your account.");
+    setMessage("Employee saved. They sign up with that email.");
   }
 
   function edit(person: Employee) {
     setEditingId(person.id);
     setForm({
       name: person.name,
+      email: person.email,
       phone: person.phone,
       role: person.role,
       kind: person.kind,
@@ -183,16 +187,17 @@ export default function EmployeesPage() {
     const ok = window.confirm("Are you sure you want to delete this employee?");
     if (!ok) return;
     saveLocal(employees.filter((item) => item.id !== person.id));
-    if (userId) {
-      await supabase.from("employees").delete().eq("user_id", userId).eq("id", person.id);
-    }
+    if (userId) await supabase.from("employees").delete().eq("user_id", userId).eq("id", person.id);
   }
 
   return (
     <AppShell title="Employees">
-      <p className="text-[var(--cr-muted)]">Crew names and rates live here. A raise changes new jobs only.</p>
+      <p className="text-[var(--cr-muted)]">
+        Add the email they will use to log in. That email opens the crew page, not the owner books.
+      </p>
       <form onSubmit={handleSubmit} className="mt-6 grid gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 md:grid-cols-2">
         <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" placeholder="Name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+        <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" placeholder="Email they will use to log in" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
         <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" placeholder="Phone" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
         <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" placeholder="Role" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })} />
         <select className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" value={form.kind} onChange={(event) => setForm({ ...form, kind: event.target.value as "employee" | "contractor" })}>
@@ -223,7 +228,8 @@ export default function EmployeesPage() {
               {person.kind} · {person.role || "No role"} · {person.active ? "Active" : "Inactive"}
               {person.hireDate ? ` · hired ${person.hireDate}` : ""}
             </p>
-            <p className="mt-1 text-sm text-[var(--cr-muted)]">{person.phone}</p>
+            <p className="mt-1 text-sm text-[var(--cr-muted)]">{person.email || "No login email"}</p>
+            <p className="text-sm text-[var(--cr-muted)]">{person.phone}</p>
             <div className="mt-3 flex flex-wrap gap-3">
               <button type="button" onClick={() => edit(person)} className="text-sm font-medium">Edit</button>
               <button type="button" onClick={() => setActive(person, !person.active)} className="text-sm font-medium">
