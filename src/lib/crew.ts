@@ -9,6 +9,8 @@ type CrewRow = {
   note?: string;
   bonus?: string;
   workDate?: string;
+  startTime?: string;
+  endTime?: string;
 };
 
 function money(value: string) {
