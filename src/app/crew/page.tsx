@@ -20,7 +20,7 @@ type Job = {
   note: string;
   status: string;
 };
-type Expense = { id: string; doc_id: string; kind: string; amount: string; note: string };
+type Expense = { id: string; doc_id: string; kind: string; amount: string; note: string; receipt?: string };
 type Draft = { id: string; client_name: string; work_date: string; hours: string; work_done: string; status: string };
 
 const empty = {
@@ -49,8 +49,7 @@ export default function CrewPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(empty);
   const [message, setMessage] = useState("");
-  const [spend, setSpend] = useState<Record<string, { kind: string; amount: string; note: string }>>({});
-
+  const [spend, setSpend] = useState<Record<string, { kind: string; amount: string; note: string; receipt?: string }>>({});
   async function load() {
     const { data } = await supabase.auth.getUser();
     const user = data.user;
@@ -98,12 +97,29 @@ export default function CrewPage() {
     load();
   }
 
+function readReceipt(file: File | undefined, jobId: string) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const current = spend[jobId] || { kind: "parts", amount: "", note: "" };
+      setSpend({ ...spend, [jobId]: { ...current, receipt: String(reader.result || "") } });
+    };
+    reader.readAsDataURL(file);
+  }
+
   async function addSpend(job: Job) {
     const row = spend[job.id] || { kind: "parts", amount: "", note: "" };
     if (!row.amount.trim()) return setMessage("Add the amount you spent.");
-    const { error } = await supabase.from("crew_expenses").insert({
-      id: Date.now().toString(), owner_id: ownerId, doc_id: job.doc_id, worker_email: email, worker_name: name,
-      kind: row.kind, amount: row.amount, note: row.note,
+        const { error } = await supabase.from("crew_expenses").insert({
+      id: Date.now().toString(),
+      owner_id: ownerId,
+      doc_id: job.doc_id,
+      worker_email: email,
+      worker_name: name,
+      kind: row.kind,
+      amount: row.amount,
+      note: row.note,
+      receipt: row.receipt || "",
     });
     if (error) return setMessage(error.message);
     setSpend({ ...spend, [job.id]: { kind: "parts", amount: "", note: "" } });
@@ -170,16 +186,22 @@ export default function CrewPage() {
               {job.client_phone && <p className="text-sm">{job.client_phone}</p>}
               {job.client_address && <p className="text-sm">{job.client_address}</p>}
               <p className="mt-1 text-sm">{job.status === "paid" ? `Pay $${Number(job.pay || 0).toFixed(2)}` : "Pay not confirmed"}</p>
-              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+<div className="mt-3 grid gap-2 sm:grid-cols-3">
                 <select className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2 text-sm" value={spend[job.id]?.kind || "parts"} onChange={(event) => setSpend({ ...spend, [job.id]: { ...(spend[job.id] || { amount: "", note: "" }), kind: event.target.value } })}>
                   <option value="gas">Gas</option><option value="parts">Parts</option><option value="dump">Dump fee</option><option value="other">Other</option>
                 </select>
                 <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2 text-sm" placeholder="Amount" value={spend[job.id]?.amount || ""} onChange={(event) => setSpend({ ...spend, [job.id]: { ...(spend[job.id] || { kind: "parts", note: "" }), amount: event.target.value } })} />
-                <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2 text-sm" placeholder="What broke or what you bought" value={spend[job.id]?.note || ""} onChange={(event) => setSpend({ ...spend, [job.id]: { ...(spend[job.id] || { kind: "parts", amount: "" }), note: event.target.value } })} />
+                <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2 text-sm" placeholder="What it was" value={spend[job.id]?.note || ""} onChange={(event) => setSpend({ ...spend, [job.id]: { ...(spend[job.id] || { kind: "parts", amount: "" }), note: event.target.value } })} />
               </div>
-              <button type="button" onClick={() => addSpend(job)} className="mt-2 text-sm font-medium">Add expense to this job</button>
+              <label className="mt-2 block text-sm text-[var(--cr-muted)]">
+                Receipt photo
+                <input type="file" accept="image/*" className="mt-1 block w-full text-sm" onChange={(event) => readReceipt(event.target.files?.[0], job.id)} />
+              </label>
+              <button type="button" onClick={() => addSpend(job)} className="mt-3 rounded-lg bg-teal-400 px-4 py-2 text-sm font-medium text-slate-950">
+                Add expense to this job
+              </button>
               {expenses.filter((item) => item.doc_id === job.doc_id).map((item) => (
-                <p key={item.id} className="mt-1 text-sm text-[var(--cr-muted)]">{item.kind} · ${item.amount} · {item.note}</p>
+                <p key={item.id} className="mt-2 text-sm text-[var(--cr-muted)]">{item.kind} · ${item.amount} · {item.note}{item.receipt ? " · receipt attached" : ""}</p>
               ))}
             </div>
           ))}
