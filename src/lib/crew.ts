@@ -15,7 +15,19 @@ function money(value: string) {
   return Number(String(value).replace(/[^0-9.-]/g, "")) || 0;
 }
 
-export async function saveCrewJobs(docId: string, invoiceNumber: string, crew: CrewRow[]) {
+export async function saveCrewJobs(
+  docId: string,
+  job: {
+    invoiceNumber: string;
+    clientName?: string;
+    clientPhone?: string;
+    clientAddress?: string;
+    status?: string;
+    startTime?: string;
+    endTime?: string;
+  },
+  crew: CrewRow[]
+) {
   const { data } = await supabase.auth.getUser();
   const user = data.user;
   if (!user || !docId) return;
@@ -32,11 +44,17 @@ export async function saveCrewJobs(docId: string, invoiceNumber: string, crew: C
       worker_email: emailById.get(row.employeeId) || "",
       doc_id: docId,
       job_date: row.workDate || "",
-      invoice_number: invoiceNumber,
+      invoice_number: job.invoiceNumber,
       hours: row.hours,
       rate: row.rate,
       pay: money(row.hours) * money(row.rate) + money(row.bonus || ""),
       note: row.note || "",
+      client_name: job.clientName || "",
+      client_phone: job.clientPhone || "",
+      client_address: job.clientAddress || "",
+      status: job.status || "draft",
+      start_time: job.startTime || row.startTime || "",
+      end_time: job.endTime || row.endTime || "",
     }))
   );
 }

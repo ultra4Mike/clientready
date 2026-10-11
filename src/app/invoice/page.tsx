@@ -332,7 +332,15 @@ export default function NewInvoicePage() {
     nextDoc.id = cloudId;
     window.localStorage.setItem("clientready-documents", JSON.stringify([...docs.filter((item: { id: string }) => item.id !== localId && item.id !== cloudId), nextDoc]));
     setDocId(cloudId);
-    await saveCrewJobs(cloudId, invoiceNumber, crew);
+    await saveCrewJobs(cloudId, {
+      invoiceNumber,
+      clientName,
+      clientPhone,
+      clientAddress,
+      status,
+      startTime: jobStart,
+      endTime: jobEnd,
+    }, crew);
     setSaveMessage(isProposal ? "Proposal saved" : "Invoice saved");
   }
 
