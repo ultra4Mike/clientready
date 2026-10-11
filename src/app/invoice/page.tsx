@@ -197,6 +197,30 @@ export default function NewInvoicePage() {
       invoiceNumber?: string; invoiceDate?: string; dueDate?: string; jobStart?: string; jobEnd?: string; notes?: string;
       taxPercent?: string; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
     };
+      useEffect(() => {
+    const raw = window.localStorage.getItem("clientready-open-draft");
+    if (!raw) return;
+    window.localStorage.removeItem("clientready-open-draft");
+    const draft = JSON.parse(raw);
+    setClientName(draft.client_name || "");
+    setClientPhone(draft.client_phone || "");
+    setClientAddress(draft.client_address || "");
+    setClientSearch(draft.client_name || "");
+    setInvoiceDate(draft.work_date || "");
+    setJobStart(draft.start_time || "");
+    setJobEnd(draft.end_time || "");
+    setItems([{ description: draft.work_done || "Job", qty: "1", rate: "" }]);
+    setCosts((current) => ({
+      ...current,
+      parts: draft.parts_cost || "",
+      driveHours: draft.drive_hours || "",
+      driveMinutes: draft.drive_minutes || "",
+      notes: [draft.parts_note, draft.notes, draft.collected_amount ? `Collected ${draft.collected_amount} ${draft.collected_method || ""}` : ""].filter(Boolean).join("\n"),
+    }));
+    setNotes(draft.notes || "Payment is due within 14 days.");
+    setSaveMessage("Crew draft loaded. Set the price, then save.");
+  }, []);
+  
     const kind: DocKind = doc.type === "proposal" ? "proposal" : "invoice";
     setDocKind(kind);
     setDocId(doc.id);

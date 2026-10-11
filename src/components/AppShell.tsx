@@ -17,6 +17,7 @@ const moreLinks = [
   { href: "/upcoming", label: "This week" },
   { href: "/history", label: "History" },
   { href: "/employees", label: "Employees" },
+  { href: "/drafts", label: "Crew drafts" },
   { href: "/year", label: "Year packet" },
   { href: "/backup", label: "Backup" },
 ];
