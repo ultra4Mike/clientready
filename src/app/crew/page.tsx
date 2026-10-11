@@ -201,15 +201,17 @@ export default function CrewPage() {
           ))}
         </div>
 
-        <h2 className="mt-8 font-semibold">Approved pay</h2>
+<h2 className="mt-8 font-semibold">Approved pay</h2>
         <div className="mt-3 space-y-3">
           {jobs.length === 0 && <p className="text-sm text-[var(--cr-muted)]">No approved jobs yet.</p>}
           {jobs.map((job) => (
-            <div key={job.id} className="rounded-2xl border border-teal-500/20 p-4">
-              <p className="font-medium">{job.invoice_number || "Job"}</p>
-              <p className="text-sm text-[var(--cr-muted)]">{job.job_date || "No date"} · {job.hours || "0"} hrs · ${Number(job.rate || 0).toFixed(2)}/hr</p>
+            <details key={job.id} className="rounded-2xl border border-teal-500/20 p-4">
+              <summary className="cursor-pointer font-medium">{job.invoice_number || "Job"} · ${Number(job.pay || 0).toFixed(2)}</summary>
+              <p className="mt-2 text-sm text-[var(--cr-muted)]">{job.job_date || "No date"} · {job.hours || "0"} hrs · ${Number(job.rate || 0).toFixed(2)}/hr</p>
               <p className="mt-1 font-semibold">${Number(job.pay || 0).toFixed(2)}</p>
-            </div>
+              {job.note && <p className="mt-1 text-sm">{job.note}</p>}
+              <p className="mt-2 text-xs text-[var(--cr-muted)]">Your pay record. The owner invoice stays with the owner.</p>
+            </details>
           ))}
         </div>
       </div>

@@ -174,76 +174,60 @@ export default function NewInvoicePage() {
   }, []);
 
   useEffect(() => {
-    const openId = window.localStorage.getItem("clientready-open-document");
-    const raw = window.localStorage.getItem("clientready-documents");
-    const wanted = window.localStorage.getItem("clientready-new-type");
-    if (!openId) {
-      const kind: DocKind = wanted === "proposal" ? "proposal" : "invoice";
-      window.localStorage.removeItem("clientready-new-type");
+    try {
+      const openId = window.localStorage.getItem("clientready-open-document");
+      const raw = window.localStorage.getItem("clientready-documents");
+      const wanted = window.localStorage.getItem("clientready-new-type");
+      if (!openId) {
+        const kind: DocKind = wanted === "proposal" ? "proposal" : "invoice";
+        window.localStorage.removeItem("clientready-new-type");
+        setDocKind(kind);
+        setInvoiceNumber(nextNumber(kind));
+        setInvoiceDate(ymd(new Date()));
+        setDueDate(plusDays(14));
+        setNotes(kind === "proposal" ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
+        return;
+      }
+      if (!raw) return;
+      const docs = JSON.parse(raw) as SavedDocument[];
+      const doc = docs.find((item) => item.id === openId && (item.type === "invoice" || item.type === "proposal"));
+      window.localStorage.removeItem("clientready-open-document");
+      if (!doc) return;
+      const data = (doc.data || {}) as {
+        clientName?: string; clientCompany?: string; clientEmail?: string; clientPhone?: string; clientAddress?: string;
+        invoiceNumber?: string; invoiceDate?: string; dueDate?: string; jobStart?: string; jobEnd?: string; notes?: string;
+        taxPercent?: string; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
+      };
+      const kind: DocKind = doc.type === "proposal" ? "proposal" : "invoice";
+      const loadedItems = Array.isArray(data.items) && data.items.length ? data.items : [{ ...emptyItem }];
+      const loadedCrew = Array.isArray(data.crew) ? data.crew : [];
+      const loadedFees = Array.isArray(data.jobCosts?.otherFees) ? data.jobCosts.otherFees : [];
       setDocKind(kind);
-      setInvoiceNumber(nextNumber(kind));
-      setInvoiceDate(ymd(new Date()));
-      setDueDate(plusDays(14));
-      setNotes(kind === "proposal" ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
-      return;
+      setDocId(doc.id);
+      setClientName(data.clientName || "");
+      setClientCompany(data.clientCompany || "");
+      setClientEmail(data.clientEmail || "");
+      setClientPhone(data.clientPhone || "");
+      setClientAddress(data.clientAddress || "");
+      setInvoiceNumber(data.invoiceNumber || (kind === "proposal" ? "PROP-1001" : "INV-1001"));
+      setInvoiceDate(data.invoiceDate || ymd(new Date()));
+      setDueDate(data.dueDate || plusDays(14));
+      setJobStart(data.jobStart || "");
+      setJobEnd(data.jobEnd || "");
+      setNotes(data.notes || (kind === "proposal" ? "This proposal is valid for 14 days." : "Payment is due within 14 days."));
+      setTaxPercent(data.taxPercent || "0");
+      setItems(loadedItems);
+      setClientSearch(data.clientName || "");
+      setStatus(data.status || "draft");
+      setStyle(data.style || "clean");
+      setJobTime(data.jobTime || "");
+      setCosts({ ...emptyCosts, ...(data.jobCosts || {}), otherFees: loadedFees });
+      setOtherFees(loadedFees);
+      setCrew(loadedCrew.map((row) => ({ ...row, bonus: row.bonus || "" })));
+    } catch {
+      window.localStorage.removeItem("clientready-open-document");
+      setSaveMessage("Could not open that document.");
     }
-    if (!raw) return;
-    const docs = JSON.parse(raw) as SavedDocument[];
-    const doc = docs.find((item) => item.id === openId && (item.type === "invoice" || item.type === "proposal"));
-    window.localStorage.removeItem("clientready-open-document");
-    if (!doc) return;
-    const data = doc.data as {
-      clientName?: string; clientCompany?: string; clientEmail?: string; clientPhone?: string; clientAddress?: string;
-      invoiceNumber?: string; invoiceDate?: string; dueDate?: string; jobStart?: string; jobEnd?: string; notes?: string;
-      taxPercent?: string; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
-    };
-      useEffect(() => {
-    const raw = window.localStorage.getItem("clientready-open-draft");
-    if (!raw) return;
-    window.localStorage.removeItem("clientready-open-draft");
-    const draft = JSON.parse(raw);
-    setClientName(draft.client_name || "");
-    setClientPhone(draft.client_phone || "");
-    setClientAddress(draft.client_address || "");
-    setClientSearch(draft.client_name || "");
-    setInvoiceDate(draft.work_date || "");
-    setJobStart(draft.start_time || "");
-    setJobEnd(draft.end_time || "");
-    setItems([{ description: draft.work_done || "Job", qty: "1", rate: "" }]);
-    setCosts((current) => ({
-      ...current,
-      parts: draft.parts_cost || "",
-      driveHours: draft.drive_hours || "",
-      driveMinutes: draft.drive_minutes || "",
-      notes: [draft.parts_note, draft.notes, draft.collected_amount ? `Collected ${draft.collected_amount} ${draft.collected_method || ""}` : ""].filter(Boolean).join("\n"),
-    }));
-    setNotes(draft.notes || "Payment is due within 14 days.");
-    setSaveMessage("Crew draft loaded. Set the price, then save.");
-  }, []);
-  
-    const kind: DocKind = doc.type === "proposal" ? "proposal" : "invoice";
-    setDocKind(kind);
-    setDocId(doc.id);
-    setClientName(data.clientName || "");
-    setClientCompany(data.clientCompany || "");
-    setClientEmail(data.clientEmail || "");
-    setClientPhone(data.clientPhone || "");
-    setClientAddress(data.clientAddress || "");
-    setInvoiceNumber(data.invoiceNumber || (kind === "proposal" ? "PROP-1001" : "INV-1001"));
-    setInvoiceDate(data.invoiceDate || ymd(new Date()));
-    setDueDate(data.dueDate || plusDays(14));
-    setJobStart(data.jobStart || "");
-    setJobEnd(data.jobEnd || "");
-    setNotes(data.notes || (kind === "proposal" ? "This proposal is valid for 14 days." : "Payment is due within 14 days."));
-    setTaxPercent(data.taxPercent || "0");
-    setItems(data.items?.length ? data.items : [{ ...emptyItem }]);
-    setClientSearch(data.clientName || "");
-    setStatus(data.status || "draft");
-    setStyle(data.style || "clean");
-    setJobTime(data.jobTime || "");
-    setCosts({ ...emptyCosts, ...(data.jobCosts || {}), otherFees: data.jobCosts?.otherFees || [] });
-    setOtherFees(data.jobCosts?.otherFees || []);
-    setCrew((data.crew || []).map((row) => ({ ...row, bonus: row.bonus || "" })));
   }, []);
 
   useEffect(() => {
@@ -256,7 +240,7 @@ export default function NewInvoicePage() {
     if (!clientSearch.trim()) return false;
     return `${client.name} ${client.company} ${client.email}`.toLowerCase().includes(clientSearch.toLowerCase());
   });
-
+  
   function chooseKind(kind: DocKind) {
     if (locked) return;
     setDocKind(kind);
