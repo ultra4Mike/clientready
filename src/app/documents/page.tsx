@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchCloudDocuments, deleteCloudDocument, getUserId } from "@/lib/cloud-docs";
 import { mergeDocs, OWNER_KEY } from "@/lib/doc-sync";
+import { runDueRecurring } from "@/lib/recurring";
 import AppShell from "@/components/AppShell";
 
 type SavedDocument = {
@@ -31,6 +32,15 @@ export default function DocumentsPage() {
     if (query) setSearch(query);
 
     async function load() {
+      await syncDocs();
+      // No server cron: due recurring drafts are made when the app opens.
+      if (await runDueRecurring()) {
+        const raw = window.localStorage.getItem("clientready-documents");
+        setDocuments(raw ? JSON.parse(raw) : []);
+      }
+    }
+
+    async function syncDocs() {
       const raw = window.localStorage.getItem("clientready-documents");
       const local = raw ? JSON.parse(raw) : [];
       if (local.length) setDocuments(local);

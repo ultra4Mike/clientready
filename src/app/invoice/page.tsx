@@ -13,6 +13,7 @@ import LineSplit from "@/components/LineSplit";
 import { normalizeCategory, type LineCategory } from "@/lib/line-split";
 import { appendChangeOrderNote, changeOrderData, changeOrdersFor, mergeChangeOrderNotes, readChangeOrderNotes, readChangeOrderOf, type ChangeOrderNote, type ChangeOrderOf } from "@/lib/change-orders";
 import ChangeOrderNotes from "@/components/ChangeOrderNotes";
+import { generateNextNow, readRecurring, readRecurringFrom, scheduleFromForm, type Frequency, type RecurringFrom } from "@/lib/recurring";
 import PayQr from "@/components/PayQr";
 import { payUrlFor } from "@/lib/pay-link";
 import SignaturePad, { SignatureBlock } from "@/components/SignaturePad";
@@ -123,6 +124,11 @@ export default function NewInvoicePage() {
   const [photos, setPhotos] = useState<JobPhoto[]>([]);
   const [changeOrderOf, setChangeOrderOf] = useState<ChangeOrderOf | null>(null);
   const [changeOrderNotes, setChangeOrderNotes] = useState<ChangeOrderNote[]>([]);
+  const [recFreq, setRecFreq] = useState<Frequency | "off">("off");
+  const [recInterval, setRecInterval] = useState("30");
+  const [recNext, setRecNext] = useState("");
+  const [recLoadedNext, setRecLoadedNext] = useState("");
+  const [recurringFrom, setRecurringFrom] = useState<RecurringFrom | null>(null);
   const [items, setItems] = useState<LineItem[]>([{ ...emptyItem }]);
   const [businessName, setBusinessName] = useState("Your business");
   const [ownerName, setOwnerName] = useState("");
@@ -229,7 +235,7 @@ export default function NewInvoicePage() {
       const data = (doc.data || {}) as {
         clientName?: string; clientCompany?: string; clientEmail?: string; clientPhone?: string; clientAddress?: string;
         invoiceNumber?: string; invoiceDate?: string; dueDate?: string; jobStart?: string; jobEnd?: string; notes?: string;
-        taxPercent?: string; discountType?: string; discountValue?: string; signature?: unknown; proposalSignature?: unknown; payLink?: string; photos?: unknown; changeOrderOf?: unknown; changeOrderNotes?: unknown; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
+        taxPercent?: string; discountType?: string; discountValue?: string; signature?: unknown; proposalSignature?: unknown; payLink?: string; photos?: unknown; changeOrderOf?: unknown; changeOrderNotes?: unknown; recurring?: unknown; recurringFrom?: unknown; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
       };
       const kind: DocKind = doc.type === "proposal" ? "proposal" : "invoice";
       const loadedItems = Array.isArray(data.items) && data.items.length ? data.items.map((item) => ({ ...item, category: normalizeCategory(item.category) })) : [{ ...emptyItem }];
@@ -259,6 +265,12 @@ export default function NewInvoicePage() {
       setPhotos(readPhotos(data.photos));
       setChangeOrderOf(kind === "invoice" ? readChangeOrderOf(data.changeOrderOf) : null);
       setChangeOrderNotes(readChangeOrderNotes(data.changeOrderNotes));
+      const schedule = kind === "invoice" ? readRecurring(data.recurring) : null;
+      setRecFreq(schedule && schedule.active ? schedule.frequency : "off");
+      setRecInterval(String(schedule?.intervalDays || 30));
+      setRecNext(schedule?.nextRunDate || "");
+      setRecLoadedNext(schedule?.nextRunDate || "");
+      setRecurringFrom(kind === "invoice" ? readRecurringFrom(data.recurringFrom) : null);
       setItems(loadedItems);
       setClientSearch(data.clientName || "");
       setStatus(data.status || "draft");
@@ -365,7 +377,7 @@ export default function NewInvoicePage() {
     setDocId(""); setClientSearch(""); setClientName(""); setClientCompany(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
     setInvoiceNumber(nextNumber(docKind)); setInvoiceDate(ymd(new Date())); setDueDate(plusDays(14)); setJobStart(""); setJobEnd("");
     setNotes(isProposal ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
-    setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setSignature(null); setProposalSignature(null); setPadKey((key) => key + 1); setDocPayLink(""); setPhotos([]); setChangeOrderOf(null); setChangeOrderNotes([]); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
+    setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setSignature(null); setProposalSignature(null); setPadKey((key) => key + 1); setDocPayLink(""); setPhotos([]); setChangeOrderOf(null); setChangeOrderNotes([]); setRecFreq("off"); setRecNext(""); setRecLoadedNext(""); setRecurringFrom(null); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
     setStyle("clean"); setJobTime(""); setCosts(emptyCosts); setCrew([]); setOtherFees([]);
   }
 
@@ -381,13 +393,14 @@ export default function NewInvoicePage() {
     // Change-order notes are append-only: keep whatever is stored, plus what this form loaded.
     const stored = (docs as SavedDocument[]).find((item) => item.id === localId);
     const keptNotes = mergeChangeOrderNotes(readChangeOrderNotes(stored?.data?.changeOrderNotes), changeOrderNotes);
+    const recurring = isProposal ? null : scheduleFromForm(readRecurring(stored?.data?.recurring), { frequency: recFreq, intervalDays: recInterval, nextRunDate: recNext, loadedNextRunDate: recLoadedNext, today: ymd(new Date()) });
     const nextDoc = {
       id: localId,
       type: docKind,
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature, proposalSignature, payLink: docPayLink, photos, ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
+      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature, proposalSignature, payLink: docPayLink, photos, ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -412,6 +425,18 @@ export default function NewInvoicePage() {
       endTime: jobEnd,
     }, crew);
     setSaveMessage(isProposal ? "Proposal saved" : "Invoice saved");
+  }
+
+  async function generateRecurringNow() {
+    if (locked) return setSaveMessage("Trial ended. Subscribe to save. $7.99/mo or $19.99 for 3 months.");
+    const raw = window.localStorage.getItem("clientready-documents");
+    const docs = raw ? (JSON.parse(raw) as SavedDocument[]) : [];
+    const stored = readRecurring(docs.find((doc) => doc.id === docId)?.data?.recurring);
+    if (!stored || !stored.active) return setSaveMessage("Turn on a schedule and save the invoice first.");
+    const draftId = await generateNextNow(docId);
+    if (!draftId) return setSaveMessage("Another tab is generating invoices right now. Try again in a moment.");
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.href = `/invoice?id=${encodeURIComponent(draftId)}`;
   }
 
   /** New draft invoice copied from the saved version of this invoice. The original is not changed. */
@@ -686,6 +711,33 @@ export default function NewInvoicePage() {
                 <CrewSpend docId={docId} />
               </div>
             </div>
+            {!isProposal && docId && (
+              <div className="space-y-2 rounded-lg border border-slate-300 p-3 text-sm" data-testid="recurring-section">
+                <p className="font-semibold">Recurring</p>
+                <div className="flex flex-wrap items-end gap-3">
+                  <label className="flex flex-col gap-1">Repeat
+                    <select aria-label="Repeat" value={recFreq} onChange={(event) => { const value = event.target.value as Frequency | "off"; setRecFreq(value); if (value !== "off" && !recNext) setRecNext(ymd(new Date())); }} className="rounded border border-slate-300 px-2 py-1">
+                      <option value="off">Off</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="days">Every X days</option>
+                    </select>
+                  </label>
+                  {recFreq === "days" && (
+                    <label className="flex flex-col gap-1">Days
+                      <input aria-label="Interval days" type="number" min="1" value={recInterval} onChange={(event) => setRecInterval(event.target.value)} className="w-20 rounded border border-slate-300 px-2 py-1" />
+                    </label>
+                  )}
+                  {recFreq !== "off" && (
+                    <label className="flex flex-col gap-1">Next run
+                      <input aria-label="Next run date" type="date" value={recNext} onChange={(event) => setRecNext(event.target.value)} className="rounded border border-slate-300 px-2 py-1" />
+                    </label>
+                  )}
+                  {recFreq !== "off" && !locked && <button type="button" onClick={generateRecurringNow} className="rounded-lg border border-slate-300 px-3 py-1">Generate next invoice now</button>}
+                </div>
+                <p className="text-xs text-slate-500">Drafts are made when the app opens on or after the next run date. They are never sent or marked paid. Save the document to keep schedule changes.</p>
+              </div>
+            )}
             <div className="flex flex-wrap gap-3">
               {!locked && <button type="button" onClick={saveDocument} className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white">Save document</button>}
               {isProposal && !locked && (
@@ -712,6 +764,7 @@ export default function NewInvoicePage() {
                 <p>{[ownerName, businessEmail, businessPhone].filter(Boolean).join(" · ")}</p>
               </div>
               <div className="shrink-0 text-right">
+                {recurringFrom && !isProposal && <p className="change-order-badge mb-1 mr-1 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide" data-testid="recurring-badge">Recurring</p>}
                 {changeOrderOf && !isProposal && <p className="change-order-badge mb-1 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide" data-testid="change-order-badge">Change order</p>}
                 <p className={`text-xs uppercase tracking-wide ${labelClass}`}>{isProposal ? "Proposal" : "Invoice"}</p>
                 <h2 className="text-xl font-semibold leading-tight">{invoiceNumber || (isProposal ? "PROP-0000" : "INV-0000")}</h2>
@@ -719,6 +772,7 @@ export default function NewInvoicePage() {
                   <div>Date: {invoiceDate || "-"} · {isProposal ? "Valid until" : "Due"}: {dueDate || "-"}</div>
                   {(jobStart || jobEnd) && <div>Time: {jobStart || "-"} to {jobEnd || "-"}</div>}
                   {changeOrderOf && !isProposal && <div data-testid="change-order-link">Change order to <a className="underline" href={`/invoice?id=${encodeURIComponent(changeOrderOf.id)}`}>{changeOrderOf.number}</a></div>}
+                  {recurringFrom && !isProposal && <div className="print-hide" data-testid="recurring-link">Recurring from <a className="underline" href={`/invoice?id=${encodeURIComponent(recurringFrom.id)}`}>{recurringFrom.number}</a></div>}
                   {!isProposal && <ChangeOrderNotes notes={changeOrderNotes} className="text-xs" />}
                 </div>
               </div>

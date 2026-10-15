@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { recurringDraftsReady, runDueRecurring } from "@/lib/recurring";
 import AppShell from "@/components/AppShell";
 import { loadAccountIntoCache } from "@/lib/account-cache";
 import { amountOf, documentTotals } from "@/lib/discount";
@@ -68,10 +69,13 @@ export default function DashboardPage() {
   const [documents, setDocuments] = useState<SavedDocument[]>([]);
   const [ownerName, setOwnerName] = useState("");
   const [search, setSearch] = useState("");
+  const recurringReady = recurringDraftsReady(documents as never);
 
   useEffect(() => {
     async function load() {
       await loadAccountIntoCache();
+      // No server cron: due recurring drafts are made when the app opens.
+      await runDueRecurring();
       const profileRaw = window.localStorage.getItem("clientready-profile");
       const clientsRaw = window.localStorage.getItem("clientready-clients");
       const docsRaw = window.localStorage.getItem("clientready-documents");
@@ -176,6 +180,12 @@ export default function DashboardPage() {
           ? "Create your first invoice to see totals."
           : "Here is what is happening with your invoices today."}
       </p>
+
+      {recurringReady > 0 && (
+        <a href="/documents?q=draft" data-testid="recurring-ready" className="mb-4 block rounded-xl border border-teal-500/40 bg-[var(--cr-card)] px-4 py-3 text-sm text-teal-300">
+          {recurringReady} recurring draft{recurringReady === 1 ? "" : "s"} ready for review
+        </a>
+      )}
 
       <div className="mb-6 flex flex-col gap-3 lg:flex-row">
         <form onSubmit={handleSearch} className="flex-1">
