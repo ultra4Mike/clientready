@@ -188,7 +188,7 @@ export default function DocumentsPage() {
           >
             <button type="button" onClick={() => openDocument(doc)} className="min-w-0 text-left">
               <p className="truncate text-base font-semibold">{doc.title || "Untitled"}</p>
-              <p className="mt-0.5 text-sm capitalize text-[var(--cr-muted)]">
+              <p className="mt-0.5 text-sm text-[var(--cr-muted)]">
                 {doc.type} · {doc.clientName || "No client"} · {doc.createdAt}
                 {doc.data?.status ? ` · ${doc.data.status}` : ""}
                 {doc.data?.outcome ? ` · ${doc.data.outcome}` : ""}
