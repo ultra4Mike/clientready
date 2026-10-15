@@ -49,6 +49,7 @@ function facts(doc: SavedDocument) {
 export default function DocumentsPage() {
   const [documents, setDocuments] = useState<SavedDocument[]>([]);
   const [typeFilter, setTypeFilter] = useState("all");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [sortBy, setSortBy] = useState("newest");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -203,6 +204,10 @@ export default function DocumentsPage() {
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
+        <button type="button" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)} className="flex min-h-11 items-center justify-between rounded-lg border border-teal-500/30 px-3 text-sm font-medium sm:hidden">
+          <span>Filters{typeFilter !== "all" || statusFilter !== "all" || fromDate || toDate ? " · on" : ""}</span><span aria-hidden="true" className={`transition ${filtersOpen ? "rotate-90" : ""}`}>›</span>
+        </button>
+        <div className={`${filtersOpen ? "grid" : "hidden"} gap-3 sm:contents`}>
         <select
           className="rounded-lg border border-teal-500/30 bg-[var(--cr-card)] px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
           value={typeFilter}
@@ -238,6 +243,7 @@ export default function DocumentsPage() {
         </select>
         <label className="flex items-center gap-2 text-sm text-[var(--cr-muted)]">From<input type="date" aria-label="From date" className={`${field} min-w-0 flex-1`} value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></label>
         <label className="flex items-center gap-2 text-sm text-[var(--cr-muted)]">To<input type="date" aria-label="To date" className={`${field} min-w-0 flex-1`} value={toDate} onChange={(event) => setToDate(event.target.value)} /></label>
+        </div>
       </div>
       <div className="mt-2 flex items-center justify-between text-xs text-[var(--cr-muted)]">
         <span data-testid="doc-count">{visibleDocs.length} of {documents.length} documents</span>
