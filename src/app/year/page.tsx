@@ -408,7 +408,7 @@ export default function YearPage() {
         ))}
       </div>
 
-      <div id="preview" className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-sm sm:p-8">
+      <div id="preview" className="w-full max-w-none rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-sm sm:p-8">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sales and expense log</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">{businessName}</h1>
         <p className="text-sm text-slate-600">{year}{taxId ? ` · EIN ${taxId}` : ""}</p>
@@ -488,7 +488,7 @@ export default function YearPage() {
           {extras.recurring.map((doc) => <p key={doc.id} className="mt-1">{doc.data?.invoiceNumber || doc.title} · from {doc.data?.recurringFrom?.number} {doc.data?.recurringFrom?.period} · {doc.clientName} · ${invoiceTotal(doc).toFixed(2)}</p>)}
         </div>
 
-        <p className="mt-8 text-xs text-slate-500">
+        <p className="mt-8 text-xs text-slate-600">
           Money in counts each payment and deposit recorded on an invoice, in the year it was received. Sales and expense log. Not a tax return. Not tax advice. Meals may not be fully deductible.
           Crew pay uses the rate saved on each job. Drive time is not added as a cost.
         </p>
