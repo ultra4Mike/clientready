@@ -205,7 +205,7 @@ async function saveDocument() {
   }
 
   return (
-    <AppShell title="Clients email">
+    <AppShell title="Client emails">
 
       <section className="mx-auto grid max-w-6xl gap-6 py-2 sm:py-4 lg:grid-cols-2 lg:gap-8">
         <form className="space-y-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
@@ -306,11 +306,11 @@ async function saveDocument() {
           />
           </div>
 
-          <div className="print-hide sticky bottom-0 z-10 -mx-4 flex flex-col gap-2 border-t border-slate-200 bg-[var(--cr-card)] px-4 py-3 sm:-mx-6 sm:flex-row sm:px-6">
+          <div className="print-hide sticky bottom-0 z-10 -mx-4 -mb-4 flex flex-col gap-3 rounded-b-2xl border-t border-slate-200 bg-[var(--cr-card)] px-4 py-4 sm:-mx-6 sm:-mb-6 sm:flex-row sm:px-6">
             <button
               type="button"
               onClick={saveDocument}
-              className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400 disabled:opacity-50"
+              className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 disabled:opacity-50"
             >
               Save document
             </button>
@@ -325,7 +325,7 @@ async function saveDocument() {
           {saveMessage && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-slate-600">{saveMessage}</p>}
         </form>
 
-        <div className="h-fit rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8 lg:sticky lg:top-20">
+        <div className="h-fit rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8 lg:sticky lg:top-20 lg:self-start">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Subject</p>
           <p className="mt-1 text-lg font-semibold">{subject || "Email subject"}</p>
           <pre className="mt-5 whitespace-pre-wrap border-t border-slate-200 pt-5 font-sans text-sm leading-6 text-slate-700">
@@ -334,7 +334,7 @@ async function saveDocument() {
           <button
             type="button"
             onClick={copyEmail}
-            className="mt-6 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400 sm:w-auto"
+            className="mt-6 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 sm:w-auto"
           >
             {copied ? "Copied" : "Copy email"}
           </button>
