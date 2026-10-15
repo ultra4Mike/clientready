@@ -176,7 +176,7 @@ export default function DocumentsPage() {
   const filtersOn = typeFilter !== "all" || statusFilter !== "all" || fromDate || toDate || search;
 
   return (
-    <AppShell title="Documents">
+    <AppShell title="All documents">
       <PageHeader
         title="All documents"
         subtitle="Invoices and proposals live here. Press Open to edit one."
