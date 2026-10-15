@@ -320,16 +320,12 @@ export default function DashboardPage() {
       )}
       <GettingStarted loading={!loaded} documents={documents} />
       <NeedsReview loading={!loaded} documents={documents} onDocuments={(docs) => setDocuments(uniqueDocs(docs as SavedDocument[]))} />
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <a href="/collect" className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 transition hover:border-amber-400">
-              <span className="block text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Overdue</span>
-              <span className={`mt-1 block text-lg font-bold tabular-nums ${loaded ? "" : "animate-pulse opacity-50"}`}>{loaded ? stats.overdueCount : "—"}</span>
-            </a>
-            <a href="/documents?filter=outstanding" className="rounded-xl border border-teal-500/30 bg-teal-500/5 p-3 transition hover:border-teal-400">
-              <span className="block text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Outstanding</span>
-              <span className={`mt-1 block text-lg font-bold tabular-nums ${loaded ? "" : "animate-pulse opacity-50"}`}>{loaded ? `$${stats.outstanding.toFixed(0)}` : "—"}</span>
-            </a>
-          </div>
+          {loaded && recurringReady === 0 && stats.overdueCount === 0 && (
+            <div data-testid="all-caught-up" className="flex items-center gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm">
+              <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">✓</span>
+              <span><span className="font-semibold">All caught up.</span> <span className="text-[var(--cr-muted)]">Nothing overdue or waiting on you.</span></span>
+            </div>
+          )}
           <h2 className="pt-2 text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Quick actions</h2>
       <div className="grid gap-2">
         <a href="/invoice" className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] flex items-center gap-3 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md">
