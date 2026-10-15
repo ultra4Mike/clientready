@@ -36,7 +36,7 @@ export default function NeedsReview({ documents, onDocuments, loading = false }:
   }
 
   return (
-    <section data-testid="needs-review" data-loading={loading ? "true" : undefined} className="mb-8 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 sm:p-5">
+    <section data-testid="needs-review" data-loading={loading ? "true" : undefined} className="mb-8 rounded-2xl data-[loading=true]:animate-pulse data-[loading=true]:opacity-70 border border-teal-500/20 bg-[var(--cr-card)] p-4 sm:p-5">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-base font-semibold">Needs review</h2>
         <span data-testid="needs-review-count" className="rounded-full bg-teal-500/15 px-2.5 py-0.5 text-xs font-semibold text-teal-700 dark:text-teal-200">{loading ? "…" : items.length}</span>
