@@ -196,7 +196,7 @@ export default function ProfilePage() {
         </label>
         {profile.logo && <img src={profile.logo} alt="Business logo" className="h-16 w-auto rounded-lg border border-teal-500/20 bg-white p-1" />}
         </div>
-        <button type="submit" className="w-full rounded-lg bg-teal-500 px-6 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 disabled:opacity-50 sm:w-auto">
+        <button type="submit" className="w-full rounded-lg bg-teal-500 px-6 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50 sm:w-auto">
           {saved ? "Saved" : "Save profile"}
         </button>
         {message && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-[var(--cr-muted)]">{message}</p>}
@@ -207,7 +207,7 @@ export default function ProfilePage() {
         <p className="text-sm text-[var(--cr-muted)]">Login email: {loginEmail || "Not signed in"}</p>
         <input type="password" className="w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Current password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
         <input type="password" className="w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="New password" value={nextPassword} onChange={(event) => setNextPassword(event.target.value)} />
-        <button type="submit" className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 disabled:opacity-50 w-full sm:w-auto">Update password</button>
+        <button type="submit" className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50 w-full sm:w-auto">Update password</button>
         {passwordMessage && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-[var(--cr-muted)]">{passwordMessage}</p>}
       </form>
     </AppShell>

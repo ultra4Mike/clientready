@@ -806,7 +806,7 @@ export default function NewInvoicePage() {
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
                   <p className="text-sm font-medium">Other fees</p>
-                  <button type="button" className="rounded-lg bg-teal-500 px-3 py-1.5 text-sm font-semibold text-slate-950! transition hover:bg-teal-500" onClick={() => setOtherFees((current) => [...current, { id: Date.now().toString(), name: "", amount: "" }])}>Add fee</button>
+                  <button type="button" className="rounded-lg bg-teal-500 px-3 py-1.5 text-sm font-semibold text-slate-950! transition hover:bg-teal-400" onClick={() => setOtherFees((current) => [...current, { id: Date.now().toString(), name: "", amount: "" }])}>Add fee</button>
                 </div>
                 {otherFees.map((fee) => (
                   <div key={fee.id} className="grid gap-2 sm:grid-cols-[1fr_8rem_auto]">
@@ -825,7 +825,7 @@ export default function NewInvoicePage() {
                       <option key={person.id} value={person.id}>{person.name} · ${Number(person.rate || 0).toFixed(2)}/hr</option>
                     ))}
                   </select>
-                  <button type="button" onClick={addCrew} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 disabled:opacity-50">Add</button>
+                  <button type="button" onClick={addCrew} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Add</button>
                 </div>
                 {crew.map((row) => (
                   <div key={row.id} className="mt-3 space-y-2 border-t border-amber-200 pt-3 text-slate-900">
@@ -855,7 +855,7 @@ export default function NewInvoicePage() {
                             <div className="mt-2 flex flex-wrap items-end gap-2">
                               <label>Start<input type="datetime-local" className="ml-1 rounded-md border border-slate-300 px-1.5 py-0.5" value={clockFix.start} onChange={(event) => setClockFix({ ...clockFix, start: event.target.value })} /></label>
                               <label>End<input aria-label="Clock end" type="datetime-local" className="ml-1 rounded-md border border-slate-300 px-1.5 py-0.5" value={clockFix.end} onChange={(event) => setClockFix({ ...clockFix, end: event.target.value })} /></label>
-                              <button type="button" onClick={saveClockFix} className="rounded-md bg-teal-500 px-3 py-1.5 text-sm font-semibold text-slate-950! transition hover:bg-teal-500">Save time</button>
+                              <button type="button" onClick={saveClockFix} className="rounded-md bg-teal-500 px-3 py-1.5 text-sm font-semibold text-slate-950! transition hover:bg-teal-400">Save time</button>
                               <button type="button" onClick={() => setClockFix(null)} className="underline">Cancel</button>
                             </div>
                           )}
@@ -921,7 +921,7 @@ export default function NewInvoicePage() {
               </p>
             )}
             <div className="print-hide sticky bottom-0 z-10 -mx-4 grid grid-cols-2 gap-2 border-t border-slate-200 bg-[var(--cr-card)] px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:-mx-6 sm:flex sm:flex-wrap sm:gap-3 sm:px-6">
-              {!locked && <button type="button" onClick={saveDocument} className="col-span-2 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 disabled:opacity-50">Save document</button>}
+              {!locked && <button type="button" onClick={saveDocument} className="col-span-2 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Save document</button>}
               {isProposal && !locked && (
                 <button type="button" onClick={createInvoiceFromProposal} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Create invoice</button>
               )}
@@ -935,7 +935,7 @@ export default function NewInvoicePage() {
         </form>
         <div className="lg:sticky lg:top-20 lg:self-start">
           <div className="print-hide mb-4 flex flex-wrap gap-2 sm:gap-3">
-            <button type="button" onClick={() => window.print()} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 disabled:opacity-50">Print / Save PDF</button>
+            <button type="button" onClick={() => window.print()} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Print / Save PDF</button>
             {!locked && !isProposal && status !== "paid" && <button type="button" onClick={copyPayLink} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">{paymentLink.trim() ? "Pay / Copy pay link" : "Add how to pay"}</button>}
             {!isProposal && docId && status !== "draft" && status !== "paid" && totals.balance > 0 && <button type="button" data-testid="invoice-reminder" onClick={() => setReminderOpen((open) => !open)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Reminder</button>}
           </div>

@@ -176,7 +176,7 @@ export default function DocumentsPage() {
         <div className="grid grid-cols-2 gap-2 sm:flex">
           <a
             href="/invoice"
-            className="rounded-full bg-teal-500 px-4 py-2 text-center text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500"
+            className="rounded-full bg-teal-500 px-4 py-2 text-center text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400"
           >
             New invoice
           </a>

@@ -58,7 +58,7 @@ export default function LoginPage() {
         {!resetMode && (
           <input type="password" required placeholder="Password" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={password} onChange={(event) => setPassword(event.target.value)} />
         )}
-        <button type="submit" disabled={busy} className="w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 disabled:opacity-60">
+        <button type="submit" disabled={busy} className="w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-60">
           {busy ? "Working" : resetMode ? "Send reset link" : "Log in"}
         </button>
       </form>

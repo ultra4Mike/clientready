@@ -255,7 +255,7 @@ async function saveDocument() {
             <button
               type="button"
               onClick={saveDocument}
-              className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 disabled:opacity-50"
+              className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50"
             >
               Save document
             </button>
@@ -274,7 +274,7 @@ async function saveDocument() {
           <button
             type="button"
             onClick={() => window.print()}
-            className="print-hide mb-4 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500"
+            className="print-hide mb-4 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400"
           >
             Print / Save PDF
           </button>

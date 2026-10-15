@@ -160,7 +160,7 @@ export default function CalendarPage() {
               <button type="button" onClick={() => shift(-1)} className="rounded-lg border border-slate-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400">Previous</button>
               <h1 className="min-w-0 flex-1 text-center text-lg font-bold tracking-tight sm:flex-none sm:px-2" data-testid="calendar-heading">{heading}</h1>
               <button type="button" onClick={() => shift(1)} className="rounded-lg border border-slate-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400">Next</button>
-              <button type="button" onClick={() => setAnchor(today)} className="rounded-lg bg-teal-500 px-3 py-1.5 text-sm font-semibold text-slate-950! transition hover:bg-teal-500">Today</button>
+              <button type="button" onClick={() => setAnchor(today)} className="rounded-lg bg-teal-500 px-3 py-1.5 text-sm font-semibold text-slate-950! transition hover:bg-teal-400">Today</button>
             </div>
           )}
         </div>

@@ -219,7 +219,7 @@ export default function EmployeesPage() {
           <input type="date" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={form.hireDate} onChange={(event) => setForm({ ...form, hireDate: event.target.value })} />
         </label>
         </div>
-        <button type="submit" className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 md:col-span-2 md:justify-self-end md:px-8">
+        <button type="submit" className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 md:col-span-2 md:justify-self-end md:px-8">
           {editingId ? "Update employee" : "Save employee"}
         </button>
         <p className="flex items-center gap-2 rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs font-medium text-[var(--cr-text)] md:col-span-2">🔒 No Social Security number, bank account, or routing number.</p>

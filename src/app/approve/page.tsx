@@ -205,7 +205,7 @@ export default function ApprovePage() {
           {!isProposal && (cardEnabled || payMessage) && (
             <div className="print-hide mt-4 rounded-xl border border-teal-500/30 bg-teal-50 p-4 text-sm text-slate-800" data-testid="card-pay">
               {cardEnabled && totals.balance >= 0.5 && (
-                <button type="button" data-testid="pay-card" disabled={paying} onClick={payByCard} className="w-full rounded-lg bg-teal-600 px-4 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-teal-500 disabled:opacity-60 sm:w-auto">
+                <button type="button" data-testid="pay-card" disabled={paying} onClick={payByCard} className="w-full rounded-lg bg-teal-600 px-4 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-teal-400 disabled:opacity-60 sm:w-auto">
                   {paying ? "Opening secure checkout…" : `Pay $${totals.balance.toFixed(2)} by card`}
                 </button>
               )}

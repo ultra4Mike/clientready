@@ -188,7 +188,7 @@ export default function InvoiceViewPage() {
           <button
             type="button"
             onClick={editInvoice}
-            className="rounded-xl bg-teal-500 px-4 py-2 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500"
+            className="rounded-xl bg-teal-500 px-4 py-2 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400"
           >
             Edit invoice
           </button>

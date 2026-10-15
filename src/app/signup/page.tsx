@@ -48,7 +48,7 @@ export default function SignupPage() {
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <input type="email" required placeholder="Email" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={email} onChange={(event) => setEmail(event.target.value)} />
         <input type="password" required minLength={6} placeholder="Password" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={password} onChange={(event) => setPassword(event.target.value)} />
-        <button type="submit" disabled={busy} className="w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 disabled:opacity-60">
+        <button type="submit" disabled={busy} className="w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-60">
           {busy ? "Creating account" : "Sign up"}
         </button>
       </form>

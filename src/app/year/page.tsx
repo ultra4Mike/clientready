@@ -393,7 +393,7 @@ export default function YearPage() {
         </div>
       )}
 
-      <button type="button" onClick={() => window.print()} className="mb-4 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 sm:w-auto print:hidden">Print / Save PDF</button>
+      <button type="button" onClick={() => window.print()} className="mb-4 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 sm:w-auto print:hidden">Print / Save PDF</button>
 
       <div className="mb-6 space-y-2 print:hidden">
         {visible.length === 0 && <p className="rounded-xl border border-dashed border-teal-500/30 p-6 text-center text-sm text-[var(--cr-muted)]">No rows match that search.</p>}

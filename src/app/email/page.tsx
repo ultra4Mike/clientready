@@ -310,7 +310,7 @@ async function saveDocument() {
             <button
               type="button"
               onClick={saveDocument}
-              className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 disabled:opacity-50"
+              className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50"
             >
               Save document
             </button>
@@ -334,7 +334,7 @@ async function saveDocument() {
           <button
             type="button"
             onClick={copyEmail}
-            className="mt-6 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 sm:w-auto"
+            className="mt-6 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 sm:w-auto"
           >
             {copied ? "Copied" : "Copy email"}
           </button>

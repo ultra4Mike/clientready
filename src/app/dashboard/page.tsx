@@ -198,7 +198,7 @@ export default function DashboardPage() {
         </form>
         <a
           href="/invoice"
-          className="shrink-0 rounded-xl bg-teal-500 px-5 py-2.5 text-center text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500"
+          className="shrink-0 rounded-xl bg-teal-500 px-5 py-2.5 text-center text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400"
         >
           New invoice +
         </a>
