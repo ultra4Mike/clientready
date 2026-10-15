@@ -4,8 +4,8 @@ import { lineSplit } from "@/lib/line-split";
 export default function LineSplit({ items, labelClass = "text-slate-500" }: { items: { qty?: unknown; rate?: unknown; category?: unknown }[]; labelClass?: string }) {
   const split = lineSplit(items);
   if (!split) return null;
-  const rows: [string, number][] = [["Labor", split.labor], ["Materials", split.materials]];
-  if (split.other > 0) rows.push(["Other", split.other]);
+  const rows = ([["Labor", split.labor], ["Materials", split.materials], ["Other", split.other]] as [string, number][]).filter(([, amount]) => amount > 0);
+  if (!rows.length) return null;
   return (
     <div className="space-y-0.5 pb-1" data-testid="line-split">
       <p className={`text-xs ${labelClass}`}>Billed by type (before discount and tax)</p>
