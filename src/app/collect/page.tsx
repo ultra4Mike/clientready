@@ -222,31 +222,39 @@ export default function CollectPage() {
           </p>
         )}
 
+        {unpaid.length > 0 && (
+          <div className="hidden grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto] gap-4 rounded-xl px-5 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)] lg:grid">
+            <span>Invoice</span><span className="text-right">Balance</span><span className="w-[27rem] text-right">Actions</span>
+          </div>
+        )}
+        <div className="space-y-3 lg:space-y-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-teal-500/20 lg:bg-[var(--cr-card)] lg:divide-y lg:divide-teal-500/15">
         {unpaid.map((doc) => (
-          <div key={doc.id} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-base font-semibold">{doc.title}</p>
+          <div key={doc.id} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6 lg:rounded-none lg:border-0 lg:bg-transparent lg:px-5 lg:py-4 lg:shadow-none lg:hover:bg-teal-500/5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto] lg:gap-4">
+              <div className="min-w-0">
+                <p className="truncate text-base font-semibold">{doc.title}</p>
                 <p className="text-sm text-[var(--cr-muted)]">
                   {doc.clientName || "No client"} · {doc.data?.status || "draft"}
                   {doc.data?.dueDate ? ` · due ${doc.data.dueDate}` : ""}
                   {isOverdue(doc) ? " · overdue" : ""}
                 </p>
-                <p className="mt-2 text-lg font-bold tabular-nums">${balance(doc).toFixed(2)} <span className="text-sm font-medium text-[var(--cr-muted)]">owed</span></p>
+              </div>
+              <div className="lg:text-right">
+                <p className="text-lg font-bold tabular-nums">${balance(doc).toFixed(2)} <span className="text-sm font-medium text-[var(--cr-muted)] lg:hidden">owed</span></p>
                 {amountPaid(doc) > 0 && (
                   <p className="text-sm text-[var(--cr-muted)]">
                     ${amountPaid(doc).toFixed(2)} paid of ${invoiceTotal(doc).toFixed(2)}
                   </p>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                <button type="button" onClick={() => openInvoice(doc.id)} className="rounded-lg border border-teal-500/30 px-4 py-2.5 text-sm font-medium transition hover:border-teal-400">
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap lg:w-[27rem] lg:flex-nowrap lg:justify-end">
+                <button type="button" onClick={() => openInvoice(doc.id)} className="rounded-lg border border-teal-500/30 px-4 py-2.5 text-sm font-medium transition hover:border-teal-400 lg:px-3 lg:py-2">
                   Open
                 </button>
-                <button type="button" onClick={() => setStatus(doc.id, "sent")} className="rounded-lg border border-teal-500/30 px-4 py-2.5 text-sm font-medium transition hover:border-teal-400">
+                <button type="button" onClick={() => setStatus(doc.id, "sent")} className="rounded-lg border border-teal-500/30 px-4 py-2.5 text-sm font-medium transition hover:border-teal-400 lg:px-3 lg:py-2">
                   Mark sent
                 </button>
-                <button type="button" data-testid={`reminder-${doc.id}`} onClick={() => setReminderId(reminderId === doc.id ? "" : doc.id)} className="rounded-lg border border-teal-500/30 px-4 py-2.5 text-sm font-medium transition hover:border-teal-400">
+                <button type="button" data-testid={`reminder-${doc.id}`} onClick={() => setReminderId(reminderId === doc.id ? "" : doc.id)} className="rounded-lg border border-teal-500/30 px-4 py-2.5 text-sm font-medium transition hover:border-teal-400 lg:px-3 lg:py-2">
                   Reminder
                 </button>
                 <button type="button" onClick={() => startPaid(doc)} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">
@@ -323,6 +331,7 @@ export default function CollectPage() {
             )}
           </div>
         ))}
+        </div>
       </div>
     </AppShell>
   );
