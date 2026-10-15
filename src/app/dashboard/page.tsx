@@ -5,6 +5,7 @@ import AppShell from "@/components/AppShell";
 import { loadAccountIntoCache } from "@/lib/account-cache";
 import { amountOf, documentTotals } from "@/lib/discount";
 import { balanceDue, paidTotal, readPayments } from "@/lib/payments";
+import { uniqueDocs } from "@/lib/change-orders";
 
 type Client = {
   id: string;
@@ -79,7 +80,7 @@ export default function DashboardPage() {
         setOwnerName(profile.ownerName || profile.businessName || "");
       }
       setClients(clientsRaw ? JSON.parse(clientsRaw) : []);
-      setDocuments(docsRaw ? JSON.parse(docsRaw) : []);
+      setDocuments(uniqueDocs(docsRaw ? JSON.parse(docsRaw) : []));
     }
     load();
   }, []);

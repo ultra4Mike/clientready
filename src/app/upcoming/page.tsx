@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { amountOf, documentTotals } from "@/lib/discount";
+import { uniqueDocs } from "@/lib/change-orders";
 
 type LineItem = {
   description?: string;
@@ -47,7 +48,7 @@ export default function UpcomingPage() {
 
   useEffect(() => {
     const raw = window.localStorage.getItem("clientready-documents");
-    if (raw) setDocuments(JSON.parse(raw));
+    if (raw) setDocuments(uniqueDocs(JSON.parse(raw)));
   }, []);
 
   const upcoming = useMemo(() => {

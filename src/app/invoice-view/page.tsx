@@ -6,7 +6,8 @@ import { balanceDue, paidTotal, readPayments, type Payment } from "@/lib/payment
 import { JobPhotoStrip } from "@/components/JobPhotos";
 import { readPhotos, type JobPhoto } from "@/lib/photos";
 import LineSplit from "@/components/LineSplit";
-import { changeOrdersFor, readChangeOrderOf, type ChangeOrderOf } from "@/lib/change-orders";
+import ChangeOrderNotes from "@/components/ChangeOrderNotes";
+import { changeOrdersFor, mergeChangeOrderNotes, readChangeOrderNotes, readChangeOrderOf, type ChangeOrderNote, type ChangeOrderOf } from "@/lib/change-orders";
 import PayQr from "@/components/PayQr";
 import { payUrlFor } from "@/lib/pay-link";
 import { SignatureBlock } from "@/components/SignaturePad";
@@ -46,7 +47,7 @@ export default function InvoiceViewPage() {
   const [docPayLink, setDocPayLink] = useState("");
   const [photos, setPhotos] = useState<JobPhoto[]>([]);
   const [changeOrderOf, setChangeOrderOf] = useState<ChangeOrderOf | null>(null);
-  const [changeOrders, setChangeOrders] = useState<{ id: string; number: string; title: string }[]>([]);
+  const [changeOrderNotes, setChangeOrderNotes] = useState<ChangeOrderNote[]>([]);
   const [signature, setSignature] = useState<Signature | null>(null);
   const [proposalSignature, setProposalSignature] = useState<Signature | null>(null);
   const [items, setItems] = useState<LineItem[]>([]);
@@ -90,6 +91,7 @@ export default function InvoiceViewPage() {
       payLink?: string;
       photos?: unknown;
       changeOrderOf?: unknown;
+      changeOrderNotes?: unknown;
       proposalSignature?: unknown;
       paymentAmount?: string;
       paymentMethod?: string;
@@ -117,7 +119,9 @@ export default function InvoiceViewPage() {
     setDocPayLink(data.payLink || "");
     setPhotos(readPhotos(data.photos));
     setChangeOrderOf(readChangeOrderOf(data.changeOrderOf));
-    setChangeOrders(changeOrdersFor(docs, doc.id));
+    // Stored notes, plus any change orders found by search (e.g. made before notes existed).
+    const found = changeOrdersFor(docs, doc.id).map((order) => ({ id: order.id, number: order.number, createdAt: "" }));
+    setChangeOrderNotes(mergeChangeOrderNotes(readChangeOrderNotes(data.changeOrderNotes), found));
     setProposalSignature(readSignature(data.proposalSignature));
     setItems(data.items || []);
     setStatus(data.status || "draft");
@@ -204,17 +208,7 @@ export default function InvoiceViewPage() {
                   Change order to <a className="underline" href={`/invoice?id=${encodeURIComponent(changeOrderOf.id)}`}>{changeOrderOf.number}</a>
                 </p>
               )}
-              {changeOrders.length > 0 && (
-                <p className="text-sm text-slate-600" data-testid="change-orders-list">
-                  Change orders:{" "}
-                  {changeOrders.map((order, index) => (
-                    <span key={order.id}>
-                      {index > 0 && ", "}
-                      <a className="underline" href={`/invoice?id=${encodeURIComponent(order.id)}`}>{order.number}</a>
-                    </span>
-                  ))}
-                </p>
-              )}
+              <ChangeOrderNotes notes={changeOrderNotes} className="text-xs text-slate-600" />
             </div>
           </div>
 

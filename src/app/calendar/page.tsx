@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { amountOf, documentTotals } from "@/lib/discount";
+import { uniqueDocs } from "@/lib/change-orders";
 
 type LineItem = {
   description?: string;
@@ -72,7 +73,7 @@ export default function CalendarPage() {
 
   useEffect(() => {
     const docsRaw = window.localStorage.getItem("clientready-documents");
-    if (docsRaw) setDocuments(JSON.parse(docsRaw));
+    if (docsRaw) setDocuments(uniqueDocs(JSON.parse(docsRaw)));
   }, []);
 
   const events = useMemo(() => {

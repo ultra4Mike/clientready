@@ -11,7 +11,8 @@ import { JobPhotosEditor, JobPhotoStrip } from "@/components/JobPhotos";
 import { isQuotaError, readPhotos, type JobPhoto } from "@/lib/photos";
 import LineSplit from "@/components/LineSplit";
 import { normalizeCategory, type LineCategory } from "@/lib/line-split";
-import { changeOrderData, changeOrdersFor, readChangeOrderOf, type ChangeOrderOf } from "@/lib/change-orders";
+import { appendChangeOrderNote, changeOrderData, changeOrdersFor, mergeChangeOrderNotes, readChangeOrderNotes, readChangeOrderOf, type ChangeOrderNote, type ChangeOrderOf } from "@/lib/change-orders";
+import ChangeOrderNotes from "@/components/ChangeOrderNotes";
 import PayQr from "@/components/PayQr";
 import { payUrlFor } from "@/lib/pay-link";
 import SignaturePad, { SignatureBlock } from "@/components/SignaturePad";
@@ -121,6 +122,7 @@ export default function NewInvoicePage() {
   const [docPayLink, setDocPayLink] = useState("");
   const [photos, setPhotos] = useState<JobPhoto[]>([]);
   const [changeOrderOf, setChangeOrderOf] = useState<ChangeOrderOf | null>(null);
+  const [changeOrderNotes, setChangeOrderNotes] = useState<ChangeOrderNote[]>([]);
   const [items, setItems] = useState<LineItem[]>([{ ...emptyItem }]);
   const [businessName, setBusinessName] = useState("Your business");
   const [ownerName, setOwnerName] = useState("");
@@ -227,7 +229,7 @@ export default function NewInvoicePage() {
       const data = (doc.data || {}) as {
         clientName?: string; clientCompany?: string; clientEmail?: string; clientPhone?: string; clientAddress?: string;
         invoiceNumber?: string; invoiceDate?: string; dueDate?: string; jobStart?: string; jobEnd?: string; notes?: string;
-        taxPercent?: string; discountType?: string; discountValue?: string; signature?: unknown; proposalSignature?: unknown; payLink?: string; photos?: unknown; changeOrderOf?: unknown; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
+        taxPercent?: string; discountType?: string; discountValue?: string; signature?: unknown; proposalSignature?: unknown; payLink?: string; photos?: unknown; changeOrderOf?: unknown; changeOrderNotes?: unknown; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
       };
       const kind: DocKind = doc.type === "proposal" ? "proposal" : "invoice";
       const loadedItems = Array.isArray(data.items) && data.items.length ? data.items.map((item) => ({ ...item, category: normalizeCategory(item.category) })) : [{ ...emptyItem }];
@@ -256,6 +258,7 @@ export default function NewInvoicePage() {
       setDocPayLink(data.payLink || "");
       setPhotos(readPhotos(data.photos));
       setChangeOrderOf(kind === "invoice" ? readChangeOrderOf(data.changeOrderOf) : null);
+      setChangeOrderNotes(readChangeOrderNotes(data.changeOrderNotes));
       setItems(loadedItems);
       setClientSearch(data.clientName || "");
       setStatus(data.status || "draft");
@@ -362,7 +365,7 @@ export default function NewInvoicePage() {
     setDocId(""); setClientSearch(""); setClientName(""); setClientCompany(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
     setInvoiceNumber(nextNumber(docKind)); setInvoiceDate(ymd(new Date())); setDueDate(plusDays(14)); setJobStart(""); setJobEnd("");
     setNotes(isProposal ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
-    setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setSignature(null); setProposalSignature(null); setPadKey((key) => key + 1); setDocPayLink(""); setPhotos([]); setChangeOrderOf(null); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
+    setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setSignature(null); setProposalSignature(null); setPadKey((key) => key + 1); setDocPayLink(""); setPhotos([]); setChangeOrderOf(null); setChangeOrderNotes([]); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
     setStyle("clean"); setJobTime(""); setCosts(emptyCosts); setCrew([]); setOtherFees([]);
   }
 
@@ -375,13 +378,16 @@ export default function NewInvoicePage() {
     const docs = raw ? JSON.parse(raw) : [];
     const localId = docId || Date.now().toString();
     const labor = crew.length ? crew.reduce((sum, row) => sum + rowPay(row), 0).toFixed(2) : costs.labor;
+    // Change-order notes are append-only: keep whatever is stored, plus what this form loaded.
+    const stored = (docs as SavedDocument[]).find((item) => item.id === localId);
+    const keptNotes = mergeChangeOrderNotes(readChangeOrderNotes(stored?.data?.changeOrderNotes), changeOrderNotes);
     const nextDoc = {
       id: localId,
       type: docKind,
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature, proposalSignature, payLink: docPayLink, photos, ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
+      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature, proposalSignature, payLink: docPayLink, photos, ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -431,12 +437,17 @@ export default function NewInvoicePage() {
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
+    // Append-only note on the original: re-read what is stored, add the note, touch nothing else.
+    const latestRaw = window.localStorage.getItem("clientready-documents");
+    const latest = latestRaw ? (JSON.parse(latestRaw) as SavedDocument[]) : docs;
+    const noted = appendChangeOrderNote(latest, original.id, { id: cloudId, number, createdAt: new Date().toISOString() });
     try {
-      window.localStorage.setItem("clientready-documents", JSON.stringify([...docs, nextDoc]));
+      window.localStorage.setItem("clientready-documents", JSON.stringify([...(noted ? noted.docs : latest), nextDoc]));
     } catch (error) {
       setSaveMessage(isQuotaError(error) ? "This browser's storage is full, so the change order could not be created on this device. Remove some photos or delete old documents, then try again." : "Could not create the change order on this device.");
       return;
     }
+    if (noted) await saveCloudDocument(noted.original);
     // Full page load on purpose: the editor reads the document once on mount, so a client-side
     // push to the same route would keep showing the original invoice.
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination
@@ -708,6 +719,7 @@ export default function NewInvoicePage() {
                   <div>Date: {invoiceDate || "-"} · {isProposal ? "Valid until" : "Due"}: {dueDate || "-"}</div>
                   {(jobStart || jobEnd) && <div>Time: {jobStart || "-"} to {jobEnd || "-"}</div>}
                   {changeOrderOf && !isProposal && <div data-testid="change-order-link">Change order to <a className="underline" href={`/invoice?id=${encodeURIComponent(changeOrderOf.id)}`}>{changeOrderOf.number}</a></div>}
+                  {!isProposal && <ChangeOrderNotes notes={changeOrderNotes} className="text-xs" />}
                 </div>
               </div>
             </div>
