@@ -198,9 +198,12 @@ export default function ClientsPage() {
 
   return (
     <AppShell title="Clients">
-      <section className="mx-auto max-w-6xl px-6 py-8">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-xl font-semibold">Client list</h1>
+      <section className="mx-auto max-w-6xl py-2 sm:px-2 sm:py-4">
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Client list</h1>
+            <p className="mt-1 text-sm text-slate-600">{clients.length} saved</p>
+          </div>
           <button
             type="button"
             onClick={() => {
@@ -215,7 +218,7 @@ export default function ClientsPage() {
         </div>
 
         <input
-          className="mb-6 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2"
+          className="mb-6 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
           placeholder="Search name, company, email, or phone"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
@@ -224,9 +227,9 @@ export default function ClientsPage() {
         {showForm && (
           <form
             onSubmit={handleSubmit}
-            className="mb-8 max-w-xl space-y-4 rounded-2xl border border-slate-200 bg-white p-6"
+            className="mb-8 max-w-xl space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"
           >
-            <h2 className="text-lg font-semibold">{editingId ? "Edit client" : "Add a client"}</h2>
+            <h2 className="text-lg font-bold tracking-tight">{editingId ? "Edit client" : "Add a client"}</h2>
             <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Contact & next visit</h2>
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Client name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
@@ -244,30 +247,30 @@ export default function ClientsPage() {
             </label>
             </div>
             <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
-            <div className="flex gap-3">
+            <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:justify-end">
               <button type="submit" className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400 disabled:opacity-50">{editingId ? "Update client" : "Save client"}</button>
               <button type="button" onClick={cancelEdit} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Cancel</button>
             </div>
           </form>
         )}
 
-        {message && <p className="mb-4 text-sm text-slate-600">{message}</p>}
+        {message && <p className="mb-4 rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-slate-600">{message}</p>}
 
         <div className="grid gap-3 md:grid-cols-2">
-          {clients.length === 0 && <p className="text-slate-600">No saved clients yet.</p>}
-          {clients.length > 0 && visible.length === 0 && <p className="text-slate-600">No clients match that search.</p>}
+          {clients.length === 0 && <p className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-600 md:col-span-2">No saved clients yet.</p>}
+          {clients.length > 0 && visible.length === 0 && <p className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-600 md:col-span-2">No clients match that search.</p>}
           {visible.map((client) => (
-            <div key={client.id} className="rounded-2xl border border-slate-200 bg-white p-5">
-              <p className="font-medium">{client.name}</p>
+            <div key={client.id} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-teal-500/60">
+              <p className="text-base font-semibold">{client.name}</p>
               <p className="text-sm text-slate-600">{client.company}</p>
               <p className="text-sm text-slate-600">{client.email}</p>
               {client.phone && <p className="text-sm text-slate-600">{client.phone}</p>}
               {client.nextVisit && <p className="mt-2 text-sm font-medium">Next visit: {client.nextVisit}</p>}
               {client.visitTime && <p className="text-sm text-slate-600">Time: {client.visitTime}</p>}
               {client.notes && <p className="mt-1 text-sm text-slate-600">{client.notes}</p>}
-              <div className="mt-3 flex gap-3">
-                <button type="button" onClick={() => editClient(client)} className="text-sm font-medium">Edit</button>
-                <button type="button" onClick={() => removeClient(client.id)} className="text-sm text-slate-500">Remove</button>
+              <div className="mt-4 flex gap-2 border-t border-slate-200 pt-3">
+                <button type="button" onClick={() => editClient(client)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium transition hover:border-teal-500">Edit</button>
+                <button type="button" onClick={() => removeClient(client.id)} className="rounded-lg px-3 py-1.5 text-sm text-slate-500 transition hover:bg-red-500/10 hover:text-red-600">Remove</button>
               </div>
             </div>
           ))}
