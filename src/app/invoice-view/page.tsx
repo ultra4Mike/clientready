@@ -93,6 +93,7 @@ export default function InvoiceViewPage() {
       signature?: unknown;
       payLink?: string;
       photos?: unknown;
+      showPhotos?: unknown;
       changeOrderOf?: unknown;
       changeOrderNotes?: unknown;
       proposalSignature?: unknown;
@@ -120,7 +121,7 @@ export default function InvoiceViewPage() {
     setPayments(readPayments(data));
     setSignature(readSignature(data.signature));
     setDocPayLink(data.payLink || "");
-    setPhotos(readPhotos(data.photos));
+    setPhotos(data.showPhotos === true ? readPhotos(data.photos) : []);
     setChangeOrderOf(readChangeOrderOf(data.changeOrderOf));
     // Stored notes, plus any change orders found by search (e.g. made before notes existed).
     const found = changeOrdersFor(docs, doc.id).map((order) => ({ id: order.id, number: order.number, createdAt: "" }));
@@ -164,14 +165,14 @@ export default function InvoiceViewPage() {
   return (
     <AppShell title="Invoice">
       <div className="print-hide mx-auto mb-6 flex max-w-3xl flex-wrap items-center justify-between gap-3">
-        <a href="/documents" className="text-sm font-medium text-[var(--cr-muted)] transition hover:text-teal-300">
+        <a href="/documents" className="text-sm font-medium text-[var(--cr-muted)] transition hover:text-teal-600 dark:hover:text-teal-300">
           Back to documents
         </a>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
           <button
             type="button"
             onClick={() => window.print()}
-            className="rounded-xl border border-teal-500/30 px-4 py-2 text-sm font-medium text-teal-200 transition hover:border-teal-400/60 hover:bg-teal-500/10"
+            className="rounded-xl border border-teal-500/30 px-4 py-2 text-sm font-medium text-teal-700 transition dark:text-teal-200 hover:border-teal-400/60 hover:bg-teal-500/10"
           >
             Print / Save PDF
           </button>
@@ -179,7 +180,7 @@ export default function InvoiceViewPage() {
             <button
               type="button"
               onClick={copyPayLink}
-              className="rounded-xl border border-teal-500/30 px-4 py-2 text-sm font-medium text-teal-200 transition hover:border-teal-400/60 hover:bg-teal-500/10"
+              className="rounded-xl border border-teal-500/30 px-4 py-2 text-sm font-medium text-teal-700 transition dark:text-teal-200 hover:border-teal-400/60 hover:bg-teal-500/10"
             >
               {paymentLink.trim() ? "Pay / Copy pay link" : "Add how to pay"}
             </button>
@@ -196,7 +197,7 @@ export default function InvoiceViewPage() {
       {message && <p className="print-hide mx-auto mb-4 max-w-3xl rounded-xl border border-teal-500/20 bg-teal-500/5 px-4 py-2 text-sm text-[var(--cr-muted)]">{message}</p>}
 
       <section className="print-reset mx-auto max-w-3xl">
-        <div id="preview" className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-lg sm:p-10">
+        <div id="preview" className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-lg sm:p-10">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 text-sm text-slate-600">
               {logo && <img src={logo} alt="Business logo" className="mb-2 h-10 w-auto" />}
