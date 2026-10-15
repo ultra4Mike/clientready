@@ -114,3 +114,10 @@ checkout. The invoice status is not changed automatically.
 
 If the keys are missing, the "Pay by card" button is hidden and the API routes answer 503.
 Card payments only work on invoices shared with an approval link.
+
+## Client portal
+
+One no-login link per client (Invoice page → "Client portal for …" → Share portal link). The customer sees every
+sent invoice/proposal for that client (drafts never), the balance and payments, can approve and sign, and pay by
+card when Stripe is set up. Owner costs, crew, schedule notes, review state and approval tokens are never returned.
+"New link" replaces the old link; "Turn off link" revokes it. Needs `supabase/migrations/20261015050000_client_portal.sql`.

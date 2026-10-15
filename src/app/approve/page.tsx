@@ -11,13 +11,19 @@ import { JobPhotoStrip } from "@/components/JobPhotos";
 import { SignatureBlock } from "@/components/SignaturePad";
 import LineSplit from "@/components/LineSplit";
 import PayQr from "@/components/PayQr";
+import SignaturePad from "@/components/SignaturePad";
+import { fetchPortalDoc, portalApprove } from "@/lib/portal";
+import type { Signature } from "@/lib/signature";
 
 type LineItem = { description?: string; qty?: string; rate?: string; category?: string };
 type PublicDoc = NonNullable<Awaited<ReturnType<typeof fetchApprovalDoc>>>;
 
 const text = (value: unknown) => (typeof value === "string" ? value : "");
 
-/** Public, no-login page behind an approval link. Read-only, plus one Approve action. */
+/**
+ * Public, no-login page behind an approval link (?t=) or a client portal link (?p=&d=).
+ * Read-only, plus Approve (portal: with an optional drawn/typed signature) and card payment.
+ */
 export default function ApprovePage() {
   const [token, setToken] = useState("");
   const [doc, setDoc] = useState<PublicDoc | null>(null);
@@ -29,9 +35,14 @@ export default function ApprovePage() {
   const [cardEnabled, setCardEnabled] = useState(false);
   const [paying, setPaying] = useState(false);
   const [payMessage, setPayMessage] = useState("");
+  const [portal, setPortal] = useState<{ p: string; d: string } | null>(null);
+  const [mySignature, setMySignature] = useState<Signature | null>(null);
+  const [approvalSignature, setApprovalSignature] = useState<Signature | null>(null);
 
   useEffect(() => {
-    const t = new URLSearchParams(window.location.search).get("t") || "";
+    const query = new URLSearchParams(window.location.search);
+    const t = query.get("t") || "";
+    const viaPortal = query.get("p") && query.get("d") ? { p: query.get("p") || "", d: query.get("d") || "" } : null;
     // Keep the token out of logs/analytics referrers on outbound links.
     const meta = document.createElement("meta");
     meta.name = "referrer";
@@ -45,12 +56,14 @@ export default function ApprovePage() {
         if (justPaid) setPayMessage("Thank you! Your card payment went through. It can take a minute to show here.");
       })
       .catch(() => setCardEnabled(false));
-    fetchApprovalDoc(t)
+    (viaPortal ? fetchPortalDoc(viaPortal.p, viaPortal.d) : fetchApprovalDoc(t))
       .then((found) => {
         setToken(t);
+        setPortal(viaPortal);
         if (!found) return setState("missing");
         setDoc(found);
         setApproval(readApproval(found.data?.approval));
+        setApprovalSignature(readSignature((found.data?.approval as { signature?: unknown } | null)?.signature));
         setState("ready");
       })
       .catch(() => setState("error"));
@@ -70,7 +83,7 @@ export default function ApprovePage() {
     setPaying(true);
     setPayMessage("");
     try {
-      const response = await fetch("/api/pay/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }) });
+      const response = await fetch("/api/pay/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(portal ? { portal: portal.p, docId: portal.d } : { token }) });
       const result = (await response.json().catch(() => ({}))) as { url?: string; error?: string };
       if (response.ok && result.url && /^https?:\/\//.test(result.url)) {
         window.location.assign(result.url);
@@ -87,12 +100,14 @@ export default function ApprovePage() {
     setBusy(true);
     setMessage("");
     try {
-      const result = await approveByToken(token, name);
+      const raw = portal ? await portalApprove(portal.p, portal.d, name || mySignature?.signerName || "", mySignature) : null;
+      const result = portal ? readApproval(raw) : await approveByToken(token, name);
       if (result) {
         setApproval(result);
+        if (raw) setApprovalSignature(readSignature(raw.signature));
       } else {
         // Already approved, or the link was turned off meanwhile: show what is stored now.
-        const latest = await fetchApprovalDoc(token);
+        const latest = portal ? await fetchPortalDoc(portal.p, portal.d) : await fetchApprovalDoc(token);
         if (!latest) setState("missing");
         else setApproval(readApproval(latest.data?.approval));
       }
@@ -126,12 +141,20 @@ export default function ApprovePage() {
     <main className="min-h-screen bg-slate-100 px-3 py-6 text-slate-900 sm:px-4 sm:py-10">
       <section className="print-reset mx-auto max-w-3xl space-y-4">
         <div className="print-hide rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm sm:p-5" data-testid="approve-panel">
-          {approved ? (
+          {portal && <a href={`/portal?t=${encodeURIComponent(portal.p)}`} className="mb-3 inline-block text-sm font-medium text-teal-700 underline" data-testid="portal-back">← All my documents</a>}
+          {portal && !approval && !isProposal ? null : approved ? (
             <p className="font-semibold text-emerald-700" data-testid="approve-done">
               Approved{approval?.approvedAt ? ` on ${new Date(approval.approvedAt).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}
               {approval?.approverName ? ` by ${approval.approverName}` : ""}. Thank you!
             </p>
           ) : (
+            <div className="space-y-3">
+            {portal && (
+              <div data-testid="portal-sign">
+                <p className="mb-1 font-medium text-slate-600">Sign (optional)</p>
+                <SignaturePad value={mySignature} onChange={setMySignature} />
+              </div>
+            )}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <label className="flex min-w-0 flex-1 flex-col gap-1.5 font-medium text-slate-600">
                 Your name (optional)
@@ -140,6 +163,7 @@ export default function ApprovePage() {
               <button type="button" disabled={busy} onClick={approve} className="w-full rounded-lg bg-emerald-600 px-5 py-2.5 font-semibold text-white shadow-sm transition hover:bg-emerald-500 disabled:opacity-60 sm:w-auto">
                 {busy ? "Approving…" : `Approve ${isProposal ? "proposal" : "invoice"}`}
               </button>
+            </div>
             </div>
           )}
           {message && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{message}</p>}
@@ -225,6 +249,7 @@ export default function ApprovePage() {
             </div>
           )}
           {approved && <p className="mt-3 text-sm font-semibold text-emerald-700">Approved{approval?.approverName ? ` by ${approval.approverName}` : ""}</p>}
+          {approved && approvalSignature && <div className="mt-2" data-testid="approval-signature"><SignatureBlock signature={approvalSignature} label="Approved and signed" /></div>}
         </div>
       </section>
     </main>

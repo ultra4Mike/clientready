@@ -1,5 +1,6 @@
 "use client";
 
+import PortalShare from "@/components/PortalShare";
 import { useEffect, useMemo, useState } from "react";
 import { saveCloudDocument } from "@/lib/cloud-docs";
 import { supabase } from "@/lib/supabase";
@@ -888,6 +889,7 @@ export default function NewInvoicePage() {
                 : <p className="text-xs text-slate-500">Save the document first, then schedule the job here or on the Calendar.</p>}
             </div>
             {docId && !locked && <ApprovalShare docId={docId} approval={approval} onChange={setApproval} />}
+            {docId && !locked && <PortalShare clientName={clientName} />}
             {!isProposal && docId && (
               <div className="space-y-3 rounded-xl border border-slate-200 p-4 text-sm sm:p-5" data-testid="recurring-section">
                 <p className="font-semibold">Recurring</p>
