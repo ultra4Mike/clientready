@@ -12,6 +12,10 @@ export type Schedule = {
   updatedAt: string;
   /** Note shown to the assigned crew (not the customer-facing invoice notes). */
   crewNote?: string;
+  /** Set by the crew's "mark done" (with photos); confirmedAt is set by the owner. */
+  doneAt?: string;
+  doneBy?: string;
+  confirmedAt?: string;
 };
 export type Worker = { id: string; name: string; email?: string; phone?: string; role?: string; rate?: string; active?: boolean };
 /** The older per-job crew/pay rows (data.crew). */
@@ -60,6 +64,9 @@ export function readSchedule(data: Record<string, unknown> | undefined): Schedul
       status,
       updatedAt: String(raw.updatedAt || ""),
       ...(raw.crewNote ? { crewNote: String(raw.crewNote).slice(0, 500) } : {}),
+      ...(raw.doneAt ? { doneAt: String(raw.doneAt) } : {}),
+      ...(raw.doneBy ? { doneBy: String(raw.doneBy) } : {}),
+      ...(raw.confirmedAt ? { confirmedAt: String(raw.confirmedAt) } : {}),
     };
   }
   if (data?.jobTime && isDate(data?.dueDate)) {
@@ -340,8 +347,7 @@ export async function syncScheduleCrewJobs(doc: CloudDoc) {
   if (!schedule || !doc.data?.schedule || !schedule.workerIds.length) return;
   const workers = new Map(allEmployees().map((person) => [person.id, person]));
   const data = doc.data || {};
-  await supabase.from("crew_jobs").insert(
-    dedupeWorkerIds(schedule.workerIds).map((workerId) => ({
+  const rows = dedupeWorkerIds(schedule.workerIds).map((workerId) => ({
       id: `${doc.id}-sched-${workerId}`,
       owner_id: user.id,
       employee_id: workerId,
@@ -362,8 +368,48 @@ export async function syncScheduleCrewJobs(doc: CloudDoc) {
       schedule_status: schedule.status,
       start_time: schedule.startTime,
       end_time: schedule.endTime || "",
-    })),
-  );
+      done_confirmed: schedule.status === "done" && Boolean(schedule.confirmedAt),
+    }));
+  const { error } = await supabase.from("crew_jobs").insert(rows);
+  // Before the done-photos migration runs, crew_jobs has no done_confirmed column: insert without it.
+  if (error && /done_confirmed/.test(error.message || "")) {
+    await supabase.from("crew_jobs").insert(rows.map(({ done_confirmed: _skip, ...row }) => { void _skip; return row; }));
+  }
+}
+
+/** Done by the crew, not yet confirmed by the owner. */
+export function awaitingConfirmation(schedule: Schedule | null) {
+  return Boolean(schedule && schedule.status === "done" && !schedule.confirmedAt);
+}
+
+/** Crew: mark an assigned job done; at least one photo (compressed JPEG data URL) is required. */
+export async function crewMarkDone(docId: string, photos: string[]) {
+  if (!photos.length) return "Add at least one photo of the finished job.";
+  const { data, error } = await supabase.rpc("crew_mark_done", { p_doc_id: docId, p_photos: photos });
+  if (error) return error.message;
+  return data === false ? "Could not mark this job done." : "";
+}
+
+/** Owner: photos the crew attached when marking the job done (newest first). */
+export async function jobDonePhotos(docId: string) {
+  if (!isUuid(docId)) return [];
+  const { data } = await supabase.from("crew_job_photos").select("id, worker_name, photo, created_at").eq("doc_id", docId).order("created_at", { ascending: false });
+  return (data || []) as { id: string; worker_name: string; photo: string; created_at: string }[];
+}
+
+/**
+ * Owner confirms a job the crew marked done. Reads the cloud schedule first (the crew's update
+ * lands there), then saves it with confirmedAt. Only the schedule block changes.
+ */
+export async function confirmJobDone(docId: string) {
+  let schedule = readSchedule(readDocs().find((doc) => doc.id === docId)?.data);
+  if (isUuid(docId)) {
+    const { data } = await supabase.from("documents").select("data").eq("id", docId).maybeSingle();
+    const cloud = readSchedule((data?.data || undefined) as Record<string, unknown> | undefined);
+    if (cloud && scheduleStamp(cloud) >= scheduleStamp(schedule)) schedule = cloud;
+  }
+  if (!schedule || schedule.status !== "done") return null;
+  return saveSchedule(docId, { ...schedule, confirmedAt: new Date().toISOString() });
 }
 
 /** Crew: updates the status of a job they are assigned to (server checks the assignment). */

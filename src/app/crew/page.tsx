@@ -2,7 +2,8 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { crewSetJobStatus, STATUS_CLASS, STATUS_LABEL, type JobStatus } from "@/lib/schedule";
+import { crewMarkDone, crewSetJobStatus, STATUS_CLASS, STATUS_LABEL, type JobStatus } from "@/lib/schedule";
+import { compressPhoto } from "@/lib/photos";
 import { compressImage, crewClockIn, crewClockOut, crewEditClock, entryHours, fmtHours, fmtTimer, type ClockEntry } from "@/lib/clock";
 
 type Client = { id: string; name: string; phone: string; address: string };
@@ -14,6 +15,7 @@ type Job = {
   client_address: string;
   client_email?: string;
   schedule_status?: string;
+  done_confirmed?: boolean;
   job_date: string;
   start_time: string;
   end_time: string;
@@ -86,7 +88,7 @@ function buildCards(jobs: Job[]): Card[] {
   for (const sched of jobs.filter((job) => job.id.includes("-sched-"))) {
     const index = cards.findIndex((card) => card.doc_id === sched.doc_id && !card.scheduled);
     const merged = {
-      scheduled: true, schedule_status: sched.schedule_status, job_date: sched.job_date || "", start_time: sched.start_time,
+      scheduled: true, schedule_status: sched.schedule_status, done_confirmed: Boolean(sched.done_confirmed), job_date: sched.job_date || "", start_time: sched.start_time,
       end_time: sched.end_time, client_email: sched.client_email, crewNote: sched.note || "",
     };
     if (index >= 0) cards[index] = { ...cards[index], ...merged, job_date: sched.job_date || cards[index].job_date };
@@ -115,6 +117,8 @@ export default function CrewPage() {
   const [form, setForm] = useState(empty);
   const [reportOpen, setReportOpen] = useState(false);
   const [spendOpen, setSpendOpen] = useState<string>("");
+  const [doneFor, setDoneFor] = useState("");
+  const [donePhotos, setDonePhotos] = useState<string[]>([]);
   const [spend, setSpend] = useState<{ kind: string; amount: string; note: string; receipt: string }>({ kind: "parts", amount: "", note: "", receipt: "" });
   const [fixing, setFixing] = useState<{ id: string; start: string; end: string; reason: string } | null>(null);
 
@@ -224,6 +228,25 @@ export default function CrewPage() {
     }, "Expense added to this job.");
   }
 
+  async function pickDonePhotos(files: FileList | null) {
+    if (!files?.length) return;
+    try {
+      const added: string[] = [];
+      for (const file of Array.from(files).slice(0, 6)) added.push(await compressPhoto(file));
+      setDonePhotos((current) => [...current, ...added].slice(0, 6));
+    } catch (error) {
+      setMessage((error as Error).message);
+    }
+  }
+
+  async function markDone(card: Card) {
+    await act(`status-${card.doc_id}`, async () => {
+      const error = await crewMarkDone(card.doc_id, donePhotos);
+      if (!error) { setDonePhotos([]); setDoneFor(""); }
+      return error;
+    }, "Marked done. Your boss will confirm it.");
+  }
+
   async function pickReceipt(file: File | undefined) {
     if (!file) return;
     try {
@@ -276,7 +299,7 @@ export default function CrewPage() {
             </p>
             <h3 className="mt-0.5 truncate text-lg font-bold tracking-tight">{card.client_name || card.invoice_number || "Job"}</h3>
           </div>
-          {card.scheduled && <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${STATUS_CLASS[status]}`}>{STATUS_LABEL[status]}</span>}
+          {card.scheduled && <span data-testid={`job-state-${card.doc_id}`} className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${STATUS_CLASS[status]}`}>{status === "done" ? (card.done_confirmed ? "Done · confirmed" : "Done · awaiting confirmation") : STATUS_LABEL[status]}</span>}
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
@@ -296,12 +319,33 @@ export default function CrewPage() {
         {card.scheduled && (
           <div className="mt-3 grid grid-cols-3 gap-2" role="group" aria-label="Job status">
             {(Object.keys(STATUS_LABEL) as JobStatus[]).map((key) => (
-              <button key={key} type="button" aria-pressed={status === key} disabled={busy !== ""} data-testid={`status-${key}-${card.doc_id}`}
-                onClick={() => act(`status-${card.doc_id}`, () => crewSetJobStatus(card.doc_id, key), `Marked ${STATUS_LABEL[key].toLowerCase()}.`)}
+              <button key={key} type="button" aria-pressed={status === key} disabled={busy !== "" || Boolean(card.done_confirmed)} data-testid={`status-${key}-${card.doc_id}`}
+                onClick={() => key === "done"
+                  ? (setDoneFor(doneFor === card.doc_id ? "" : card.doc_id), setDonePhotos([]))
+                  : act(`status-${card.doc_id}`, () => crewSetJobStatus(card.doc_id, key), `Marked ${STATUS_LABEL[key].toLowerCase()}.`)}
                 className={`min-h-11 rounded-xl border px-2 py-2 text-sm font-semibold transition ${status === key ? `${STATUS_CLASS[key]} ring-2 ring-teal-400/60` : "border-teal-500/30 bg-[var(--cr-bg)] hover:border-teal-400 hover:bg-teal-500/10"} disabled:opacity-60`}>
                 {STATUS_LABEL[key]}
               </button>
             ))}
+          </div>
+        )}
+        {card.scheduled && doneFor === card.doc_id && !card.done_confirmed && (
+          <div className="mt-3 space-y-2 rounded-xl border border-teal-500/30 p-3 text-sm" data-testid={`done-panel-${card.doc_id}`}>
+            <p className="font-semibold">Photo of the finished job (required)</p>
+            <label className="flex min-h-11 cursor-pointer items-center justify-center rounded-xl border border-dashed border-teal-500/40 px-3 py-2 font-medium">
+              📷 {donePhotos.length ? "Add another photo" : "Take or choose photo"}
+              <input type="file" accept="image/*" capture="environment" multiple className="sr-only" data-testid={`done-photo-input-${card.doc_id}`} onChange={(event) => { pickDonePhotos(event.target.files); event.target.value = ""; }} />
+            </label>
+            {donePhotos.length > 0 && (
+              <div className="flex flex-wrap gap-2" data-testid="done-photo-previews">
+                {/* eslint-disable-next-line @next/next/no-img-element -- local data URL previews */}
+                {donePhotos.map((photo, index) => <img key={index} src={photo} alt={`Finished job photo ${index + 1}`} className="h-16 w-16 rounded-lg object-cover" />)}
+              </div>
+            )}
+            <button type="button" disabled={busy !== "" || donePhotos.length === 0} onClick={() => markDone(card)} data-testid={`done-submit-${card.doc_id}`} className="min-h-11 w-full rounded-xl bg-teal-500 px-4 py-2.5 font-semibold text-slate-950 disabled:opacity-50">
+              Mark done
+            </button>
+            {donePhotos.length === 0 && <p className="text-xs text-[var(--cr-muted)]">Add at least one photo to mark the job done.</p>}
           </div>
         )}
 

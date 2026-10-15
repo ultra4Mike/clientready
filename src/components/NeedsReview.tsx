@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { confirmJobDone } from "@/lib/schedule";
 import { markReviewed, reviewItems, type ExpenseRow, type ReviewItem, type ReviewKind } from "@/lib/review";
 
 const LABEL: Record<ReviewKind, string> = {
@@ -24,7 +25,13 @@ export default function NeedsReview({ documents, onDocuments }: { documents: Doc
 
   async function review(item: ReviewItem) {
     setBusy(`${item.docId}:${item.key}`);
-    onDocuments(await markReviewed(item));
+    if (item.kind === "done") {
+      // Confirming is the review for a crew-done job (sets schedule.confirmedAt; nothing else changes).
+      await confirmJobDone(item.docId).catch(() => null);
+      onDocuments(JSON.parse(window.localStorage.getItem("clientready-documents") || "[]"));
+    } else {
+      onDocuments(await markReviewed(item));
+    }
     setBusy("");
   }
 
@@ -47,7 +54,7 @@ export default function NeedsReview({ documents, onDocuments }: { documents: Doc
               </a>
               <button type="button" disabled={Boolean(busy)} onClick={() => review(item)} data-testid="mark-reviewed"
                 className="tap shrink-0 rounded-lg border border-teal-500/30 px-3 py-1.5 text-xs font-medium text-teal-700 transition hover:bg-teal-500/10 disabled:opacity-50 dark:text-teal-200">
-                {busy === `${item.docId}:${item.key}` ? "Saving…" : "Mark reviewed"}
+                {busy === `${item.docId}:${item.key}` ? "Saving…" : item.kind === "done" ? "Confirm done" : "Mark reviewed"}
               </button>
             </li>
           ))}

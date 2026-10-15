@@ -1,6 +1,7 @@
 "use client";
 
 import PortalShare from "@/components/PortalShare";
+import JobDonePanel from "@/components/JobDonePanel";
 import { StageEditor, StageSchedule } from "@/components/StageSchedule";
 import { readStages, type Stage } from "@/lib/stages";
 import { useEffect, useMemo, useState } from "react";
@@ -892,6 +893,7 @@ export default function NewInvoicePage() {
               {docId && !locked
                 ? <ScheduleEditor key={scheduleKey} value={schedule} workers={workers} onSave={saveJobSchedule} confirmRemove={(ids) => confirmRemoval(workLogged(crew, ids, clockHoursFor(docId)))} />
                 : <p className="text-xs text-slate-500">Save the document first, then schedule the job here or on the Calendar.</p>}
+              {docId && <JobDonePanel docId={docId} schedule={schedule} onConfirmed={(next) => { setSchedule(next); setScheduleKey((key) => key + 1); }} />}
             </div>
             {docId && !locked && <ApprovalShare docId={docId} approval={approval} onChange={setApproval} />}
             {docId && !locked && <PortalShare clientName={clientName} />}

@@ -57,9 +57,9 @@ export function reviewItems(docs: Doc[], expenses: ExpenseRow[], today = ymd(new
   for (const doc of docs) {
     const data = doc.data || {};
     const schedule = readSchedule(data);
-    if (schedule?.status === "done") {
-      all.push({ key: "done", version: `${schedule.date}|${schedule.startTime}`, kind: "done", docId: doc.id,
-        title: `Crew marked ${numberOf(doc)} done`, detail: `${schedule.date}${who(doc)} · confirm the work`, href: open(doc) });
+    if (schedule?.status === "done" && !schedule.confirmedAt) {
+      all.push({ key: "done", version: schedule.doneAt || `${schedule.date}|${schedule.startTime}`, kind: "done", docId: doc.id,
+        title: `Crew marked ${numberOf(doc)} done`, detail: `${schedule.date}${schedule.doneBy ? ` · ${schedule.doneBy}` : ""}${who(doc)} · awaiting your confirmation`, href: `${open(doc)}#job-done` });
     }
     const approval = readApproval(data.approval);
     if (doc.type === "proposal" && approval?.status === "pending") {
