@@ -171,12 +171,12 @@ export default function DocumentsPage() {
     <AppShell title="Documents">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-[var(--cr-muted)] sm:text-base">
-          Invoices and proposals live here. Click a row to edit it.
+          Invoices and proposals live here. Press Open to edit one.
         </p>
         <div className="grid grid-cols-2 gap-2 sm:flex">
           <a
             href="/invoice"
-            className="rounded-full bg-teal-400 px-4 py-2 text-center text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300"
+            className="rounded-full bg-teal-500 px-4 py-2 text-center text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400"
           >
             New invoice
           </a>
@@ -189,9 +189,9 @@ export default function DocumentsPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 sm:grid-cols-2 md:grid-cols-3">
+      <div className="grid gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 sm:grid-cols-2 lg:grid-cols-4">
         <input
-          className="rounded-lg border border-teal-500/30 bg-[var(--cr-card)] px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
+          className="sm:col-span-2 lg:col-span-4 rounded-lg border border-teal-500/30 bg-[var(--cr-card)] px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
           placeholder="Search client, number, amount, email"
           aria-label="Search documents"
           value={search}
@@ -261,9 +261,9 @@ export default function DocumentsPage() {
           >
             <button type="button" onClick={() => openDocument(doc)} className="min-w-0 text-left">
               <p className="truncate text-base font-semibold">{doc.title || "Untitled"}</p>
-              <p className="mt-0.5 text-sm text-[var(--cr-muted)]">
+              <p className="mt-1 flex flex-wrap items-center gap-x-1 text-sm text-[var(--cr-text)] opacity-85">
                 {doc.type} · {doc.clientName || "No client"} · {doc.createdAt}
-                {doc.data?.status ? ` · ${doc.data.status}` : ""}
+                {doc.data?.status ? <> · <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold capitalize ${({ paid: "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300", draft: "border-slate-400/40 bg-slate-400/15", sent: "border-sky-500/40 bg-sky-500/15 text-sky-700 dark:text-sky-300", overdue: "border-red-500/40 bg-red-500/15 text-red-700 dark:text-red-300", accepted: "border-teal-500/40 bg-teal-500/15 text-teal-700 dark:text-teal-300" } as Record<string, string>)[String(doc.data.status)] || "border-teal-500/30"}`}>{String(doc.data.status)}</span></> : ""}
                 {(factsById.get(doc.id)?.total || 0) > 0 ? ` · $${(factsById.get(doc.id)?.total || 0).toFixed(2)}` : ""}
                 {(factsById.get(doc.id)?.owed || 0) > 0 && doc.data?.status !== "draft" ? ` · $${(factsById.get(doc.id)?.owed || 0).toFixed(2)} owed` : ""}
                 {doc.data?.outcome ? ` · ${doc.data.outcome}` : ""}
