@@ -182,32 +182,32 @@ export default function CollectPage() {
 
   return (
     <AppShell title="Collect">
-      <p className="text-[var(--cr-muted)]">Unpaid invoices and overdue amounts.</p>
+      <p className="text-sm text-[var(--cr-muted)] sm:text-base">Unpaid invoices and overdue amounts.</p>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
         <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
-          <p className="text-sm text-[var(--cr-muted)]">Unpaid invoices</p>
-          <p className="mt-2 text-2xl font-semibold">{totals.unpaidCount}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Unpaid invoices</p>
+          <p className="mt-2 text-2xl font-bold tabular-nums">{totals.unpaidCount}</p>
         </div>
         <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
-          <p className="text-sm text-[var(--cr-muted)]">Open amount</p>
-          <p className="mt-2 text-2xl font-semibold">${totals.openAmount.toFixed(2)}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Open amount</p>
+          <p className="mt-2 text-2xl font-bold tabular-nums">${totals.openAmount.toFixed(2)}</p>
         </div>
         <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
-          <p className="text-sm text-[var(--cr-muted)]">Overdue</p>
-          <p className="mt-2 text-2xl font-semibold">${totals.overdueAmount.toFixed(2)}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Overdue</p>
+          <p className="mt-2 text-2xl font-bold tabular-nums text-amber-600 dark:text-amber-300">${totals.overdueAmount.toFixed(2)}</p>
         </div>
       </div>
 
       <div className="mt-8 space-y-3">
         {pendingDrafts > 0 && (
-          <p data-testid="recurring-pending-note" className="text-sm text-[var(--cr-muted)]">
+          <p data-testid="recurring-pending-note" className="rounded-xl border border-teal-500/30 bg-teal-500/10 px-4 py-3 text-sm text-[var(--cr-muted)]">
             {pendingDrafts} recurring draft{pendingDrafts === 1 ? "" : "s"} awaiting review, not counted here.{" "}
-            <a href="/documents" className="text-teal-300 underline">Review in Documents</a>
+            <a href="/documents" className="font-medium text-teal-700 underline dark:text-teal-300">Review in Documents</a>
           </p>
         )}
         {unpaid.length === 0 && (
-          <p className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 text-[var(--cr-muted)]">
+          <p className="rounded-2xl border border-dashed border-teal-500/30 bg-[var(--cr-card)] p-8 text-center text-sm text-[var(--cr-muted)]">
             Nothing to collect. Unpaid invoices will show here.
           </p>
         )}
@@ -216,27 +216,27 @@ export default function CollectPage() {
           <div key={doc.id} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="font-medium">{doc.title}</p>
+                <p className="text-base font-semibold">{doc.title}</p>
                 <p className="text-sm text-[var(--cr-muted)]">
                   {doc.clientName || "No client"} · {doc.data?.status || "draft"}
                   {doc.data?.dueDate ? ` · due ${doc.data.dueDate}` : ""}
                   {isOverdue(doc) ? " · overdue" : ""}
                 </p>
-                <p className="mt-1 font-semibold">${balance(doc).toFixed(2)} owed</p>
+                <p className="mt-2 text-lg font-bold tabular-nums">${balance(doc).toFixed(2)} <span className="text-sm font-medium text-[var(--cr-muted)]">owed</span></p>
                 {amountPaid(doc) > 0 && (
                   <p className="text-sm text-[var(--cr-muted)]">
                     ${amountPaid(doc).toFixed(2)} paid of ${invoiceTotal(doc).toFixed(2)}
                   </p>
                 )}
               </div>
-              <div className="flex flex-wrap gap-3">
-                <button type="button" onClick={() => openInvoice(doc.id)} className="text-sm font-medium">
+              <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+                <button type="button" onClick={() => openInvoice(doc.id)} className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm font-medium transition hover:border-teal-400">
                   Open
                 </button>
-                <button type="button" onClick={() => setStatus(doc.id, "sent")} className="text-sm font-medium">
+                <button type="button" onClick={() => setStatus(doc.id, "sent")} className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm font-medium transition hover:border-teal-400">
                   Mark sent
                 </button>
-                <button type="button" onClick={() => startPaid(doc)} className="text-sm font-medium">
+                <button type="button" onClick={() => startPaid(doc)} className="rounded-lg bg-teal-400 px-3 py-2 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300">
                   Record payment
                 </button>
               </div>
@@ -273,10 +273,10 @@ export default function CollectPage() {
                   value={paymentRef}
                   onChange={(event) => setPaymentRef(event.target.value)}
                 />
-                <p className="text-sm text-[var(--cr-muted)] sm:col-span-2">
+                <p className="text-xs text-[var(--cr-muted)] sm:col-span-2">
                   Do not enter a full card, account, or routing number.
                 </p>
-                <div className="flex gap-3 sm:col-span-2">
+                <div className="flex flex-col gap-2 sm:col-span-2 sm:flex-row">
                   <button
                     type="button"
                     onClick={() => savePaid(doc)}
@@ -284,7 +284,7 @@ export default function CollectPage() {
                   >
                     {method === "Cash" ? "Save and print receipt" : "Save payment"}
                   </button>
-                  <button type="button" onClick={() => setPayingId("")} className="text-sm">
+                  <button type="button" onClick={() => setPayingId("")} className="rounded-lg px-4 py-2.5 text-sm font-medium text-[var(--cr-muted)] transition hover:bg-teal-500/10">
                     Cancel
                   </button>
                 </div>
