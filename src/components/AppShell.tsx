@@ -73,9 +73,12 @@ function Logo() {
 export default function AppShell({
   children,
   title,
+  showTitle = false,
 }: {
   children: ReactNode;
   title: string;
+  /** Show `title` in the desktop top bar. Off by default: every page renders its own PageHeader as the single title. */
+  showTitle?: boolean;
 }) {
   const [theme, setTheme] = useState("dark");
   const [wide, setWide] = useState(true);
@@ -177,7 +180,7 @@ useEffect(() => {
           </aside>
           <div className="min-w-0 flex-1">
             <header className="sticky top-0 z-20 flex items-center justify-between border-b border-teal-500/20 bg-[var(--cr-bg)] px-6 py-3">
-              <h1 className="text-lg font-semibold">{title}</h1>
+              {showTitle ? <h1 className="text-lg font-semibold">{title}</h1> : <span className="sr-only">{title}</span>}
               {actions}
             </header>
             <div className="app-main p-6"><div className="mx-auto w-full max-w-6xl">{children}</div></div>
@@ -192,8 +195,7 @@ useEffect(() => {
             </div>
           </header>
           <div className="app-main p-4 pb-[calc(10rem+env(safe-area-inset-bottom))] print:pb-4">
-            <div className="group/shell mx-auto w-full max-w-6xl">
-            <h1 className="print-hide mb-4 text-2xl font-bold tracking-tight group-has-[[data-page-header]]/shell:hidden">{title}</h1>
+            <div className="mx-auto w-full max-w-6xl">
             {children}
             </div>
           </div>
