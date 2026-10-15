@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
+import PageHeader from "@/components/PageHeader";
 import { documentTotals } from "@/lib/discount";
 import { uniqueDocs } from "@/lib/change-orders";
 import { readPayments } from "@/lib/payments";
@@ -355,6 +356,7 @@ export default function YearPage() {
 
   return (
     <AppShell title="Year packet">
+      <PageHeader title="Sales and expense log" subtitle="Filter the year, open any row, then print or save the packet." actions={<button type="button" onClick={() => window.print()} className="w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 sm:w-auto">Print / Save PDF</button>} />
       <div className="mb-4 grid gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 sm:grid-cols-2 md:grid-cols-4 print:hidden">
         <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={year} onChange={(event) => setYear(event.target.value)} />
         <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Search client, invoice, worker" value={search} onChange={(event) => setSearch(event.target.value)} />
@@ -393,17 +395,18 @@ export default function YearPage() {
         </div>
       )}
 
-      <button type="button" onClick={() => window.print()} className="mb-4 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 sm:w-auto print:hidden">Print / Save PDF</button>
 
-      <div className="mb-6 space-y-2 print:hidden">
-        {visible.length === 0 && <p className="rounded-xl border border-dashed border-teal-500/30 p-6 text-center text-sm text-[var(--cr-muted)]">No rows match that search.</p>}
+
+      <div className="mb-6 overflow-hidden rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] shadow-sm print:hidden">
+        <div className="hidden gap-4 border-b border-teal-500/20 bg-teal-500/5 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)] md:grid md:grid-cols-[6.5rem_minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.4fr)_7rem]"><span>Date</span><span>Invoice / client</span><span>Category</span><span>Details</span><span className="text-right">Amount</span></div>
+        {visible.length === 0 && <p className="p-8 text-center text-sm text-[var(--cr-muted)]">No rows match that search.</p>}
         {visible.map((row) => (
-          <button key={row.id} type="button" onClick={() => openRow(row)} className="block w-full rounded-xl border border-teal-500/20 bg-[var(--cr-card)] p-4 text-left shadow-sm transition hover:border-teal-400/60">
-            <p className="font-medium">{row.worker ? `${row.worker} · ` : ""}{row.number} · {row.client}</p>
-            <p className="text-sm text-[var(--cr-muted)]">
-              {row.date} · {row.category} · ${row.amount.toFixed(2)}
-              {row.hours ? ` · ${row.hours} hrs @ $${Number(row.rate || 0).toFixed(2)}` : ""} {row.method} {row.ref} {row.note}
-            </p>
+          <button key={row.id} type="button" onClick={() => openRow(row)} className="grid w-full grid-cols-2 gap-x-4 gap-y-1 border-b border-teal-500/10 px-4 py-3 text-left text-sm transition last:border-b-0 hover:bg-teal-500/5 md:items-center md:grid-cols-[6.5rem_minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.4fr)_7rem]">
+            <span className="tabular-nums text-[var(--cr-muted)]">{row.date}</span>
+            <span className="min-w-0 truncate font-medium max-md:order-first max-md:col-span-2">{row.worker ? `${row.worker} · ` : ""}{row.number} · {row.client}</span>
+            <span className="truncate">{row.category}</span>
+            <span className="min-w-0 truncate text-[var(--cr-muted)] max-md:col-span-2">{row.hours ? `${row.hours} hrs @ $${Number(row.rate || 0).toFixed(2)} ` : ""}{row.method} {row.ref} {row.note}</span>
+            <span className="text-right font-semibold tabular-nums max-md:col-start-2 max-md:row-start-2">${row.amount.toFixed(2)}</span>
           </button>
         ))}
       </div>
