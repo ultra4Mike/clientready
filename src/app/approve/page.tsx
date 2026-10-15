@@ -175,7 +175,7 @@ export default function ApprovePage() {
           </div>
 
           {text(data.notes) && <p className="mt-3 text-sm text-slate-600">{text(data.notes)}</p>}
-          <JobPhotoStrip photos={readPhotos(data.photos)} />
+          {data.showPhotos === true && <JobPhotoStrip photos={readPhotos(data.photos)} />}
           {(payUrl || signature || proposalSignature) && (
             <div className="print-keep mt-4 grid items-end gap-6 border-t border-slate-200 pt-4 sm:grid-cols-2">
               <div className="space-y-3">

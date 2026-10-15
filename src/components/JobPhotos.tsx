@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { compressPhoto, dataUrlBytes, MAX_PHOTOS, type JobPhoto } from "@/lib/photos";
 
-type EditorProps = { photos: JobPhoto[]; onChange: (photos: JobPhoto[]) => void };
+type EditorProps = { photos: JobPhoto[]; onChange: (photos: JobPhoto[]) => void; showOnCopy?: boolean; onShowOnCopyChange?: (value: boolean) => void };
 
-export function JobPhotosEditor({ photos, onChange }: EditorProps) {
+export function JobPhotosEditor({ photos, onChange, showOnCopy = false, onShowOnCopyChange }: EditorProps) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -63,6 +63,12 @@ export function JobPhotosEditor({ photos, onChange }: EditorProps) {
             </div>
           ))}
         </div>
+      )}
+      {photos.length > 0 && onShowOnCopyChange && (
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input type="checkbox" className="h-4 w-4 accent-teal-600" data-testid="photos-on-copy" checked={showOnCopy} onChange={(event) => onShowOnCopyChange(event.target.checked)} />
+          Show photos on the customer copy (preview, print, approval link)
+        </label>
       )}
       {photos.length > 0 && <p className="text-xs text-slate-500" data-testid="photos-size">Photos add about {totalKb} KB to this document.</p>}
       {message && <p className="text-sm text-red-600" data-testid="photos-message">{message}</p>}
