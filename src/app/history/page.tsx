@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
+import PageHeader from "@/components/PageHeader";
 
 type Client = {
   id: string;
@@ -58,13 +59,10 @@ export default function HistoryPage() {
   }
 
   return (
-    <AppShell title="History">
+    <AppShell title="Client history">
 
       <section className="max-w-4xl py-2 sm:py-4">
-        <h1 className="text-2xl font-bold tracking-tight">Client history</h1>
-        <p className="mt-1 text-sm text-slate-600 sm:text-base">
-          Pick a client to see every document attached to them.
-        </p>
+        <PageHeader title="Client history" subtitle="Pick a client to see every document attached to them." />
 
         <select
           className="mt-6 w-full max-w-md rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
