@@ -182,7 +182,7 @@ export default function DashboardPage() {
       </p>
 
       {recurringReady > 0 && (
-        <a href="/documents?q=draft" data-testid="recurring-ready" className="mb-6 flex items-center justify-between rounded-xl border border-teal-500/40 bg-teal-500/10 px-4 py-3 text-sm font-medium text-teal-200 transition hover:bg-teal-500/15">
+        <a href="/documents?q=draft" data-testid="recurring-ready" className="mb-6 flex items-center justify-between rounded-xl border border-teal-500/40 bg-teal-500/10 px-4 py-3 text-sm font-medium text-teal-700 dark:text-teal-200 transition hover:bg-teal-500/15">
           {recurringReady} recurring draft{recurringReady === 1 ? "" : "s"} ready for review
         </a>
       )}
