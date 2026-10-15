@@ -58,12 +58,12 @@ export default function PortalShare({ clientName, clientId = "", compact = false
       {link && (
         <div className="flex flex-wrap gap-2">
           <input aria-label="Portal link" readOnly value={link} onFocus={(event) => event.target.select()} className="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1 text-xs" />
-          <button type="button" onClick={copy} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium transition hover:border-teal-500">Copy link</button>
+          <button type="button" onClick={copy} className="rounded-lg border border-slate-300 max-sm:min-h-11 px-3 py-1.5 text-sm font-medium transition hover:border-teal-500">Copy link</button>
         </div>
       )}
       <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={busy || token === null} onClick={make} data-testid="portal-make" className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium transition hover:border-teal-500">{token ? "New link" : "Share portal link"}</button>
-        {token && <button type="button" disabled={busy} onClick={revoke} data-testid="portal-revoke" className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium transition hover:border-teal-500">Turn off link</button>}
+        <button type="button" disabled={busy || token === null} onClick={make} data-testid="portal-make" className="rounded-lg border border-slate-300 max-sm:min-h-11 px-3 py-1.5 text-sm font-medium transition hover:border-teal-500">{token ? "New link" : "Share portal link"}</button>
+        {token && <button type="button" disabled={busy} onClick={revoke} data-testid="portal-revoke" className="rounded-lg border border-slate-300 max-sm:min-h-11 px-3 py-1.5 text-sm font-medium transition hover:border-teal-500">Turn off link</button>}
       </div>
       {token === null && <p className="text-xs text-slate-500">Sign in and save to your account to share a portal link.</p>}
       {message && <p className="text-xs text-slate-500" data-testid="portal-message">{message}</p>}
