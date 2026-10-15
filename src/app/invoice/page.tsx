@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
 import { getTrialState } from "@/lib/trial";
 import { saveCrewJobs } from "@/lib/crew";
+import { documentTotals, discountLabel, normalizeDiscountType, type DiscountType } from "@/lib/discount";
 
 type LineItem = { description: string; qty: string; rate: string };
 type SavedClient = { id: string; name: string; company: string; email: string; phone: string; address: string };
@@ -101,6 +102,8 @@ export default function NewInvoicePage() {
   const [jobEnd, setJobEnd] = useState("");
   const [notes, setNotes] = useState("Payment is due within 14 days.");
   const [taxPercent, setTaxPercent] = useState("0");
+  const [discountType, setDiscountType] = useState<DiscountType>("percent");
+  const [discountValue, setDiscountValue] = useState("");
   const [items, setItems] = useState<LineItem[]>([{ ...emptyItem }]);
   const [businessName, setBusinessName] = useState("Your business");
   const [ownerName, setOwnerName] = useState("");
@@ -196,7 +199,7 @@ export default function NewInvoicePage() {
       const data = (doc.data || {}) as {
         clientName?: string; clientCompany?: string; clientEmail?: string; clientPhone?: string; clientAddress?: string;
         invoiceNumber?: string; invoiceDate?: string; dueDate?: string; jobStart?: string; jobEnd?: string; notes?: string;
-        taxPercent?: string; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
+        taxPercent?: string; discountType?: string; discountValue?: string; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
       };
       const kind: DocKind = doc.type === "proposal" ? "proposal" : "invoice";
       const loadedItems = Array.isArray(data.items) && data.items.length ? data.items : [{ ...emptyItem }];
@@ -216,6 +219,8 @@ export default function NewInvoicePage() {
       setJobEnd(data.jobEnd || "");
       setNotes(data.notes || (kind === "proposal" ? "This proposal is valid for 14 days." : "Payment is due within 14 days."));
       setTaxPercent(data.taxPercent || "0");
+      setDiscountType(normalizeDiscountType(data.discountType));
+      setDiscountValue(data.discountValue || "");
       setItems(loadedItems);
       setClientSearch(data.clientName || "");
       setStatus(data.status || "draft");
@@ -241,6 +246,11 @@ export default function NewInvoicePage() {
     return `${client.name} ${client.company} ${client.email}`.toLowerCase().includes(clientSearch.toLowerCase());
   });
   
+  const totals = useMemo(() => {
+    const subtotal = items.reduce((sum, item) => sum + (Number(item.qty) || 0) * (Number(item.rate) || 0), 0);
+    return documentTotals(subtotal, taxPercent, discountType, discountValue);
+  }, [items, taxPercent, discountType, discountValue]);
+
   function chooseKind(kind: DocKind) {
     if (locked) return;
     setDocKind(kind);
@@ -307,7 +317,7 @@ export default function NewInvoicePage() {
     setDocId(""); setClientSearch(""); setClientName(""); setClientCompany(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
     setInvoiceNumber(nextNumber(docKind)); setInvoiceDate(ymd(new Date())); setDueDate(plusDays(14)); setJobStart(""); setJobEnd("");
     setNotes(isProposal ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
-    setTaxPercent("0"); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
+    setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
     setStyle("clean"); setJobTime(""); setCosts(emptyCosts); setCrew([]); setOtherFees([]);
   }
 
@@ -326,7 +336,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
+      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -362,7 +372,7 @@ export default function NewInvoicePage() {
       data: {
         clientName, clientCompany, clientEmail, clientPhone, clientAddress,
         invoiceNumber: number, invoiceDate: ymd(new Date()), dueDate: plusDays(14),
-        jobStart, jobEnd, notes: "Payment is due within 14 days.", taxPercent, items,
+        jobStart, jobEnd, notes: "Payment is due within 14 days.", taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), items,
         status: "draft", style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew,
       },
     };
@@ -381,12 +391,6 @@ export default function NewInvoicePage() {
   function updateItem(index: number, field: keyof LineItem, value: string) {
     setItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
   }
-
-  const totals = useMemo(() => {
-    const subtotal = items.reduce((sum, item) => sum + (Number(item.qty) || 0) * (Number(item.rate) || 0), 0);
-    const tax = subtotal * ((Number(taxPercent) || 0) / 100);
-    return { subtotal, tax, total: subtotal + tax };
-  }, [items, taxPercent]);
 
   const jobMath = useMemo(() => {
     const otherTotal = otherFees.reduce((sum, fee) => sum + money(fee.amount), 0);
@@ -463,6 +467,14 @@ export default function NewInvoicePage() {
                   <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Rate" value={item.rate} onChange={(event) => updateItem(index, "rate", event.target.value)} />
                 </div>
               ))}
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm text-slate-600">Discount (taken off before tax)</p>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setDiscountType("percent")} className={`rounded-lg px-4 py-2 text-sm ${discountType === "percent" ? "bg-slate-900 text-white" : "border border-slate-300"}`}>%</button>
+                <button type="button" onClick={() => setDiscountType("amount")} className={`rounded-lg px-4 py-2 text-sm ${discountType === "amount" ? "bg-slate-900 text-white" : "border border-slate-300"}`}>$</button>
+                <input className="w-full rounded-lg border border-slate-300 px-3 py-2" inputMode="decimal" placeholder={discountType === "percent" ? "Discount percent, e.g. 10" : "Discount amount, e.g. 50"} value={discountValue} onChange={(event) => setDiscountValue(event.target.value)} />
+              </div>
             </div>
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Tax percent" value={taxPercent} onChange={(event) => setTaxPercent(event.target.value)} />
             <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
@@ -578,6 +590,7 @@ export default function NewInvoicePage() {
             </div>
             <div className="mt-6 space-y-1 border-t border-slate-500 pt-4 text-sm">
               <div className="flex justify-between"><span>Subtotal</span><span>${totals.subtotal.toFixed(2)}</span></div>
+              {totals.discount > 0 && <div className="flex justify-between"><span>{discountLabel(discountType, discountValue)}</span><span>-${totals.discount.toFixed(2)}</span></div>}
               <div className="flex justify-between"><span>Tax</span><span>${totals.tax.toFixed(2)}</span></div>
               <div className="flex justify-between text-base font-semibold"><span>Total</span><span>${totals.total.toFixed(2)}</span></div>
             </div>

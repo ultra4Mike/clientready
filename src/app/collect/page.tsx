@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { saveCloudDocument } from "@/lib/cloud-docs";
+import { documentTotals } from "@/lib/discount";
 
 type LineItem = {
   qty?: string;
@@ -19,6 +20,8 @@ type SavedDocument = {
     status?: string;
     dueDate?: string;
     taxPercent?: string;
+    discountType?: string;
+    discountValue?: string;
     items?: LineItem[];
     paymentMethod?: string;
     paymentDate?: string;
@@ -35,7 +38,7 @@ function invoiceTotal(doc: SavedDocument) {
   const subtotal = items.reduce((sum, item) => {
     return sum + (Number(item.qty) || 0) * (Number(item.rate) || 0);
   }, 0);
-  return subtotal + subtotal * ((Number(doc.data?.taxPercent) || 0) / 100);
+  return documentTotals(subtotal, doc.data?.taxPercent, doc.data?.discountType, doc.data?.discountValue).total;
 }
 
 function isOverdue(doc: SavedDocument) {

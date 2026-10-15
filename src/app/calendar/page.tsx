@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
+import { documentTotals } from "@/lib/discount";
 
 type LineItem = {
   description?: string;
@@ -19,6 +20,8 @@ type SavedDocument = {
     status?: string;
     outcome?: string;
     taxPercent?: string;
+    discountType?: string;
+    discountValue?: string;
     jobTime?: string;
     items?: LineItem[];
   };
@@ -55,7 +58,7 @@ function invoiceTotal(doc: SavedDocument) {
   const subtotal = items.reduce((sum, item) => {
     return sum + (Number(item.qty) || 0) * (Number(item.rate) || 0);
   }, 0);
-  return subtotal + subtotal * ((Number(doc.data?.taxPercent) || 0) / 100);
+  return documentTotals(subtotal, doc.data?.taxPercent, doc.data?.discountType, doc.data?.discountValue).total;
 }
 
 export default function CalendarPage() {

@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { loadAccountIntoCache } from "@/lib/account-cache";
+import { documentTotals } from "@/lib/discount";
 
 type Client = {
   id: string;
@@ -28,6 +29,8 @@ type SavedDocument = {
     dueDate?: string;
     invoiceDate?: string;
     taxPercent?: string;
+    discountType?: string;
+    discountValue?: string;
     items?: LineItem[];
   };
 };
@@ -37,7 +40,7 @@ function invoiceTotal(doc: SavedDocument) {
   const subtotal = items.reduce((sum, item) => {
     return sum + (Number(item.qty) || 0) * (Number(item.rate) || 0);
   }, 0);
-  return subtotal + subtotal * ((Number(doc.data?.taxPercent) || 0) / 100);
+  return documentTotals(subtotal, doc.data?.taxPercent, doc.data?.discountType, doc.data?.discountValue).total;
 }
 
 function monthKey(value: string) {

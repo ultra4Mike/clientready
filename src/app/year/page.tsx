@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
+import { documentTotals } from "@/lib/discount";
 
 type OtherFee = { id?: string; name?: string; amount?: string };
 
@@ -45,6 +46,8 @@ type SavedDocument = {
     paymentMethod?: string;
     paymentRef?: string;
     taxPercent?: string;
+    discountType?: string;
+    discountValue?: string;
     items?: { qty?: string; rate?: string }[];
     jobCosts?: JobCosts;
     crew?: CrewRow[];
@@ -85,7 +88,7 @@ function money(value: unknown) {
 function invoiceTotal(doc: SavedDocument) {
   const items = doc.data?.items || [];
   const subtotal = items.reduce((sum, item) => sum + money(item.qty) * money(item.rate), 0);
-  return subtotal + subtotal * (money(doc.data?.taxPercent) / 100);
+  return documentTotals(subtotal, doc.data?.taxPercent, doc.data?.discountType, doc.data?.discountValue).total;
 }
 
 function crewPay(row: CrewRow) {

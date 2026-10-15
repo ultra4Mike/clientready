@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
+import { documentTotals, discountLabel } from "@/lib/discount";
 
 type LineItem = {
   description: string;
@@ -29,6 +30,8 @@ export default function InvoiceViewPage() {
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const [taxPercent, setTaxPercent] = useState("0");
+  const [discountType, setDiscountType] = useState("percent");
+  const [discountValue, setDiscountValue] = useState("");
   const [items, setItems] = useState<LineItem[]>([]);
   const [status, setStatus] = useState("");
   const [businessName, setBusinessName] = useState("");
@@ -63,6 +66,8 @@ export default function InvoiceViewPage() {
       dueDate?: string;
       notes?: string;
       taxPercent?: string;
+      discountType?: string;
+      discountValue?: string;
       items?: LineItem[];
       status?: string;
       jobTime?: string;
@@ -78,6 +83,8 @@ export default function InvoiceViewPage() {
     setDueDate(data.dueDate || "");
     setNotes(data.notes || "");
     setTaxPercent(data.taxPercent || "0");
+    setDiscountType(data.discountType || "percent");
+    setDiscountValue(data.discountValue || "");
     setItems(data.items || []);
     setStatus(data.status || "draft");
     setJobTime(data.jobTime || "");
@@ -87,9 +94,8 @@ export default function InvoiceViewPage() {
     const subtotal = items.reduce((sum, item) => {
       return sum + (Number(item.qty) || 0) * (Number(item.rate) || 0);
     }, 0);
-    const tax = subtotal * ((Number(taxPercent) || 0) / 100);
-    return { subtotal, tax, total: subtotal + tax };
-  }, [items, taxPercent]);
+    return documentTotals(subtotal, taxPercent, discountType, discountValue);
+  }, [items, taxPercent, discountType, discountValue]);
 
   function editInvoice() {
     if (!docId) return;
@@ -184,6 +190,12 @@ export default function InvoiceViewPage() {
               <span>Subtotal</span>
               <span>${totals.subtotal.toFixed(2)}</span>
             </div>
+            {totals.discount > 0 && (
+              <div className="flex justify-between">
+                <span>{discountLabel(discountType, discountValue)}</span>
+                <span>-${totals.discount.toFixed(2)}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span>Tax</span>
               <span>${totals.tax.toFixed(2)}</span>
