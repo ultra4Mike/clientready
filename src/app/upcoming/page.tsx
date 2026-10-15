@@ -77,7 +77,7 @@ export default function UpcomingPage() {
   }
 
   return (
-    <AppShell title="Upcoming">
+    <AppShell title="This week">
 
       <section className="max-w-4xl py-2 sm:py-4">
         <PageHeader title="This week" subtitle="Scheduled jobs and invoices due in the next 7 days." actions={<a href="/calendar" className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm font-medium transition hover:border-teal-400">Calendar</a>} />
