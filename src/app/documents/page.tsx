@@ -280,7 +280,12 @@ export default function DocumentsPage() {
           >
             <button type="button" onClick={() => openDocument(doc)} className="col-span-2 min-w-0 text-left md:col-span-1">
               <p className="truncate text-base font-semibold md:text-sm">{doc.title || "Untitled"}</p>
-              <p className="text-xs capitalize text-[var(--cr-muted)]">{doc.type}</p>
+              <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-[var(--cr-muted)]">
+                <span className="capitalize">{doc.type}</span>
+                <span aria-hidden="true">·</span>
+                <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${({ draft: "border-slate-400/40 bg-slate-400/10", sent: "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300", approved: "border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300", scheduled: "border-teal-500/40 bg-teal-500/10 text-teal-700 dark:text-teal-300", invoiced: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300", paid: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" } as Record<string, string>)[stageOf(doc).stage] || "border-slate-400/40"}`}>{STAGE_LABEL[stageOf(doc).stage]}</span>
+                {NEXT_LABEL[stageOf(doc).next] ? <span className="text-teal-700 dark:text-teal-300">Next: {NEXT_LABEL[stageOf(doc).next]}</span> : null}
+              </p>
               <ApprovalBadge approval={readApproval(doc.data?.approval)} className="mt-1" />
             </button>
             <div className="min-w-0 text-sm">
@@ -294,16 +299,16 @@ export default function DocumentsPage() {
               {(factsById.get(doc.id)?.owed || 0) > 0 && doc.data?.status !== "draft" ? <p className="text-xs text-amber-600 dark:text-amber-300">${(factsById.get(doc.id)?.owed || 0).toFixed(2)} owed</p> : null}
             </div>
             <div className="tap-row col-span-2 flex justify-end gap-2 border-t border-teal-500/10 pt-3 md:col-span-1 md:border-0 md:pt-0">
-              <button type="button" onClick={() => openDocument(doc)} className="rounded-lg bg-teal-500 px-3 py-1.5 text-sm font-semibold text-slate-950! transition hover:bg-teal-400">
+              <button type="button" onClick={() => openDocument(doc)} className="rounded-lg bg-teal-500 px-3 py-1.5 text-sm font-semibold text-slate-950! transition hover:bg-teal-400 max-md:min-h-11 max-md:flex-1">
                 Open
               </button>
-              <button type="button" onClick={() => duplicateDocument(doc)} className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400">
+              <button type="button" onClick={() => duplicateDocument(doc)} className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400 max-md:min-h-11 max-md:flex-1">
                 Duplicate
               </button>
               <button
                 type="button"
                 onClick={() => removeDocument(doc.id)}
-                className="rounded-lg px-2 py-1.5 text-sm text-[var(--cr-muted)] transition hover:bg-red-500/10 hover:text-red-500"
+                className="rounded-lg border border-rose-500/40 px-2.5 py-1.5 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10 max-md:min-h-11 dark:text-rose-300"
               >
                 Remove
               </button>
