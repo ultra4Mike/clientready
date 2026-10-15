@@ -63,6 +63,8 @@ export default function InvoiceViewPage() {
   const [paymentLink, setPaymentLink] = useState("");
   const [message, setMessage] = useState("");
   const [approval, setApproval] = useState<Approval | null>(null);
+  // "loading" until storage is read; "empty" when no invoice id is given or it isn't found.
+  const [viewState, setViewState] = useState<"loading" | "ready" | "empty">("loading");
 
   useEffect(() => {
     const profileRaw = window.localStorage.getItem("clientready-profile");
@@ -75,9 +77,9 @@ export default function InvoiceViewPage() {
 
     const openId = new URLSearchParams(window.location.search).get("id") || window.localStorage.getItem("clientready-open-document");
     const docsRaw = window.localStorage.getItem("clientready-documents");
-    if (!openId || !docsRaw) return;
-    const docs = JSON.parse(docsRaw) as SavedDocument[];
+    const docs = openId && docsRaw ? (JSON.parse(docsRaw) as SavedDocument[]) : [];
     const doc = docs.find((item) => item.id === openId && item.type === "invoice");
+    setViewState(doc ? "ready" : "empty");
     if (!doc) return;
     const data = (doc.data || {}) as {
       invoiceNumber?: string;
@@ -164,6 +166,24 @@ export default function InvoiceViewPage() {
       setMessage(paymentLink);
     }
     setTimeout(() => setMessage(""), 2000);
+  }
+
+  if (viewState !== "ready") {
+    return (
+      <AppShell title="Invoice">
+        <div data-testid="invoice-view-empty" data-state={viewState} className="mx-auto max-w-3xl py-12 text-center">
+          {viewState === "loading" ? (
+            <p className="text-sm text-[var(--cr-muted)]">Loading…</p>
+          ) : (
+            <>
+              <p className="text-base font-semibold">No invoice selected</p>
+              <p className="mt-1 text-sm text-[var(--cr-muted)]">Open an invoice from your documents to view or print it.</p>
+              <a href="/documents" className="mt-4 inline-block rounded-lg border border-teal-500/30 px-4 py-2 text-sm font-medium">Go to Documents</a>
+            </>
+          )}
+        </div>
+      </AppShell>
+    );
   }
 
   return (
