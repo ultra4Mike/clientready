@@ -7,13 +7,15 @@ type Props = {
   value: Schedule | null;
   workers: Worker[];
   defaults?: { date?: string; startTime?: string };
-  onSave: (schedule: Schedule | null, options?: { keepOpen?: boolean }) => void;
+  onSave: (schedule: Schedule | null, options?: { keepOpen?: boolean; confirmed?: string[] }) => void;
+  /** Called before people are removed; return false to keep them (e.g. they have hours logged). */
+  confirmRemove?: (removedIds: string[]) => boolean;
   onCancel?: () => void;
   saveLabel?: string;
 };
 
 /** Date, start/end time, assigned workers and status for one job. */
-export default function ScheduleEditor({ value, workers, defaults, onSave, onCancel, saveLabel = "Save schedule" }: Props) {
+export default function ScheduleEditor({ value, workers, defaults, onSave, onCancel, confirmRemove, saveLabel = "Save schedule" }: Props) {
   const [date, setDate] = useState(value?.date || defaults?.date || "");
   const [startTime, setStartTime] = useState(value?.startTime || defaults?.startTime || "");
   const [endTime, setEndTime] = useState(value?.endTime || "");
@@ -38,8 +40,10 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
       seen.add(`id:${id}`);
       return true;
     });
+    const removed = workerIds.filter((id) => !next.includes(id));
+    if (removed.length && confirmRemove && !confirmRemove(removed)) return;
     setWorkerIds(next);
-    if (value) onSave({ ...value, workerIds: next }, { keepOpen: true });
+    if (value) onSave({ ...value, workerIds: next }, { keepOpen: true, confirmed: removed });
   }
 
   function save() {

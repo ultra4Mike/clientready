@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import ScheduleEditor from "@/components/ScheduleEditor";
 import { uniqueDocs } from "@/lib/change-orders";
-import { moveSchedule, readSchedule, readWorkers, saveSchedule, STATUS_CLASS, STATUS_LABEL, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
+import { confirmRemovalFor, moveSchedule, readSchedule, readWorkers, saveSchedule, STATUS_CLASS, STATUS_LABEL, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
 
 type SavedDocument = {
   id: string;
@@ -71,9 +71,9 @@ export default function CalendarPage() {
   });
   const unscheduled = jobDocs.filter((doc) => !readSchedule(doc.data) && text(doc.data?.status) !== "paid");
 
-  async function save(docId: string, schedule: Schedule | null, options?: { keepOpen?: boolean }) {
+  async function save(docId: string, schedule: Schedule | null, options?: { keepOpen?: boolean; confirmed?: string[] }) {
     try {
-      await saveSchedule(docId, schedule);
+      await saveSchedule(docId, schedule, options?.confirmed);
       setState((prev) => ({ ...prev, docs: readDocs() }));
       setMessage(schedule ? "Schedule saved" : "Job unscheduled");
     } catch {
@@ -189,6 +189,7 @@ export default function CalendarPage() {
               workers={workers}
               defaults={{ date: editing.date, startTime: editing.startTime }}
               onSave={(schedule, options) => save(editing.docId, schedule, options)}
+              confirmRemove={(ids) => confirmRemovalFor(editing.docId, ids)}
               onCancel={() => setEditing(null)}
             />
           </div>

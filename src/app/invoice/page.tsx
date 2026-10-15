@@ -15,7 +15,7 @@ import { appendChangeOrderNote, changeOrderData, changeOrdersFor, mergeChangeOrd
 import ChangeOrderNotes from "@/components/ChangeOrderNotes";
 import { ApprovalBadge, ApprovalShare } from "@/components/Approval";
 import ScheduleEditor from "@/components/ScheduleEditor";
-import { crewForWorkers, crewIds, dedupeWorkerIds, readSchedule, readWorkers, saveAssignment, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
+import { confirmRemoval, crewForWorkers, crewIds, workLogged, clockHoursFor, dedupeWorkerIds, readSchedule, readWorkers, saveAssignment, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
 import { readApproval, refreshApproval, type Approval } from "@/lib/approval";
 import { generateNextNow, readRecurring, readRecurringFrom, scheduleFromForm, type Frequency, type RecurringFrom } from "@/lib/recurring";
 import PayQr from "@/components/PayQr";
@@ -377,10 +377,10 @@ export default function NewInvoicePage() {
   }
 
   /** Crew/pay section changed who is on the job: save it as the job's assignment (schedule.workerIds). */
-  async function shareAssignment(nextCrew: CrewRow[]) {
+  async function shareAssignment(nextCrew: CrewRow[], confirmed: string[] = []) {
     if (!docId) return;
     try {
-      const saved = await saveAssignment(docId, dedupeWorkerIds(crewIds(nextCrew)));
+      const saved = await saveAssignment(docId, dedupeWorkerIds(crewIds(nextCrew)), confirmed);
       if (saved?.data?.schedule) {
         setSchedule(readSchedule(saved.data));
         setScheduleKey((key) => key + 1);
@@ -391,10 +391,14 @@ export default function NewInvoicePage() {
   }
 
   function removeCrewRow(id: string) {
+    const row = crew.find((item) => item.id === id);
+    if (!row) return;
+    // Hours typed in this form count too, not just what is saved.
+    if (!confirmRemoval(workLogged([row], [row.employeeId], crew.some((item) => item.id !== id && item.employeeId === row.employeeId) ? {} : clockHoursFor(docId)))) return;
     if (!allowCrewChange()) return;
     const nextCrew = crew.filter((item) => item.id !== id);
     setCrew(nextCrew);
-    void shareAssignment(nextCrew);
+    void shareAssignment(nextCrew, [row.employeeId]);
   }
 
   function updateCrew(id: string, patch: Partial<CrewRow>) {
@@ -468,9 +472,9 @@ export default function NewInvoicePage() {
     setSaveMessage(isProposal ? "Proposal saved" : "Invoice saved");
   }
 
-  async function saveJobSchedule(next: Schedule | null, options?: { keepOpen?: boolean }) {
+  async function saveJobSchedule(next: Schedule | null, options?: { keepOpen?: boolean; confirmed?: string[] }) {
     try {
-      const saved = await saveSchedule(docId, next);
+      const saved = await saveSchedule(docId, next, options?.confirmed);
       const savedSchedule = saved ? readSchedule(saved.data) : null;
       setSchedule(savedSchedule);
       // Same people in the crew/pay section: add empty rows for new people, drop removed ones,
@@ -774,7 +778,7 @@ export default function NewInvoicePage() {
                 {schedule && <span className="text-xs" data-testid="schedule-summary">{schedule.date}{schedule.startTime ? ` ${schedule.startTime}` : ""}{schedule.endTime ? `–${schedule.endTime}` : ""} · {STATUS_LABEL[schedule.status]}</span>}
               </div>
               {docId && !locked
-                ? <ScheduleEditor key={scheduleKey} value={schedule} workers={workers} onSave={saveJobSchedule} />
+                ? <ScheduleEditor key={scheduleKey} value={schedule} workers={workers} onSave={saveJobSchedule} confirmRemove={(ids) => confirmRemoval(workLogged(crew, ids, clockHoursFor(docId)))} />
                 : <p className="text-xs text-slate-500">Save the document first, then schedule the job here or on the Calendar.</p>}
             </div>
             {docId && !locked && <ApprovalShare docId={docId} approval={approval} onChange={setApproval} />}

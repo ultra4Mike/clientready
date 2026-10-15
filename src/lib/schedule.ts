@@ -147,6 +147,70 @@ export function crewForWorkers(crew: CrewRow[], workerIds: string[], schedule: P
   return [...kept, ...added];
 }
 
+/** Hours or pay already recorded for these people on this job (crew rows, plus clock entries). */
+export function workLogged(crew: CrewRow[], ids: string[], clockHours: Record<string, number> = {}, people: Worker[] = allEmployees()) {
+  const names = new Map(people.map((person) => [person.id, person.name]));
+  return ids.map((id) => {
+    const rows = crew.filter((row) => row.employeeId === id);
+    const hours = rows.reduce((sum, row) => sum + (Number(row.hours) || 0), 0);
+    const bonus = rows.reduce((sum, row) => sum + (Number(String(row.bonus).replace(/[^0-9.-]/g, "")) || 0), 0);
+    const paid = rows.some((row) => row.paidToWorker);
+    const clocked = clockHours[id] || 0;
+    return { id, name: names.get(id) || rows[0]?.name || "This worker", hours, bonus, paid, clocked };
+  }).filter((item) => item.hours > 0 || item.bonus > 0 || item.paid || item.clocked > 0);
+}
+
+/**
+ * Asks before removing people who already have hours/pay on the job. Returns true to go ahead.
+ * Names each person and their hours; Cancel keeps everything.
+ */
+export function confirmRemoval(logged: ReturnType<typeof workLogged>) {
+  if (!logged.length) return true;
+  const lines = logged.map((item) => {
+    const parts = [];
+    if (item.hours > 0) parts.push(`${item.hours} hour${item.hours === 1 ? "" : "s"} logged`);
+    if (item.clocked > 0) parts.push(`${item.clocked.toFixed(2)} hours clocked`);
+    if (item.bonus > 0) parts.push(`$${item.bonus.toFixed(2)} extra pay`);
+    if (item.paid) parts.push("marked paid to worker");
+    return `${item.name}: ${parts.join(", ")}`;
+  });
+  return window.confirm(`Remove from this job?\n\n${lines.join("\n")}\n\nTheir hours and pay row on this job will be deleted. Cancel keeps everything.`);
+}
+
+/** Confirm step for a stored job (calendar, Schedule section). */
+export function confirmRemovalFor(docId: string, removedIds: string[]) {
+  const doc = readDocs().find((item) => item.id === docId);
+  const crew = (Array.isArray(doc?.data?.crew) ? doc?.data?.crew : []) as CrewRow[];
+  return confirmRemoval(workLogged(crew, removedIds, clockHoursFor(docId)));
+}
+
+/** Clocked hours per worker on a job, from the owner's cached clock entries. */
+export function clockHoursFor(docId: string): Record<string, number> {
+  try {
+    const raw = window.localStorage.getItem("clientready-clock-entries");
+    const entries = raw ? (JSON.parse(raw) as { doc_id: string; employee_id: string; started_at: string; ended_at?: string | null }[]) : [];
+    const out: Record<string, number> = {};
+    for (const entry of entries) {
+      if (entry.doc_id !== docId || !entry.started_at) continue;
+      const end = entry.ended_at ? Date.parse(entry.ended_at) : Date.now();
+      out[entry.employee_id] = (out[entry.employee_id] || 0) + Math.max(0, end - Date.parse(entry.started_at)) / 3600000;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export class UnconfirmedRemovalError extends Error {}
+
+/** Refuses to drop crew rows that hold hours/pay unless that person's removal was confirmed. */
+function guardDroppedRows(before: CrewRow[], after: CrewRow[], confirmed: string[] = []) {
+  const keptIds = new Set(after.map((row) => row.id));
+  const dropped = before.filter((row) => !keptIds.has(row.id) && !confirmed.includes(row.employeeId));
+  const risky = workLogged(dropped, [...new Set(dropped.map((row) => row.employeeId))]);
+  if (risky.length) throw new UnconfirmedRemovalError(`Removing ${risky.map((item) => item.name).join(", ")} would delete logged hours`);
+}
+
 /** Money snapshot without the crew rows (which assignment may add/remove), so other money can't move. */
 function moneyExceptCrew(data: Record<string, unknown> | undefined) {
   return moneySnapshot({ ...(data || {}), crew: undefined });
@@ -179,7 +243,7 @@ export function readWorkers(): Worker[] {
  * Unscheduling keeps the crew rows. Throws if any other money, status or payment field would
  * change, or if a kept crew row would change.
  */
-export function applySchedule<T extends CloudDoc>(docs: T[], docId: string, schedule: Schedule | null) {
+export function applySchedule<T extends CloudDoc>(docs: T[], docId: string, schedule: Schedule | null, confirmed: string[] = []) {
   const index = docs.findIndex((doc) => doc.id === docId);
   if (index < 0) return null;
   const doc = docs[index];
@@ -194,6 +258,7 @@ export function applySchedule<T extends CloudDoc>(docs: T[], docId: string, sche
     delete data.schedule;
   }
   const updated = { ...doc, data } as T;
+  guardDroppedRows(crew, (updated.data.crew || []) as CrewRow[], confirmed);
   if (moneyExceptCrew(updated.data) !== before) throw new Error("Schedule change would touch money fields");
   const keptBefore = new Map(crew.map((row) => [row.id, JSON.stringify(row)]));
   for (const row of (updated.data.crew || []) as CrewRow[]) {
@@ -209,15 +274,16 @@ export function applySchedule<T extends CloudDoc>(docs: T[], docId: string, sche
  * Assign people to a job from either place (schedule chips or the crew/pay section).
  * Scheduled jobs go through saveSchedule; unscheduled ones only update the crew rows.
  */
-export async function saveAssignment(docId: string, workerIds: string[]) {
+export async function saveAssignment(docId: string, workerIds: string[], confirmed: string[] = []) {
   const doc = readDocs().find((item) => item.id === docId);
   if (!doc) return null;
   const current = (doc.data?.schedule ? readSchedule(doc.data) : null);
-  if (current) return saveSchedule(docId, { ...current, workerIds });
+  if (current) return saveSchedule(docId, { ...current, workerIds }, confirmed);
   const before = moneyExceptCrew(doc.data);
   const ids = dedupeWorkerIds(workerIds);
   const crew = (Array.isArray(doc.data?.crew) ? doc.data.crew : []) as CrewRow[];
   const next: CloudDoc = { ...doc, data: { ...(doc.data || {}), crew: crewForWorkers(crew, ids, null) } };
+  guardDroppedRows(crew, next.data.crew as CrewRow[], confirmed);
   if (moneyExceptCrew(next.data) !== before) throw new Error("Assignment would touch money fields");
   window.localStorage.setItem(DOCS_KEY, JSON.stringify(readDocs().map((item) => (item.id === docId ? next : item))));
   const cloudId = await saveCloudDocument(next);
@@ -243,8 +309,8 @@ async function syncCrewPayRows(doc: CloudDoc) {
   }, (Array.isArray(data.crew) ? data.crew : []) as CrewRow[]);
 }
 
-export async function saveSchedule(docId: string, schedule: Schedule | null) {
-  const applied = applySchedule(readDocs(), docId, schedule);
+export async function saveSchedule(docId: string, schedule: Schedule | null, confirmed: string[] = []) {
+  const applied = applySchedule(readDocs(), docId, schedule, confirmed);
   if (!applied) return null;
   window.localStorage.setItem(DOCS_KEY, JSON.stringify(applied.docs));
   const cloudId = await saveCloudDocument(applied.doc);
