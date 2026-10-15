@@ -48,7 +48,7 @@ export default function DraftsPage() {
     <AppShell title="Crew drafts">
       <p className="text-sm leading-6 text-[var(--cr-muted)] sm:text-base">Jobs the crew sent in. Open one, set the price, and save the invoice.</p>
       <div className="mt-6 space-y-3">
-        {drafts.length === 0 && <p className="rounded-2xl border border-dashed border-teal-500/30 p-8 text-center text-sm text-[var(--cr-muted)]">No crew jobs yet.</p>}
+        {drafts.length === 0 && <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-teal-500/30 bg-[var(--cr-card)] px-6 py-12 text-center"><span className="flex h-12 w-12 items-center justify-center rounded-full bg-teal-500/15 text-xl">🧰</span><p className="text-base font-semibold">No crew jobs yet.</p><p className="max-w-sm text-sm text-[var(--cr-muted)]">When your crew sends a job report from their phone, it shows up here ready to price.</p></div>}
         {drafts.map((draft) => (
           <div key={draft.id} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
             <p className="text-base font-semibold">{draft.client_name} · {draft.worker_name}</p>
@@ -60,7 +60,7 @@ export default function DraftsPage() {
             <p className="mt-1 text-sm text-[var(--cr-muted)]">
               Parts ${draft.parts_cost || "0"} · Collected ${draft.collected_amount || "0"} {draft.collected_method || ""}
             </p>
-            <button type="button" onClick={() => openAsInvoice(draft)} className="mt-4 w-full rounded-lg bg-teal-400 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300 sm:w-auto">Open as invoice</button>
+            <button type="button" onClick={() => openAsInvoice(draft)} className="mt-4 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 sm:w-auto">Open as invoice</button>
           </div>
         ))}
       </div>
