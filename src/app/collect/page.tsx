@@ -191,7 +191,7 @@ export default function CollectPage() {
           : "Confirmation or note";
 
   return (
-    <AppShell title="Collect">
+    <AppShell title="Get paid">
       <PageHeader title="Get paid" subtitle="Unpaid invoices and overdue amounts, with the next step on each one." actions={<a href="/invoice" className="rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">New invoice +</a>} />
 
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
