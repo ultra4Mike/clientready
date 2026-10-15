@@ -7,6 +7,8 @@ import AppShell from "@/components/AppShell";
 import { getTrialState } from "@/lib/trial";
 import { saveCrewJobs } from "@/lib/crew";
 import { balanceDue, paidTotal, paymentFields, paymentMethods, readPayments, type Payment } from "@/lib/payments";
+import PayQr from "@/components/PayQr";
+import { payUrlFor } from "@/lib/pay-link";
 import SignaturePad, { SignatureBlock } from "@/components/SignaturePad";
 import { readSignature, type Signature } from "@/lib/signature";
 import { amountOf, documentTotals, discountLabel, normalizeDiscountType, type DiscountType } from "@/lib/discount";
@@ -111,6 +113,7 @@ export default function NewInvoicePage() {
   const [signature, setSignature] = useState<Signature | null>(null);
   const [proposalSignature, setProposalSignature] = useState<Signature | null>(null);
   const [padKey, setPadKey] = useState(0);
+  const [docPayLink, setDocPayLink] = useState("");
   const [items, setItems] = useState<LineItem[]>([{ ...emptyItem }]);
   const [businessName, setBusinessName] = useState("Your business");
   const [ownerName, setOwnerName] = useState("");
@@ -206,7 +209,7 @@ export default function NewInvoicePage() {
       const data = (doc.data || {}) as {
         clientName?: string; clientCompany?: string; clientEmail?: string; clientPhone?: string; clientAddress?: string;
         invoiceNumber?: string; invoiceDate?: string; dueDate?: string; jobStart?: string; jobEnd?: string; notes?: string;
-        taxPercent?: string; discountType?: string; discountValue?: string; signature?: unknown; proposalSignature?: unknown; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
+        taxPercent?: string; discountType?: string; discountValue?: string; signature?: unknown; proposalSignature?: unknown; payLink?: string; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
       };
       const kind: DocKind = doc.type === "proposal" ? "proposal" : "invoice";
       const loadedItems = Array.isArray(data.items) && data.items.length ? data.items : [{ ...emptyItem }];
@@ -232,6 +235,8 @@ export default function NewInvoicePage() {
       setSignature(readSignature(data.signature));
       setProposalSignature(readSignature(data.proposalSignature));
       setPadKey((key) => key + 1);
+      setDocPayLink(data.payLink || "");
+      setDocPayLink(data.payLink || "");
       setItems(loadedItems);
       setClientSearch(data.clientName || "");
       setStatus(data.status || "draft");
@@ -337,7 +342,7 @@ export default function NewInvoicePage() {
     setDocId(""); setClientSearch(""); setClientName(""); setClientCompany(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
     setInvoiceNumber(nextNumber(docKind)); setInvoiceDate(ymd(new Date())); setDueDate(plusDays(14)); setJobStart(""); setJobEnd("");
     setNotes(isProposal ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
-    setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setSignature(null); setProposalSignature(null); setPadKey((key) => key + 1); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
+    setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setSignature(null); setProposalSignature(null); setPadKey((key) => key + 1); setDocPayLink(""); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
     setStyle("clean"); setJobTime(""); setCosts(emptyCosts); setCrew([]); setOtherFees([]);
   }
 
@@ -356,7 +361,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature, proposalSignature, items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
+      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature, proposalSignature, payLink: docPayLink, items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -392,7 +397,7 @@ export default function NewInvoicePage() {
       data: {
         clientName, clientCompany, clientEmail, clientPhone, clientAddress,
         invoiceNumber: number, invoiceDate: ymd(new Date()), dueDate: plusDays(14),
-        jobStart, jobEnd, notes: "Payment is due within 14 days.", taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature: null, proposalSignature: signature, items,
+        jobStart, jobEnd, notes: "Payment is due within 14 days.", taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature: null, proposalSignature: signature, payLink: docPayLink, items,
         status: "draft", style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew,
       },
     };
@@ -419,6 +424,8 @@ export default function NewInvoicePage() {
     const setAside = leftOver > 0 ? leftOver * ((Number(setAsidePercent) || 0) / 100) : 0;
     return { jobCost, leftOver, setAside, yours: leftOver - setAside };
   }, [costs, otherFees, totals.total, setAsidePercent]);
+
+  const payUrl = payUrlFor(docPayLink, paymentLink);
 
   const previewClass = style === "bold" ? "rounded-2xl border border-slate-900 bg-slate-900 p-8 text-white shadow-sm" : "rounded-2xl border border-slate-200 bg-white p-8 text-slate-900 shadow-sm";
   const mutedClass = style === "bold" ? "text-slate-300" : "text-slate-600";
@@ -516,6 +523,15 @@ export default function NewInvoicePage() {
                 <p className="text-right"><span className="block text-sm text-slate-600">Still owed</span><span data-testid="still-owed" className="text-2xl font-bold">${totals.balance.toFixed(2)}</span></p>
               </div>
             </div>
+            {!isProposal && (
+              <label className="block text-sm text-slate-600">
+                Pay link for this invoice (optional)
+                <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="https://… (uses your profile pay link if blank)" value={docPayLink} onChange={(event) => setDocPayLink(event.target.value)} />
+                <span className="mt-1 block text-xs text-slate-500" data-testid="pay-qr-note">
+                  {payUrl ? `"Scan to pay" QR will link to ${payUrl}` : docPayLink.trim() ? "Not a web link (must start with http:// or https://), so no QR code is shown." : "No web pay link yet, so no QR code is shown. Add one here or in Profile."}
+                </span>
+              </label>
+            )}
             <SignaturePad key={padKey} value={signature} onChange={setSignature} defaultName={clientName} />
             <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
             <div className="owner-costs space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-slate-900">
@@ -638,6 +654,7 @@ export default function NewInvoicePage() {
             </div>
             <p className={`mt-8 text-sm ${mutedClass}`}>{notes}</p>
             {!isProposal && paymentLink && <p className={`mt-4 text-sm ${mutedClass}`}>Pay here: {paymentLink}</p>}
+            {!isProposal && <PayQr url={payUrl} />}
             {!isProposal && <SignatureBlock signature={proposalSignature} label="Proposal accepted" muted={mutedClass} onDark={style === "bold"} />}
             <SignatureBlock signature={signature} label={isProposal ? "Customer acceptance" : "Customer signature"} muted={mutedClass} onDark={style === "bold"} />
           </div>
