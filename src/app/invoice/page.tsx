@@ -11,6 +11,7 @@ import { JobPhotosEditor, JobPhotoStrip } from "@/components/JobPhotos";
 import { currentDocId } from "@/lib/doc-sync";
 import { isQuotaError, readPhotos, type JobPhoto } from "@/lib/photos";
 import LineSplit from "@/components/LineSplit";
+import ReminderPanel from "@/components/ReminderPanel";
 import { normalizeCategory, type LineCategory } from "@/lib/line-split";
 import { appendChangeOrderNote, changeOrderData, changeOrdersFor, mergeChangeOrderNotes, readChangeOrderNotes, readChangeOrderOf, type ChangeOrderNote, type ChangeOrderOf } from "@/lib/change-orders";
 import ChangeOrderNotes from "@/components/ChangeOrderNotes";
@@ -170,6 +171,7 @@ export default function NewInvoicePage() {
   const [items, setItems] = useState<LineItem[]>([{ ...emptyItem }]);
   const [businessName, setBusinessName] = useState("Your business");
   const [ownerName, setOwnerName] = useState("");
+  const [reminderOpen, setReminderOpen] = useState(false);
   const [businessEmail, setBusinessEmail] = useState("");
   const [businessPhone, setBusinessPhone] = useState("");
   const [savedClients, setSavedClients] = useState<SavedClient[]>([]);
@@ -915,7 +917,18 @@ export default function NewInvoicePage() {
           <div className="print-hide mb-4 flex flex-wrap gap-2 sm:gap-3">
             <button type="button" onClick={() => window.print()} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Print / Save PDF</button>
             {!locked && !isProposal && status !== "paid" && <button type="button" onClick={copyPayLink} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">{paymentLink.trim() ? "Pay / Copy pay link" : "Add how to pay"}</button>}
+            {!isProposal && docId && status !== "draft" && status !== "paid" && totals.balance > 0 && <button type="button" data-testid="invoice-reminder" onClick={() => setReminderOpen((open) => !open)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Reminder</button>}
           </div>
+          {reminderOpen && !isProposal && totals.balance > 0 && (
+            <div className="print-hide mb-4">
+              <ReminderPanel
+                input={{ clientName, invoiceNumber, owed: totals.balance, dueDate, payUrl: payUrlFor(docPayLink, paymentLink), businessName: businessName === "Your business" ? "" : businessName, ownerName, today: ymd(new Date()) }}
+                phone={clientPhone}
+                email={clientEmail}
+                onClose={() => setReminderOpen(false)}
+              />
+            </div>
+          )}
           <div id="preview" className={previewClass}>
             <div className="flex items-start justify-between gap-4">
               <div className={`min-w-0 text-sm ${mutedClass}`}>

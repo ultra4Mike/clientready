@@ -7,6 +7,8 @@ import { amountOf, documentTotals } from "@/lib/discount";
 import { balanceDue, paidTotal, paymentFields, paymentMethods, readPayments } from "@/lib/payments";
 import { uniqueDocs } from "@/lib/change-orders";
 import { isPendingRecurringDraft } from "@/lib/recurring";
+import ReminderPanel from "@/components/ReminderPanel";
+import { payUrlFor } from "@/lib/pay-link";
 
 type LineItem = {
   qty?: string;
@@ -75,10 +77,17 @@ export default function CollectPage() {
   const [paidDate, setPaidDate] = useState(today());
   const [amount, setAmount] = useState("");
   const [paymentRef, setPaymentRef] = useState("");
+  const [reminderId, setReminderId] = useState("");
+  const [profile, setProfile] = useState<{ businessName?: string; ownerName?: string; paymentLink?: string }>({});
 
   useEffect(() => {
     const raw = window.localStorage.getItem("clientready-documents");
     if (raw) setDocuments(uniqueDocs(JSON.parse(raw)));
+    try {
+      setProfile(JSON.parse(window.localStorage.getItem("clientready-profile") || "{}"));
+    } catch {
+      setProfile({});
+    }
   }, []);
 
   function saveDocs(next: SavedDocument[]) {
@@ -229,18 +238,39 @@ export default function CollectPage() {
                   </p>
                 )}
               </div>
-              <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                 <button type="button" onClick={() => openInvoice(doc.id)} className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm font-medium transition hover:border-teal-400">
                   Open
                 </button>
                 <button type="button" onClick={() => setStatus(doc.id, "sent")} className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm font-medium transition hover:border-teal-400">
                   Mark sent
                 </button>
+                <button type="button" data-testid={`reminder-${doc.id}`} onClick={() => setReminderId(reminderId === doc.id ? "" : doc.id)} className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm font-medium transition hover:border-teal-400">
+                  Reminder
+                </button>
                 <button type="button" onClick={() => startPaid(doc)} className="rounded-lg bg-teal-400 px-3 py-2 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300">
                   Record payment
                 </button>
               </div>
             </div>
+
+            {reminderId === doc.id && (
+              <ReminderPanel
+                input={{
+                  clientName: doc.clientName || String(doc.data?.clientName || ""),
+                  invoiceNumber: String(doc.data?.invoiceNumber || doc.title || ""),
+                  owed: balance(doc),
+                  dueDate: String(doc.data?.dueDate || ""),
+                  payUrl: payUrlFor(doc.data?.payLink, profile.paymentLink),
+                  businessName: profile.businessName || "",
+                  ownerName: profile.ownerName || "",
+                  today: today(),
+                }}
+                phone={String(doc.data?.clientPhone || "")}
+                email={String(doc.data?.clientEmail || "")}
+                onClose={() => setReminderId("")}
+              />
+            )}
 
             {payingId === doc.id && (
               <div className="mt-4 grid gap-3 border-t border-teal-500/20 pt-4 sm:grid-cols-2">
