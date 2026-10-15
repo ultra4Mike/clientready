@@ -5,6 +5,7 @@ import { loadAccountIntoCache } from "@/lib/account-cache";
 import { uniqueDocs } from "@/lib/change-orders";
 import { localYmd, niceYmd, scheduledJobs, timeLabel, type ScheduledJob } from "@/lib/scheduled-jobs";
 import { STATUS_LABEL } from "@/lib/schedule";
+import PageHeader from "@/components/PageHeader";
 
 type Client = {
   id: string;
@@ -85,7 +86,8 @@ export default function SchedulePage() {
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-6xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-2 lg:gap-8">
+      <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6 sm:pt-8"><PageHeader title="Schedule" subtitle="Book jobs for your clients and see what's on the books." /></div>
+      <section className="mx-auto grid max-w-6xl gap-6 px-4 pb-6 sm:px-6 sm:pb-8 lg:grid-cols-2 lg:gap-8">
         <form
           onSubmit={handleSubmit}
           className="h-fit space-y-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-6 lg:sticky lg:top-20"
