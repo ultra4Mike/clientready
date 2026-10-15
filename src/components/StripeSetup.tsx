@@ -66,6 +66,11 @@ export default function StripeSetup() {
           ? "Customers see “Pay by card” on shared invoices. Paid amounts are added to the invoice's payments; the status is never changed for you."
           : "Optional. When set up, customers can pay what they owe by card from a shared invoice or client portal. Nothing is needed from you now."}
       </p>
+      <details className="group/dev rounded-lg border border-teal-500/15">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3 text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)] [&::-webkit-details-marker]:hidden">
+          Developer setup<span aria-hidden="true" className="text-base transition group-open/dev:rotate-90">›</span>
+        </summary>
+        <div className="space-y-3 border-t border-teal-500/15 p-3 [&_code]:break-all">
       {rows.length > 0 && (
         <ul className="space-y-1 text-xs" data-testid="stripe-checks">
           {rows.map(([name, ok, label]) => (
@@ -83,10 +88,12 @@ export default function StripeSetup() {
           <li>On your host (e.g. Vercel → Settings → Environment Variables) set <code>STRIPE_SECRET_KEY</code>, <code>STRIPE_WEBHOOK_SECRET</code> and <code>SUPABASE_SERVICE_ROLE_KEY</code>, then redeploy. Never paste keys into this app.</li>
         </ol>
       )}
-      <div className="flex flex-wrap items-center gap-2">
-        <input aria-label="Stripe webhook URL" readOnly value={webhookUrl} onFocus={(event) => event.target.select()} className="min-w-0 flex-1 rounded border border-teal-500/30 bg-transparent px-2 py-1 text-xs" />
-        <button type="button" onClick={() => copy(webhookUrl, "Webhook URL")} className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-xs font-medium transition hover:border-teal-500">Copy webhook URL</button>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <input aria-label="Stripe webhook URL" readOnly value={webhookUrl} onFocus={(event) => event.target.select()} className="w-full min-w-0 rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 font-mono text-xs sm:flex-1" />
+        <button type="button" onClick={() => copy(webhookUrl, "Webhook URL")} className="min-h-11 rounded-lg border border-teal-500/30 px-3 py-2 text-sm font-medium transition hover:border-teal-500 sm:min-h-0 sm:shrink-0 sm:text-xs">Copy webhook URL</button>
       </div>
+        </div>
+      </details>
       {copied && <p className="text-xs text-[var(--cr-muted)]" data-testid="stripe-copied">{copied}</p>}
     </div>
   );
