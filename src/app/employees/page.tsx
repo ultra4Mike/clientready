@@ -192,6 +192,7 @@ export default function EmployeesPage() {
 
   return (
     <AppShell title="Employees">
+      <div className="mx-auto max-w-4xl">
       <p className="text-sm text-[var(--cr-muted)] sm:text-base">
         Add the email they will use to log in. That email opens the crew page, not the owner books.
       </p>
@@ -218,15 +219,15 @@ export default function EmployeesPage() {
           <input type="date" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={form.hireDate} onChange={(event) => setForm({ ...form, hireDate: event.target.value })} />
         </label>
         </div>
-        <button type="submit" className="rounded-lg bg-teal-400 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300 md:col-span-2 md:justify-self-end md:px-8">
+        <button type="submit" className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 md:col-span-2 md:justify-self-end md:px-8">
           {editingId ? "Update employee" : "Save employee"}
         </button>
-        <p className="text-xs text-[var(--cr-muted)] md:col-span-2 md:text-right">No Social Security number, bank account, or routing number.</p>
+        <p className="flex items-center gap-2 rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs font-medium text-[var(--cr-text)] md:col-span-2">🔒 No Social Security number, bank account, or routing number.</p>
       </form>
       {message && <p className="mt-3 rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-[var(--cr-muted)]">{message}</p>}
 
       <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Team</h2>
-      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+      <div className="mt-3 grid gap-4 lg:grid-cols-2">
         {employees.length === 0 && <p className="rounded-2xl border border-dashed border-teal-500/30 p-8 text-center text-sm text-[var(--cr-muted)] lg:col-span-2">No employees yet.</p>}
         {employees.map((person) => (
           <div key={person.id} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
@@ -244,13 +245,14 @@ export default function EmployeesPage() {
               </button>
               <button type="button" onClick={() => remove(person)} className="rounded-lg px-3 py-1.5 text-sm text-[var(--cr-muted)] transition hover:bg-red-500/10 hover:text-red-500">Remove</button>
             </div>
-            <div className="mt-4 grid gap-2 rounded-xl bg-teal-500/5 p-3 sm:grid-cols-3">
+            <div className="mt-4 grid gap-3 rounded-xl border border-teal-500/15 bg-teal-500/5 p-3 sm:grid-cols-[1fr_1fr_auto] sm:p-4">
               <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="New rate" value={editingId === person.id ? raiseRate : ""} onChange={(event) => { setEditingId(person.id); setRaiseRate(event.target.value); }} />
               <input type="date" className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={editingId === person.id ? raiseDate : ""} onChange={(event) => { setEditingId(person.id); setRaiseDate(event.target.value); }} />
               <button type="button" onClick={() => giveRaise(person)} className="rounded-lg border border-teal-500/40 px-3 py-2.5 text-sm font-medium transition hover:border-teal-400 hover:bg-teal-500/10">Save raise</button>
             </div>
           </div>
         ))}
+      </div>
       </div>
     </AppShell>
   );
