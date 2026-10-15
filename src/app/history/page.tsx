@@ -52,8 +52,7 @@ export default function HistoryPage() {
 
   function openDocument(doc: SavedDocument) {
     window.localStorage.setItem("clientready-open-document", doc.id);
-    if (doc.type === "invoice") window.location.href = `/invoice?id=${encodeURIComponent(doc.id)}`;
-    else if (doc.type === "proposal") window.location.href = "/proposal";
+    if (doc.type === "invoice" || doc.type === "proposal") window.location.href = `/invoice?id=${encodeURIComponent(doc.id)}`;
     else if (doc.type === "email") window.location.href = "/email";
     else window.location.href = "/report";
   }

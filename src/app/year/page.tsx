@@ -272,7 +272,7 @@ export default function YearPage() {
 
   function openRow(row: Row) {
     window.localStorage.setItem("clientready-open-document", row.docId);
-    window.location.href = row.docType === "proposal" ? "/proposal" : `/invoice?id=${encodeURIComponent(row.docId)}`;
+    window.location.href = `/invoice?id=${encodeURIComponent(row.docId)}`;
   }
 
   return (
