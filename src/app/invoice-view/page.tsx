@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { balanceDue, paidTotal, readPayments, type Payment } from "@/lib/payments";
+import { SignatureBlock } from "@/components/SignaturePad";
+import { readSignature, type Signature } from "@/lib/signature";
 import { amountOf, documentTotals, discountLabel } from "@/lib/discount";
 
 type LineItem = {
@@ -34,6 +36,8 @@ export default function InvoiceViewPage() {
   const [discountType, setDiscountType] = useState("percent");
   const [discountValue, setDiscountValue] = useState("");
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [signature, setSignature] = useState<Signature | null>(null);
+  const [proposalSignature, setProposalSignature] = useState<Signature | null>(null);
   const [items, setItems] = useState<LineItem[]>([]);
   const [status, setStatus] = useState("");
   const [businessName, setBusinessName] = useState("");
@@ -71,6 +75,8 @@ export default function InvoiceViewPage() {
       discountType?: string;
       discountValue?: string;
       payments?: unknown;
+      signature?: unknown;
+      proposalSignature?: unknown;
       paymentAmount?: string;
       paymentMethod?: string;
       paymentDate?: string;
@@ -93,6 +99,8 @@ export default function InvoiceViewPage() {
     setDiscountType(data.discountType || "percent");
     setDiscountValue(data.discountValue || "");
     setPayments(readPayments(data));
+    setSignature(readSignature(data.signature));
+    setProposalSignature(readSignature(data.proposalSignature));
     setItems(data.items || []);
     setStatus(data.status || "draft");
     setJobTime(data.jobTime || "");
@@ -230,6 +238,8 @@ export default function InvoiceViewPage() {
           {paymentLink && (
             <p className="mt-4 text-sm text-slate-600">Pay here: {paymentLink}</p>
           )}
+          <SignatureBlock signature={proposalSignature} label="Proposal accepted" />
+          <SignatureBlock signature={signature} />
         </div>
       </section>
     </AppShell>
