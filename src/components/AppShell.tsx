@@ -115,7 +115,7 @@ useEffect(() => {
     <div className="app-root min-h-screen bg-[var(--cr-bg)] text-[var(--cr-text)]">
       {wide ? (
         <div className="app-root flex min-h-screen">
-          <aside className="w-56 shrink-0 border-r border-teal-500/20 bg-[var(--cr-panel)] p-4">
+          <aside className="sticky top-0 h-screen w-56 shrink-0 overflow-y-auto border-r border-teal-500/20 bg-[var(--cr-panel)] p-4">
             <Logo />
             <div className="mt-6">{nav}</div>
           </aside>
@@ -124,7 +124,7 @@ useEffect(() => {
               <h1 className="text-lg font-semibold">{title}</h1>
               {actions}
             </header>
-            <div className="app-main p-6">{children}</div>
+            <div className="app-main p-6"><div className="mx-auto w-full max-w-6xl">{children}</div></div>
           </div>
         </div>
       ) : (
@@ -137,8 +137,10 @@ useEffect(() => {
             <div className="mt-3">{nav}</div>
           </header>
           <div className="app-main p-4">
+            <div className="mx-auto w-full max-w-6xl">
             <h1 className="print-hide mb-4 text-2xl font-bold tracking-tight">{title}</h1>
             {children}
+            </div>
           </div>
         </>
       )}
