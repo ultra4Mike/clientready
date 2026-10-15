@@ -148,7 +148,7 @@ export default function CalendarPage() {
 
   return (
     <AppShell title="Calendar">
-      <PageHeader title="Schedule" subtitle="Drag jobs onto the week or month. Click a slot or job to edit it." actions={<a href="/invoice" className="rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">New job</a>} />
+      <PageHeader title="Schedule" subtitle={<><span className="hidden sm:inline">Drag jobs onto the week or month. Click a slot or job to edit it.</span><span className="sm:hidden">Tap a slot or job to edit it.</span></>} actions={<a href="/invoice" className="rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">New job</a>} />
       <section className="py-0">
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div className="inline-flex w-full gap-1 rounded-xl border border-slate-500/30 p-1 sm:w-auto" role="tablist">
@@ -168,9 +168,9 @@ export default function CalendarPage() {
           )}
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-          {(Object.keys(STATUS_LABEL) as JobStatus[]).filter((key) => key !== "done").map((key) => <span key={key} className={`rounded-full border px-2.5 py-0.5 font-medium ${STATUS_CLASS[key]}`}>{STATUS_LABEL[key]}</span>)}
-          {(Object.keys(DONE_LABEL) as DoneState[]).map((key) => <span key={key} data-testid={`legend-done-${key}`} className={`rounded-full border px-2.5 py-0.5 font-medium ${DONE_CLASS[key]}`}>{DONE_LABEL[key]}</span>)}
-          <span className="opacity-90">Drag a job to move it. Click a slot or job to edit.</span>
+          {(Object.keys(STATUS_LABEL) as JobStatus[]).filter((key) => key !== "done").map((key) => <span key={key} className={`whitespace-nowrap rounded-full border px-2.5 py-0.5 font-medium ${STATUS_CLASS[key]}`}>{STATUS_LABEL[key]}</span>)}
+          {(Object.keys(DONE_LABEL) as DoneState[]).map((key) => <span key={key} data-testid={`legend-done-${key}`} className={`whitespace-nowrap rounded-full border px-2.5 py-0.5 font-medium ${DONE_CLASS[key]}`}>{DONE_LABEL[key]}</span>)}
+          <span className="basis-full opacity-90 sm:basis-auto"><span className="hidden sm:inline">Drag a job to move it. Click a slot or job to edit.</span><span className="sm:hidden">Tap a job or time slot to edit or move it.</span></span>
         </div>
         {message && <p className="mt-3 rounded-lg border border-teal-500/30 px-3 py-2 text-sm" data-testid="calendar-message">{message}</p>}
 
