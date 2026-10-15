@@ -3,6 +3,7 @@
 import PortalShare from "@/components/PortalShare";
 import EmailComposer from "@/components/EmailComposer";
 import StageBar from "@/components/StageBar";
+import { CREW_KINDS, crewKindLabel, estimateByKind, type CostFields } from "@/lib/cost-categories";
 import { documentStage, NEXT_LABEL, STAGE_LABEL, STAGES } from "@/lib/doc-stage";
 import { readEmailLog, type EmailLogEntry } from "@/lib/email";
 import { clientIdFor } from "@/lib/portal";
@@ -879,6 +880,7 @@ export default function NewInvoicePage() {
                 <div className="flex items-center gap-3">
                   <p className="text-sm font-medium">Other fees</p>
                   <button type="button" className="rounded-lg bg-teal-500 px-3 py-1.5 text-sm font-semibold text-slate-950! transition hover:bg-teal-400" onClick={() => setOtherFees((current) => [...current, { id: Date.now().toString(), name: "", amount: "" }])}>Add fee</button>
+                  <button type="button" data-testid="add-dump-fee" className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium transition hover:border-teal-500" onClick={() => setOtherFees((current) => [...current, { id: Date.now().toString(), name: "Dump fee", amount: "" }])}>Add dump fee</button>
                 </div>
                 {otherFees.map((fee) => (
                   <div key={fee.id} className="grid gap-2 sm:grid-cols-[1fr_8rem_auto]">
@@ -1120,7 +1122,7 @@ export default function NewInvoicePage() {
     </AppShell>
   );
 }
-type CostEstimate = { parts?: string; gas?: string; tools?: string; lunch?: string; otherFees?: { amount?: string }[] };
+type CostEstimate = CostFields;
 
 /** Owner only: what the crew actually spent on this job next to the cost estimate. Never changes the invoice. */
 function CrewSpend({ docId, estimate }: { docId: string; estimate: CostEstimate }) {
@@ -1131,12 +1133,11 @@ function CrewSpend({ docId, estimate }: { docId: string; estimate: CostEstimate 
   }, [docId]);
   if (!rows.length) return null;
   const num = (value: unknown) => Number(String(value ?? "").replace(/[^0-9.-]/g, "")) || 0;
-  const spent = (kinds: string[]) => rows.filter((row) => kinds.includes(row.kind)).reduce((sum, row) => sum + num(row.amount), 0);
-  const groups: [string, number, number][] = [
-    ["Gas / diesel", num(estimate.gas), spent(["gas"])],
-    ["Parts and materials", num(estimate.parts) + num(estimate.tools), spent(["parts"])],
-    ["Dump fees and other", (estimate.otherFees || []).reduce((sum, fee) => sum + num(fee.amount), 0) + num(estimate.lunch), spent(["dump", "other"])],
-  ];
+  const known = CREW_KINDS.map((item) => item.kind as string);
+  // Crew rows with an unknown kind count as Other, so every crew dollar shows up in exactly one row.
+  const spent = (kind: string) => rows.filter((row) => (known.includes(row.kind) ? row.kind : "other") === kind).reduce((sum, row) => sum + num(row.amount), 0);
+  const byKind = estimateByKind(estimate);
+  const groups: [string, number, number, string, string][] = CREW_KINDS.map(({ kind, label }) => [label, byKind[kind].amount, spent(kind), byKind[kind].source, kind]);
   const totalEstimate = groups.reduce((sum, [, est]) => sum + est, 0);
   const totalActual = groups.reduce((sum, [, , actual]) => sum + actual, 0);
   const diffClass = (diff: number) => (diff > 0.005 ? "font-semibold text-red-600" : diff < -0.005 ? "text-teal-700" : "");
@@ -1147,16 +1148,19 @@ function CrewSpend({ docId, estimate }: { docId: string; estimate: CostEstimate 
       <table className="mt-2 w-full text-left text-sm">
         <thead><tr className="text-xs text-[var(--cr-muted)]"><th className="font-normal">Cost</th><th className="text-right font-normal">Estimate</th><th className="text-right font-normal">Crew spent</th><th className="text-right font-normal">Difference</th></tr></thead>
         <tbody>
-          {groups.filter(([, est, actual]) => est > 0 || actual > 0).map(([label, est, actual]) => (
-            <tr key={label} data-testid="cve-row"><td>{label}</td><td className="text-right tabular-nums">${est.toFixed(2)}</td><td className="text-right tabular-nums">${actual.toFixed(2)}</td><td className={`text-right tabular-nums ${diffClass(actual - est)}`}>{diffText(actual - est)}</td></tr>
+          {groups.filter(([, est, actual]) => est > 0 || actual > 0).map(([label, est, actual, source, kind]) => (
+            <tr key={label} data-testid="cve-row" data-kind={kind}><td>{label}<span className="block text-xs text-[var(--cr-muted)]">Estimate from: {source}</span></td><td className="text-right tabular-nums">${est.toFixed(2)}</td><td className="text-right tabular-nums">${actual.toFixed(2)}</td><td className={`text-right tabular-nums ${diffClass(actual - est)}`}>{diffText(actual - est)}</td></tr>
           ))}
           <tr className="border-t border-slate-200 font-semibold" data-testid="cve-total"><td>Total</td><td className="text-right tabular-nums">${totalEstimate.toFixed(2)}</td><td className="text-right tabular-nums">${totalActual.toFixed(2)}</td><td className={`text-right tabular-nums ${diffClass(totalActual - totalEstimate)}`}>{diffText(totalActual - totalEstimate)}</td></tr>
+          {byKind.lunch.amount > 0 && (
+            <tr data-testid="cve-lunch" className="text-[var(--cr-muted)]"><td>Lunch / meals<span className="block text-xs">Your cost only · not tracked by crew · not in the total above</span></td><td className="text-right tabular-nums">${byKind.lunch.amount.toFixed(2)}</td><td className="text-right">—</td><td /></tr>
+          )}
         </tbody>
       </table>
       <p className="mt-2 text-xs text-[var(--cr-muted)]">Receipts from your crew. Check them before you change your fee. This does not change the invoice or your costs.</p>
       {rows.map((row) => (
         <div key={row.id} className="mt-2">
-          <p>{row.worker_name} · {row.kind} · ${num(row.amount).toFixed(2)} · {row.note}</p>
+          <p>{row.worker_name} · {crewKindLabel(row.kind)} · ${num(row.amount).toFixed(2)} · {row.note}</p>
           {row.receipt && <a href={row.receipt} download={`receipt-${row.id}.jpg`} className="text-xs underline">Save receipt</a>}
         </div>
       ))}

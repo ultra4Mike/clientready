@@ -1,5 +1,6 @@
 "use client";
 
+import { crewKindLabel } from "@/lib/cost-categories";
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
@@ -457,7 +458,7 @@ export default function YearPage() {
           {extras.receipts.length === 0 && <p className="mt-2 text-sm text-slate-500">No receipts logged by crew this year.</p>}
           {extras.receipts.length > 0 && <p className="mt-2 font-medium">Logged by crew: ${extras.receiptTotal.toFixed(2)}</p>}
           {extras.receipts.map((item) => (
-            <p key={item.id} className="mt-1 text-sm">{String(item.created_at || "").slice(0, 10)} · {item.worker_name || "Crew"} · {item.kind || "other"} · {item.doc?.data?.invoiceNumber || item.doc?.title || "Job"} · ${money(item.amount).toFixed(2)} {item.note}</p>
+            <p key={item.id} className="mt-1 text-sm">{String(item.created_at || "").slice(0, 10)} · {item.worker_name || "Crew"} · {crewKindLabel(item.kind)} · {item.doc?.data?.invoiceNumber || item.doc?.title || "Job"} · ${money(item.amount).toFixed(2)} {item.note}</p>
           ))}
           {extras.receipts.length > 0 && <p className="mt-1 text-xs text-slate-500">Shown for your records. Not added to Expenses above, so nothing is counted twice if you also entered it as a job cost.</p>}
         </div>

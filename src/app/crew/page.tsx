@@ -1,5 +1,6 @@
 "use client";
 
+import { CREW_KINDS } from "@/lib/cost-categories";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { crewMarkDone, crewSetJobStatus, STATUS_CLASS, STATUS_LABEL, type JobStatus } from "@/lib/schedule";
@@ -37,7 +38,8 @@ const empty = {
   startTime: "", endTime: "", hours: "", partsCost: "", partsNote: "",
   driveHours: "", driveMinutes: "", notes: "", finished: false, collectedAmount: "", collectedMethod: "cash",
 };
-const KINDS = [["gas", "Gas"], ["parts", "Parts"], ["dump", "Dump fee"], ["other", "Other"]] as const;
+// Same names as the owner's "Crew spend vs your estimate" rows.
+const KINDS = CREW_KINDS.map(({ kind, label }) => [kind, label] as const);
 const input = "w-full rounded-xl border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30";
 const cardClass = "rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5";
 

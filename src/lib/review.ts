@@ -1,3 +1,4 @@
+import { crewKindLabel } from "@/lib/cost-categories";
 import { amountOf, documentTotals } from "@/lib/discount";
 import { balanceDue, isOpenBalance, paidTotal, readPayments } from "@/lib/payments";
 import { readApproval } from "@/lib/approval";
@@ -49,7 +50,7 @@ export function reviewItems(docs: Doc[], expenses: ExpenseRow[], today = ymd(new
     const amount = amountOf(row.amount);
     all.push({
       key: `expense:${row.id}`, version: `${amount.toFixed(2)}|${row.kind || ""}`, kind: "expense", docId: doc.id,
-      title: `${row.worker_name || "Crew"} spent ${money(amount)} (${row.kind || "other"})`,
+      title: `${row.worker_name || "Crew"} spent ${money(amount)} (${crewKindLabel(row.kind)})`,
       detail: `${numberOf(doc)}${who(doc)}${row.note ? ` · ${row.note}` : ""}`, href: `${open(doc)}#crew-spend`,
     });
   }
