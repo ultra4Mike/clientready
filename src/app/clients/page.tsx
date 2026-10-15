@@ -288,7 +288,7 @@ export default function ClientsPage() {
               </div>
               <p className="line-clamp-2 text-sm text-slate-600">{client.notes}</p>
               <div className="flex gap-2 md:justify-end">
-                <button type="button" aria-expanded={portalFor === client.id} data-testid="client-portal-toggle" onClick={() => setPortalFor(portalFor === client.id ? "" : client.id)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium transition hover:border-teal-500">Portal</button>
+                <button type="button" aria-expanded={portalFor === client.id} data-testid="client-portal-toggle" onClick={() => setPortalFor(portalFor === client.id ? "" : client.id)} className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium transition sm:min-h-0 ${portalFor === client.id ? "border-teal-400 bg-teal-500/15 text-teal-700 dark:text-teal-300" : "border-slate-300 hover:border-teal-500"}`}><span aria-hidden="true">🔗</span>Portal</button>
                 <button type="button" onClick={() => editClient(client)} className="min-h-11 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium transition hover:border-teal-500 sm:min-h-0">Edit</button>
                 <button type="button" onClick={() => removeClient(client.id)} className="min-h-11 rounded-lg border border-rose-500/40 px-3 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10 sm:min-h-10 dark:text-rose-300">Remove</button>
               </div>
