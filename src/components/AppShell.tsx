@@ -75,7 +75,7 @@ useEffect(() => {
   }
 
   const nav = (
-    <nav className={wide ? "space-y-1" : "flex flex-wrap gap-2"}>
+    <nav className={wide ? "space-y-1" : "-mx-1 flex gap-1 overflow-x-auto whitespace-nowrap pb-1"}>
       {mainLinks.map((link) => (
         <a key={link.href} href={link.href} className={linkClass(link.href)}>
           {link.label}
@@ -98,7 +98,7 @@ useEffect(() => {
   );
 
   const actions = (
-    <div className="flex flex-wrap items-center gap-4 text-sm">
+    <div className="flex flex-wrap items-center gap-3 text-sm font-medium sm:gap-4">
       <button type="button" onClick={() => saveTheme(theme === "dark" ? "light" : "dark")}>
         {theme === "dark" ? "Light" : "Dark"}
       </button>
