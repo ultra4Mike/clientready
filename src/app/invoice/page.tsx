@@ -671,6 +671,26 @@ export default function NewInvoicePage() {
 
   return (
     <AppShell title={isProposal ? "New proposal" : "New invoice"}>
+      <div className="print-hide mb-6 flex flex-col gap-4 border-b border-teal-500/15 pb-5 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wider text-teal-600 dark:text-teal-300">{isProposal ? "Proposal" : "Invoice"}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-3">
+            <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{invoiceNumber || (isProposal ? "New proposal" : "New invoice")}</h2>
+            <span className="rounded-full border border-teal-500/40 bg-teal-500/10 px-3 py-0.5 text-xs font-semibold capitalize">{status}</span>
+          </div>
+          <p className="mt-1 text-sm text-[var(--cr-muted)]">{clientName || "No client yet"} · Total ${totals.total.toFixed(2)}</p>
+        </div>
+        <div className="hidden flex-wrap gap-2 lg:flex">
+              {!locked && <button type="button" onClick={saveDocument} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Save document</button>}
+              {isProposal && !locked && (
+                <button type="button" onClick={createInvoiceFromProposal} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Create invoice</button>
+              )}
+              {!isProposal && !locked && docId && (
+                <button type="button" onClick={createChangeOrder} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Create change order</button>
+              )}
+              {!locked && <button type="button" onClick={clearForm} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Clear form</button>}
+        </div>
+      </div>
       <section className="print-reset mx-auto grid max-w-6xl gap-6 py-2 sm:py-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-8">
         <form className="space-y-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
 {locked && (
@@ -733,6 +753,7 @@ export default function NewInvoicePage() {
               <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Line items & pricing</h2>
             <div className="space-y-3">
               <div className="flex items-center justify-between"><h2 className="font-medium">Line items</h2><button type="button" className="tap rounded-lg border border-teal-500/40 px-3 py-1.5 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300" onClick={() => setItems((current) => [...current, { ...emptyItem }])}>Add item</button></div>
+              <div className="hidden gap-2 border-b border-slate-200 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:grid sm:grid-cols-[minmax(0,1fr)_4.5rem_6rem_8.5rem]"><span>Description</span><span>Qty</span><span>Rate</span><span>Type</span></div>
               {items.map((item, index) => (
                 <div key={index} className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-2 sm:grid-cols-[minmax(0,1fr)_4.5rem_6rem_8.5rem] sm:border-0 sm:p-0">
                   <input className="col-span-2 sm:col-span-1 rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Description" value={item.description} onChange={(event) => updateItem(index, "description", event.target.value)} />
@@ -757,6 +778,12 @@ export default function NewInvoicePage() {
             <label className="block text-sm font-medium text-slate-600">Tax %
             <input className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Tax percent" value={taxPercent} onChange={(event) => setTaxPercent(event.target.value)} />
             </label>
+            <div className="ml-auto w-full max-w-xs space-y-1 rounded-xl border border-teal-500/30 bg-teal-500/5 p-4 text-sm">
+              <div className="flex justify-between"><span className="text-slate-600">Subtotal</span><span className="tabular-nums">${totals.subtotal.toFixed(2)}</span></div>
+              {totals.discount > 0 && <div className="flex justify-between"><span className="text-slate-600">Discount</span><span className="tabular-nums">-${totals.discount.toFixed(2)}</span></div>}
+              <div className="flex justify-between"><span className="text-slate-600">Tax</span><span className="tabular-nums">${totals.tax.toFixed(2)}</span></div>
+              <div className="flex justify-between border-t border-teal-500/30 pt-2 text-base font-bold"><span>Total</span><span className="tabular-nums">${totals.total.toFixed(2)}</span></div>
+            </div>
             <div className="space-y-2 rounded-xl border border-slate-200 p-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-medium">{isProposal ? "Deposit received" : "Payments received"}</h2>
@@ -929,7 +956,7 @@ export default function NewInvoicePage() {
                 {fromProposal ? <>Made from proposal <a className="font-medium text-teal-600 underline" href={`/invoice?id=${encodeURIComponent(fromProposal.id)}`}>{fromProposal.number}</a></> : <>Invoice made from this proposal: {madeInvoices.map((item, index) => <span key={item.id}>{index ? ", " : ""}<a className="font-medium text-teal-600 underline" href={`/invoice?id=${encodeURIComponent(item.id)}`}>{item.number}</a></span>)}</>}
               </p>
             )}
-            <div className="print-hide sticky bottom-0 z-10 -mx-4 grid grid-cols-2 gap-2 border-t border-slate-200 bg-[var(--cr-card)] px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:-mx-6 sm:flex sm:flex-wrap sm:gap-3 sm:px-6">
+            <div className="print-hide sticky bottom-0 lg:hidden z-10 -mx-4 grid grid-cols-2 gap-2 border-t border-slate-200 bg-[var(--cr-card)] px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:-mx-6 sm:flex sm:flex-wrap sm:gap-3 sm:px-6">
               {!locked && <button type="button" onClick={saveDocument} className="col-span-2 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Save document</button>}
               {isProposal && !locked && (
                 <button type="button" onClick={createInvoiceFromProposal} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Create invoice</button>
