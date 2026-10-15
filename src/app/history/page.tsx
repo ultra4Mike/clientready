@@ -60,7 +60,7 @@ export default function HistoryPage() {
   return (
     <AppShell title="History">
 
-      <section className="mx-auto max-w-4xl py-2 sm:px-2 sm:py-4">
+      <section className="max-w-4xl py-2 sm:py-4">
         <h1 className="text-2xl font-bold tracking-tight">Client history</h1>
         <p className="mt-1 text-sm text-slate-600 sm:text-base">
           Pick a client to see every document attached to them.
