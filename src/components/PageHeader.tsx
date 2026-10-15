@@ -13,7 +13,7 @@ export default function PageHeader({
   eyebrow?: ReactNode;
 }) {
   return (
-    <div className="print-hide mb-6 flex flex-col gap-4 border-b border-teal-500/15 pb-5 sm:flex-row sm:items-end sm:justify-between">
+    <div data-page-header className="print-hide mb-6 flex flex-col gap-4 border-b border-teal-500/15 pb-5 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
         {eyebrow && <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-teal-600 dark:text-teal-300">{eyebrow}</div>}
         <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{title}</h2>
