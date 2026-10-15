@@ -60,9 +60,9 @@ export default function HistoryPage() {
   return (
     <AppShell title="History">
 
-      <section className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      <section className="mx-auto max-w-4xl py-2 sm:px-2 sm:py-4">
         <h1 className="text-2xl font-bold tracking-tight">Client history</h1>
-        <p className="mt-2 text-slate-600">
+        <p className="mt-1 text-sm text-slate-600 sm:text-base">
           Pick a client to see every document attached to them.
         </p>
 
@@ -81,12 +81,14 @@ export default function HistoryPage() {
         </select>
 
         {selected && (
-          <div className="mt-8">
-            <h2 className="text-lg font-semibold">{selected.name}</h2>
+          <div className="mt-6">
+            <div className="rounded-2xl border border-teal-500/30 bg-teal-500/5 p-4 sm:p-5">
+            <h2 className="text-lg font-bold tracking-tight">{selected.name}</h2>
             <p className="text-sm text-slate-600">{selected.company}</p>
             <p className="text-sm text-slate-600">{selected.email}</p>
+            </div>
 
-            <div className="mt-6 space-y-3">
+            <div className="mt-4 space-y-3">
               {history.length === 0 && (
                 <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600">
                   No documents for this client yet.
@@ -99,8 +101,8 @@ export default function HistoryPage() {
                   onClick={() => openDocument(doc)}
                   className="block w-full rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-500 hover:shadow-md"
                 >
-                  <p className="font-medium">{doc.title}</p>
-                  <p className="text-sm text-slate-600">
+                  <p className="text-base font-semibold">{doc.title}</p>
+                  <p className="mt-0.5 text-sm text-slate-600">
                     {doc.type} · {doc.createdAt}
                     {doc.data?.status ? ` · ${doc.data.status}` : ""}
                     {doc.data?.outcome ? ` · ${doc.data.outcome}` : ""}
