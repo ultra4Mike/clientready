@@ -195,9 +195,9 @@ export default function EmployeesPage() {
     <AppShell title="Employees">
       <PageHeader title="Team" subtitle="Add the email they will use to log in. That email opens the crew page, not the owner books." />
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
-      <div className="xl:sticky xl:top-20">
+      <div className="order-2 xl:order-none xl:sticky xl:top-20">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Add or edit a person</h2>
-      <form onSubmit={handleSubmit} className="grid gap-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-6 md:grid-cols-2 xl:grid-cols-1">
+      <form onSubmit={handleSubmit} className="grid gap-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none sm:p-6 md:grid-cols-2 xl:grid-cols-1">
         <div className="grid gap-3 rounded-xl border border-teal-500/20 p-4 md:col-span-2 md:grid-cols-2 xl:col-span-1 xl:grid-cols-1">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-500 md:col-span-2">Person & role</h2>
         <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
@@ -228,7 +228,7 @@ export default function EmployeesPage() {
       {message && <p className="mt-3 rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-[var(--cr-muted)]">{message}</p>}
 
       </div>
-      <div className="min-w-0">
+      <div className="order-1 min-w-0 xl:order-none">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">People ({employees.length})</h2>
       <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
         {employees.length === 0 && <p className="rounded-2xl border border-dashed border-teal-500/30 p-8 text-center text-sm text-[var(--cr-muted)] lg:col-span-2">No employees yet.</p>}
@@ -242,17 +242,20 @@ export default function EmployeesPage() {
             <p className="mt-1 text-sm text-[var(--cr-muted)]">{person.email || "No login email"}</p>
             <p className="text-sm text-[var(--cr-muted)]">{person.phone}</p>
             <div className="mt-4 flex flex-wrap gap-2 border-t border-teal-500/10 pt-3">
-              <button type="button" onClick={() => edit(person)} className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400">Edit</button>
-              <button type="button" onClick={() => setActive(person, !person.active)} className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400">
+              <button type="button" onClick={() => edit(person)} className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400 max-sm:min-h-11">Edit</button>
+              <button type="button" onClick={() => setActive(person, !person.active)} className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400 max-sm:min-h-11">
                 {person.active ? "Mark inactive" : "Mark active"}
               </button>
-              <button type="button" onClick={() => remove(person)} className="rounded-lg px-3 py-1.5 text-sm text-[var(--cr-muted)] transition hover:bg-red-500/10 hover:text-red-500">Remove</button>
+              <button type="button" onClick={() => remove(person)} className="rounded-lg border border-rose-500/40 px-3 py-1.5 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10 max-sm:min-h-11 dark:text-rose-300">Remove</button>
             </div>
-            <div className="mt-4 flex flex-wrap gap-3 rounded-xl border border-teal-500/15 bg-teal-500/5 p-3 sm:p-4">
+            <details className="group/raise mt-4 rounded-xl border border-teal-500/15 bg-teal-500/5">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3 text-sm font-medium [&::-webkit-details-marker]:hidden">Give raise<span aria-hidden="true" className="text-[var(--cr-muted)] transition group-open/raise:rotate-90">›</span></summary>
+            <div className="flex flex-wrap gap-3 border-t border-teal-500/15 p-3 sm:p-4">
               <input className="min-w-0 flex-1 basis-32 rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="New rate" value={editingId === person.id ? raiseRate : ""} onChange={(event) => { setEditingId(person.id); setRaiseRate(event.target.value); }} />
               <input type="date" className="min-w-0 flex-1 basis-36 rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={editingId === person.id ? raiseDate : ""} onChange={(event) => { setEditingId(person.id); setRaiseDate(event.target.value); }} />
               <button type="button" onClick={() => giveRaise(person)} className="w-full shrink-0 whitespace-nowrap rounded-lg sm:w-auto border border-teal-500/40 px-3 py-2.5 text-sm font-medium transition hover:border-teal-400 hover:bg-teal-500/10">Save raise</button>
             </div>
+            </details>
           </div>
         ))}
       </div>
