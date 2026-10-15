@@ -142,7 +142,7 @@ export default function InvoiceViewPage() {
 
   return (
     <AppShell title="Invoice">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="print-hide mb-4 flex flex-wrap items-center justify-between gap-3">
         <a href="/documents" className="text-sm text-[var(--cr-muted)]">
           Back to documents
         </a>
@@ -172,33 +172,38 @@ export default function InvoiceViewPage() {
           </button>
         </div>
       </div>
-      {message && <p className="mb-3 text-sm text-[var(--cr-muted)]">{message}</p>}
+      {message && <p className="print-hide mb-3 text-sm text-[var(--cr-muted)]">{message}</p>}
 
-      <section className="mx-auto max-w-3xl">
-        <div id="preview" className="rounded-2xl border border-slate-200 bg-white p-8 text-slate-900 shadow-sm">
-          {logo && <img src={logo} alt="Business logo" className="mb-3 h-14 w-auto" />}
-          <p className="text-sm uppercase tracking-wide text-slate-500">Invoice</p>
-          <h1 className="mt-1 text-2xl font-semibold">{invoiceNumber || "Invoice"}</h1>
-          <p className="mt-1 text-sm text-slate-600">{status}</p>
-          <p className="mt-4 text-sm text-slate-600">{businessName}</p>
-          <p className="text-sm text-slate-600">Date: {invoiceDate || "-"}</p>
-          <p className="text-sm text-slate-600">Due: {dueDate || "-"}</p>
-          {jobTime && <p className="text-sm text-slate-600">Scheduled time: {jobTime}</p>}
-
-          <div className="mt-8">
-            <p className="text-sm text-slate-500">Bill to</p>
-            <p className="font-medium">{clientName || "Client"}</p>
-            {clientCompany && <p className="text-sm text-slate-600">{clientCompany}</p>}
-            {clientEmail && <p className="text-sm text-slate-600">{clientEmail}</p>}
-            {clientPhone && <p className="text-sm text-slate-600">{clientPhone}</p>}
-            {clientAddress && <p className="text-sm text-slate-600">{clientAddress}</p>}
+      <section className="print-reset mx-auto max-w-3xl">
+        <div id="preview" className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 text-sm text-slate-600">
+              {logo && <img src={logo} alt="Business logo" className="mb-2 h-10 w-auto" />}
+              <p className="font-semibold">{businessName}</p>
+              {jobTime && <p>Scheduled time: {jobTime}</p>}
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="text-xs uppercase tracking-wide text-slate-500">Invoice · {status}</p>
+              <h1 className="text-xl font-semibold leading-tight">{invoiceNumber || "Invoice"}</h1>
+              <p className="text-sm text-slate-600">Date: {invoiceDate || "-"} · Due: {dueDate || "-"}</p>
+            </div>
           </div>
 
-          <div className="mt-8 border-t border-slate-200 pt-4">
+          <div className="mt-4 text-sm">
+            <p className="text-xs text-slate-500">Bill to</p>
+            <p className="font-medium">
+              {clientName || "Client"}
+              {clientCompany && <span className="font-normal text-slate-600"> · {clientCompany}</span>}
+            </p>
+            {(clientEmail || clientPhone) && <p className="text-slate-600">{[clientEmail, clientPhone].filter(Boolean).join(" · ")}</p>}
+            {clientAddress && <p className="text-slate-600">{clientAddress}</p>}
+          </div>
+
+          <div className="mt-4 border-t border-slate-200 pt-1">
             {items.map((item, index) => {
               const amount = amountOf(item.qty) * amountOf(item.rate);
               return (
-                <div key={index} className="flex justify-between py-2 text-sm">
+                <div key={index} className="flex justify-between gap-4 py-1 text-sm">
                   <span>
                     {item.description || "Item"} · {item.qty} x ${item.rate}
                   </span>
@@ -208,44 +213,61 @@ export default function InvoiceViewPage() {
             })}
           </div>
 
-          <div className="mt-6 space-y-1 border-t border-slate-200 pt-4 text-sm">
-            <div className="flex justify-between">
-              <span>Subtotal</span>
-              <span>${totals.subtotal.toFixed(2)}</span>
+          <div className="mt-2 grid grid-cols-2 gap-6 border-t border-slate-200 pt-2 text-sm">
+            <div className="space-y-0.5 text-slate-600">
+              {payments.some((payment) => amountOf(payment.amount) > 0) && <p className="text-xs text-slate-500">Payments</p>}
+              {payments.filter((payment) => amountOf(payment.amount) > 0).map((payment) => (
+                <div key={payment.id} className="flex justify-between gap-2">
+                  <span>Paid{payment.date ? ` ${payment.date}` : ""}{payment.method ? ` · ${payment.method}` : ""}{payment.ref ? ` · ${payment.ref}` : ""}</span>
+                  <span>-${amountOf(payment.amount).toFixed(2)}</span>
+                </div>
+              ))}
+              {paymentLink && <p className="break-all pt-1 text-xs">Pay here: {paymentLink}</p>}
             </div>
-            {totals.discount > 0 && (
+            <div className="space-y-0.5">
               <div className="flex justify-between">
-                <span>{discountLabel(discountType, discountValue)}</span>
-                <span>-${totals.discount.toFixed(2)}</span>
+                <span>Subtotal</span>
+                <span>${totals.subtotal.toFixed(2)}</span>
               </div>
-            )}
-            <div className="flex justify-between">
-              <span>Tax</span>
-              <span>${totals.tax.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-base font-semibold">
-              <span>Total</span>
-              <span>${totals.total.toFixed(2)}</span>
-            </div>
-            {payments.filter((payment) => amountOf(payment.amount) > 0).map((payment) => (
-              <div key={payment.id} className="flex justify-between text-slate-600">
-                <span>Paid{payment.date ? ` ${payment.date}` : ""}{payment.method ? ` · ${payment.method}` : ""}{payment.ref ? ` · ${payment.ref}` : ""}</span>
-                <span>-${amountOf(payment.amount).toFixed(2)}</span>
+              {totals.discount > 0 && (
+                <div className="flex justify-between">
+                  <span>{discountLabel(discountType, discountValue)}</span>
+                  <span>-${totals.discount.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span>Tax</span>
+                <span>${totals.tax.toFixed(2)}</span>
               </div>
-            ))}
-            <div className="mt-2 flex justify-between border-t border-slate-200 pt-2 text-xl font-bold">
-              <span>Still owed</span>
-              <span>${totals.balance.toFixed(2)}</span>
+              <div className="flex justify-between font-semibold">
+                <span>Total</span>
+                <span>${totals.total.toFixed(2)}</span>
+              </div>
+              {totals.paid > 0 && (
+                <div className="flex justify-between">
+                  <span>Paid</span>
+                  <span>-${totals.paid.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="mt-1 flex justify-between border-t border-slate-200 pt-1 text-lg font-bold">
+                <span>Still owed</span>
+                <span>${totals.balance.toFixed(2)}</span>
+              </div>
             </div>
           </div>
 
-          {notes && <p className="mt-8 text-sm text-slate-600">{notes}</p>}
-          {paymentLink && (
-            <p className="mt-4 text-sm text-slate-600">Pay here: {paymentLink}</p>
+          {notes && <p className="mt-3 text-sm text-slate-600">{notes}</p>}
+          {(payUrlFor(docPayLink, paymentLink) || signature || proposalSignature) && (
+            <div className="print-keep mt-3 grid grid-cols-2 items-end gap-6 border-t border-slate-200 pt-3">
+              <div className="space-y-3">
+                <SignatureBlock signature={proposalSignature} label="Proposal accepted" />
+                <SignatureBlock signature={signature} />
+              </div>
+              <div className="flex justify-end">
+                <PayQr url={payUrlFor(docPayLink, paymentLink)} />
+              </div>
+            </div>
           )}
-          <PayQr url={payUrlFor(docPayLink, paymentLink)} />
-          <SignatureBlock signature={proposalSignature} label="Proposal accepted" />
-          <SignatureBlock signature={signature} />
         </div>
       </section>
     </AppShell>

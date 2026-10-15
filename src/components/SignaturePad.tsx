@@ -147,16 +147,16 @@ export default function SignaturePad({ value, onChange, defaultName = "" }: Prop
 export function SignatureBlock({ signature, label = "Customer signature", muted = "text-slate-600", onDark = false }: { signature: Signature | null; label?: string; muted?: string; onDark?: boolean }) {
   if (!signature) return null;
   return (
-    <div className={`mt-8 border-t border-slate-500 pt-4 ${onDark ? "sig-on-dark" : ""}`} data-testid="signature-block">
+    <div className={`min-w-0 ${onDark ? "sig-on-dark" : ""}`} data-testid="signature-block">
       <p className={`text-sm ${muted}`}>{label}</p>
       {signature.type === "drawn" && signature.dataUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={signature.dataUrl} alt={`Signature of ${signature.signerName}`} className="sig-ink mt-2 h-16 w-auto" />
+        <img src={signature.dataUrl} alt={`Signature of ${signature.signerName}`} className="sig-ink mt-1 h-12 w-auto" />
       ) : (
-        <p className="sig-typed mt-2 text-4xl" style={{ fontFamily: scriptFont }}>{signature.text}</p>
+        <p className="sig-typed mt-1 text-3xl leading-tight" style={{ fontFamily: scriptFont }}>{signature.text}</p>
       )}
-      <p className={`mt-1 text-sm ${muted}`}>Signed by {signature.signerName} · {signedAtLabel(signature.signedAt)}</p>
-      <p className={`mt-1 text-xs ${muted}`}>{SIGNATURE_DISCLAIMER}</p>
+      <p className={`text-xs ${muted}`}>Signed by {signature.signerName} · {signedAtLabel(signature.signedAt)}</p>
+      <p className={`sig-fine mt-0.5 text-[11px] leading-snug ${muted}`}>{SIGNATURE_DISCLAIMER}</p>
     </div>
   );
 }

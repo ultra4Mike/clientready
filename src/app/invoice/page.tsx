@@ -427,13 +427,13 @@ export default function NewInvoicePage() {
 
   const payUrl = payUrlFor(docPayLink, paymentLink);
 
-  const previewClass = style === "bold" ? "rounded-2xl border border-slate-900 bg-slate-900 p-8 text-white shadow-sm" : "rounded-2xl border border-slate-200 bg-white p-8 text-slate-900 shadow-sm";
+  const previewClass = style === "bold" ? "rounded-2xl border border-slate-900 bg-slate-900 p-6 text-white shadow-sm" : "rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm";
   const mutedClass = style === "bold" ? "text-slate-300" : "text-slate-600";
   const labelClass = style === "bold" ? "text-slate-400" : "text-slate-500";
 
   return (
     <AppShell title={isProposal ? "New proposal" : "New invoice"}>
-      <section className="mx-auto grid max-w-6xl gap-8 px-6 py-8 lg:grid-cols-2">
+      <section className="print-reset mx-auto grid max-w-6xl gap-8 px-6 py-8 lg:grid-cols-2">
         <form className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
 {locked && (
             <p
@@ -612,51 +612,65 @@ export default function NewInvoicePage() {
           </fieldset>
         </form>
         <div>
-          <div className="mb-4 flex flex-wrap gap-3">
+          <div className="print-hide mb-4 flex flex-wrap gap-3">
             <button type="button" onClick={() => window.print()} className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white">Print / Save PDF</button>
             {!locked && !isProposal && status !== "paid" && <button type="button" onClick={copyPayLink} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">{paymentLink.trim() ? "Pay / Copy pay link" : "Add how to pay"}</button>}
           </div>
           <div id="preview" className={previewClass}>
-            {logo && <img src={logo} alt="Business logo" className="mb-3 h-14 w-auto" />}
-            <div className="flex items-start justify-between">
-              <div>
-                <p className={`text-sm uppercase tracking-wide ${labelClass}`}>{isProposal ? "Proposal" : "Invoice"}</p>
-                <h2 className="mt-1 text-2xl font-semibold">{invoiceNumber || (isProposal ? "PROP-0000" : "INV-0000")}</h2>
-                <div className={`mt-4 text-sm ${mutedClass}`}><p className="font-medium">{businessName}</p><p>{ownerName}</p><p>{businessEmail}</p><p>{businessPhone}</p></div>
+            <div className="flex items-start justify-between gap-4">
+              <div className={`min-w-0 text-sm ${mutedClass}`}>
+                {logo && <img src={logo} alt="Business logo" className="mb-2 h-10 w-auto" />}
+                <p className="font-semibold">{businessName}</p>
+                <p>{[ownerName, businessEmail, businessPhone].filter(Boolean).join(" · ")}</p>
               </div>
-              <div className={`text-right text-sm ${mutedClass}`}>
-                <div>Date: {invoiceDate || "-"}</div>
-                <div>{isProposal ? "Valid until" : "Due"}: {dueDate || "-"}</div>
-                {(jobStart || jobEnd) && <div>Time: {jobStart || "-"} to {jobEnd || "-"}</div>}
+              <div className="shrink-0 text-right">
+                <p className={`text-xs uppercase tracking-wide ${labelClass}`}>{isProposal ? "Proposal" : "Invoice"}</p>
+                <h2 className="text-xl font-semibold leading-tight">{invoiceNumber || (isProposal ? "PROP-0000" : "INV-0000")}</h2>
+                <div className={`text-sm ${mutedClass}`}>
+                  <div>Date: {invoiceDate || "-"} · {isProposal ? "Valid until" : "Due"}: {dueDate || "-"}</div>
+                  {(jobStart || jobEnd) && <div>Time: {jobStart || "-"} to {jobEnd || "-"}</div>}
+                </div>
               </div>
             </div>
-            <div className="mt-8">
-              <p className={`text-sm ${labelClass}`}>{isProposal ? "Prepared for" : "Bill to"}</p>
-              <p className="font-medium">{clientName || "Client name"}</p>
-              {clientCompany && <p className={`text-sm ${mutedClass}`}>{clientCompany}</p>}
-              {clientEmail && <p className={`text-sm ${mutedClass}`}>{clientEmail}</p>}
-              {clientPhone && <p className={`text-sm ${mutedClass}`}>{clientPhone}</p>}
-              {clientAddress && <p className={`text-sm ${mutedClass}`}>{clientAddress}</p>}
+            <div className="mt-4 text-sm">
+              <p className={`text-xs ${labelClass}`}>{isProposal ? "Prepared for" : "Bill to"}</p>
+              <p className="font-medium">{clientName || "Client name"}{clientCompany && <span className={`font-normal ${mutedClass}`}> · {clientCompany}</span>}</p>
+              {(clientEmail || clientPhone) && <p className={mutedClass}>{[clientEmail, clientPhone].filter(Boolean).join(" · ")}</p>}
+              {clientAddress && <p className={mutedClass}>{clientAddress}</p>}
             </div>
-            <div className="mt-8 border-t border-slate-500 pt-4">
+            <div className="mt-4 border-t border-slate-500 pt-1">
               {items.map((item, index) => {
                 const amount = amountOf(item.qty) * amountOf(item.rate);
-                return <div key={index} className="flex justify-between py-2 text-sm"><span>{item.description || "Item"}</span><span>${amount.toFixed(2)}</span></div>;
+                return <div key={index} className="flex justify-between gap-4 py-1 text-sm"><span>{item.description || "Item"}</span><span>${amount.toFixed(2)}</span></div>;
               })}
             </div>
-            <div className="mt-6 space-y-1 border-t border-slate-500 pt-4 text-sm">
-              <div className="flex justify-between"><span>Subtotal</span><span>${totals.subtotal.toFixed(2)}</span></div>
-              {totals.discount > 0 && <div className="flex justify-between"><span>{discountLabel(discountType, discountValue)}</span><span>-${totals.discount.toFixed(2)}</span></div>}
-              <div className="flex justify-between"><span>Tax</span><span>${totals.tax.toFixed(2)}</span></div>
-              <div className="flex justify-between text-base font-semibold"><span>Total</span><span>${totals.total.toFixed(2)}</span></div>
-              {totals.paid > 0 && <div className="flex justify-between"><span>{isProposal ? "Deposit paid" : "Paid"}</span><span>-${totals.paid.toFixed(2)}</span></div>}
-              {(!isProposal || totals.paid > 0) && <div className="mt-2 flex justify-between border-t border-slate-500 pt-2 text-xl font-bold"><span>{isProposal ? "Balance after deposit" : "Still owed"}</span><span data-testid="preview-still-owed">${totals.balance.toFixed(2)}</span></div>}
+            <div className="mt-2 grid grid-cols-2 gap-6 border-t border-slate-500 pt-2 text-sm">
+              <div className={`space-y-0.5 ${mutedClass}`}>
+                {payments.filter((payment) => amountOf(payment.amount) > 0).length > 0 && <p className={`text-xs ${labelClass}`}>{isProposal ? "Deposit" : "Payments"}</p>}
+                {payments.filter((payment) => amountOf(payment.amount) > 0).map((payment) => (
+                  <div key={payment.id} className="flex justify-between gap-2"><span>{[payment.date, payment.method, payment.ref].filter(Boolean).join(" · ") || "Payment"}</span><span>${amountOf(payment.amount).toFixed(2)}</span></div>
+                ))}
+                {!isProposal && paymentLink && <p className="break-all pt-1 text-xs">Pay here: {paymentLink}</p>}
+              </div>
+              <div className="space-y-0.5">
+                <div className="flex justify-between"><span>Subtotal</span><span>${totals.subtotal.toFixed(2)}</span></div>
+                {totals.discount > 0 && <div className="flex justify-between"><span>{discountLabel(discountType, discountValue)}</span><span>-${totals.discount.toFixed(2)}</span></div>}
+                <div className="flex justify-between"><span>Tax</span><span>${totals.tax.toFixed(2)}</span></div>
+                <div className="flex justify-between font-semibold"><span>Total</span><span>${totals.total.toFixed(2)}</span></div>
+                {totals.paid > 0 && <div className="flex justify-between"><span>{isProposal ? "Deposit paid" : "Paid"}</span><span>-${totals.paid.toFixed(2)}</span></div>}
+                {(!isProposal || totals.paid > 0) && <div className="mt-1 flex justify-between border-t border-slate-500 pt-1 text-lg font-bold"><span>{isProposal ? "Balance after deposit" : "Still owed"}</span><span data-testid="preview-still-owed">${totals.balance.toFixed(2)}</span></div>}
+              </div>
             </div>
-            <p className={`mt-8 text-sm ${mutedClass}`}>{notes}</p>
-            {!isProposal && paymentLink && <p className={`mt-4 text-sm ${mutedClass}`}>Pay here: {paymentLink}</p>}
-            {!isProposal && <PayQr url={payUrl} />}
-            {!isProposal && <SignatureBlock signature={proposalSignature} label="Proposal accepted" muted={mutedClass} onDark={style === "bold"} />}
-            <SignatureBlock signature={signature} label={isProposal ? "Customer acceptance" : "Customer signature"} muted={mutedClass} onDark={style === "bold"} />
+            {notes && <p className={`mt-3 text-sm ${mutedClass}`}>{notes}</p>}
+            {(payUrl && !isProposal) || signature || (proposalSignature && !isProposal) ? (
+              <div className="print-keep mt-3 grid grid-cols-2 items-end gap-6 border-t border-slate-500 pt-3">
+                <div className="space-y-3">
+                  {!isProposal && <SignatureBlock signature={proposalSignature} label="Proposal accepted" muted={mutedClass} onDark={style === "bold"} />}
+                  <SignatureBlock signature={signature} label={isProposal ? "Customer acceptance" : "Customer signature"} muted={mutedClass} onDark={style === "bold"} />
+                </div>
+                <div className="flex justify-end">{!isProposal && <PayQr url={payUrl} />}</div>
+              </div>
+            ) : null}
           </div>
         </div>
       </section>
