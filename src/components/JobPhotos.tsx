@@ -59,7 +59,7 @@ export function JobPhotosEditor({ photos, onChange, showOnCopy = false, onShowOn
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={photo.dataUrl} alt={photo.caption || "Job photo"} className="aspect-square w-full rounded-lg object-cover" />
               <input className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" maxLength={60} placeholder="Caption (optional)" value={photo.caption} onChange={(event) => onChange(photos.map((item) => item.id === photo.id ? { ...item, caption: event.target.value } : item))} />
-              <button type="button" className="text-sm text-slate-600" onClick={() => onChange(photos.filter((item) => item.id !== photo.id))}>Remove</button>
+              <button type="button" className="min-h-11 rounded-lg border border-rose-500/40 px-3 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10 sm:min-h-10 dark:text-rose-300" onClick={() => onChange(photos.filter((item) => item.id !== photo.id))}>Remove</button>
             </div>
           ))}
         </div>
