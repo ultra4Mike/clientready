@@ -9,6 +9,8 @@ import { readApproval } from "@/lib/approval";
 import AppShell from "@/components/AppShell";
 import { documentTotals } from "@/lib/discount";
 import { balanceDue, paidTotal, readPayments } from "@/lib/payments";
+import { isPendingRecurringDraft } from "@/lib/recurring";
+import { searchWithNumbers } from "@/lib/doc-number";
 
 type SavedDocument = {
   id: string;
@@ -57,6 +59,12 @@ export default function DocumentsPage() {
     const params = new URLSearchParams(window.location.search);
     const query = params.get("q") || "";
     if (query) setSearch(query);
+    // Links from the dashboard cards: /documents?filter=outstanding|paid|overdue|unpaid
+    const preset = params.get("filter") || "";
+    if (["outstanding", "unpaid", "paid", "overdue"].includes(preset)) {
+      setTypeFilter("invoice");
+      setStatusFilter(preset);
+    }
 
     async function load() {
       await syncDocs();
@@ -131,13 +139,20 @@ export default function DocumentsPage() {
       const info = factsById.get(doc.id) || facts(doc);
       if (typeFilter !== "all" && doc.type !== typeFilter) return false;
       const status = String(doc.data?.status || "draft");
-      if (statusFilter === "unpaid" ? !(doc.type === "invoice" && info.owed > 0 && status !== "draft") : statusFilter !== "all" && status !== statusFilter) return false;
+      if (statusFilter === "outstanding") {
+        // Same rule as the dashboard's Total outstanding card.
+        if (doc.type !== "invoice" || isPendingRecurringDraft(doc) || info.owed <= 0) return false;
+      } else if (statusFilter === "unpaid" ? !(doc.type === "invoice" && info.owed > 0 && status !== "draft") : statusFilter !== "all" && status !== statusFilter) return false;
       if (fromDate && (!info.date || info.date < fromDate)) return false;
       if (toDate && (!info.date || info.date > toDate)) return false;
+      return true;
+    });
+    const searched = searchWithNumbers(filtered, deferredSearch, (doc) => doc.data?.invoiceNumber || doc.title, (doc) => {
+      const info = factsById.get(doc.id) || facts(doc);
       return words.every((word) => info.text.includes(word) || (/^\d+(\.\d+)?$/.test(word) && Math.abs(info.total - Number(word)) < 0.005));
     });
 
-    return filtered.sort((a, b) => {
+    return searched.sort((a, b) => {
       const fa = factsById.get(a.id) || facts(a);
       const fb = factsById.get(b.id) || facts(b);
       if (sortBy === "client") return a.clientName.localeCompare(b.clientName);
@@ -207,7 +222,8 @@ export default function DocumentsPage() {
         </select>
         <select className={field} aria-label="Status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
           <option value="all">Any status</option>
-          <option value="unpaid">Unpaid (still owed)</option>
+          <option value="outstanding">Outstanding (balance due)</option>
+          <option value="unpaid">Unpaid, sent (still owed)</option>
           <option value="draft">Draft</option>
           <option value="sent">Sent</option>
           <option value="overdue">Overdue</option>

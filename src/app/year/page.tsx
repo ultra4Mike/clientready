@@ -8,6 +8,7 @@ import { readPayments } from "@/lib/payments";
 import { lineSplit } from "@/lib/line-split";
 import { isPendingRecurringDraft } from "@/lib/recurring";
 import { supabase } from "@/lib/supabase";
+import { searchWithNumbers } from "@/lib/doc-number";
 
 type CrewExpense = { id: string; doc_id: string; worker_name?: string; kind?: string; amount?: string; note?: string; created_at?: string; receipt?: string };
 
@@ -311,10 +312,16 @@ export default function YearPage() {
         row.category === filter;
       const matchesType = filter !== "employees" || crewType === "all" || row.workerKind === crewType;
       const matchesWorker = filter !== "employees" || worker === "all" || row.worker === worker;
-      const haystack = `${row.date} ${row.client} ${row.number} ${row.category} ${row.worker || ""} ${row.method} ${row.ref} ${row.note}`.toLowerCase();
-      return matchesFilter && matchesType && matchesWorker && haystack.includes(search.toLowerCase());
+      return matchesFilter && matchesType && matchesWorker;
     });
-    return filtered.sort((a, b) => {
+    const docById = new Map(documents.map((doc) => [doc.id, doc]));
+    // "1003", "INV-1003" or "PROP-1003" finds that document; other searches match the row text.
+    const searched = searchWithNumbers(filtered, search, (row) => row.number, (row) => {
+      const doc = docById.get(row.docId);
+      const haystack = `${row.date} ${row.client} ${row.number} ${row.category} ${row.worker || ""} ${row.method} ${row.ref} ${row.note} ${row.docType} ${doc?.data?.status || ""}`.toLowerCase();
+      return search.toLowerCase().split(/\s+/).filter(Boolean).every((word) => haystack.includes(word));
+    });
+    return searched.sort((a, b) => {
       if (sortBy === "client") return a.client.localeCompare(b.client);
       if (sortBy === "number") return a.number.localeCompare(b.number);
       if (sortBy === "amount") return b.amount - a.amount;
@@ -322,7 +329,7 @@ export default function YearPage() {
       if (sortBy === "worker") return String(a.worker || "").localeCompare(String(b.worker || ""));
       return String(b.date).localeCompare(String(a.date));
     });
-  }, [rows, filter, crewType, worker, search, sortBy]);
+  }, [rows, documents, filter, crewType, worker, search, sortBy]);
 
   const summary = useMemo(() => {
     const collected = rows.filter((row) => row.kind === "in").reduce((sum, row) => sum + row.amount, 0);

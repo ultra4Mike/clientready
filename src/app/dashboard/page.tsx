@@ -205,7 +205,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5">
+        <a href="/documents?filter=outstanding" data-testid="stat-outstanding" className="block rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
           <div className="flex items-start justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Total outstanding</p>
             <IconWrap>$</IconWrap>
@@ -214,8 +214,8 @@ export default function DashboardPage() {
           <p className="mt-2 text-xs text-[var(--cr-muted)]">
             {stats.outstanding === 0 ? "No outstanding invoices" : "Not marked paid"}
           </p>
-        </div>
-        <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5">
+        </a>
+        <a href="/documents?filter=paid" data-testid="stat-paid" className="block rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
           <div className="flex items-start justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Paid</p>
             <IconWrap>✓</IconWrap>
@@ -224,8 +224,8 @@ export default function DashboardPage() {
           <p className="mt-2 text-xs text-[var(--cr-muted)]">
             {stats.paid === 0 ? "No payments yet" : `${stats.paidRate}% marked paid`}
           </p>
-        </div>
-        <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5">
+        </a>
+        <a href="/documents?filter=overdue" data-testid="stat-overdue" className="block rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
           <div className="flex items-start justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Overdue</p>
             <IconWrap>!</IconWrap>
@@ -234,8 +234,8 @@ export default function DashboardPage() {
           <p className="mt-2 text-xs text-[var(--cr-muted)]">
             {stats.overdueCount === 0 ? "No overdue invoices" : `${stats.overdueCount} overdue`}
           </p>
-        </div>
-        <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5">
+        </a>
+        <a href="/clients" data-testid="stat-clients" className="block rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
           <div className="flex items-start justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Clients</p>
             <IconWrap>☺</IconWrap>
@@ -244,7 +244,7 @@ export default function DashboardPage() {
           <p className="mt-2 text-xs text-[var(--cr-muted)]">
             {clients.length === 0 ? "No clients added" : "Saved clients"}
           </p>
-        </div>
+        </a>
       </div>
 
       {stats.invoiceCount > 0 && (
