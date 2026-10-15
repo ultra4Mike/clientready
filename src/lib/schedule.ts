@@ -40,8 +40,8 @@ export function doneState(schedule: Pick<Schedule, "status" | "confirmedAt">): D
 export const DONE_LABEL: Record<DoneState, string> = { awaiting: "Done · awaiting confirmation", confirmed: "Done · confirmed" };
 /** Same look as done, dashed + amber edge while it still needs the owner's confirmation. */
 export const DONE_CLASS: Record<DoneState, string> = {
-  awaiting: "border-dashed border-amber-500 bg-emerald-500/10 text-emerald-800 dark:text-emerald-100",
-  confirmed: STATUS_CLASS.done,
+  awaiting: "border-2 border-dashed border-orange-400 bg-orange-500/10 text-orange-800 dark:text-orange-200",
+  confirmed: "border-emerald-600 bg-emerald-500/30 font-semibold text-emerald-900 dark:text-emerald-100",
 };
 export function statusLabel(schedule: Pick<Schedule, "status" | "confirmedAt">) {
   const done = doneState(schedule);
