@@ -15,6 +15,7 @@ import { saveCloudDocument } from "@/lib/cloud-docs";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
 import { getTrialState } from "@/lib/trial";
+import { syncClientContact } from "@/lib/client-sync";
 import { saveCrewJobs } from "@/lib/crew";
 import { balanceDue, paidTotal, paymentFields, paymentMethods, readPayments, type Payment } from "@/lib/payments";
 import { JobPhotosEditor, JobPhotoStrip } from "@/components/JobPhotos";
@@ -565,6 +566,9 @@ export default function NewInvoicePage() {
     }, crew);
     await syncScheduleCrewJobs(nextDoc);
     setWorkers(readWorkers());
+    // Contact changes also go to the linked saved client (Clients page / portal).
+    const clientsAfter = await syncClientContact(docClientId, { name: clientName, company: clientCompany, email: clientEmail, phone: clientPhone, address: clientAddress }).catch(() => null);
+    if (clientsAfter) setSavedClients(clientsAfter as SavedClient[]);
     setSaveMessage(isProposal ? "Proposal saved" : "Invoice saved");
   }
 
