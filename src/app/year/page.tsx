@@ -405,7 +405,7 @@ export default function YearPage() {
           <button key={row.id} type="button" onClick={() => openRow(row)} className="grid w-full grid-cols-2 gap-x-4 gap-y-1 border-b border-teal-500/10 px-4 py-3 text-left text-sm transition last:border-b-0 hover:bg-teal-500/5 md:items-center md:grid-cols-[6.5rem_minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.4fr)_7rem]">
             <span className="tabular-nums text-[var(--cr-muted)]">{row.date}</span>
             <span className="min-w-0 truncate font-medium max-md:order-first max-md:col-span-2">{row.worker ? `${row.worker} · ` : ""}{row.number} · {row.client}</span>
-            <span className="truncate">{row.category}</span>
+            <span className="min-w-0 break-words md:truncate">{row.category}</span>
             <span className="min-w-0 truncate text-[var(--cr-muted)] max-md:col-span-2">{row.hours ? `${row.hours} hrs @ $${Number(row.rate || 0).toFixed(2)} ` : ""}{row.method} {row.ref} {row.note}</span>
             <span className="text-right font-semibold tabular-nums max-md:col-start-2 max-md:row-start-2">${row.amount.toFixed(2)}</span>
           </button>
@@ -448,7 +448,7 @@ export default function YearPage() {
           return (
             <div key={label} className="mt-4 w-full">
               <p className="font-medium">{label}: ${total.toFixed(2)}</p>
-              {group.map((row) => <div key={row.id} className="flex flex-wrap gap-x-4 gap-y-0.5 border-b border-slate-200 py-2 text-sm last:border-b-0"><span className="w-24 tabular-nums text-slate-500">{row.date}</span><span>{row.number}</span><span className="flex-1 text-slate-500">{row.note}</span><span className="w-24 text-right font-medium tabular-nums">${row.amount.toFixed(2)}</span></div>)}
+              {group.map((row) => <div key={row.id} className="flex items-start justify-between gap-4 border-b border-slate-200 py-2 text-sm last:border-b-0"><div className="min-w-0 flex-1 sm:flex sm:gap-4"><span className="block tabular-nums text-slate-500 max-sm:text-xs sm:w-24 sm:shrink-0">{row.date}</span><span>{row.number}</span><span className="ml-2 min-w-0 break-words text-slate-500 sm:ml-0 sm:flex-1">{row.note}</span></div><span className="shrink-0 text-right font-medium tabular-nums sm:w-24">${row.amount.toFixed(2)}</span></div>)}
             </div>
           );
         })}
