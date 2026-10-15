@@ -712,7 +712,8 @@ export default function NewInvoicePage() {
   return (
     <SectionDefaults.Provider value={sectionDefaults}>
     <AppShell title={isProposal ? "New proposal" : "New invoice"}>
-      <div className="print-hide mb-6 flex flex-col gap-4 border-b border-teal-500/15 pb-5 lg:flex-row lg:items-end lg:justify-between">
+      <div className="print-hide mb-6 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0" data-testid="doc-stage" data-stage={docStage.stage} data-next-action={docStage.next}>
           <p className="text-xs font-semibold uppercase tracking-wider text-teal-600 dark:text-teal-300">{isProposal ? "Proposal" : "Invoice"}</p>
           <div className="mt-1 flex flex-wrap items-center gap-3">
@@ -733,8 +734,9 @@ export default function NewInvoicePage() {
         </div>
       </div>
       {docId && (
-        <div className="print-hide mb-6" data-testid="stage-bar" data-stage={docStage.stage} data-next-action={docStage.next}>
+        <div className="print-hide mt-4 border-t border-teal-500/15 pt-4" data-testid="stage-bar" data-stage={docStage.stage} data-next-action={docStage.next}>
           <StageBar
+            embedded
             stages={STAGES.map((stage) => STAGE_LABEL[stage])}
             current={STAGES.indexOf(docStage.stage)}
             nextActionLabel={NEXT_LABEL[docStage.next] || undefined}
@@ -742,6 +744,7 @@ export default function NewInvoicePage() {
           />
         </div>
       )}
+      </div>
       <section className="print-reset mx-auto grid max-w-6xl gap-6 py-2 sm:py-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-8">
         <form className="space-y-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none sm:p-6">
 {locked && (
