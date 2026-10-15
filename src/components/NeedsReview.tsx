@@ -53,14 +53,14 @@ export default function NeedsReview({ documents, onDocuments, loading = false, o
       ) : (
         <ul className="divide-y divide-teal-500/10">
           {items.map((item) => (
-            <li key={`${item.docId}:${item.key}`} data-testid={`review-${item.kind}`} data-key={item.key} className="flex items-center gap-3 py-2.5">
+            <li key={`${item.docId}:${item.key}`} data-testid={`review-${item.kind}`} data-key={item.key} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:gap-3 sm:py-2.5">
               <a href={item.href} className="min-w-0 flex-1">
                 <span className="text-xs font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-300">{LABEL[item.kind]}</span>
-                <span className="block truncate text-sm font-medium">{item.title}</span>
-                <span className="block truncate text-xs text-[var(--cr-muted)]">{item.detail}</span>
+                <span className="block text-sm font-medium break-words sm:truncate">{item.title}</span>
+                <span className="block text-xs text-[var(--cr-muted)] break-words sm:truncate">{item.detail}</span>
               </a>
               <button type="button" disabled={Boolean(busy)} onClick={() => review(item)} data-testid="mark-reviewed"
-                className="tap shrink-0 rounded-lg border border-teal-500/30 px-3 py-1.5 text-xs font-medium text-teal-700 transition hover:bg-teal-500/10 disabled:opacity-50 dark:text-teal-200">
+                className="tap min-h-11 shrink-0 self-start rounded-lg border border-teal-500/30 px-3 py-1.5 text-xs sm:min-h-0 sm:self-auto font-medium text-teal-700 transition hover:bg-teal-500/10 disabled:opacity-50 dark:text-teal-200">
                 {busy === `${item.docId}:${item.key}` ? "Saving…" : item.kind === "done" ? "Confirm done" : "Mark reviewed"}
               </button>
             </li>
