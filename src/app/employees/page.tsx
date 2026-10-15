@@ -192,10 +192,10 @@ export default function EmployeesPage() {
 
   return (
     <AppShell title="Employees">
-      <p className="text-[var(--cr-muted)]">
+      <p className="text-sm text-[var(--cr-muted)] sm:text-base">
         Add the email they will use to log in. That email opens the crew page, not the owner books.
       </p>
-      <form onSubmit={handleSubmit} className="mt-6 grid gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 md:grid-cols-2">
+      <form onSubmit={handleSubmit} className="mt-5 grid gap-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-6 md:grid-cols-2">
         <div className="grid gap-3 rounded-xl border border-teal-500/20 p-4 md:col-span-2 md:grid-cols-2">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-500 md:col-span-2">Person & role</h2>
         <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
@@ -209,44 +209,45 @@ export default function EmployeesPage() {
         </div>
         <div className="grid gap-3 rounded-xl border border-teal-500/20 p-4 md:col-span-2 md:grid-cols-2">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-500 md:col-span-2">Pay & start date</h2>
-        <label className="text-sm">
+        <label className="text-sm font-medium">
           Hourly rate
           <input className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="24" value={form.rate} onChange={(event) => setForm({ ...form, rate: event.target.value })} />
         </label>
-        <label className="text-sm">
+        <label className="text-sm font-medium">
           Hire date
           <input type="date" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={form.hireDate} onChange={(event) => setForm({ ...form, hireDate: event.target.value })} />
         </label>
         </div>
-        <button type="submit" className="rounded-lg bg-teal-400 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300 md:col-span-2">
+        <button type="submit" className="rounded-lg bg-teal-400 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300 md:col-span-2 md:justify-self-end md:px-8">
           {editingId ? "Update employee" : "Save employee"}
         </button>
-        <p className="text-sm text-[var(--cr-muted)] md:col-span-2">No Social Security number, bank account, or routing number.</p>
+        <p className="text-xs text-[var(--cr-muted)] md:col-span-2 md:text-right">No Social Security number, bank account, or routing number.</p>
       </form>
-      {message && <p className="mt-3 text-sm text-[var(--cr-muted)]">{message}</p>}
+      {message && <p className="mt-3 rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-[var(--cr-muted)]">{message}</p>}
 
-      <div className="mt-6 space-y-3">
-        {employees.length === 0 && <p className="text-[var(--cr-muted)]">No employees yet.</p>}
+      <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Team</h2>
+      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        {employees.length === 0 && <p className="rounded-2xl border border-dashed border-teal-500/30 p-8 text-center text-sm text-[var(--cr-muted)] lg:col-span-2">No employees yet.</p>}
         {employees.map((person) => (
           <div key={person.id} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
-            <p className="font-medium">{person.name} · ${Number(person.rate || 0).toFixed(2)}/hr</p>
+            <p className="text-base font-semibold">{person.name} <span className="font-medium text-teal-600 dark:text-teal-300">· ${Number(person.rate || 0).toFixed(2)}/hr</span></p>
             <p className="text-sm text-[var(--cr-muted)]">
               {person.kind} · {person.role || "No role"} · {person.active ? "Active" : "Inactive"}
               {person.hireDate ? ` · hired ${person.hireDate}` : ""}
             </p>
             <p className="mt-1 text-sm text-[var(--cr-muted)]">{person.email || "No login email"}</p>
             <p className="text-sm text-[var(--cr-muted)]">{person.phone}</p>
-            <div className="mt-3 flex flex-wrap gap-3">
-              <button type="button" onClick={() => edit(person)} className="text-sm font-medium">Edit</button>
-              <button type="button" onClick={() => setActive(person, !person.active)} className="text-sm font-medium">
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-teal-500/10 pt-3">
+              <button type="button" onClick={() => edit(person)} className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400">Edit</button>
+              <button type="button" onClick={() => setActive(person, !person.active)} className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400">
                 {person.active ? "Mark inactive" : "Mark active"}
               </button>
-              <button type="button" onClick={() => remove(person)} className="text-sm text-[var(--cr-muted)]">Remove</button>
+              <button type="button" onClick={() => remove(person)} className="rounded-lg px-3 py-1.5 text-sm text-[var(--cr-muted)] transition hover:bg-red-500/10 hover:text-red-500">Remove</button>
             </div>
-            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            <div className="mt-4 grid gap-2 rounded-xl bg-teal-500/5 p-3 sm:grid-cols-3">
               <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="New rate" value={editingId === person.id ? raiseRate : ""} onChange={(event) => { setEditingId(person.id); setRaiseRate(event.target.value); }} />
               <input type="date" className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={editingId === person.id ? raiseDate : ""} onChange={(event) => { setEditingId(person.id); setRaiseDate(event.target.value); }} />
-              <button type="button" onClick={() => giveRaise(person)} className="rounded-lg border border-teal-500/40 px-3 py-2 text-sm">Save raise</button>
+              <button type="button" onClick={() => giveRaise(person)} className="rounded-lg border border-teal-500/40 px-3 py-2.5 text-sm font-medium transition hover:border-teal-400 hover:bg-teal-500/10">Save raise</button>
             </div>
           </div>
         ))}
