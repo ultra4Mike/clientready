@@ -278,7 +278,7 @@ export default function YearPage() {
 
   return (
     <AppShell title="Year packet">
-      <div className="mb-4 grid gap-3 md:grid-cols-4">
+      <div className="mb-4 grid gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 sm:grid-cols-2 md:grid-cols-4 print:hidden">
         <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={year} onChange={(event) => setYear(event.target.value)} />
         <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Search client, invoice, worker" value={search} onChange={(event) => setSearch(event.target.value)} />
         <select className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={filter} onChange={(event) => { setFilter(event.target.value); setCrewType("all"); setWorker("all"); }}>
@@ -303,7 +303,7 @@ export default function YearPage() {
       </div>
 
       {filter === "employees" && (
-        <div className="mb-4 grid gap-3 md:grid-cols-2">
+        <div className="mb-4 grid gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 md:grid-cols-2 print:hidden">
           <select className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={crewType} onChange={(event) => { setCrewType(event.target.value); setWorker("all"); }}>
             <option value="all">Employees and contractors</option>
             <option value="employee">Employees</option>
@@ -316,12 +316,12 @@ export default function YearPage() {
         </div>
       )}
 
-      <button type="button" onClick={() => window.print()} className="mb-4 rounded-lg bg-teal-400 px-4 py-2 text-sm font-medium text-slate-950">Print / Save PDF</button>
+      <button type="button" onClick={() => window.print()} className="mb-4 w-full rounded-lg bg-teal-400 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300 sm:w-auto print:hidden">Print / Save PDF</button>
 
-      <div className="mb-6 space-y-2">
-        {visible.length === 0 && <p className="text-[var(--cr-muted)]">No rows match that search.</p>}
+      <div className="mb-6 space-y-2 print:hidden">
+        {visible.length === 0 && <p className="rounded-xl border border-dashed border-teal-500/30 p-6 text-center text-sm text-[var(--cr-muted)]">No rows match that search.</p>}
         {visible.map((row) => (
-          <button key={row.id} type="button" onClick={() => openRow(row)} className="block w-full rounded-xl border border-teal-500/20 bg-[var(--cr-card)] p-4 text-left">
+          <button key={row.id} type="button" onClick={() => openRow(row)} className="block w-full rounded-xl border border-teal-500/20 bg-[var(--cr-card)] p-4 text-left shadow-sm transition hover:border-teal-400/60">
             <p className="font-medium">{row.worker ? `${row.worker} · ` : ""}{row.number} · {row.client}</p>
             <p className="text-sm text-[var(--cr-muted)]">
               {row.date} · {row.category} · ${row.amount.toFixed(2)}
@@ -331,23 +331,25 @@ export default function YearPage() {
         ))}
       </div>
 
-      <div id="preview" className="rounded-2xl border border-slate-200 bg-white p-8 text-slate-900">
-        <p className="text-sm uppercase tracking-wide text-slate-500">Sales and expense log</p>
-        <h1 className="mt-1 text-2xl font-semibold">{businessName}</h1>
+      <div id="preview" className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-sm sm:p-8">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sales and expense log</p>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight">{businessName}</h1>
         <p className="text-sm text-slate-600">{year}{taxId ? ` · EIN ${taxId}` : ""}</p>
-        <p className="mt-4">Collected: ${summary.collected.toFixed(2)}</p>
-        <p>Expenses: ${summary.spent.toFixed(2)}</p>
-        <p>Crew pay included: ${summary.wages.toFixed(2)}</p>
-        <p>Profit: ${summary.profit.toFixed(2)}</p>
-        <p>Set aside ({setAsidePercent}%): ${summary.setAside.toFixed(2)}</p>
-        <p className="font-semibold">Yours after set-aside: ${summary.yours.toFixed(2)}</p>
+        <div className="mt-5 max-w-md divide-y divide-slate-200 border-y border-slate-200 text-sm">
+          <div className="flex justify-between gap-4 py-2"><span className="text-slate-600">Collected</span><span className="tabular-nums">${summary.collected.toFixed(2)}</span></div>
+          <div className="flex justify-between gap-4 py-2"><span className="text-slate-600">Expenses</span><span className="tabular-nums">${summary.spent.toFixed(2)}</span></div>
+          <div className="flex justify-between gap-4 py-2"><span className="text-slate-600">Crew pay included</span><span className="tabular-nums">${summary.wages.toFixed(2)}</span></div>
+          <div className="flex justify-between gap-4 py-2"><span className="text-slate-600">Profit</span><span className="tabular-nums">${summary.profit.toFixed(2)}</span></div>
+          <div className="flex justify-between gap-4 py-2"><span className="text-slate-600">Set aside ({setAsidePercent}%)</span><span className="tabular-nums">${summary.setAside.toFixed(2)}</span></div>
+          <div className="flex justify-between gap-4 py-2 font-semibold"><span>Yours after set-aside</span><span className="tabular-nums">${summary.yours.toFixed(2)}</span></div>
+        </div>
 
-        <h2 className="mt-8 font-semibold">Money in</h2>
+        <h2 className="mt-8 border-b border-slate-200 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-700">Money in</h2>
         {rows.filter((row) => row.kind === "in").map((row) => (
           <p key={row.id} className="mt-2 text-sm">{row.date} · {row.client} · {row.number} · ${row.amount.toFixed(2)} · {row.method} {row.ref}</p>
         ))}
 
-        <h2 className="mt-8 font-semibold">Crew pay</h2>
+        <h2 className="mt-8 border-b border-slate-200 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-700">Crew pay</h2>
         {workers.map((person) => (
           <div key={person.name} className="mt-4">
             <p className="font-medium">{person.name}: ${person.total.toFixed(2)} · {person.hours.toFixed(2)} hrs</p>
@@ -357,7 +359,7 @@ export default function YearPage() {
           </div>
         ))}
 
-        <h2 className="mt-8 font-semibold">Other money out</h2>
+        <h2 className="mt-8 border-b border-slate-200 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-700">Other money out</h2>
         {["Parts and materials", "Gas / diesel", "Job supplies", "Lunch / meals cost", "Other fees"].map((label) => {
           const group = rows.filter((row) => row.category === label);
           const total = group.reduce((sum, row) => sum + row.amount, 0);
