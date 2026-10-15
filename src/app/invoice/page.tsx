@@ -685,7 +685,7 @@ export default function NewInvoicePage() {
           {!locked && daysLeft <= 5 && (
             <p className="text-sm text-slate-600">{daysLeft} day{daysLeft === 1 ? "" : "s"} left in the trial.</p>
           )}
-          <fieldset disabled={locked} className="min-w-0 space-y-4 pb-2">
+          <fieldset disabled={locked} className="min-w-0 space-y-4 pb-6">
             <div className="flex gap-2">
               <button type="button" onClick={() => chooseKind("invoice")} className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${!isProposal ? "bg-teal-500 text-slate-950! shadow-sm" : "border border-slate-300 hover:border-teal-500"}`}>Invoice</button>
               <button type="button" onClick={() => chooseKind("proposal")} className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${isProposal ? "bg-teal-500 text-slate-950! shadow-sm" : "border border-slate-300 hover:border-teal-500"}`}>Proposal</button>
@@ -784,7 +784,7 @@ export default function NewInvoicePage() {
               <label className="block text-sm font-medium text-slate-600">
                 Pay link for this invoice (optional)
                 <input className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="https://… (uses your profile pay link if blank)" value={docPayLink} onChange={(event) => setDocPayLink(event.target.value)} />
-                <span className="mt-1 block text-xs text-slate-500" data-testid="pay-qr-note">
+                <span className="mt-1 block text-xs text-slate-600" data-testid="pay-qr-note">
                   {payUrl ? `"Scan to pay" QR will link to ${payUrl}` : docPayLink.trim() ? "Not a web link (must start with http:// or https://), so no QR code is shown." : "No web pay link yet, so no QR code is shown. Add one here or in Profile."}
                 </span>
               </label>
@@ -823,7 +823,7 @@ export default function NewInvoicePage() {
                   </div>
                 ))}
               </div>
-              <div className="rounded-lg border border-amber-200 bg-white p-3 text-slate-900">
+              <div className="rounded-xl border border-slate-200 bg-white p-4 text-slate-900">
                 <p className="text-sm font-medium text-slate-900">Crew on this job ({crew.length})</p>
                 <div className="mt-2 flex gap-2">
                   <select className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={pickedEmployee} onChange={(event) => setPickedEmployee(event.target.value)}>
@@ -892,7 +892,7 @@ export default function NewInvoicePage() {
               </div>
               {docId && !locked
                 ? <ScheduleEditor key={scheduleKey} value={schedule} workers={workers} onSave={saveJobSchedule} confirmRemove={(ids) => confirmRemoval(workLogged(crew, ids, clockHoursFor(docId)))} />
-                : <p className="text-xs text-slate-500">Save the document first, then schedule the job here or on the Calendar.</p>}
+                : <p className="text-xs text-slate-600">Save the document first, then schedule the job here or on the Calendar.</p>}
               {docId && <JobDonePanel docId={docId} schedule={schedule} onConfirmed={(next) => { setSchedule(next); setScheduleKey((key) => key + 1); }} />}
             </div>
             {docId && !locked && <ApprovalShare docId={docId} approval={approval} onChange={setApproval} />}
@@ -921,7 +921,7 @@ export default function NewInvoicePage() {
                   )}
                   {recFreq !== "off" && !locked && <button type="button" onClick={generateRecurringNow} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium transition hover:border-teal-500">Generate next invoice now</button>}
                 </div>
-                <p className="text-xs text-slate-500">Drafts are made when the app opens on or after the next run date. They are never sent or marked paid. Save the document to keep schedule changes.</p>
+                <p className="text-xs text-slate-600">Drafts are made when the app opens on or after the next run date. They are never sent or marked paid. Save the document to keep schedule changes.</p>
               </div>
             )}
             {(fromProposal || madeInvoices.length > 0) && (
