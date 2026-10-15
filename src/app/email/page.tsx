@@ -207,10 +207,12 @@ async function saveDocument() {
   return (
     <AppShell title="Clients email">
 
-      <section className="mx-auto grid max-w-6xl gap-8 px-6 py-8 lg:grid-cols-2">
-        <form className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
-          <h1 className="text-xl font-semibold">Email details</h1>
+      <section className="mx-auto grid max-w-6xl gap-6 py-2 sm:py-4 lg:grid-cols-2 lg:gap-8">
+        <form className="space-y-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+          <h1 className="text-xl font-bold tracking-tight">Email details</h1>
 
+          <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Client & email type</h2>
           <div>
             <input
               className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
@@ -225,7 +227,7 @@ async function saveDocument() {
                     key={client.id}
                     type="button"
                     onClick={() => chooseClient(client)}
-                    className="block w-full border-b border-slate-100 px-3 py-2 text-left hover:bg-slate-50"
+                    className="block w-full border-b border-slate-100 px-3 py-2.5 text-left transition last:border-0 hover:bg-teal-500/10"
                   >
                     <span className="block font-medium">{client.name}</span>
                     <span className="block text-sm text-slate-500">
@@ -267,14 +269,17 @@ async function saveDocument() {
             value={clientEmail}
             onChange={(event) => setClientEmail(event.target.value)}
           />
-          <input
+          </div>
+          <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Message</h2>
+                    <input
             className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
             placeholder="Subject / project"
             value={subject}
             onChange={(event) => setSubject(event.target.value)}
           />
           <textarea
-            className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2"
+            className="min-h-28 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
             placeholder="Key points"
             value={points}
             onChange={(event) => setPoints(event.target.value)}
@@ -299,8 +304,9 @@ async function saveDocument() {
             value={yourName}
             onChange={(event) => setYourName(event.target.value)}
           />
+          </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="print-hide sticky bottom-0 z-10 -mx-4 flex flex-col gap-2 border-t border-slate-200 bg-[var(--cr-card)] px-4 py-3 sm:-mx-6 sm:flex-row sm:px-6">
             <button
               type="button"
               onClick={saveDocument}
@@ -316,19 +322,19 @@ async function saveDocument() {
               Save as client
             </button>
           </div>
-          {saveMessage && <p className="text-sm text-slate-600">{saveMessage}</p>}
+          {saveMessage && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-slate-600">{saveMessage}</p>}
         </form>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <p className="text-sm text-slate-500">Subject</p>
-          <p className="font-medium">{subject || "Email subject"}</p>
-          <pre className="mt-6 whitespace-pre-wrap font-sans text-sm leading-6 text-slate-700">
+        <div className="h-fit rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8 lg:sticky lg:top-20">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Subject</p>
+          <p className="mt-1 text-lg font-semibold">{subject || "Email subject"}</p>
+          <pre className="mt-5 whitespace-pre-wrap border-t border-slate-200 pt-5 font-sans text-sm leading-6 text-slate-700">
             {emailText}
           </pre>
           <button
             type="button"
             onClick={copyEmail}
-            className="mt-6 rounded-lg bg-slate-900 px-4 py-2 text-sm text-white"
+            className="mt-6 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400 sm:w-auto"
           >
             {copied ? "Copied" : "Copy email"}
           </button>
