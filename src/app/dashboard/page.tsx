@@ -203,42 +203,42 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <a href="/documents?filter=outstanding" data-testid="stat-outstanding" data-loading={loaded ? undefined : "true"} className="block rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
+        <a href="/documents?filter=outstanding" data-testid="stat-outstanding" data-loading={loaded ? undefined : "true"} className="group block data-[loading=true]:pointer-events-none data-[loading=true]:animate-pulse rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
           <div className="flex items-start justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Total outstanding</p>
             <IconWrap>$</IconWrap>
           </div>
-          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight sm:text-3xl">{loaded ? `$${stats.outstanding.toFixed(2)}` : "—"}</p>
+          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight group-data-[loading=true]:w-24 group-data-[loading=true]:rounded-md group-data-[loading=true]:bg-teal-500/15 group-data-[loading=true]:text-transparent sm:text-3xl">{loaded ? `$${stats.outstanding.toFixed(2)}` : "—"}</p>
           <p className="mt-2 text-xs text-[var(--cr-muted)]">
             {!loaded ? "Loading…" : stats.outstanding === 0 ? "No outstanding invoices" : "Not marked paid"}
           </p>
         </a>
-        <a href="/documents?filter=paid" data-testid="stat-paid" data-loading={loaded ? undefined : "true"} className="block rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
+        <a href="/documents?filter=paid" data-testid="stat-paid" data-loading={loaded ? undefined : "true"} className="group block data-[loading=true]:pointer-events-none data-[loading=true]:animate-pulse rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
           <div className="flex items-start justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Paid</p>
             <IconWrap>✓</IconWrap>
           </div>
-          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight sm:text-3xl">{loaded ? `$${stats.paid.toFixed(2)}` : "—"}</p>
+          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight group-data-[loading=true]:w-24 group-data-[loading=true]:rounded-md group-data-[loading=true]:bg-teal-500/15 group-data-[loading=true]:text-transparent sm:text-3xl">{loaded ? `$${stats.paid.toFixed(2)}` : "—"}</p>
           <p className="mt-2 text-xs text-[var(--cr-muted)]">
             {!loaded ? "Loading…" : stats.paid === 0 ? "No payments yet" : `${stats.paidRate}% marked paid`}
           </p>
         </a>
-        <a href="/documents?filter=overdue" data-testid="stat-overdue" data-loading={loaded ? undefined : "true"} className="block rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
+        <a href="/documents?filter=overdue" data-testid="stat-overdue" data-loading={loaded ? undefined : "true"} className="group block data-[loading=true]:pointer-events-none data-[loading=true]:animate-pulse rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
           <div className="flex items-start justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Overdue</p>
             <IconWrap>!</IconWrap>
           </div>
-          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight sm:text-3xl">{loaded ? `$${stats.overdue.toFixed(2)}` : "—"}</p>
+          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight group-data-[loading=true]:w-24 group-data-[loading=true]:rounded-md group-data-[loading=true]:bg-teal-500/15 group-data-[loading=true]:text-transparent sm:text-3xl">{loaded ? `$${stats.overdue.toFixed(2)}` : "—"}</p>
           <p className="mt-2 text-xs text-[var(--cr-muted)]">
             {!loaded ? "Loading…" : stats.overdueCount === 0 ? "No overdue invoices" : `${stats.overdueCount} overdue`}
           </p>
         </a>
-        <a href="/clients" data-testid="stat-clients" data-loading={loaded ? undefined : "true"} className="block rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
+        <a href="/clients" data-testid="stat-clients" data-loading={loaded ? undefined : "true"} className="group block data-[loading=true]:pointer-events-none data-[loading=true]:animate-pulse rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
           <div className="flex items-start justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Clients</p>
             <IconWrap>☺</IconWrap>
           </div>
-          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight sm:text-3xl">{loaded ? clients.length : "—"}</p>
+          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight group-data-[loading=true]:w-24 group-data-[loading=true]:rounded-md group-data-[loading=true]:bg-teal-500/15 group-data-[loading=true]:text-transparent sm:text-3xl">{loaded ? clients.length : "—"}</p>
           <p className="mt-2 text-xs text-[var(--cr-muted)]">
             {!loaded ? "Loading…" : clients.length === 0 ? "No clients added" : "Saved clients"}
           </p>
@@ -320,11 +320,11 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 gap-2 text-sm">
             <a href="/collect" className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 transition hover:border-amber-400">
               <span className="block text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Overdue</span>
-              <span className="mt-1 block text-lg font-bold tabular-nums">{loaded ? stats.overdueCount : "—"}</span>
+              <span className={`mt-1 block text-lg font-bold tabular-nums ${loaded ? "" : "animate-pulse opacity-50"}`}>{loaded ? stats.overdueCount : "—"}</span>
             </a>
             <a href="/documents?filter=outstanding" className="rounded-xl border border-teal-500/30 bg-teal-500/5 p-3 transition hover:border-teal-400">
               <span className="block text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Outstanding</span>
-              <span className="mt-1 block text-lg font-bold tabular-nums">{loaded ? `$${stats.outstanding.toFixed(0)}` : "—"}</span>
+              <span className={`mt-1 block text-lg font-bold tabular-nums ${loaded ? "" : "animate-pulse opacity-50"}`}>{loaded ? `$${stats.outstanding.toFixed(0)}` : "—"}</span>
             </a>
           </div>
           <h2 className="pt-2 text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Quick actions</h2>
