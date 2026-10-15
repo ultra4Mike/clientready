@@ -23,6 +23,13 @@ const moreLinks = [
   { href: "/backup", label: "Backup" },
 ];
 
+const QUICK_CREATE = [
+  { href: "/invoice", label: "New invoice" },
+  { href: "/proposal", label: "New proposal" },
+  { href: "/clients", label: "Add client" },
+  { href: "/schedule", label: "Schedule" },
+];
+
 const TAB_HREFS = ["/dashboard", "/documents", "/calendar", "/clients"];
 
 const ICON_PATHS: Record<string, string> = {
@@ -62,6 +69,7 @@ export default function AppShell({
   const [theme, setTheme] = useState("dark");
   const [wide, setWide] = useState(true);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 useEffect(() => {
     const savedTheme = window.localStorage.getItem("clientready-theme") || "dark";
     setTheme(savedTheme);
@@ -178,6 +186,27 @@ useEffect(() => {
               </div>
             </div>
           )}
+          {createOpen && <div className="fixed inset-0 z-40 print:hidden" onClick={() => setCreateOpen(false)} />}
+          <div className="fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 flex flex-col items-end gap-2 print:hidden">
+            {createOpen && (
+              <div className="w-48 overflow-hidden rounded-2xl border border-teal-500/20 bg-[var(--cr-panel)] py-1 shadow-2xl">
+                {QUICK_CREATE.map((item) => (
+                  <a key={item.href} href={item.href} className="block px-4 py-3 text-sm font-medium transition hover:bg-teal-500/10">
+                    {item.label}
+                  </a>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              aria-label="Quick create"
+              aria-expanded={createOpen}
+              onClick={() => setCreateOpen(!createOpen)}
+              className="flex h-14 w-14 items-center justify-center rounded-full bg-teal-500 text-slate-950! shadow-lg shadow-teal-500/30 transition hover:bg-teal-400"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" className={`h-7 w-7 transition-transform ${createOpen ? "rotate-45" : ""}`} fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+            </button>
+          </div>
           <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-50 border-t border-teal-500/20 bg-[var(--cr-panel)]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur print:hidden">
             <div className="mx-auto grid max-w-lg grid-cols-5">
               {mainLinks.filter((link) => TAB_HREFS.includes(link.href)).map((link) => (
