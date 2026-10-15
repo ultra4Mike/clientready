@@ -58,7 +58,7 @@ function monthKey(value: string) {
 
 function IconWrap({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal-500/10 text-teal-600 ring-1 dark:text-teal-300 ring-teal-400/30">
+    <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-teal-500/15 text-lg text-teal-600 ring-1 dark:text-teal-300 ring-teal-400/30">
       {children}
     </span>
   );
@@ -135,7 +135,7 @@ export default function DashboardPage() {
     return { points, max };
   }, [invoices]);
 
-  const width = 520;
+  const width = 1000;
   const height = 180;
   const path = chart.points
     .map((point, index) => {
@@ -198,7 +198,7 @@ export default function DashboardPage() {
         </form>
         <a
           href="/invoice"
-          className="shrink-0 rounded-xl bg-teal-500 px-5 py-2.5 text-center text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400"
+          className="shrink-0 rounded-xl bg-teal-500 px-5 py-2.5 text-center text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500"
         >
           New invoice +
         </a>
@@ -251,9 +251,9 @@ export default function DashboardPage() {
         <div className="mt-6 rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-base font-semibold">Invoice overview</h2>
-            <span className="text-xs text-[var(--cr-muted)]">Last 6 months</span>
+            <span className="text-xs text-[var(--cr-muted)]">Last 6 months · {stats.paidRate}% of invoices marked paid</span>
           </div>
-          <svg viewBox={`0 0 ${width} ${height}`} className="h-48 w-full">
+          <svg viewBox={`0 0 ${width} ${height}`} className="h-56 w-full">
             {[1, 2, 3, 4].map((line) => (
               <line
                 key={line}
@@ -262,7 +262,7 @@ export default function DashboardPage() {
                 y1={20 + line * 35}
                 y2={20 + line * 35}
                 stroke="currentColor"
-                opacity="0.15"
+                opacity="0.3"
               />
             ))}
             <path d={path} fill="none" stroke="#2dd4bf" strokeWidth="3" />
@@ -312,11 +312,6 @@ export default function DashboardPage() {
         </a>
       </div>
 
-      {stats.invoiceCount > 0 && (
-        <p className="mt-6 text-sm text-[var(--cr-muted)]">
-          {stats.paidRate}% of your invoices are marked paid.
-        </p>
-      )}
     </AppShell>
   );
 }
