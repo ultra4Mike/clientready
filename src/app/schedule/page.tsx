@@ -1,6 +1,10 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { loadAccountIntoCache } from "@/lib/account-cache";
+import { uniqueDocs } from "@/lib/change-orders";
+import { localYmd, niceYmd, scheduledJobs, timeLabel, type ScheduledJob } from "@/lib/scheduled-jobs";
+import { STATUS_LABEL } from "@/lib/schedule";
 
 type Client = {
   id: string;
@@ -26,12 +30,22 @@ export default function SchedulePage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [form, setForm] = useState(emptyForm);
+  const [jobs, setJobs] = useState<ScheduledJob[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     const clientsRaw = window.localStorage.getItem("clientready-clients");
     const apptRaw = window.localStorage.getItem("clientready-appointments");
     if (clientsRaw) setClients(JSON.parse(clientsRaw));
     if (apptRaw) setAppointments(JSON.parse(apptRaw));
+    // Jobs scheduled on invoices/proposals: the same source as the calendar, from today on.
+    const readJobs = () => {
+      const raw = window.localStorage.getItem("clientready-documents");
+      const today = localYmd();
+      setJobs(scheduledJobs(raw ? uniqueDocs(JSON.parse(raw) as ScheduledJob["doc"][]) : []).filter(({ schedule }) => schedule.date >= today));
+    };
+    readJobs();
+    loadAccountIntoCache().catch(() => false).then(() => { readJobs(); setLoaded(true); });
   }, []);
 
   function saveAppointments(next: Appointment[]) {
@@ -126,7 +140,16 @@ export default function SchedulePage() {
         </form>
 
         <div className="space-y-3">
-          {appointments.length === 0 && (
+          {jobs.length > 0 && <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Scheduled jobs</h2>}
+          {jobs.map(({ doc, schedule }) => (
+            <a key={`job-${doc.id}`} href={`/invoice?id=${encodeURIComponent(doc.id)}`} data-testid="schedule-job" className="block rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm transition hover:border-teal-400">
+              <p className="text-base font-semibold">{doc.clientName || doc.title}</p>
+              <p className="mt-0.5 text-sm font-medium text-teal-600">{niceYmd(schedule.date)}{schedule.startTime ? ` at ${timeLabel(schedule.startTime)}` : ""}</p>
+              <p className="mt-1 text-sm text-slate-600">{doc.title} · {STATUS_LABEL[schedule.status]}</p>
+            </a>
+          ))}
+          {jobs.length > 0 && appointments.length > 0 && <h2 className="pt-2 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Other appointments</h2>}
+          {loaded && jobs.length === 0 && appointments.length === 0 && (
             <p className="rounded-2xl border border-dashed border-teal-500/30 bg-[var(--cr-card)] p-8 text-center text-sm text-slate-600">No appointments yet.</p>
           )}
           {appointments

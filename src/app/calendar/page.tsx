@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import ScheduleEditor from "@/components/ScheduleEditor";
 import { uniqueDocs } from "@/lib/change-orders";
+import { scheduledJobs } from "@/lib/scheduled-jobs";
 import { confirmRemovalFor, moveSchedule, readSchedule, readWorkers, saveSchedule, STATUS_CLASS, STATUS_LABEL, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
 
 type SavedDocument = {
@@ -65,10 +66,7 @@ export default function CalendarPage() {
   const workerName = useMemo(() => new Map(workers.map((person) => [person.id, person.name])), [workers]);
 
   const jobDocs = docs.filter((doc) => doc.type === "invoice" || doc.type === "proposal");
-  const jobs: Job[] = jobDocs.flatMap((doc) => {
-    const schedule = readSchedule(doc.data);
-    return schedule ? [{ doc, schedule }] : [];
-  });
+  const jobs: Job[] = scheduledJobs(jobDocs);
   const unscheduled = jobDocs.filter((doc) => !readSchedule(doc.data) && text(doc.data?.status) !== "paid");
 
   async function save(docId: string, schedule: Schedule | null, options?: { keepOpen?: boolean; confirmed?: string[] }) {

@@ -4,6 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { amountOf, documentTotals } from "@/lib/discount";
 import { uniqueDocs } from "@/lib/change-orders";
+import { loadAccountIntoCache } from "@/lib/account-cache";
+import { addDaysYmd, localYmd, niceYmd, scheduledJobs, timeLabel } from "@/lib/scheduled-jobs";
+import { STATUS_LABEL } from "@/lib/schedule";
 
 type LineItem = {
   description?: string;
@@ -13,6 +16,7 @@ type LineItem = {
 
 type SavedDocument = {
   id: string;
+  [key: string]: unknown;
   type: string;
   title: string;
   clientName: string;
@@ -20,6 +24,7 @@ type SavedDocument = {
     dueDate?: string;
     status?: string;
     jobTime?: string;
+    [key: string]: unknown;
     taxPercent?: string;
     discountType?: string;
     discountValue?: string;
@@ -35,40 +40,35 @@ function invoiceTotal(doc: SavedDocument) {
   return documentTotals(subtotal, doc.data?.taxPercent, doc.data?.discountType, doc.data?.discountValue).total;
 }
 
-function niceDate(date: string) {
-  return new Date(date + "T00:00:00").toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "long",
-    day: "numeric",
-  });
-}
 
 export default function UpcomingPage() {
   const [documents, setDocuments] = useState<SavedDocument[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    const raw = window.localStorage.getItem("clientready-documents");
-    if (raw) setDocuments(uniqueDocs(JSON.parse(raw)));
+    const read = () => {
+      const raw = window.localStorage.getItem("clientready-documents");
+      setDocuments(raw ? uniqueDocs(JSON.parse(raw)) : []);
+    };
+    read();
+    // Same data as the calendar: refresh from the account, then read again.
+    loadAccountIntoCache().catch(() => false).then(() => { read(); setLoaded(true); });
   }, []);
 
+  // Today and the next 6 days, as local dates (same as the calendar).
+  const today = localYmd();
+  const last = addDaysYmd(today, 6);
+  const jobs = useMemo(
+    () => scheduledJobs(documents).filter(({ schedule }) => schedule.date >= today && schedule.date <= last),
+    [documents, today, last],
+  );
   const upcoming = useMemo(() => {
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 7);
-
+    const scheduled = new Set(jobs.map(({ doc }) => doc.id));
     return documents
-      .filter((doc) => doc.type === "invoice" && doc.data?.dueDate)
-      .filter((doc) => {
-        const date = new Date(doc.data?.dueDate + "T00:00:00");
-        return date >= start && date <= end;
-      })
-      .sort((a, b) => {
-        const aKey = `${a.data?.dueDate}-${a.data?.jobTime || ""}`;
-        const bKey = `${b.data?.dueDate}-${b.data?.jobTime || ""}`;
-        return aKey.localeCompare(bKey);
-      });
-  }, [documents]);
+      .filter((doc) => doc.type === "invoice" && !scheduled.has(doc.id) && /^\d{4}-\d{2}-\d{2}$/.test(doc.data?.dueDate || ""))
+      .filter((doc) => doc.data?.status !== "paid" && (doc.data?.dueDate || "") >= today && (doc.data?.dueDate || "") <= last)
+      .sort((a, b) => String(a.data?.dueDate).localeCompare(String(b.data?.dueDate)));
+  }, [documents, jobs, today, last]);
 
   function openView(id: string) {
     window.localStorage.setItem("clientready-open-document", id);
@@ -81,18 +81,39 @@ export default function UpcomingPage() {
       <section className="max-w-4xl py-2 sm:py-4">
         <h1 className="text-2xl font-bold tracking-tight">This week</h1>
         <p className="mt-1 text-sm text-slate-600 sm:text-base">
-          Invoices and jobs due in the next 7 days.
+          Scheduled jobs and invoices due in the next 7 days.
         </p>
 
         <div className="mt-8 space-y-3">
-          {upcoming.length === 0 && (
+          {loaded && jobs.length === 0 && upcoming.length === 0 && (
             <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-teal-500/30 bg-[var(--cr-card)] px-6 py-12 text-center"><span className="flex h-12 w-12 items-center justify-center rounded-full bg-teal-500/15 text-xl">📅</span><p className="text-base font-semibold">Nothing scheduled this week.</p><p className="max-w-sm text-sm text-[var(--cr-muted)]">Invoices due and jobs in the next 7 days will appear here.</p><a href="/calendar" className="mt-2 rounded-lg border border-teal-500/30 px-4 py-2 text-sm font-medium">Open calendar</a></div>
           )}
 
+          {!loaded && jobs.length === 0 && upcoming.length === 0 && <p className="text-sm text-[var(--cr-muted)]" data-loading="true">Loading…</p>}
+
+          {jobs.map(({ doc, schedule }) => (
+            <a
+              key={`job-${doc.id}`}
+              href={`/invoice?id=${encodeURIComponent(doc.id)}`}
+              data-testid="upcoming-job"
+              className="block w-full rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-500 hover:shadow-md"
+            >
+              <p className="text-base font-semibold">
+                {schedule.startTime ? `${timeLabel(schedule.startTime)} · ` : ""}
+                {doc.title} · {doc.clientName}
+              </p>
+              <p className="mt-0.5 text-sm text-slate-600">
+                {niceYmd(schedule.date)} · Job {STATUS_LABEL[schedule.status].toLowerCase()}
+              </p>
+            </a>
+          ))}
+
+          {upcoming.length > 0 && <h2 className="pt-2 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Invoices due</h2>}
           {upcoming.map((doc) => (
             <button
               key={doc.id}
               type="button"
+              data-testid="upcoming-due"
               onClick={() => openView(doc.id)}
               className="block w-full rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-500 hover:shadow-md"
             >
@@ -101,7 +122,7 @@ export default function UpcomingPage() {
                 {doc.title} · {doc.clientName}
               </p>
               <p className="mt-0.5 text-sm text-slate-600">
-                {niceDate(doc.data?.dueDate || "")} · {doc.data?.status || "draft"} · $
+                Due {niceYmd(doc.data?.dueDate || "")} · {doc.data?.status || "draft"} · $
                 {invoiceTotal(doc).toFixed(2)}
               </p>
             </button>
