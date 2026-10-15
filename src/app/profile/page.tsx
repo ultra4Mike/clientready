@@ -137,7 +137,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <AppShell title="Profile">
+    <AppShell title="Settings">
       <PageHeader title="Settings" subtitle="Your business details, how customers pay you, and your login." />
       <div className="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)]">
         <nav className="print-hide hidden lg:block">
