@@ -60,14 +60,14 @@ export default function HistoryPage() {
   return (
     <AppShell title="History">
 
-      <section className="mx-auto max-w-6xl px-6 py-8">
-        <h1 className="text-2xl font-semibold">Client history</h1>
+      <section className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+        <h1 className="text-2xl font-bold tracking-tight">Client history</h1>
         <p className="mt-2 text-slate-600">
           Pick a client to see every document attached to them.
         </p>
 
         <select
-          className="mt-6 w-full max-w-md rounded-lg border border-slate-300 px-3 py-2"
+          className="mt-6 w-full max-w-md rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
           value={selectedName}
           onChange={(event) => setSelectedName(event.target.value)}
         >
@@ -88,7 +88,7 @@ export default function HistoryPage() {
 
             <div className="mt-6 space-y-3">
               {history.length === 0 && (
-                <p className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-600">
+                <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600">
                   No documents for this client yet.
                 </p>
               )}
@@ -97,7 +97,7 @@ export default function HistoryPage() {
                   key={doc.id}
                   type="button"
                   onClick={() => openDocument(doc)}
-                  className="block w-full rounded-2xl border border-slate-200 bg-white p-5 text-left"
+                  className="block w-full rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-500 hover:shadow-md"
                 >
                   <p className="font-medium">{doc.title}</p>
                   <p className="text-sm text-slate-600">

@@ -78,15 +78,15 @@ export default function UpcomingPage() {
   return (
     <AppShell title="Upcoming">
 
-      <section className="mx-auto max-w-6xl px-6 py-8">
-        <h1 className="text-2xl font-semibold">This week</h1>
+      <section className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+        <h1 className="text-2xl font-bold tracking-tight">This week</h1>
         <p className="mt-2 text-slate-600">
           Invoices and jobs due in the next 7 days.
         </p>
 
         <div className="mt-8 space-y-3">
           {upcoming.length === 0 && (
-            <p className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-600">
+            <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600">
               Nothing scheduled this week.
             </p>
           )}
@@ -96,7 +96,7 @@ export default function UpcomingPage() {
               key={doc.id}
               type="button"
               onClick={() => openView(doc.id)}
-              className="block w-full rounded-2xl border border-slate-200 bg-white p-5 text-left"
+              className="block w-full rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-500 hover:shadow-md"
             >
               <p className="font-medium">
                 {doc.data?.jobTime ? `${doc.data.jobTime} · ` : ""}
