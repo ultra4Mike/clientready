@@ -189,9 +189,9 @@ export default function InvoiceViewPage() {
               <span className="flex h-14 w-14 items-center justify-center rounded-full bg-teal-500/15 text-2xl" aria-hidden="true">🧾</span>
               <p className="mt-4 text-lg font-semibold">No invoice selected</p>
               <p className="mt-1 max-w-sm text-sm text-[var(--cr-muted)]">Open an invoice from your documents to view or print it.</p>
-              <div className="mt-6 flex flex-col gap-2 sm:flex-row">
-                <a href="/documents" className="rounded-lg bg-teal-500 px-5 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">Go to Documents</a>
-                <a href="/invoice" className="rounded-lg border border-teal-500/30 px-5 py-2.5 text-sm font-medium transition hover:border-teal-400">New invoice</a>
+              <div className="mt-6 grid w-full max-w-sm grid-cols-1 gap-2 sm:grid-cols-2">
+                <a href="/documents" className="flex min-h-11 items-center justify-center rounded-lg bg-teal-500 px-5 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">Go to Documents</a>
+                <a href="/invoice" className="flex min-h-11 items-center justify-center rounded-lg border border-teal-500/30 px-5 py-2.5 text-sm font-medium transition hover:border-teal-400">New invoice</a>
               </div>
             </>
           )}
