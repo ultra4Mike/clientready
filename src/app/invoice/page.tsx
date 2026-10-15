@@ -11,6 +11,7 @@ import { JobPhotosEditor, JobPhotoStrip } from "@/components/JobPhotos";
 import { isQuotaError, readPhotos, type JobPhoto } from "@/lib/photos";
 import LineSplit from "@/components/LineSplit";
 import { normalizeCategory, type LineCategory } from "@/lib/line-split";
+import { changeOrderData, changeOrdersFor, readChangeOrderOf, type ChangeOrderOf } from "@/lib/change-orders";
 import PayQr from "@/components/PayQr";
 import { payUrlFor } from "@/lib/pay-link";
 import SignaturePad, { SignatureBlock } from "@/components/SignaturePad";
@@ -119,6 +120,7 @@ export default function NewInvoicePage() {
   const [padKey, setPadKey] = useState(0);
   const [docPayLink, setDocPayLink] = useState("");
   const [photos, setPhotos] = useState<JobPhoto[]>([]);
+  const [changeOrderOf, setChangeOrderOf] = useState<ChangeOrderOf | null>(null);
   const [items, setItems] = useState<LineItem[]>([{ ...emptyItem }]);
   const [businessName, setBusinessName] = useState("Your business");
   const [ownerName, setOwnerName] = useState("");
@@ -225,7 +227,7 @@ export default function NewInvoicePage() {
       const data = (doc.data || {}) as {
         clientName?: string; clientCompany?: string; clientEmail?: string; clientPhone?: string; clientAddress?: string;
         invoiceNumber?: string; invoiceDate?: string; dueDate?: string; jobStart?: string; jobEnd?: string; notes?: string;
-        taxPercent?: string; discountType?: string; discountValue?: string; signature?: unknown; proposalSignature?: unknown; payLink?: string; photos?: unknown; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
+        taxPercent?: string; discountType?: string; discountValue?: string; signature?: unknown; proposalSignature?: unknown; payLink?: string; photos?: unknown; changeOrderOf?: unknown; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
       };
       const kind: DocKind = doc.type === "proposal" ? "proposal" : "invoice";
       const loadedItems = Array.isArray(data.items) && data.items.length ? data.items.map((item) => ({ ...item, category: normalizeCategory(item.category) })) : [{ ...emptyItem }];
@@ -253,6 +255,7 @@ export default function NewInvoicePage() {
       setPadKey((key) => key + 1);
       setDocPayLink(data.payLink || "");
       setPhotos(readPhotos(data.photos));
+      setChangeOrderOf(kind === "invoice" ? readChangeOrderOf(data.changeOrderOf) : null);
       setItems(loadedItems);
       setClientSearch(data.clientName || "");
       setStatus(data.status || "draft");
@@ -359,7 +362,7 @@ export default function NewInvoicePage() {
     setDocId(""); setClientSearch(""); setClientName(""); setClientCompany(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
     setInvoiceNumber(nextNumber(docKind)); setInvoiceDate(ymd(new Date())); setDueDate(plusDays(14)); setJobStart(""); setJobEnd("");
     setNotes(isProposal ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
-    setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setSignature(null); setProposalSignature(null); setPadKey((key) => key + 1); setDocPayLink(""); setPhotos([]); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
+    setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setSignature(null); setProposalSignature(null); setPadKey((key) => key + 1); setDocPayLink(""); setPhotos([]); setChangeOrderOf(null); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
     setStyle("clean"); setJobTime(""); setCosts(emptyCosts); setCrew([]); setOtherFees([]);
   }
 
@@ -378,7 +381,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature, proposalSignature, payLink: docPayLink, photos, items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
+      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature, proposalSignature, payLink: docPayLink, photos, ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -403,6 +406,41 @@ export default function NewInvoicePage() {
       endTime: jobEnd,
     }, crew);
     setSaveMessage(isProposal ? "Proposal saved" : "Invoice saved");
+  }
+
+  /** New draft invoice copied from the saved version of this invoice. The original is not changed. */
+  async function createChangeOrder() {
+    if (locked) {
+      setSaveMessage("Trial ended. Subscribe to save. $7.99/mo or $19.99 for 3 months.");
+      return;
+    }
+    const raw = window.localStorage.getItem("clientready-documents");
+    const docs = raw ? (JSON.parse(raw) as SavedDocument[]) : [];
+    const original = docs.find((doc) => doc.id === docId && doc.type === "invoice");
+    if (!original) return setSaveMessage("Save this invoice first, then create a change order.");
+    const originalNumber = String(original.data?.invoiceNumber || original.title);
+    const count = changeOrdersFor(docs, original.id).length + 1;
+    const number = nextNumber("invoice");
+    const nextDoc = {
+      id: Date.now().toString(),
+      type: "invoice" as const,
+      title: `Change Order #${count} to ${originalNumber}`,
+      clientName: original.clientName,
+      createdAt: new Date().toLocaleDateString(),
+      data: changeOrderData(original, number, ymd(new Date()), plusDays(14)),
+    };
+    const cloudId = await saveCloudDocument(nextDoc);
+    nextDoc.id = cloudId;
+    try {
+      window.localStorage.setItem("clientready-documents", JSON.stringify([...docs, nextDoc]));
+    } catch (error) {
+      setSaveMessage(isQuotaError(error) ? "This browser's storage is full, so the change order could not be created on this device. Remove some photos or delete old documents, then try again." : "Could not create the change order on this device.");
+      return;
+    }
+    // Full page load on purpose: the editor reads the document once on mount, so a client-side
+    // push to the same route would keep showing the original invoice.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.href = `/invoice?id=${encodeURIComponent(cloudId)}`;
   }
 
   async function createInvoiceFromProposal() {
@@ -642,6 +680,9 @@ export default function NewInvoicePage() {
               {isProposal && !locked && (
                 <button type="button" onClick={createInvoiceFromProposal} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Create invoice</button>
               )}
+              {!isProposal && !locked && docId && (
+                <button type="button" onClick={createChangeOrder} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Create change order</button>
+              )}
               {!locked && <button type="button" onClick={clearForm} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Clear form</button>}
             </div>
             {saveMessage && <p className="text-sm text-slate-600">{saveMessage}</p>}
@@ -660,11 +701,13 @@ export default function NewInvoicePage() {
                 <p>{[ownerName, businessEmail, businessPhone].filter(Boolean).join(" · ")}</p>
               </div>
               <div className="shrink-0 text-right">
+                {changeOrderOf && !isProposal && <p className="change-order-badge mb-1 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide" data-testid="change-order-badge">Change order</p>}
                 <p className={`text-xs uppercase tracking-wide ${labelClass}`}>{isProposal ? "Proposal" : "Invoice"}</p>
                 <h2 className="text-xl font-semibold leading-tight">{invoiceNumber || (isProposal ? "PROP-0000" : "INV-0000")}</h2>
                 <div className={`text-sm ${mutedClass}`}>
                   <div>Date: {invoiceDate || "-"} · {isProposal ? "Valid until" : "Due"}: {dueDate || "-"}</div>
                   {(jobStart || jobEnd) && <div>Time: {jobStart || "-"} to {jobEnd || "-"}</div>}
+                  {changeOrderOf && !isProposal && <div data-testid="change-order-link">Change order to <a className="underline" href={`/invoice?id=${encodeURIComponent(changeOrderOf.id)}`}>{changeOrderOf.number}</a></div>}
                 </div>
               </div>
             </div>

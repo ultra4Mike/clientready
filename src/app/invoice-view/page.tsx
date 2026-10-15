@@ -6,6 +6,7 @@ import { balanceDue, paidTotal, readPayments, type Payment } from "@/lib/payment
 import { JobPhotoStrip } from "@/components/JobPhotos";
 import { readPhotos, type JobPhoto } from "@/lib/photos";
 import LineSplit from "@/components/LineSplit";
+import { changeOrdersFor, readChangeOrderOf, type ChangeOrderOf } from "@/lib/change-orders";
 import PayQr from "@/components/PayQr";
 import { payUrlFor } from "@/lib/pay-link";
 import { SignatureBlock } from "@/components/SignaturePad";
@@ -44,6 +45,8 @@ export default function InvoiceViewPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [docPayLink, setDocPayLink] = useState("");
   const [photos, setPhotos] = useState<JobPhoto[]>([]);
+  const [changeOrderOf, setChangeOrderOf] = useState<ChangeOrderOf | null>(null);
+  const [changeOrders, setChangeOrders] = useState<{ id: string; number: string; title: string }[]>([]);
   const [signature, setSignature] = useState<Signature | null>(null);
   const [proposalSignature, setProposalSignature] = useState<Signature | null>(null);
   const [items, setItems] = useState<LineItem[]>([]);
@@ -63,7 +66,7 @@ export default function InvoiceViewPage() {
       setPaymentLink(profile.paymentLink || "");
     }
 
-    const openId = window.localStorage.getItem("clientready-open-document");
+    const openId = new URLSearchParams(window.location.search).get("id") || window.localStorage.getItem("clientready-open-document");
     const docsRaw = window.localStorage.getItem("clientready-documents");
     if (!openId || !docsRaw) return;
     const docs = JSON.parse(docsRaw) as SavedDocument[];
@@ -86,6 +89,7 @@ export default function InvoiceViewPage() {
       signature?: unknown;
       payLink?: string;
       photos?: unknown;
+      changeOrderOf?: unknown;
       proposalSignature?: unknown;
       paymentAmount?: string;
       paymentMethod?: string;
@@ -112,6 +116,8 @@ export default function InvoiceViewPage() {
     setSignature(readSignature(data.signature));
     setDocPayLink(data.payLink || "");
     setPhotos(readPhotos(data.photos));
+    setChangeOrderOf(readChangeOrderOf(data.changeOrderOf));
+    setChangeOrders(changeOrdersFor(docs, doc.id));
     setProposalSignature(readSignature(data.proposalSignature));
     setItems(data.items || []);
     setStatus(data.status || "draft");
@@ -189,9 +195,26 @@ export default function InvoiceViewPage() {
               {jobTime && <p>Scheduled time: {jobTime}</p>}
             </div>
             <div className="shrink-0 text-right">
+              {changeOrderOf && <p className="change-order-badge mb-1 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide" data-testid="change-order-badge">Change order</p>}
               <p className="text-xs uppercase tracking-wide text-slate-500">Invoice · {status}</p>
               <h1 className="text-xl font-semibold leading-tight">{invoiceNumber || "Invoice"}</h1>
               <p className="text-sm text-slate-600">Date: {invoiceDate || "-"} · Due: {dueDate || "-"}</p>
+              {changeOrderOf && (
+                <p className="text-sm text-slate-600" data-testid="change-order-link">
+                  Change order to <a className="underline" href={`/invoice?id=${encodeURIComponent(changeOrderOf.id)}`}>{changeOrderOf.number}</a>
+                </p>
+              )}
+              {changeOrders.length > 0 && (
+                <p className="text-sm text-slate-600" data-testid="change-orders-list">
+                  Change orders:{" "}
+                  {changeOrders.map((order, index) => (
+                    <span key={order.id}>
+                      {index > 0 && ", "}
+                      <a className="underline" href={`/invoice?id=${encodeURIComponent(order.id)}`}>{order.number}</a>
+                    </span>
+                  ))}
+                </p>
+              )}
             </div>
           </div>
 
