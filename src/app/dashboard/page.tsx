@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { recurringDraftsReady, runDueRecurring } from "@/lib/recurring";
 import AppShell from "@/components/AppShell";
+import PageHeader from "@/components/PageHeader";
 import { loadAccountIntoCache } from "@/lib/account-cache";
 import { amountOf, documentTotals } from "@/lib/discount";
 import { balanceDue, isOpenBalance, paidTotal, readPayments } from "@/lib/payments";
@@ -179,22 +180,19 @@ export default function DashboardPage() {
 
   return (
     <AppShell title={`${hello}${ownerName ? `, ${ownerName}` : ""}.`}>
-      <p className="mb-6 text-sm text-[var(--cr-muted)] sm:text-base">
-        {!loaded ? "Loading your numbers…" : stats.invoiceCount === 0
+      <PageHeader
+        title={`${hello}${ownerName ? `, ${ownerName}` : ""}.`}
+        subtitle={<>{!loaded ? "Loading your numbers…" : stats.invoiceCount === 0
           ? "Create your first invoice to see totals."
-          : "Here is what is happening with your invoices today."}
-      </p>
+          : "Here is what is happening with your invoices today."}</>}
+        actions={<>
+          <a href="/invoice" className="rounded-xl bg-teal-500 px-5 py-2.5 text-center text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">New invoice +</a>
+          <button type="button" onClick={newProposal} className="rounded-xl border border-teal-500/40 px-5 py-2.5 text-sm font-medium transition hover:border-teal-400">New proposal</button>
+        </>}
+      />
 
-      {recurringReady > 0 && (
-        <a href="/documents?q=draft" data-testid="recurring-ready" className="mb-6 flex items-center justify-between rounded-xl border border-teal-500/40 bg-teal-500/10 px-4 py-3 text-sm font-medium text-teal-700 dark:text-teal-200 transition hover:bg-teal-500/15">
-          {recurringReady} recurring draft{recurringReady === 1 ? "" : "s"} ready for review
-        </a>
-      )}
-
-      <NeedsReview loading={!loaded} documents={documents} onDocuments={(docs) => setDocuments(uniqueDocs(docs as SavedDocument[]))} />
-
-      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <form onSubmit={handleSearch} className="flex-1">
+      <div className="mb-6">
+        <form onSubmit={handleSearch} >
           <input
             className="w-full rounded-xl border border-teal-500/20 bg-[var(--cr-card)] px-4 py-2.5 text-sm placeholder:text-[var(--cr-muted)] focus:border-teal-400/60 focus:outline-none focus:ring-2 focus:ring-teal-400/20"
             placeholder="Search invoices, clients, documents..."
@@ -202,12 +200,6 @@ export default function DashboardPage() {
             onChange={(event) => setSearch(event.target.value)}
           />
         </form>
-        <a
-          href="/invoice"
-          className="shrink-0 rounded-xl bg-teal-500 px-5 py-2.5 text-center text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400"
-        >
-          New invoice +
-        </a>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
@@ -253,8 +245,10 @@ export default function DashboardPage() {
         </a>
       </div>
 
+      <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-6">
       {stats.invoiceCount > 0 && (
-        <div className="mt-6 rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
+        <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-base font-semibold">Invoice overview</h2>
             <span className="text-xs text-[var(--cr-muted)]">Last 6 months · {stats.paidRate}% of invoices marked paid</span>
@@ -297,27 +291,62 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <h2 className="mt-10 text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">
-        QUICK ACTIONS
-      </h2>
-      <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <a href="/invoice" className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md">
-          <IconWrap>+</IconWrap>
-          <p className="mt-4 font-semibold">New invoice</p>
-          <p className="mt-1 text-sm text-[var(--cr-muted)]">Create an invoice and send it to a client.</p>
+          <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] shadow-sm" data-testid="recent-docs">
+            <div className="flex items-center justify-between border-b border-teal-500/15 px-5 py-4">
+              <h2 className="text-base font-semibold">Recent documents</h2>
+              <a href="/documents" className="text-sm font-medium text-teal-600 hover:underline dark:text-teal-300">View all</a>
+            </div>
+            {documents.length === 0 && <p className="px-5 py-8 text-center text-sm text-[var(--cr-muted)]">{loaded ? "No documents yet." : "Loading…"}</p>}
+            {documents.slice(0, 5).map((doc) => (
+              <a key={doc.id} href={`/documents?q=${encodeURIComponent(doc.title || "")}`} className="flex items-center justify-between gap-3 border-b border-teal-500/10 px-5 py-3 text-sm transition last:border-b-0 hover:bg-teal-500/5">
+                <span className="min-w-0">
+                  <span className="block truncate font-medium">{doc.title || "Untitled"}</span>
+                  <span className="block text-xs capitalize text-[var(--cr-muted)]">{doc.type} · {doc.createdAt}</span>
+                </span>
+                <span className="shrink-0 rounded-full border border-teal-500/30 px-2.5 py-0.5 text-xs font-semibold capitalize">{String(doc.data?.status || "draft")}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+
+        <aside className="min-w-0 space-y-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Needs attention</h2>
+      {recurringReady > 0 && (
+        <a href="/documents?q=draft" data-testid="recurring-ready" className="flex items-center justify-between rounded-xl border border-teal-500/40 bg-teal-500/10 px-4 py-3 text-sm font-medium text-teal-700 dark:text-teal-200 transition hover:bg-teal-500/15">
+          {recurringReady} recurring draft{recurringReady === 1 ? "" : "s"} ready for review
         </a>
-        <button type="button" onClick={newProposal} className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md text-left">
+      )}
+      <NeedsReview loading={!loaded} documents={documents} onDocuments={(docs) => setDocuments(uniqueDocs(docs as SavedDocument[]))} />
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <a href="/collect" className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 transition hover:border-amber-400">
+              <span className="block text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Overdue</span>
+              <span className="mt-1 block text-lg font-bold tabular-nums">{loaded ? stats.overdueCount : "—"}</span>
+            </a>
+            <a href="/documents?filter=outstanding" className="rounded-xl border border-teal-500/30 bg-teal-500/5 p-3 transition hover:border-teal-400">
+              <span className="block text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Outstanding</span>
+              <span className="mt-1 block text-lg font-bold tabular-nums">{loaded ? `$${stats.outstanding.toFixed(0)}` : "—"}</span>
+            </a>
+          </div>
+          <h2 className="pt-2 text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Quick actions</h2>
+      <div className="grid gap-2">
+        <a href="/invoice" className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] flex items-center gap-3 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md">
+          <IconWrap>+</IconWrap>
+          <span className="min-w-0"><p className="font-semibold">New invoice</p>
+          <p className="mt-1 text-sm text-[var(--cr-muted)]">Create an invoice and send it to a client.</p></span>
+        </a>
+        <button type="button" onClick={newProposal} className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] flex items-center gap-3 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md text-left">
           <IconWrap>✎</IconWrap>
-          <p className="mt-4 font-semibold">New proposal</p>
-          <p className="mt-1 text-sm text-[var(--cr-muted)]">Create a proposal and share it with a prospect.</p>
+          <span className="min-w-0"><p className="font-semibold">New proposal</p>
+          <p className="mt-1 text-sm text-[var(--cr-muted)]">Create a proposal and share it with a prospect.</p></span>
         </button>
-        <a href={thirdAction.href} className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md">
+        <a href={thirdAction.href} className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] flex items-center gap-3 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md">
           <IconWrap>{thirdAction.icon}</IconWrap>
-          <p className="mt-4 font-semibold">{thirdAction.title}</p>
-          <p className="mt-1 text-sm text-[var(--cr-muted)]">{thirdAction.text}</p>
+          <span className="min-w-0"><p className="font-semibold">{thirdAction.title}</p>
+          <p className="mt-1 text-sm text-[var(--cr-muted)]">{thirdAction.text}</p></span>
         </a>
       </div>
-
+        </aside>
+      </div>
     </AppShell>
   );
 }
