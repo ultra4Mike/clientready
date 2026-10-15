@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
+import PageHeader from "@/components/PageHeader";
 
 const emptyProfile = {
   businessName: "",
@@ -136,15 +137,25 @@ export default function ProfilePage() {
 
   return (
     <AppShell title="Profile">
+      <PageHeader title="Settings" subtitle="Your business details, how customers pay you, and your login." />
+      <div className="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)]">
+        <nav className="print-hide hidden lg:block">
+          <div className="sticky top-20 space-y-1 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-2 text-sm font-medium">
+            <a href="#business" className="block rounded-lg px-3 py-2 transition hover:bg-teal-500/10">Business info</a>
+            <a href="#payments" className="block rounded-lg px-3 py-2 transition hover:bg-teal-500/10">Payments &amp; logo</a>
+            <a href="#password" className="block rounded-lg px-3 py-2 transition hover:bg-teal-500/10">Login password</a>
+          </div>
+        </nav>
+        <div className="min-w-0">
       <form
         onSubmit={handleSubmit}
-        className="mt-2 max-w-2xl space-y-5 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:mt-6 sm:p-6"
+        className="max-w-3xl space-y-5 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:mt-6 sm:p-6"
       >
         <h1 className="text-xl font-bold tracking-tight">Your business details</h1>
         <p className="text-sm text-[var(--cr-muted)]">
           Payment instructions print on customer invoices. This is not a card processor.
         </p>
-        <div className="grid gap-4 rounded-xl border border-teal-500/20 p-4 sm:grid-cols-2 sm:p-5">
+        <div id="business" className="scroll-mt-24 grid gap-4 rounded-xl border border-teal-500/20 p-4 sm:grid-cols-2 sm:p-5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600 sm:col-span-2">Business info</h2>
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
           Business name
@@ -179,7 +190,7 @@ export default function ProfilePage() {
           <textarea className="mt-1.5 min-h-24 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Default payment terms" value={profile.paymentTerms} onChange={(event) => update("paymentTerms", event.target.value)} />
         </label>
         </div>
-        <div className="space-y-3 rounded-xl border border-teal-500/20 p-4 sm:p-5">
+        <div id="payments" className="scroll-mt-24 space-y-3 rounded-xl border border-teal-500/20 p-4 sm:p-5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Payments, savings & logo</h2>
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
           How customers pay you
@@ -202,7 +213,7 @@ export default function ProfilePage() {
         {message && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-[var(--cr-muted)]">{message}</p>}
       </form>
 
-      <form onSubmit={changePassword} className="mt-6 max-w-2xl space-y-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-6">
+      <form id="password" onSubmit={changePassword} className="scroll-mt-24 mt-6 max-w-3xl space-y-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-6">
         <h2 className="text-lg font-bold tracking-tight">Login password</h2>
         <p className="text-sm text-[var(--cr-muted)]">Login email: {loginEmail || "Not signed in"}</p>
         <input type="password" className="w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Current password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
@@ -210,6 +221,8 @@ export default function ProfilePage() {
         <button type="submit" className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50 w-full sm:w-auto">Update password</button>
         {passwordMessage && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-[var(--cr-muted)]">{passwordMessage}</p>}
       </form>
+        </div>
+      </div>
     </AppShell>
   );
 }
