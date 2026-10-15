@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { balanceDue, paidTotal, readPayments, type Payment } from "@/lib/payments";
+import { JobPhotoStrip } from "@/components/JobPhotos";
+import { readPhotos, type JobPhoto } from "@/lib/photos";
 import PayQr from "@/components/PayQr";
 import { payUrlFor } from "@/lib/pay-link";
 import { SignatureBlock } from "@/components/SignaturePad";
@@ -39,6 +41,7 @@ export default function InvoiceViewPage() {
   const [discountValue, setDiscountValue] = useState("");
   const [payments, setPayments] = useState<Payment[]>([]);
   const [docPayLink, setDocPayLink] = useState("");
+  const [photos, setPhotos] = useState<JobPhoto[]>([]);
   const [signature, setSignature] = useState<Signature | null>(null);
   const [proposalSignature, setProposalSignature] = useState<Signature | null>(null);
   const [items, setItems] = useState<LineItem[]>([]);
@@ -80,6 +83,7 @@ export default function InvoiceViewPage() {
       payments?: unknown;
       signature?: unknown;
       payLink?: string;
+      photos?: unknown;
       proposalSignature?: unknown;
       paymentAmount?: string;
       paymentMethod?: string;
@@ -105,6 +109,7 @@ export default function InvoiceViewPage() {
     setPayments(readPayments(data));
     setSignature(readSignature(data.signature));
     setDocPayLink(data.payLink || "");
+    setPhotos(readPhotos(data.photos));
     setProposalSignature(readSignature(data.proposalSignature));
     setItems(data.items || []);
     setStatus(data.status || "draft");
@@ -257,6 +262,7 @@ export default function InvoiceViewPage() {
           </div>
 
           {notes && <p className="mt-3 text-sm text-slate-600">{notes}</p>}
+          <JobPhotoStrip photos={photos} />
           {(payUrlFor(docPayLink, paymentLink) || signature || proposalSignature) && (
             <div className="print-keep mt-3 grid grid-cols-2 items-end gap-6 border-t border-slate-200 pt-3">
               <div className="space-y-3">

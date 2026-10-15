@@ -7,6 +7,8 @@ import AppShell from "@/components/AppShell";
 import { getTrialState } from "@/lib/trial";
 import { saveCrewJobs } from "@/lib/crew";
 import { balanceDue, paidTotal, paymentFields, paymentMethods, readPayments, type Payment } from "@/lib/payments";
+import { JobPhotosEditor, JobPhotoStrip } from "@/components/JobPhotos";
+import { isQuotaError, readPhotos, type JobPhoto } from "@/lib/photos";
 import PayQr from "@/components/PayQr";
 import { payUrlFor } from "@/lib/pay-link";
 import SignaturePad, { SignatureBlock } from "@/components/SignaturePad";
@@ -114,6 +116,7 @@ export default function NewInvoicePage() {
   const [proposalSignature, setProposalSignature] = useState<Signature | null>(null);
   const [padKey, setPadKey] = useState(0);
   const [docPayLink, setDocPayLink] = useState("");
+  const [photos, setPhotos] = useState<JobPhoto[]>([]);
   const [items, setItems] = useState<LineItem[]>([{ ...emptyItem }]);
   const [businessName, setBusinessName] = useState("Your business");
   const [ownerName, setOwnerName] = useState("");
@@ -209,7 +212,7 @@ export default function NewInvoicePage() {
       const data = (doc.data || {}) as {
         clientName?: string; clientCompany?: string; clientEmail?: string; clientPhone?: string; clientAddress?: string;
         invoiceNumber?: string; invoiceDate?: string; dueDate?: string; jobStart?: string; jobEnd?: string; notes?: string;
-        taxPercent?: string; discountType?: string; discountValue?: string; signature?: unknown; proposalSignature?: unknown; payLink?: string; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
+        taxPercent?: string; discountType?: string; discountValue?: string; signature?: unknown; proposalSignature?: unknown; payLink?: string; photos?: unknown; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
       };
       const kind: DocKind = doc.type === "proposal" ? "proposal" : "invoice";
       const loadedItems = Array.isArray(data.items) && data.items.length ? data.items : [{ ...emptyItem }];
@@ -236,7 +239,7 @@ export default function NewInvoicePage() {
       setProposalSignature(readSignature(data.proposalSignature));
       setPadKey((key) => key + 1);
       setDocPayLink(data.payLink || "");
-      setDocPayLink(data.payLink || "");
+      setPhotos(readPhotos(data.photos));
       setItems(loadedItems);
       setClientSearch(data.clientName || "");
       setStatus(data.status || "draft");
@@ -342,7 +345,7 @@ export default function NewInvoicePage() {
     setDocId(""); setClientSearch(""); setClientName(""); setClientCompany(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
     setInvoiceNumber(nextNumber(docKind)); setInvoiceDate(ymd(new Date())); setDueDate(plusDays(14)); setJobStart(""); setJobEnd("");
     setNotes(isProposal ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
-    setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setSignature(null); setProposalSignature(null); setPadKey((key) => key + 1); setDocPayLink(""); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
+    setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setSignature(null); setProposalSignature(null); setPadKey((key) => key + 1); setDocPayLink(""); setPhotos([]); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
     setStyle("clean"); setJobTime(""); setCosts(emptyCosts); setCrew([]); setOtherFees([]);
   }
 
@@ -361,11 +364,19 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature, proposalSignature, payLink: docPayLink, items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
+      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature, proposalSignature, payLink: docPayLink, photos, items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
-    window.localStorage.setItem("clientready-documents", JSON.stringify([...docs.filter((item: { id: string }) => item.id !== localId && item.id !== cloudId), nextDoc]));
+    try {
+      window.localStorage.setItem("clientready-documents", JSON.stringify([...docs.filter((item: { id: string }) => item.id !== localId && item.id !== cloudId), nextDoc]));
+    } catch (error) {
+      setDocId(cloudId);
+      setSaveMessage(isQuotaError(error)
+        ? `This browser's storage is full, so the document was not saved on this device${cloudId !== localId ? " (it was saved to your account)" : ""}. Remove some photos or delete old documents, then save again.`
+        : "Could not save on this device.");
+      return;
+    }
     setDocId(cloudId);
     await saveCrewJobs(cloudId, {
       invoiceNumber,
@@ -397,13 +408,18 @@ export default function NewInvoicePage() {
       data: {
         clientName, clientCompany, clientEmail, clientPhone, clientAddress,
         invoiceNumber: number, invoiceDate: ymd(new Date()), dueDate: plusDays(14),
-        jobStart, jobEnd, notes: "Payment is due within 14 days.", taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature: null, proposalSignature: signature, payLink: docPayLink, items,
+        jobStart, jobEnd, notes: "Payment is due within 14 days.", taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature: null, proposalSignature: signature, payLink: docPayLink, photos, items,
         status: "draft", style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew,
       },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
-    window.localStorage.setItem("clientready-documents", JSON.stringify([...docs, nextDoc]));
+    try {
+      window.localStorage.setItem("clientready-documents", JSON.stringify([...docs, nextDoc]));
+    } catch (error) {
+      setSaveMessage(isQuotaError(error) ? "This browser's storage is full, so the invoice could not be created on this device. Remove some photos or delete old documents, then try again." : "Could not create the invoice on this device.");
+      return;
+    }
     window.localStorage.setItem("clientready-open-document", cloudId);
     window.location.href = "/invoice";
   }
@@ -532,6 +548,7 @@ export default function NewInvoicePage() {
                 </span>
               </label>
             )}
+            <JobPhotosEditor photos={photos} onChange={setPhotos} />
             <SignaturePad key={padKey} value={signature} onChange={setSignature} defaultName={clientName} />
             <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
             <div className="owner-costs space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-slate-900">
@@ -662,6 +679,7 @@ export default function NewInvoicePage() {
               </div>
             </div>
             {notes && <p className={`mt-3 text-sm ${mutedClass}`}>{notes}</p>}
+            <JobPhotoStrip photos={photos} muted={mutedClass} />
             {(payUrl && !isProposal) || signature || (proposalSignature && !isProposal) ? (
               <div className="print-keep mt-3 grid grid-cols-2 items-end gap-6 border-t border-slate-500 pt-3">
                 <div className="space-y-3">

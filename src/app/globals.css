@@ -327,3 +327,13 @@ html.dark input.sig-typed,
     page-break-inside: avoid;
   }
 }
+
+@media print {
+  /* Thumbnails print as plain images; the "button" wrapper is only for click-to-enlarge on screen. */
+  #preview button.photo-thumb {
+    display: block !important;
+  }
+  #preview .photo-caption {
+    font-size: 8pt !important;
+  }
+}
