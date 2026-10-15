@@ -74,6 +74,8 @@ export default function DashboardPage() {
   const [ownerName, setOwnerName] = useState("");
   const [search, setSearch] = useState("");
   // false until the account/cache has been read: show placeholders, not $0 / 0 clients.
+  // Needs Review items still open (null until NeedsReview has loaded and reported).
+  const [reviewCount, setReviewCount] = useState<number | null>(null);
   const [loaded, setLoaded] = useState(false);
   const recurringReady = recurringDraftsReady(documents);
 
@@ -319,8 +321,8 @@ export default function DashboardPage() {
         </a>
       )}
       <GettingStarted loading={!loaded} documents={documents} />
-      <NeedsReview loading={!loaded} documents={documents} onDocuments={(docs) => setDocuments(uniqueDocs(docs as SavedDocument[]))} />
-          {loaded && recurringReady === 0 && stats.overdueCount === 0 && (
+      <NeedsReview loading={!loaded} onCount={setReviewCount} documents={documents} onDocuments={(docs) => setDocuments(uniqueDocs(docs as SavedDocument[]))} />
+          {loaded && reviewCount === 0 && recurringReady === 0 && stats.overdueCount === 0 && (
             <div data-testid="all-caught-up" className="flex items-center gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm">
               <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">✓</span>
               <span><span className="font-semibold">All caught up.</span> <span className="text-[var(--cr-muted)]">Nothing overdue or waiting on you.</span></span>
