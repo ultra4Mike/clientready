@@ -146,38 +146,38 @@ export default function CalendarPage() {
 
   return (
     <AppShell title="Calendar">
-      <section className="mx-auto max-w-7xl py-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex gap-1" role="tablist">
+      <section className="mx-auto max-w-7xl py-2 sm:py-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <div className="inline-flex w-full gap-1 rounded-xl border border-slate-500/30 p-1 sm:w-auto" role="tablist">
             {(["week", "month", "worker"] as View[]).map((item) => (
-              <button key={item} type="button" role="tab" aria-selected={view === item} onClick={() => setView(item)} className={`rounded-lg border px-3 py-1.5 text-sm ${view === item ? "border-teal-400 text-teal-300" : "border-slate-500/40"}`}>
+              <button key={item} type="button" role="tab" aria-selected={view === item} onClick={() => setView(item)} className={`flex-1 rounded-lg border px-3 py-1.5 text-sm font-medium transition sm:flex-none ${view === item ? "border-teal-400 bg-teal-500/15 text-teal-700 dark:text-teal-300" : "border-slate-500/40"}`}>
                 {item === "week" ? "Week" : item === "month" ? "Month" : "By worker"}
               </button>
             ))}
           </div>
           {view !== "worker" && (
-            <div className="flex items-center gap-3">
-              <button type="button" onClick={() => shift(-1)}>Previous</button>
-              <h1 className="text-lg font-semibold" data-testid="calendar-heading">{heading}</h1>
-              <button type="button" onClick={() => shift(1)}>Next</button>
-              <button type="button" onClick={() => setAnchor(today)} className="text-sm underline">Today</button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => shift(-1)} className="rounded-lg border border-slate-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400">Previous</button>
+              <h1 className="min-w-0 flex-1 text-center text-lg font-bold tracking-tight sm:flex-none sm:px-2" data-testid="calendar-heading">{heading}</h1>
+              <button type="button" onClick={() => shift(1)} className="rounded-lg border border-slate-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400">Next</button>
+              <button type="button" onClick={() => setAnchor(today)} className="rounded-lg bg-teal-400 px-3 py-1.5 text-sm font-semibold text-slate-950 transition hover:bg-teal-300">Today</button>
             </div>
           )}
         </div>
-        <div className="mt-2 flex flex-wrap gap-2 text-xs">
-          {(Object.keys(STATUS_LABEL) as JobStatus[]).map((key) => <span key={key} className={`rounded border px-2 py-0.5 ${STATUS_CLASS[key]}`}>{STATUS_LABEL[key]}</span>)}
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+          {(Object.keys(STATUS_LABEL) as JobStatus[]).map((key) => <span key={key} className={`rounded-full border px-2.5 py-0.5 font-medium ${STATUS_CLASS[key]}`}>{STATUS_LABEL[key]}</span>)}
           <span className="opacity-70">Drag a job to move it. Click a slot or job to edit.</span>
         </div>
-        {message && <p className="mt-2 text-sm" data-testid="calendar-message">{message}</p>}
+        {message && <p className="mt-3 rounded-lg border border-teal-500/30 px-3 py-2 text-sm" data-testid="calendar-message">{message}</p>}
 
         {editing && editingDoc && (
-          <div className="mt-4 rounded-2xl border border-teal-500/30 bg-[var(--cr-card)] p-4">
+          <div className="mt-4 rounded-2xl border border-teal-500/30 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <p className="font-semibold">{editingDoc.title} · {editingDoc.clientName}</p>
-              <a href={`/invoice?id=${encodeURIComponent(editingDoc.id)}`} className="text-sm underline">Open {editingDoc.type}</a>
+              <a href={`/invoice?id=${encodeURIComponent(editingDoc.id)}`} className="text-sm font-medium text-teal-600 hover:underline dark:text-teal-300">Open {editingDoc.type}</a>
             </div>
             {!readSchedule(editingDoc.data) && (
-              <label className="mb-3 flex flex-col gap-1 text-sm">Job
+              <label className="mb-3 flex flex-col gap-1.5 text-sm font-medium">Job
                 <select aria-label="Job to schedule" value={editing.docId} onChange={(event) => setEditing({ ...editing, docId: event.target.value })} className="rounded-md border border-slate-300 bg-transparent px-2 py-1.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30">
                   {unscheduled.map((doc) => <option key={doc.id} value={doc.id}>{doc.title} · {doc.clientName}</option>)}
                 </select>
@@ -201,7 +201,7 @@ export default function CalendarPage() {
               <div className="grid min-w-[44rem] grid-cols-[3rem_repeat(7,minmax(0,1fr))] text-xs" data-testid="week-grid">
                 <div />
                 {weekDays.map((day) => (
-                  <div key={day} className={`border-b border-slate-500/30 p-1 text-center font-medium ${day === today ? "text-teal-300" : ""}`}>
+                  <div key={day} className={`border-b border-slate-500/30 p-1.5 text-center font-semibold ${day === today ? "text-teal-600 dark:text-teal-300" : ""}`}>
                     {DAY_NAMES[parse(day).getDay()]} {parse(day).getDate()}
                   </div>
                 ))}
@@ -240,8 +240,8 @@ export default function CalendarPage() {
             )}
 
             {view === "month" && (
-              <div data-testid="month-grid">
-                <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium opacity-70">{DAY_NAMES.map((name) => <div key={name}>{name}</div>)}</div>
+              <div className="min-w-[36rem]" data-testid="month-grid">
+                <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold uppercase tracking-wide opacity-70">{DAY_NAMES.map((name) => <div key={name}>{name}</div>)}</div>
                 <div className="mt-1 grid grid-cols-7 gap-1">
                   {monthCells.map((day, index) => (
                     <div
@@ -250,7 +250,7 @@ export default function CalendarPage() {
                       onDragOver={(event) => day && event.preventDefault()}
                       onDrop={day ? dropOn(day) : undefined}
                       onClick={() => day && unscheduled.length && setEditing({ docId: unscheduled[0].id, date: day })}
-                      className={`min-h-24 rounded-lg border p-1 text-xs ${day ? "border-slate-500/30" : "border-transparent"} ${day === today ? "ring-1 ring-teal-400" : ""}`}
+                      className={`min-h-24 rounded-lg border p-1.5 text-xs transition hover:bg-teal-500/5 ${day ? "border-slate-500/30" : "border-transparent"} ${day === today ? "ring-2 ring-teal-400" : ""}`}
                     >
                       {day && <div className="font-medium">{parse(day).getDate()}</div>}
                       <div className="space-y-0.5">
@@ -267,15 +267,15 @@ export default function CalendarPage() {
 
             {view === "worker" && (
               <div className="space-y-3" data-testid="worker-view">
-                <label className="flex flex-col gap-1 text-sm">Worker
-                  <select aria-label="Worker" value={workerId} onChange={(event) => setWorkerId(event.target.value)} className="max-w-xs rounded border border-slate-500/40 bg-transparent px-2 py-1">
+                <label className="flex flex-col gap-1.5 text-sm font-medium">Worker
+                  <select aria-label="Worker" value={workerId} onChange={(event) => setWorkerId(event.target.value)} className="max-w-xs rounded-lg border border-slate-500/40 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30">
                     <option value="">Pick a worker</option>
                     {workers.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
                   </select>
                 </label>
-                {workerId && workerJobs.length === 0 && <p className="text-sm opacity-70">No jobs assigned.</p>}
+                {workerId && workerJobs.length === 0 && <p className="rounded-xl border border-dashed border-slate-500/40 p-6 text-center text-sm opacity-70">No jobs assigned.</p>}
                 {workerJobs.map((job) => (
-                  <div key={job.doc.id} className="rounded-xl border border-slate-500/30 p-3 text-sm" data-testid={`worker-job-${job.doc.id}`}>
+                  <div key={job.doc.id} className="space-y-1 rounded-xl border border-slate-500/30 bg-[var(--cr-card)] p-4 text-sm shadow-sm" data-testid={`worker-job-${job.doc.id}`}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="font-medium">{text(job.doc.data?.clientName) || job.doc.clientName} · {job.doc.title}</p>
                       <select aria-label="Status" value={job.schedule.status} onChange={(event) => save(job.doc.id, { ...job.schedule, status: event.target.value as JobStatus })} className={`rounded border px-2 py-0.5 text-xs ${STATUS_CLASS[job.schedule.status]}`}>
@@ -293,11 +293,11 @@ export default function CalendarPage() {
             )}
           </div>
 
-          <aside className="rounded-2xl border border-slate-500/30 p-3 text-sm" data-testid="unscheduled">
+          <aside className="h-fit rounded-2xl border border-slate-500/30 bg-[var(--cr-card)] p-4 text-sm shadow-sm lg:sticky lg:top-20 print:hidden" data-testid="unscheduled">
             <p className="font-semibold">Unscheduled jobs</p>
             <p className="mb-2 text-xs opacity-70">Drag onto the calendar, or click to set a time.</p>
-            {unscheduled.length === 0 && <p className="text-xs opacity-70">None.</p>}
-            <div className="space-y-1">
+            {unscheduled.length === 0 && <p className="rounded-lg border border-dashed border-slate-500/40 p-3 text-center text-xs opacity-70">None.</p>}
+            <div className="space-y-1.5">
               {unscheduled.map((doc) => (
                 <div
                   key={doc.id}
@@ -305,7 +305,7 @@ export default function CalendarPage() {
                   data-testid={`unscheduled-${doc.id}`}
                   onDragStart={(event) => event.dataTransfer.setData("text/plain", doc.id)}
                   onClick={() => setEditing({ docId: doc.id, date: current })}
-                  className="cursor-grab truncate rounded border border-slate-500/40 px-2 py-1 text-xs"
+                  className="cursor-grab truncate rounded-lg border border-slate-500/40 px-2.5 py-1.5 text-xs transition hover:border-teal-400"
                 >
                   {doc.title} · {doc.clientName || "No client"}
                 </div>
