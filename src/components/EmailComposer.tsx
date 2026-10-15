@@ -90,27 +90,27 @@ export default function EmailComposer(props: Props) {
     setMessage(`Opened in your email app. Send it from there.${logged?.markedSent ? " Marked as sent." : ""}`);
   }
 
-  const field = "w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2 text-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30";
-  const button = "rounded-lg border border-teal-500/30 px-3 py-2 text-center text-sm font-medium transition hover:border-teal-400";
+  const field = "mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30";
+  const button = "inline-flex min-h-11 items-center justify-center rounded-lg border border-teal-500/30 px-4 py-2 text-center sm:min-h-10 text-sm font-medium transition hover:border-teal-400";
   return (
-    <div className="mt-4 space-y-3 rounded-xl border border-teal-500/20 p-4" data-testid="email-composer" data-provider={enabled === null ? "checking" : enabled ? "app" : "mailto"}>
+    <div className="mt-4 space-y-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5" data-testid="email-composer" data-provider={enabled === null ? "checking" : enabled ? "app" : "mailto"}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-semibold">Email {props.clientName || "client"}</p>
+        <p className="text-base font-semibold">Email {props.clientName || "client"}</p>
         {kinds.length > 1 && (
           <div className="inline-flex rounded-lg border border-teal-500/30 p-0.5" role="tablist">
             {kinds.map((key) => (
-              <button key={key} type="button" role="tab" aria-selected={kind === key} data-testid={`email-kind-${key}`} onClick={() => setKind(key)} className={`rounded-md px-3 py-1 text-sm ${kind === key ? "bg-teal-500 font-semibold text-slate-950!" : ""}`}>{KIND_LABEL[key]}</button>
+              <button key={key} type="button" role="tab" aria-selected={kind === key} data-testid={`email-kind-${key}`} onClick={() => setKind(key)} className={`min-h-9 rounded-md px-3 py-1 text-sm ${kind === key ? "bg-teal-500 font-semibold text-slate-950!" : ""}`}>{KIND_LABEL[key]}</button>
             ))}
           </div>
         )}
       </div>
-      <label className="block text-xs font-medium">To
+      <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">To
         <input aria-label="Email to" type="email" className={field} value={to} onChange={(event) => setTo(event.target.value)} placeholder="customer@example.com" />
       </label>
-      <label className="block text-xs font-medium">Subject
+      <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Subject
         <input aria-label="Email subject" className={field} value={subject} onChange={(event) => setSubjects((current) => ({ ...current, [kind]: event.target.value }))} />
       </label>
-      <label className="block text-xs font-medium">Message
+      <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Message
         <textarea aria-label="Email message" className={`${field} min-h-40`} value={body} onChange={(event) => setBodies((current) => ({ ...current, [kind]: event.target.value }))} />
       </label>
       {!viewUrl && <p className="text-xs text-[var(--cr-muted)]" data-testid="email-no-link">No online link yet. Share an approval link or the client portal to include one.</p>}
@@ -126,14 +126,14 @@ export default function EmailComposer(props: Props) {
           Also mark this {props.isProposal ? "proposal" : "invoice"} as sent
         </label>
       )}
-      <div className="flex flex-wrap gap-2">
-        {enabled && <button type="button" data-testid="email-send" disabled={!ready || busy} onClick={send} className="rounded-lg bg-teal-500 px-4 py-2 text-sm font-semibold text-slate-950! transition hover:bg-teal-400 disabled:opacity-50">{busy ? "Sending…" : "Send email"}</button>}
+      <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+        {enabled && <button type="button" data-testid="email-send" disabled={!ready || busy} onClick={send} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-teal-500 px-5 py-2 text-sm font-semibold sm:min-h-10 text-slate-950! transition hover:bg-teal-400 disabled:opacity-50">{busy ? "Sending…" : "Send email"}</button>}
         {ready ? (
           <a className={button} data-testid="email-mailto" href={mailtoHref(to, subject, body)} onClick={openedInApp}>Open in email app</a>
         ) : (
           <span className={`${button} opacity-50`}>Open in email app</span>
         )}
-        {props.onClose && <button type="button" className="text-sm text-[var(--cr-muted)]" onClick={props.onClose}>Close</button>}
+        {props.onClose && <button type="button" className="min-h-11 rounded-lg px-4 text-sm text-[var(--cr-muted)] transition hover:bg-teal-500/10 sm:min-h-10" onClick={props.onClose}>Close</button>}
       </div>
       {!ready && <p className="text-xs text-[var(--cr-muted)]">Add a valid email address, a subject and a message.</p>}
       {message && <p className="text-xs" data-testid="email-message" role="status">{message}</p>}
