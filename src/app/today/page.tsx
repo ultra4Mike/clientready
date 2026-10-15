@@ -68,31 +68,43 @@ export default function TodayPage() {
   return (
     <AppShell title="Today">
       <section className="py-2 sm:py-4" data-testid="today" data-state={state}>
-        <PageHeader title="Today" subtitle={today ? niceYmd(today) : "Loading…"} actions={<a href="/calendar" className="text-sm underline">Calendar</a>} />
-        {message && <p className="mb-3 text-sm" role="status" data-testid="today-message">{message}</p>}
-        {state === "loading" && <p className="text-sm text-[var(--cr-muted)]">Loading…</p>}
-        {state === "empty" && <p className="text-sm text-[var(--cr-muted)]" data-testid="today-empty">No jobs scheduled today.</p>}
+        <PageHeader title="Today" subtitle={today ? niceYmd(today) : "Loading…"} actions={<a href="/calendar" className="inline-flex min-h-11 items-center rounded-lg border border-teal-500/30 px-4 text-sm font-medium transition hover:border-teal-400 sm:min-h-10">Calendar</a>} />
+        {message && <p className="mb-3 rounded-lg border border-teal-500/30 bg-teal-500/10 px-3 py-2 text-sm" role="status" data-testid="today-message">{message}</p>}
+        {state === "loading" && <div className="space-y-3" aria-hidden="true">{[0, 1, 2].map((n) => <div key={n} className="h-28 animate-pulse rounded-2xl bg-teal-500/10" />)}<p className="sr-only">Loading…</p></div>}
+        {state === "empty" && (
+          <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-teal-500/30 bg-[var(--cr-card)] px-6 py-12 text-center">
+            <span aria-hidden="true" className="flex h-12 w-12 items-center justify-center rounded-full bg-teal-500/15 text-xl">☀️</span>
+            <p className="text-base font-semibold" data-testid="today-empty">No jobs scheduled today.</p>
+            <a href="/calendar" className="mt-2 inline-flex min-h-11 items-center rounded-lg border border-teal-500/30 px-4 text-sm font-medium">Open calendar</a>
+          </div>
+        )}
         <ol className="space-y-3">
           {jobs.map(({ doc, schedule }) => {
             const phone = text(doc.data?.clientPhone);
             const address = text(doc.data?.clientAddress);
             const done = doneState(schedule);
             const people = schedule.workerIds.map((id) => workers.get(id)).filter(Boolean).join(", ");
+            const tone = schedule.status === "done" ? (done === "awaiting" ? "border-l-amber-400" : "border-l-emerald-500") : schedule.status === "in_progress" ? "border-l-sky-400" : "border-l-teal-500";
             return (
-              <li key={doc.id} data-testid="today-job" data-doc-id={doc.id} data-time={schedule.startTime || ""} data-status={schedule.status} data-done={done || undefined} className="rounded-xl border border-teal-500/20 p-4 text-sm">
-                <p className="font-semibold">
+              <li key={doc.id} data-testid="today-job" data-doc-id={doc.id} data-time={schedule.startTime || ""} data-status={schedule.status} data-done={done || undefined} className={`grid grid-cols-[4.5rem_minmax(0,1fr)] gap-3 rounded-2xl border border-l-4 border-teal-500/20 bg-[var(--cr-card)] p-4 text-sm shadow-sm sm:grid-cols-[6rem_minmax(0,1fr)] sm:gap-5 sm:p-5 ${tone}`}>
+                <div className="font-semibold tabular-nums leading-tight">
                   <span data-testid="today-time">{schedule.startTime ? timeLabel(schedule.startTime) : "Any time"}{schedule.endTime ? ` – ${timeLabel(schedule.endTime)}` : ""}</span>
-                  {" · "}
-                  <a href={`/invoice?id=${encodeURIComponent(doc.id)}`} className="underline-offset-2 hover:underline">{text(doc.data?.clientName) || doc.clientName || doc.title}</a>
-                </p>
-                <p className="text-xs text-[var(--cr-muted)]" data-testid="today-status">{statusLabel(schedule)} · {doc.title}{people ? ` · ${people}` : ""}</p>
-                {address && <p data-testid="today-address">{address}</p>}
-                {phone && <p><a href={`tel:${phone.replace(/[^\d+]/g, "")}`} data-testid="today-phone" className="underline">{phone}</a></p>}
-                {schedule.crewNote && <p className="text-xs text-[var(--cr-muted)]">Crew note: {schedule.crewNote}</p>}
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {schedule.status === "scheduled" && <button type="button" disabled={busy === doc.id} data-testid="today-start" onClick={() => setStatus(doc.id, schedule, "in_progress")} className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium">Start</button>}
-                  {schedule.status !== "done" && <button type="button" disabled={busy === doc.id} data-testid="today-complete" onClick={() => setStatus(doc.id, schedule, "done")} className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium">Complete</button>}
-                  {done === "awaiting" && <button type="button" disabled={busy === doc.id} data-testid="today-confirm" onClick={() => confirm(doc.id)} className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium">Confirm done</button>}
+                </div>
+                <div className="min-w-0 space-y-1">
+                  <p className="text-base font-semibold">
+                    <a href={`/invoice?id=${encodeURIComponent(doc.id)}`} className="underline-offset-2 hover:underline">{text(doc.data?.clientName) || doc.clientName || doc.title}</a>
+                  </p>
+                  <p className="text-xs text-[var(--cr-muted)]" data-testid="today-status"><span className={`mr-1 inline-block rounded-full border px-2 py-0.5 text-[11px] font-semibold ${schedule.status === "done" ? (done === "awaiting" ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300" : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300") : schedule.status === "in_progress" ? "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300" : "border-teal-500/30 bg-teal-500/10 text-teal-700 dark:text-teal-300"}`}>{statusLabel(schedule)}</span> {doc.title}{people ? ` · ${people}` : ""}</p>
+                  {address && <p className="break-words" data-testid="today-address">{address}</p>}
+                  {phone && <p><a href={`tel:${phone.replace(/[^\d+]/g, "")}`} data-testid="today-phone" className="underline">{phone}</a></p>}
+                  {schedule.crewNote && <p className="rounded-lg bg-teal-500/5 px-2 py-1 text-xs text-[var(--cr-muted)]">Crew note: {schedule.crewNote}</p>}
+                  <div className="grid grid-cols-2 gap-2 pt-2 sm:flex sm:flex-wrap">
+                    {phone && <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} className="inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-semibold transition disabled:opacity-50 border border-teal-500/30 hover:border-teal-400">Call</a>}
+                    {address && <a href={`https://maps.google.com/?q=${encodeURIComponent(address)}`} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-semibold transition disabled:opacity-50 border border-teal-500/30 hover:border-teal-400">Map</a>}
+                    {schedule.status === "scheduled" && <button type="button" disabled={busy === doc.id} data-testid="today-start" onClick={() => setStatus(doc.id, schedule, "in_progress")} className="inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-semibold transition disabled:opacity-50 border border-teal-500/30 hover:border-teal-400">Start</button>}
+                    {schedule.status !== "done" && <button type="button" disabled={busy === doc.id} data-testid="today-complete" onClick={() => setStatus(doc.id, schedule, "done")} className="inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-semibold transition disabled:opacity-50 bg-teal-500 text-slate-950! hover:bg-teal-400">Complete</button>}
+                    {done === "awaiting" && <button type="button" disabled={busy === doc.id} data-testid="today-confirm" onClick={() => confirm(doc.id)} className="inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-semibold transition disabled:opacity-50 bg-teal-500 text-slate-950! hover:bg-teal-400">Confirm done</button>}
+                  </div>
                 </div>
               </li>
             );
