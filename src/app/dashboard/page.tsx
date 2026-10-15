@@ -10,6 +10,7 @@ import { amountOf, documentTotals } from "@/lib/discount";
 import { balanceDue, isOpenBalance, paidTotal, readPayments } from "@/lib/payments";
 import { uniqueDocs } from "@/lib/change-orders";
 import NeedsReview from "@/components/NeedsReview";
+import GettingStarted from "@/components/GettingStarted";
 
 type Client = {
   id: string;
@@ -317,6 +318,7 @@ export default function DashboardPage() {
           {recurringReady} recurring draft{recurringReady === 1 ? "" : "s"} ready for review
         </a>
       )}
+      <GettingStarted loading={!loaded} documents={documents} />
       <NeedsReview loading={!loaded} documents={documents} onDocuments={(docs) => setDocuments(uniqueDocs(docs as SavedDocument[]))} />
           <div className="grid grid-cols-2 gap-2 text-sm">
             <a href="/collect" className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 transition hover:border-amber-400">
