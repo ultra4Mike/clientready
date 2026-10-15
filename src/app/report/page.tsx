@@ -166,10 +166,12 @@ async function saveDocument() {
   return (
     <AppShell title="report">
 
-      <section className="mx-auto grid max-w-6xl gap-8 px-6 py-8 lg:grid-cols-2">
-        <form className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
-          <h1 className="text-xl font-semibold">Report details</h1>
+      <section className="mx-auto grid max-w-6xl gap-6 py-2 sm:py-4 lg:grid-cols-2 lg:gap-8">
+        <form className="space-y-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+          <h1 className="text-xl font-bold tracking-tight">Report details</h1>
 
+          <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Client & period</h2>
           <div>
             <input
               className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
@@ -184,7 +186,7 @@ async function saveDocument() {
                     key={client.id}
                     type="button"
                     onClick={() => chooseClient(client)}
-                    className="block w-full border-b border-slate-100 px-3 py-2 text-left hover:bg-slate-50"
+                    className="block w-full border-b border-slate-100 px-3 py-2.5 text-left transition last:border-0 hover:bg-teal-500/10"
                   >
                     <span className="block font-medium">{client.name}</span>
                     <span className="block text-sm text-slate-500">
@@ -220,8 +222,11 @@ async function saveDocument() {
             value={dateRange}
             onChange={(event) => setDateRange(event.target.value)}
           />
-          <textarea
-            className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2"
+          </div>
+          <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Progress</h2>
+                    <textarea
+            className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
             placeholder="Work completed"
             value={completed}
             onChange={(event) => setCompleted(event.target.value)}
@@ -244,8 +249,9 @@ async function saveDocument() {
             value={issues}
             onChange={(event) => setIssues(event.target.value)}
           />
+          </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="print-hide sticky bottom-0 z-10 -mx-4 flex flex-col gap-2 border-t border-slate-200 bg-[var(--cr-card)] px-4 py-3 sm:-mx-6 sm:flex-row sm:px-6">
             <button
               type="button"
               onClick={saveDocument}
@@ -261,27 +267,27 @@ async function saveDocument() {
               Save as client
             </button>
           </div>
-          {saveMessage && <p className="text-sm text-slate-600">{saveMessage}</p>}
+          {saveMessage && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-slate-600">{saveMessage}</p>}
         </form>
 
         <div>
           <button
             type="button"
             onClick={() => window.print()}
-            className="mb-4 rounded-lg bg-slate-900 px-4 py-2 text-sm text-white"
+            className="print-hide mb-4 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400"
           >
             Print / Save PDF
           </button>
 
           <div
             id="preview"
-            className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"
+            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8"
           >
             {logo && (
               <img src={logo} alt="Business logo" className="mb-3 h-14 w-auto" />
             )}
-            <p className="text-sm uppercase tracking-wide text-slate-500">Report</p>
-            <h2 className="mt-1 text-2xl font-semibold">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Report</p>
+            <h2 className="mt-1 text-2xl font-bold tracking-tight">
               {title || "Report title"}
             </h2>
             <p className="mt-2 text-sm text-slate-600">
@@ -292,23 +298,23 @@ async function saveDocument() {
             </p>
             <p className="text-sm text-slate-600">{dateRange || "Date range"}</p>
 
-            <div className="mt-8 space-y-4 text-sm leading-6 text-slate-700">
+            <div className="mt-6 space-y-5 border-t border-slate-200 pt-6 text-sm leading-6 text-slate-700">
               <div>
-                <h3 className="font-semibold text-slate-900">Work completed</h3>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-900">Work completed</h3>
                 <p className="whitespace-pre-wrap">
                   {completed || "Completed work will appear here."}
                 </p>
               </div>
               <div>
-                <h3 className="font-semibold text-slate-900">Current status</h3>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-900">Current status</h3>
                 <p className="whitespace-pre-wrap">{status || "-"}</p>
               </div>
               <div>
-                <h3 className="font-semibold text-slate-900">Next steps</h3>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-900">Next steps</h3>
                 <p className="whitespace-pre-wrap">{nextSteps || "-"}</p>
               </div>
               <div>
-                <h3 className="font-semibold text-slate-900">Issues</h3>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-900">Issues</h3>
                 <p className="whitespace-pre-wrap">{issues || "None noted."}</p>
               </div>
             </div>
