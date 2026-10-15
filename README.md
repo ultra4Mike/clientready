@@ -113,6 +113,8 @@ checkout. The invoice status is not changed automatically.
    - Copy the endpoint's signing secret into `STRIPE_WEBHOOK_SECRET`.
 
 If the keys are missing, the "Pay by card" button is hidden and the API routes answer 503.
+Profile → Payments shows a "Card payments (Stripe)" panel: which settings the server has (yes/no and test/live
+mode only, never a key), these steps, and the webhook URL to copy (`GET /api/stripe/readiness`).
 Card payments only work on invoices shared with an approval link.
 
 ## Client portal
