@@ -270,22 +270,22 @@ export default function CrewPage() {
       <article key={`${card.id}`} className={cardClass} data-testid={`crew-card-${card.doc_id}`}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-sm text-teal-600 dark:text-teal-300">
+            <p className="text-xs font-semibold uppercase tracking-wide text-teal-600 dark:text-teal-300">
               {card.job_date ? dayLabel(card.job_date) : "No date yet"}
               {card.start_time ? ` · ${timeLabel(card.start_time)}${card.end_time ? `–${timeLabel(card.end_time)}` : ""}` : ""}
             </p>
-            <h3 className="truncate text-lg font-semibold">{card.client_name || card.invoice_number || "Job"}</h3>
+            <h3 className="mt-0.5 truncate text-lg font-bold tracking-tight">{card.client_name || card.invoice_number || "Job"}</h3>
           </div>
-          {card.scheduled && <span className={`shrink-0 rounded-full border px-2 py-0.5 text-xs ${STATUS_CLASS[status]}`}>{STATUS_LABEL[status]}</span>}
+          {card.scheduled && <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${STATUS_CLASS[status]}`}>{STATUS_LABEL[status]}</span>}
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
           {card.client_phone
-            ? <a href={`tel:${card.client_phone}`} className="rounded-xl border border-teal-500/30 px-3 py-2 text-center" data-testid="call">📞 Call {card.client_phone}</a>
-            : <span className="rounded-xl border border-teal-500/10 px-3 py-2 text-center opacity-50">No phone</span>}
+            ? <a href={`tel:${card.client_phone}`} className="flex min-h-11 items-center justify-center rounded-xl border border-teal-500/30 px-3 py-2 text-center font-medium transition hover:border-teal-400 hover:bg-teal-500/10" data-testid="call">📞 Call {card.client_phone}</a>
+            : <span className="flex min-h-11 items-center justify-center rounded-xl border border-dashed border-teal-500/20 px-3 py-2 text-center opacity-50">No phone</span>}
           {mapUrl
-            ? <a href={mapUrl} target="_blank" rel="noreferrer" className="rounded-xl border border-teal-500/30 px-3 py-2 text-center" data-testid="map">📍 Map</a>
-            : <span className="rounded-xl border border-teal-500/10 px-3 py-2 text-center opacity-50">No address</span>}
+            ? <a href={mapUrl} target="_blank" rel="noreferrer" className="flex min-h-11 items-center justify-center rounded-xl border border-teal-500/30 px-3 py-2 text-center font-medium transition hover:border-teal-400 hover:bg-teal-500/10" data-testid="map">📍 Map</a>
+            : <span className="flex min-h-11 items-center justify-center rounded-xl border border-dashed border-teal-500/20 px-3 py-2 text-center opacity-50">No address</span>}
         </div>
         {card.client_address && <p className="mt-2 text-sm text-[var(--cr-muted)]">{card.client_address}</p>}
         {card.client_email && <p className="text-sm"><a className="underline" href={`mailto:${card.client_email}`}>{card.client_email}</a></p>}
@@ -298,18 +298,18 @@ export default function CrewPage() {
             {(Object.keys(STATUS_LABEL) as JobStatus[]).map((key) => (
               <button key={key} type="button" aria-pressed={status === key} disabled={busy !== ""} data-testid={`status-${key}-${card.doc_id}`}
                 onClick={() => act(`status-${card.doc_id}`, () => crewSetJobStatus(card.doc_id, key), `Marked ${STATUS_LABEL[key].toLowerCase()}.`)}
-                className={`rounded-xl border px-2 py-2 text-xs font-medium ${status === key ? STATUS_CLASS[key] : "border-teal-500/20"}`}>
+                className={`min-h-10 rounded-xl border px-2 py-2 text-xs font-semibold transition ${status === key ? `${STATUS_CLASS[key]} ring-1 ring-current` : "border-teal-500/20 hover:border-teal-400"} disabled:opacity-60`}>
                 {STATUS_LABEL[key]}
               </button>
             ))}
           </div>
         )}
 
-        <div className="mt-3 rounded-xl border border-teal-500/20 p-3">
+        <div className="mt-4 rounded-xl border border-teal-500/20 bg-teal-500/5 p-3 sm:p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs text-[var(--cr-muted)]">Your time on this job</p>
-              <p className="text-xl font-semibold tabular-nums" data-testid={`timer-${card.doc_id}`}>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Your time on this job</p>
+              <p className="text-2xl font-bold tabular-nums" data-testid={`timer-${card.doc_id}`}>
                 {running ? fmtTimer((now) - Date.parse(running.started_at)) : fmtHours(total)}
               </p>
               {running && <p className="text-xs text-[var(--cr-muted)]">Clocked in at {clockTime(running.started_at)} · {fmtHours(total)} total</p>}
@@ -321,29 +321,29 @@ export default function CrewPage() {
             )}
           </div>
           {mine.length > 0 && (
-            <ul className="mt-2 space-y-1 text-sm">
+            <ul className="mt-3 divide-y divide-teal-500/10 border-t border-teal-500/10 text-sm">
               {mine.map((entry) => (
-                <li key={entry.id} className="flex flex-wrap items-center justify-between gap-2" data-testid="clock-entry">
+                <li key={entry.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5" data-testid="clock-entry">
                   <span>{dayLabel(ymd(new Date(entry.started_at)))} · {clockTime(entry.started_at)} – {entry.ended_at ? clockTime(entry.ended_at) : "now"}{entry.edited_reason ? ` · edited: ${entry.edited_reason}` : ""}</span>
                   <span className="flex items-center gap-2">
                     <span className="tabular-nums">{fmtHours(entryHours(entry, now))}</span>
-                    <button type="button" className="text-xs underline" onClick={() => setFixing({ id: entry.id, start: localInput(entry.started_at), end: localInput(entry.ended_at || new Date().toISOString()), reason: "" })}>Fix time</button>
+                    <button type="button" className="text-xs font-medium text-teal-700 underline-offset-2 hover:underline dark:text-teal-300" onClick={() => setFixing({ id: entry.id, start: localInput(entry.started_at), end: localInput(entry.ended_at || new Date().toISOString()), reason: "" })}>Fix time</button>
                   </span>
                 </li>
               ))}
             </ul>
           )}
           {fixing && mine.some((entry) => entry.id === fixing.id) && (
-            <div className="mt-2 space-y-2 rounded-xl border border-amber-500/40 p-2 text-sm">
+            <div className="mt-3 space-y-3 rounded-xl border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
               <p className="text-xs">Forgot to clock in or out? Set the real times and say why. Your boss sees the reason.</p>
               <div className="grid grid-cols-2 gap-2">
-                <label className="text-xs">Start<input type="datetime-local" className={input} value={fixing.start} onChange={(event) => setFixing({ ...fixing, start: event.target.value })} /></label>
-                <label className="text-xs">End<input type="datetime-local" className={input} value={fixing.end} onChange={(event) => setFixing({ ...fixing, end: event.target.value })} /></label>
+                <label className="space-y-1 text-xs font-medium">Start<input type="datetime-local" className={input} value={fixing.start} onChange={(event) => setFixing({ ...fixing, start: event.target.value })} /></label>
+                <label className="space-y-1 text-xs font-medium">End<input type="datetime-local" className={input} value={fixing.end} onChange={(event) => setFixing({ ...fixing, end: event.target.value })} /></label>
               </div>
               <input className={input} placeholder="Reason, e.g. forgot to clock out" value={fixing.reason} onChange={(event) => setFixing({ ...fixing, reason: event.target.value })} aria-label="Reason" />
               <div className="flex gap-2">
-                <button type="button" onClick={saveFix} className="rounded-xl bg-teal-400 px-3 py-2 font-medium text-slate-950">Save time</button>
-                <button type="button" onClick={() => setFixing(null)} className="rounded-xl border border-teal-500/30 px-3 py-2">Cancel</button>
+                <button type="button" onClick={saveFix} className="flex-1 rounded-xl bg-teal-400 px-3 py-2.5 font-semibold text-slate-950 transition hover:bg-teal-300 sm:flex-none">Save time</button>
+                <button type="button" onClick={() => setFixing(null)} className="flex-1 rounded-xl border border-teal-500/30 px-3 py-2.5 font-medium transition hover:border-teal-400 sm:flex-none">Cancel</button>
               </div>
             </div>
           )}
@@ -351,7 +351,7 @@ export default function CrewPage() {
 
         <div className="mt-3">
           {spendOpen === card.doc_id ? (
-            <div className="space-y-2 rounded-xl border border-teal-500/30 p-3" data-testid={`expense-form-${card.doc_id}`}>
+            <div className="space-y-3 rounded-xl border border-teal-500/30 p-3 sm:p-4" data-testid={`expense-form-${card.doc_id}`}>
               <div className="grid grid-cols-2 gap-2">
                 <select aria-label="Category" className={input} value={spend.kind} onChange={(event) => setSpend({ ...spend, kind: event.target.value })}>
                   {KINDS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -359,19 +359,19 @@ export default function CrewPage() {
                 <input aria-label="Amount" inputMode="decimal" className={input} placeholder="Amount $" value={spend.amount} onChange={(event) => setSpend({ ...spend, amount: event.target.value })} />
               </div>
               <input aria-label="What it was" className={input} placeholder="What it was" value={spend.note} onChange={(event) => setSpend({ ...spend, note: event.target.value })} />
-              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-teal-500/50 px-3 py-3 text-sm">
+              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-teal-500/50 px-3 py-3 text-sm font-medium transition hover:bg-teal-500/10">
                 📷 {spend.receipt ? "Retake receipt photo" : "Snap receipt"}
                 <input aria-label="Receipt photo" type="file" accept="image/*" capture="environment" className="sr-only" onChange={(event) => pickReceipt(event.target.files?.[0])} />
               </label>
               {/* eslint-disable-next-line @next/next/no-img-element -- local data URL preview */}
               {spend.receipt && <img src={spend.receipt} alt="Receipt preview" className="max-h-40 rounded-lg" data-testid="receipt-preview" />}
               <div className="flex gap-2">
-                <button type="button" disabled={busy !== ""} onClick={() => saveExpense(card)} className="flex-1 rounded-xl bg-teal-400 px-3 py-2 font-semibold text-slate-950">Save expense</button>
-                <button type="button" onClick={() => setSpendOpen("")} className="rounded-xl border border-teal-500/30 px-3 py-2">Cancel</button>
+                <button type="button" disabled={busy !== ""} onClick={() => saveExpense(card)} className="flex-1 rounded-xl bg-teal-400 px-3 py-2.5 font-semibold text-slate-950 transition hover:bg-teal-300 disabled:opacity-60">Save expense</button>
+                <button type="button" onClick={() => setSpendOpen("")} className="rounded-xl border border-teal-500/30 px-4 py-2.5 font-medium transition hover:border-teal-400">Cancel</button>
               </div>
             </div>
           ) : (
-            <button type="button" data-testid={`add-expense-${card.doc_id}`} onClick={() => { setSpend({ kind: "parts", amount: "", note: "", receipt: "" }); setSpendOpen(card.doc_id); }} className="w-full rounded-xl border border-teal-500/40 px-3 py-2 text-sm font-medium">
+            <button type="button" data-testid={`add-expense-${card.doc_id}`} onClick={() => { setSpend({ kind: "parts", amount: "", note: "", receipt: "" }); setSpendOpen(card.doc_id); }} className="w-full rounded-xl border border-teal-500/40 px-3 py-2.5 text-sm font-medium transition hover:border-teal-400 hover:bg-teal-500/10">
               🧾 Add expense / receipt
             </button>
           )}
@@ -398,10 +398,10 @@ export default function CrewPage() {
 
   return (
     <main className="min-h-screen bg-[var(--cr-bg)] pb-24 text-[var(--cr-text)]">
-      <header className="sticky top-0 z-10 border-b border-teal-500/20 bg-[var(--cr-bg)]/95 px-4 py-3 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-teal-500/20 bg-[var(--cr-bg)] px-4 py-3 shadow-sm print:hidden">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-400 font-bold text-slate-950">C</span>
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-400 font-bold text-slate-950 shadow-sm">C</span>
             <div>
               <p className="text-sm font-semibold leading-tight" data-testid="crew-name">{name || "Your jobs"}</p>
               <p className="text-xs text-[var(--cr-muted)]">Crew</p>
@@ -409,24 +409,24 @@ export default function CrewPage() {
           </div>
           <div className="flex items-center gap-3 text-sm">
             {open && <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-200 tabular-nums" data-testid="header-timer">⏱ {fmtTimer((now) - Date.parse(open.started_at))}</span>}
-            <button type="button" onClick={switchTheme}>{theme === "dark" ? "Light" : "Dark"}</button>
-            <button type="button" onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}>Log out</button>
+            <button type="button" onClick={switchTheme} className="rounded-lg px-2 py-1 font-medium transition hover:bg-teal-500/10">{theme === "dark" ? "Light" : "Dark"}</button>
+            <button type="button" className="rounded-lg px-2 py-1 font-medium transition hover:bg-teal-500/10" onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}>Log out</button>
           </div>
         </div>
-        <nav className="mx-auto mt-3 grid max-w-2xl grid-cols-4 gap-1 rounded-xl bg-[var(--cr-card)] p-1 text-sm" role="tablist">
+        <nav className="mx-auto mt-3 grid max-w-2xl grid-cols-4 gap-1 rounded-xl border border-teal-500/20 bg-[var(--cr-card)] p-1 text-xs sm:text-sm" role="tablist">
           {tabs.map(([key, label]) => (
-            <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)} className={`rounded-lg px-2 py-2 ${tab === key ? "bg-teal-400 font-semibold text-slate-950" : ""}`}>{label}</button>
+            <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)} className={`rounded-lg px-1 py-2 font-medium transition ${tab === key ? "bg-teal-400 font-semibold text-slate-950 shadow-sm" : "hover:bg-teal-500/10"}`}>{label}</button>
           ))}
         </nav>
       </header>
 
-      <div className="mx-auto max-w-2xl space-y-4 px-4 pt-4">
+      <div className="mx-auto max-w-2xl space-y-5 px-4 pt-5">
         {message && <p className="rounded-xl border border-teal-500/30 px-3 py-2 text-sm" role="status" data-testid="crew-message">{message}</p>}
 
         {tab === "today" && (
           <section className="space-y-3">
-            <h2 className="text-lg font-semibold">{today ? dayLabel(today) : "Today"}</h2>
-            {todayCards.length === 0 && <p className={`${cardClass} text-sm text-[var(--cr-muted)]`}>Nothing scheduled for you today.</p>}
+            <h2 className="text-xl font-bold tracking-tight">{today ? dayLabel(today) : "Today"}</h2>
+            {todayCards.length === 0 && <p className={`${cardClass} border-dashed py-10 text-center text-sm text-[var(--cr-muted)]`}>Nothing scheduled for you today.</p>}
             {todayCards.map(jobCard)}
           </section>
         )}
@@ -443,7 +443,7 @@ export default function CrewPage() {
                 </div>
               );
             })}
-            {weekCards.length === 0 && <p className={`${cardClass} text-sm text-[var(--cr-muted)]`}>No jobs for you this week.</p>}
+            {weekCards.length === 0 && <p className={`${cardClass} border-dashed py-10 text-center text-sm text-[var(--cr-muted)]`}>No jobs for you this week.</p>}
             {later.length > 0 && (
               <div className="space-y-2" data-testid="coming-up">
                 <h2 className="text-sm font-semibold text-[var(--cr-muted)]">Coming up</h2>
@@ -461,14 +461,14 @@ export default function CrewPage() {
 
         {tab === "hours" && (
           <section className={cardClass} data-testid="my-hours">
-            <h2 className="text-lg font-semibold">My hours this week</h2>
+            <h2 className="text-lg font-bold tracking-tight">My hours this week</h2>
             <p className="text-xs text-[var(--cr-muted)]">Clocked is from your clock in/out. Pay sheet is what your boss logged for pay.</p>
-            <table className="mt-3 w-full text-sm">
-              <thead><tr className="text-left text-xs text-[var(--cr-muted)]"><th className="py-1">Day</th><th className="py-1 text-right">Clocked</th><th className="py-1 text-right">Pay sheet</th></tr></thead>
+            <table className="mt-4 w-full text-sm">
+              <thead><tr className="text-left text-xs uppercase tracking-wide text-[var(--cr-muted)]"><th className="py-2 font-semibold">Day</th><th className="py-2 text-right font-semibold">Clocked</th><th className="py-2 text-right font-semibold">Pay sheet</th></tr></thead>
               <tbody>
                 {hoursByDay.map((item) => (
                   <tr key={item.day} className={`border-t border-teal-500/10 ${item.day === today ? "font-semibold" : ""}`} data-testid={`hours-${item.day}`}>
-                    <td className="py-1.5">{dayLabel(item.day)}</td>
+                    <td className="py-2">{dayLabel(item.day)}</td>
                     <td className="py-1.5 text-right tabular-nums">{item.clocked ? fmtHours(item.clocked) : "–"}</td>
                     <td className="py-1.5 text-right tabular-nums">{item.logged ? `${item.logged.toFixed(2)} h` : "–"}</td>
                   </tr>
@@ -478,9 +478,9 @@ export default function CrewPage() {
                 <tr className="border-t border-teal-500/30 font-semibold" data-testid="hours-total"><td className="py-2">Total</td><td className="py-2 text-right tabular-nums">{fmtHours(weekClocked)}</td><td className="py-2 text-right tabular-nums">{weekLogged.toFixed(2)} h</td></tr>
               </tfoot>
             </table>
-            <div className="mt-4 rounded-xl bg-teal-500/10 p-3 text-sm">
+            <div className="mt-5 rounded-xl bg-teal-500/10 p-4 text-sm">
               <p className="text-xs text-[var(--cr-muted)]">Your confirmed pay (jobs marked paid)</p>
-              <p className="text-xl font-semibold">${confirmedPay.toFixed(2)}</p>
+              <p className="mt-1 text-2xl font-bold tabular-nums">${confirmedPay.toFixed(2)}</p>
               <p className="text-xs text-[var(--cr-muted)]">Only you can see this. A scheduled job is not pay yet.</p>
             </div>
           </section>
@@ -488,7 +488,7 @@ export default function CrewPage() {
 
         {tab === "reports" && (
           <section className="space-y-3">
-            <button type="button" onClick={() => setReportOpen(!reportOpen)} className="w-full rounded-xl bg-teal-400 px-4 py-3 font-semibold text-slate-950">{reportOpen ? "Close" : "New job report"}</button>
+            <button type="button" onClick={() => setReportOpen(!reportOpen)} className="w-full rounded-xl bg-teal-400 px-4 py-3 font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300">{reportOpen ? "Close" : "New job report"}</button>
             {reportOpen && (
               <form onSubmit={saveDraft} className={`${cardClass} space-y-3`}>
                 <select className={input} onChange={(event) => { const client = clients.find((item) => item.id === event.target.value); if (client) setForm({ ...form, clientName: client.name, clientPhone: client.phone || "", clientAddress: client.address || "" }); }}>
@@ -500,20 +500,20 @@ export default function CrewPage() {
                 <input className={input} placeholder="Address" value={form.clientAddress} onChange={(event) => setForm({ ...form, clientAddress: event.target.value })} />
                 <textarea className={`${input} min-h-20`} placeholder="What was done" value={form.workDone} onChange={(event) => setForm({ ...form, workDone: event.target.value })} />
                 <div className="grid grid-cols-2 gap-3">
-                  <label className="text-sm">Date<input type="date" className={input} value={form.workDate} onChange={(event) => setForm({ ...form, workDate: event.target.value })} /></label>
-                  <label className="text-sm">Hours<input className={input} value={form.hours} onChange={(event) => setForm({ ...form, hours: event.target.value })} /></label>
-                  <label className="text-sm">Start<input type="time" className={input} value={form.startTime} onChange={(event) => setForm({ ...form, startTime: event.target.value })} /></label>
-                  <label className="text-sm">End<input type="time" className={input} value={form.endTime} onChange={(event) => setForm({ ...form, endTime: event.target.value })} /></label>
+                  <label className="space-y-1 text-sm font-medium">Date<input type="date" className={input} value={form.workDate} onChange={(event) => setForm({ ...form, workDate: event.target.value })} /></label>
+                  <label className="space-y-1 text-sm font-medium">Hours<input className={input} value={form.hours} onChange={(event) => setForm({ ...form, hours: event.target.value })} /></label>
+                  <label className="space-y-1 text-sm font-medium">Start<input type="time" className={input} value={form.startTime} onChange={(event) => setForm({ ...form, startTime: event.target.value })} /></label>
+                  <label className="space-y-1 text-sm font-medium">End<input type="time" className={input} value={form.endTime} onChange={(event) => setForm({ ...form, endTime: event.target.value })} /></label>
                 </div>
                 <input className={input} placeholder="Parts, gas, or dump fee you paid" value={form.partsCost} onChange={(event) => setForm({ ...form, partsCost: event.target.value })} />
                 <input className={input} placeholder="What it was" value={form.partsNote} onChange={(event) => setForm({ ...form, partsNote: event.target.value })} />
                 <textarea className={`${input} min-h-16`} placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
-                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.finished} onChange={(event) => setForm({ ...form, finished: event.target.checked })} /> Job is finished</label>
-                <button type="submit" className="w-full rounded-xl bg-teal-400 px-4 py-2 font-semibold text-slate-950">Send job report</button>
+                <label className="flex items-center gap-3 rounded-xl border border-teal-500/20 px-3 py-3 text-sm font-medium"><input className="h-4 w-4 accent-teal-500" type="checkbox" checked={form.finished} onChange={(event) => setForm({ ...form, finished: event.target.checked })} /> Job is finished</label>
+                <button type="submit" className="sticky bottom-3 w-full rounded-xl bg-teal-400 px-4 py-3 font-semibold text-slate-950 shadow-lg transition hover:bg-teal-300">Send job report</button>
               </form>
             )}
-            <h2 className="font-semibold">Reports you sent</h2>
-            {drafts.length === 0 && <p className="text-sm text-[var(--cr-muted)]">None yet.</p>}
+            <h2 className="pt-2 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Reports you sent</h2>
+            {drafts.length === 0 && <p className="rounded-2xl border border-dashed border-teal-500/30 p-6 text-center text-sm text-[var(--cr-muted)]">None yet.</p>}
             {drafts.map((draft) => (
               <div key={draft.id} className={cardClass}>
                 <p className="font-medium">{draft.client_name}</p>
