@@ -356,7 +356,7 @@ export default function YearPage() {
   }
 
   return (
-    <AppShell title="Year packet">
+    <AppShell title="Sales and expense log">
       <PageHeader title="Sales and expense log" subtitle="Filter the year, open any row, then print or save the packet." actions={<button type="button" onClick={() => window.print()} className="w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 sm:w-auto">Print / Save PDF</button>} />
       <div className="mb-4 grid gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 sm:grid-cols-2 md:grid-cols-4 print:hidden">
         <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={year} onChange={(event) => setYear(event.target.value)} />
