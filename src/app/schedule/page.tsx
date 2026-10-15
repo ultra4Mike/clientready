@@ -1,5 +1,6 @@
 "use client";
 
+import AppShell from "@/components/AppShell";
 import { FormEvent, useEffect, useState } from "react";
 
 type Client = {
@@ -59,19 +60,13 @@ export default function SchedulePage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white shadow-sm print:hidden">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
-          <a href="/dashboard" className="text-sm font-medium text-slate-600 transition hover:text-teal-600">
-            Back to dashboard
-          </a>
-          <a href="/calendar" className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:border-teal-500 hover:text-teal-600">
-            Calendar
-          </a>
-        </div>
-      </header>
-
-      <section className="mx-auto grid max-w-6xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-2 lg:gap-8">
+    <AppShell title="Schedule">
+      <div className="mb-4 flex justify-end">
+        <a href="/calendar" className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400">
+          Open calendar
+        </a>
+      </div>
+      <section className="grid gap-6 lg:grid-cols-2 lg:gap-8">
         <form
           onSubmit={handleSubmit}
           className="h-fit space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 lg:sticky lg:top-20"
@@ -119,7 +114,7 @@ export default function SchedulePage() {
           />
           <button
             type="submit"
-            className="w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400 disabled:opacity-50 sm:w-auto"
+            className="w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 disabled:opacity-50 sm:w-auto"
           >
             Save appointment
           </button>
@@ -155,6 +150,6 @@ export default function SchedulePage() {
             ))}
         </div>
       </section>
-    </main>
+    </AppShell>
   );
 }
