@@ -9,13 +9,15 @@ import { saveCrewJobs } from "@/lib/crew";
 import { balanceDue, paidTotal, paymentFields, paymentMethods, readPayments, type Payment } from "@/lib/payments";
 import { JobPhotosEditor, JobPhotoStrip } from "@/components/JobPhotos";
 import { isQuotaError, readPhotos, type JobPhoto } from "@/lib/photos";
+import LineSplit from "@/components/LineSplit";
+import { normalizeCategory, type LineCategory } from "@/lib/line-split";
 import PayQr from "@/components/PayQr";
 import { payUrlFor } from "@/lib/pay-link";
 import SignaturePad, { SignatureBlock } from "@/components/SignaturePad";
 import { readSignature, type Signature } from "@/lib/signature";
 import { amountOf, documentTotals, discountLabel, normalizeDiscountType, type DiscountType } from "@/lib/discount";
 
-type LineItem = { description: string; qty: string; rate: string };
+type LineItem = { description: string; qty: string; rate: string; category?: LineCategory };
 type SavedClient = { id: string; name: string; company: string; email: string; phone: string; address: string };
 type SavedDocument = { id: string; type: "invoice" | "proposal"; title: string; clientName: string; createdAt: string; data: Record<string, unknown> };
 type OtherFee = { id: string; name: string; amount: string };
@@ -226,7 +228,7 @@ export default function NewInvoicePage() {
         taxPercent?: string; discountType?: string; discountValue?: string; signature?: unknown; proposalSignature?: unknown; payLink?: string; photos?: unknown; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
       };
       const kind: DocKind = doc.type === "proposal" ? "proposal" : "invoice";
-      const loadedItems = Array.isArray(data.items) && data.items.length ? data.items : [{ ...emptyItem }];
+      const loadedItems = Array.isArray(data.items) && data.items.length ? data.items.map((item) => ({ ...item, category: normalizeCategory(item.category) })) : [{ ...emptyItem }];
       const loadedCrew = Array.isArray(data.crew) ? data.crew : [];
       const loadedFees = Array.isArray(data.jobCosts?.otherFees) ? data.jobCosts.otherFees : [];
       setDocKind(kind);
@@ -516,10 +518,15 @@ export default function NewInvoicePage() {
             <div className="space-y-3">
               <div className="flex items-center justify-between"><h2 className="font-medium">Line items</h2><button type="button" className="text-sm" onClick={() => setItems((current) => [...current, { ...emptyItem }])}>Add item</button></div>
               {items.map((item, index) => (
-                <div key={index} className="grid gap-2 sm:grid-cols-3">
+                <div key={index} className="grid gap-2 sm:grid-cols-4">
                   <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Description" value={item.description} onChange={(event) => updateItem(index, "description", event.target.value)} />
                   <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Qty" value={item.qty} onChange={(event) => updateItem(index, "qty", event.target.value)} />
                   <input className="rounded-lg border border-slate-300 px-3 py-2" placeholder="Rate" value={item.rate} onChange={(event) => updateItem(index, "rate", event.target.value)} />
+                  <select aria-label="Item type" data-testid="item-category" className="rounded-lg border border-slate-300 px-3 py-2" value={item.category || ""} onChange={(event) => setItems((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, category: normalizeCategory(event.target.value) } : row))}>
+                    <option value="">Unmarked</option>
+                    <option value="labor">Labor</option>
+                    <option value="materials">Materials</option>
+                  </select>
                 </div>
               ))}
             </div>
@@ -675,6 +682,7 @@ export default function NewInvoicePage() {
             </div>
             <div className="mt-2 grid grid-cols-2 gap-6 border-t border-slate-500 pt-2 text-sm">
               <div className={`space-y-0.5 ${mutedClass}`}>
+                <LineSplit items={items} labelClass={labelClass} />
                 {payments.filter((payment) => amountOf(payment.amount) > 0).length > 0 && <p className={`text-xs ${labelClass}`}>{isProposal ? "Deposit" : "Payments"}</p>}
                 {payments.filter((payment) => amountOf(payment.amount) > 0).map((payment) => (
                   <div key={payment.id} className="flex justify-between gap-2"><span>{[payment.date, payment.method, payment.ref].filter(Boolean).join(" · ") || "Payment"}</span><span>${amountOf(payment.amount).toFixed(2)}</span></div>

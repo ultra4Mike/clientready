@@ -5,6 +5,7 @@ import AppShell from "@/components/AppShell";
 import { balanceDue, paidTotal, readPayments, type Payment } from "@/lib/payments";
 import { JobPhotoStrip } from "@/components/JobPhotos";
 import { readPhotos, type JobPhoto } from "@/lib/photos";
+import LineSplit from "@/components/LineSplit";
 import PayQr from "@/components/PayQr";
 import { payUrlFor } from "@/lib/pay-link";
 import { SignatureBlock } from "@/components/SignaturePad";
@@ -15,6 +16,7 @@ type LineItem = {
   description: string;
   qty: string;
   rate: string;
+  category?: string;
 };
 
 type SavedDocument = {
@@ -219,6 +221,7 @@ export default function InvoiceViewPage() {
 
           <div className="mt-2 grid grid-cols-2 gap-6 border-t border-slate-200 pt-2 text-sm">
             <div className="space-y-0.5 text-slate-600">
+              <LineSplit items={items} />
               {payments.some((payment) => amountOf(payment.amount) > 0) && <p className="text-xs text-slate-500">Payments</p>}
               {payments.filter((payment) => amountOf(payment.amount) > 0).map((payment) => (
                 <div key={payment.id} className="flex justify-between gap-2">
