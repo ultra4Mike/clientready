@@ -23,6 +23,16 @@ const moreLinks = [
   { href: "/backup", label: "Backup" },
 ];
 
+const ALL_LINKS = [...mainLinks, ...moreLinks];
+const byHref = (href: string) => ALL_LINKS.find((link) => link.href === href)!;
+const NAV_GROUPS = [
+  { label: "Work", links: ["/dashboard", "/calendar", "/upcoming", "/drafts"].map(byHref) },
+  { label: "Clients", links: ["/clients", "/history"].map(byHref) },
+  { label: "Money", links: ["/documents", "/collect", "/year"].map(byHref) },
+  { label: "Team", links: ["/employees"].map(byHref) },
+];
+const BOTTOM_LINKS = [{ href: "/profile", label: "Settings" }, byHref("/backup")];
+
 const QUICK_CREATE = [
   { href: "/invoice", label: "New invoice" },
   { href: "/proposal", label: "New proposal" },
@@ -102,25 +112,28 @@ useEffect(() => {
   }
 
   const nav = (
-    <nav className={wide ? "space-y-1" : "-mx-1 flex gap-1 overflow-x-auto whitespace-nowrap pb-1"}>
-      {mainLinks.map((link) => (
-        <a key={link.href} href={link.href} className={linkClass(link.href)}>
-          {link.label}
-        </a>
-      ))}
-      <button
-        type="button"
-        onClick={() => setMoreOpen(!moreOpen)}
-        className="block rounded-lg px-3 py-2 text-left text-sm font-medium transition hover:bg-teal-500/15"
-      >
-        More
-      </button>
-      {moreOpen &&
-        moreLinks.map((link) => (
+    <nav className="flex h-full flex-col">
+      <div className="space-y-5">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label}>
+            <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)]">{group.label}</p>
+            <div className="space-y-0.5">
+              {group.links.map((link) => (
+                <a key={link.href} href={link.href} className={linkClass(link.href)}>
+                  {link.label}
+                </a>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-auto space-y-0.5 border-t border-teal-500/15 pt-3">
+        {BOTTOM_LINKS.map((link) => (
           <a key={link.href} href={link.href} className={linkClass(link.href)}>
             {link.label}
           </a>
         ))}
+      </div>
     </nav>
   );
 
@@ -143,7 +156,7 @@ useEffect(() => {
         <div className="app-root flex min-h-screen">
           <aside className="sticky top-0 h-screen w-56 shrink-0 overflow-y-auto border-r border-teal-500/20 bg-[var(--cr-panel)] p-4">
             <Logo />
-            <div className="mt-6">{nav}</div>
+            <div className="mt-6 flex min-h-[calc(100%-4rem)] flex-col">{nav}</div>
           </aside>
           <div className="min-w-0 flex-1">
             <header className="sticky top-0 z-20 flex items-center justify-between border-b border-teal-500/20 bg-[var(--cr-bg)] px-6 py-3">
@@ -175,13 +188,23 @@ useEffect(() => {
                 onClick={(event) => event.stopPropagation()}
               >
                 <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-slate-500/40" />
-                <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">More</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {[...mainLinks.filter((link) => !TAB_HREFS.includes(link.href)), ...moreLinks].map((link) => (
-                    <a key={link.href} href={link.href} className="rounded-xl border border-teal-500/20 bg-[var(--cr-card)] px-4 py-3 text-sm font-medium transition hover:border-teal-400">
-                      {link.label}
-                    </a>
-                  ))}
+                <div className="max-h-[60vh] space-y-4 overflow-y-auto">
+                  {[...NAV_GROUPS, { label: "Settings", links: BOTTOM_LINKS }].map((group) => {
+                    const links = group.links.filter((link) => !TAB_HREFS.includes(link.href));
+                    if (!links.length) return null;
+                    return (
+                      <div key={group.label}>
+                        <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)]">{group.label}</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {links.map((link) => (
+                            <a key={link.href} href={link.href} className="rounded-xl border border-teal-500/20 bg-[var(--cr-card)] px-4 py-3 text-sm font-medium transition hover:border-teal-400">
+                              {link.label}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
