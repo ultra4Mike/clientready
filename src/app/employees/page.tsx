@@ -192,7 +192,7 @@ export default function EmployeesPage() {
 
   return (
     <AppShell title="Employees">
-      <div className="mx-auto max-w-4xl">
+      <div className="max-w-4xl">
       <p className="text-sm text-[var(--cr-muted)] sm:text-base">
         Add the email they will use to log in. That email opens the crew page, not the owner books.
       </p>
@@ -245,10 +245,10 @@ export default function EmployeesPage() {
               </button>
               <button type="button" onClick={() => remove(person)} className="rounded-lg px-3 py-1.5 text-sm text-[var(--cr-muted)] transition hover:bg-red-500/10 hover:text-red-500">Remove</button>
             </div>
-            <div className="mt-4 grid gap-3 rounded-xl border border-teal-500/15 bg-teal-500/5 p-3 sm:grid-cols-[1fr_1fr_auto] sm:p-4">
-              <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="New rate" value={editingId === person.id ? raiseRate : ""} onChange={(event) => { setEditingId(person.id); setRaiseRate(event.target.value); }} />
-              <input type="date" className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={editingId === person.id ? raiseDate : ""} onChange={(event) => { setEditingId(person.id); setRaiseDate(event.target.value); }} />
-              <button type="button" onClick={() => giveRaise(person)} className="rounded-lg border border-teal-500/40 px-3 py-2.5 text-sm font-medium transition hover:border-teal-400 hover:bg-teal-500/10">Save raise</button>
+            <div className="mt-4 flex flex-wrap gap-3 rounded-xl border border-teal-500/15 bg-teal-500/5 p-3 sm:p-4">
+              <input className="min-w-0 flex-1 basis-32 rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="New rate" value={editingId === person.id ? raiseRate : ""} onChange={(event) => { setEditingId(person.id); setRaiseRate(event.target.value); }} />
+              <input type="date" className="min-w-0 flex-1 basis-36 rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={editingId === person.id ? raiseDate : ""} onChange={(event) => { setEditingId(person.id); setRaiseDate(event.target.value); }} />
+              <button type="button" onClick={() => giveRaise(person)} className="w-full shrink-0 whitespace-nowrap rounded-lg sm:w-auto border border-teal-500/40 px-3 py-2.5 text-sm font-medium transition hover:border-teal-400 hover:bg-teal-500/10">Save raise</button>
             </div>
           </div>
         ))}
