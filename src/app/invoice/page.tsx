@@ -665,7 +665,7 @@ export default function NewInvoicePage() {
 
   return (
     <AppShell title={isProposal ? "New proposal" : "New invoice"}>
-      <section className="print-reset mx-auto grid max-w-6xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-2 lg:gap-8">
+      <section className="print-reset mx-auto grid max-w-6xl gap-6 py-2 sm:py-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-8">
         <form className="space-y-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
 {locked && (
             <p
@@ -679,10 +679,10 @@ export default function NewInvoicePage() {
           {!locked && daysLeft <= 5 && (
             <p className="text-sm text-slate-600">{daysLeft} day{daysLeft === 1 ? "" : "s"} left in the trial.</p>
           )}
-          <fieldset disabled={locked} className="min-w-0 space-y-4">
+          <fieldset disabled={locked} className="min-w-0 space-y-4 pb-2">
             <div className="flex gap-2">
-              <button type="button" onClick={() => chooseKind("invoice")} className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${!isProposal ? "bg-teal-500 text-slate-950 shadow-sm" : "border border-slate-300 hover:border-teal-500"}`}>Invoice</button>
-              <button type="button" onClick={() => chooseKind("proposal")} className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${isProposal ? "bg-teal-500 text-slate-950 shadow-sm" : "border border-slate-300 hover:border-teal-500"}`}>Proposal</button>
+              <button type="button" onClick={() => chooseKind("invoice")} className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${!isProposal ? "bg-teal-500 text-slate-950! shadow-sm" : "border border-slate-300 hover:border-teal-500"}`}>Invoice</button>
+              <button type="button" onClick={() => chooseKind("proposal")} className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${isProposal ? "bg-teal-500 text-slate-950! shadow-sm" : "border border-slate-300 hover:border-teal-500"}`}>Proposal</button>
             </div>
             <h1 className="text-xl font-bold tracking-tight">{isProposal ? "Proposal details" : "Invoice details"}</h1>
             <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
@@ -726,10 +726,10 @@ export default function NewInvoicePage() {
             <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Line items & pricing</h2>
             <div className="space-y-3">
-              <div className="flex items-center justify-between"><h2 className="font-medium">Line items</h2><button type="button" className="tap text-sm" onClick={() => setItems((current) => [...current, { ...emptyItem }])}>Add item</button></div>
+              <div className="flex items-center justify-between"><h2 className="font-medium">Line items</h2><button type="button" className="tap rounded-lg border border-teal-500/40 px-3 py-1.5 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300" onClick={() => setItems((current) => [...current, { ...emptyItem }])}>Add item</button></div>
               {items.map((item, index) => (
-                <div key={index} className="grid gap-2 sm:grid-cols-4">
-                  <input className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Description" value={item.description} onChange={(event) => updateItem(index, "description", event.target.value)} />
+                <div key={index} className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-2 sm:grid-cols-[minmax(0,1fr)_4.5rem_6rem_8.5rem] sm:border-0 sm:p-0">
+                  <input className="col-span-2 sm:col-span-1 rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Description" value={item.description} onChange={(event) => updateItem(index, "description", event.target.value)} />
                   <input className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Qty" value={item.qty} onChange={(event) => updateItem(index, "qty", event.target.value)} />
                   <input className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Rate" value={item.rate} onChange={(event) => updateItem(index, "rate", event.target.value)} />
                   <select aria-label="Item type" data-testid="item-category" className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={item.category || ""} onChange={(event) => setItems((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, category: normalizeCategory(event.target.value) } : row))}>
@@ -741,14 +741,16 @@ export default function NewInvoicePage() {
               ))}
             </div>
             <div className="space-y-2">
-              <p className="text-sm text-slate-600">Discount (taken off before tax)</p>
+              <p className="text-sm font-medium text-slate-600">Discount (taken off before tax)</p>
               <div className="flex gap-2">
-                <button type="button" onClick={() => setDiscountType("percent")} className={`rounded-lg px-4 py-2 text-sm font-medium transition ${discountType === "percent" ? "bg-teal-500 font-semibold text-slate-950" : "border border-slate-300 hover:border-teal-500"}`}>%</button>
-                <button type="button" onClick={() => setDiscountType("amount")} className={`rounded-lg px-4 py-2 text-sm font-medium transition ${discountType === "amount" ? "bg-teal-500 font-semibold text-slate-950" : "border border-slate-300 hover:border-teal-500"}`}>$</button>
+                <button type="button" onClick={() => setDiscountType("percent")} className={`rounded-lg px-4 py-2 text-sm font-medium transition ${discountType === "percent" ? "bg-teal-500 font-semibold text-slate-950!" : "border border-slate-300 hover:border-teal-500"}`}>%</button>
+                <button type="button" onClick={() => setDiscountType("amount")} className={`rounded-lg px-4 py-2 text-sm font-medium transition ${discountType === "amount" ? "bg-teal-500 font-semibold text-slate-950!" : "border border-slate-300 hover:border-teal-500"}`}>$</button>
                 <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" inputMode="decimal" placeholder={discountType === "percent" ? "Discount percent, e.g. 10" : "Discount amount, e.g. 50"} value={discountValue} onChange={(event) => setDiscountValue(event.target.value)} />
               </div>
             </div>
-            <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Tax percent" value={taxPercent} onChange={(event) => setTaxPercent(event.target.value)} />
+            <label className="block text-sm font-medium text-slate-600">Tax %
+            <input className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Tax percent" value={taxPercent} onChange={(event) => setTaxPercent(event.target.value)} />
+            </label>
             <div className="space-y-2 rounded-xl border border-slate-200 p-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-medium">{isProposal ? "Deposit received" : "Payments received"}</h2>
@@ -784,7 +786,7 @@ export default function NewInvoicePage() {
             <SignaturePad key={padKey} value={signature} onChange={setSignature} defaultName={clientName} />
             <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
             </div>
-            <div className="owner-costs space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-slate-900 sm:p-5">
+            <div className="owner-costs space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-slate-900 sm:p-5">
               <h2 className="font-medium">Your costs only</h2>
               <p className="text-sm text-slate-600">Wages fill from hours times the saved rate, plus any extra pay.</p>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -804,7 +806,7 @@ export default function NewInvoicePage() {
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
                   <p className="text-sm font-medium">Other fees</p>
-                  <button type="button" className="rounded-lg bg-teal-400 px-3 py-1.5 text-sm font-semibold text-slate-950 transition hover:bg-teal-300" onClick={() => setOtherFees((current) => [...current, { id: Date.now().toString(), name: "", amount: "" }])}>Add fee</button>
+                  <button type="button" className="rounded-lg bg-teal-500 px-3 py-1.5 text-sm font-semibold text-slate-950! transition hover:bg-teal-400" onClick={() => setOtherFees((current) => [...current, { id: Date.now().toString(), name: "", amount: "" }])}>Add fee</button>
                 </div>
                 {otherFees.map((fee) => (
                   <div key={fee.id} className="grid gap-2 sm:grid-cols-[1fr_8rem_auto]">
@@ -823,7 +825,7 @@ export default function NewInvoicePage() {
                       <option key={person.id} value={person.id}>{person.name} · ${Number(person.rate || 0).toFixed(2)}/hr</option>
                     ))}
                   </select>
-                  <button type="button" onClick={addCrew} className="rounded-lg bg-teal-400 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300 disabled:opacity-50">Add</button>
+                  <button type="button" onClick={addCrew} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Add</button>
                 </div>
                 {crew.map((row) => (
                   <div key={row.id} className="mt-3 space-y-2 border-t border-amber-200 pt-3 text-slate-900">
@@ -853,7 +855,7 @@ export default function NewInvoicePage() {
                             <div className="mt-2 flex flex-wrap items-end gap-2">
                               <label>Start<input type="datetime-local" className="ml-1 rounded-md border border-slate-300 px-1.5 py-0.5" value={clockFix.start} onChange={(event) => setClockFix({ ...clockFix, start: event.target.value })} /></label>
                               <label>End<input aria-label="Clock end" type="datetime-local" className="ml-1 rounded-md border border-slate-300 px-1.5 py-0.5" value={clockFix.end} onChange={(event) => setClockFix({ ...clockFix, end: event.target.value })} /></label>
-                              <button type="button" onClick={saveClockFix} className="rounded-md bg-teal-500 px-3 py-1.5 text-sm font-semibold text-slate-950 transition hover:bg-teal-400">Save time</button>
+                              <button type="button" onClick={saveClockFix} className="rounded-md bg-teal-500 px-3 py-1.5 text-sm font-semibold text-slate-950! transition hover:bg-teal-500">Save time</button>
                               <button type="button" onClick={() => setClockFix(null)} className="underline">Cancel</button>
                             </div>
                           )}
@@ -919,7 +921,7 @@ export default function NewInvoicePage() {
               </p>
             )}
             <div className="print-hide sticky bottom-0 z-10 -mx-4 grid grid-cols-2 gap-2 border-t border-slate-200 bg-[var(--cr-card)] px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:-mx-6 sm:flex sm:flex-wrap sm:gap-3 sm:px-6">
-              {!locked && <button type="button" onClick={saveDocument} className="col-span-2 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Save document</button>}
+              {!locked && <button type="button" onClick={saveDocument} className="col-span-2 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 disabled:opacity-50">Save document</button>}
               {isProposal && !locked && (
                 <button type="button" onClick={createInvoiceFromProposal} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Create invoice</button>
               )}
@@ -931,9 +933,9 @@ export default function NewInvoicePage() {
             {saveMessage && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-slate-600">{saveMessage}</p>}
           </fieldset>
         </form>
-        <div>
+        <div className="lg:sticky lg:top-20 lg:self-start">
           <div className="print-hide mb-4 flex flex-wrap gap-2 sm:gap-3">
-            <button type="button" onClick={() => window.print()} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Print / Save PDF</button>
+            <button type="button" onClick={() => window.print()} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 disabled:opacity-50">Print / Save PDF</button>
             {!locked && !isProposal && status !== "paid" && <button type="button" onClick={copyPayLink} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">{paymentLink.trim() ? "Pay / Copy pay link" : "Add how to pay"}</button>}
             {!isProposal && docId && status !== "draft" && status !== "paid" && totals.balance > 0 && <button type="button" data-testid="invoice-reminder" onClick={() => setReminderOpen((open) => !open)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Reminder</button>}
           </div>
