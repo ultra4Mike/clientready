@@ -11,7 +11,7 @@ export type Schedule = {
   status: JobStatus;
   updatedAt: string;
 };
-export type Worker = { id: string; name: string; email?: string; phone?: string; active?: boolean };
+export type Worker = { id: string; name: string; email?: string; phone?: string; role?: string; active?: boolean };
 
 export const STATUS_LABEL: Record<JobStatus, string> = { scheduled: "Scheduled", in_progress: "In progress", done: "Done" };
 export const STATUS_CLASS: Record<JobStatus, string> = {

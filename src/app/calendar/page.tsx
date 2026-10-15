@@ -71,7 +71,7 @@ export default function CalendarPage() {
   });
   const unscheduled = jobDocs.filter((doc) => !readSchedule(doc.data) && text(doc.data?.status) !== "paid");
 
-  async function save(docId: string, schedule: Schedule | null) {
+  async function save(docId: string, schedule: Schedule | null, options?: { keepOpen?: boolean }) {
     try {
       await saveSchedule(docId, schedule);
       setState((prev) => ({ ...prev, docs: readDocs() }));
@@ -79,7 +79,7 @@ export default function CalendarPage() {
     } catch {
       setMessage("Could not save the schedule.");
     }
-    setEditing(null);
+    if (!options?.keepOpen) setEditing(null);
   }
 
   function dropOn(date: string, startTime?: string) {
@@ -188,7 +188,7 @@ export default function CalendarPage() {
               value={readSchedule(editingDoc.data)}
               workers={workers}
               defaults={{ date: editing.date, startTime: editing.startTime }}
-              onSave={(schedule) => save(editing.docId, schedule)}
+              onSave={(schedule, options) => save(editing.docId, schedule, options)}
               onCancel={() => setEditing(null)}
             />
           </div>

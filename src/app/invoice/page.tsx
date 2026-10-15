@@ -443,11 +443,12 @@ export default function NewInvoicePage() {
     setSaveMessage(isProposal ? "Proposal saved" : "Invoice saved");
   }
 
-  async function saveJobSchedule(next: Schedule | null) {
+  async function saveJobSchedule(next: Schedule | null, options?: { keepOpen?: boolean }) {
     try {
       const saved = await saveSchedule(docId, next);
       setSchedule(saved ? readSchedule(saved.data) : null);
-      setScheduleKey((key) => key + 1);
+      // Crew add/remove keeps the editor as is (other unsaved edits stay); a full save reloads it.
+      if (!options?.keepOpen) setScheduleKey((key) => key + 1);
       setSaveMessage(next ? "Schedule saved" : "Job unscheduled");
     } catch {
       setSaveMessage("Could not save the schedule.");
