@@ -873,7 +873,7 @@ export default function NewInvoicePage() {
                 <p>Left over: ${jobMath.leftOver.toFixed(2)}</p>
                 <p>Set aside ({setAsidePercent}%): ${jobMath.setAside.toFixed(2)}</p>
                 <p className="font-semibold">Yours after set-aside: ${jobMath.yours.toFixed(2)}</p>
-                <CrewSpend docId={docId} />
+                <CrewSpend docId={docId} estimate={{ ...costs, otherFees }} />
               </div>
             </div>
             <div className="print-hide space-y-3 rounded-xl border border-slate-200 p-4 text-sm sm:p-5" data-testid="schedule-section">
@@ -1016,21 +1016,44 @@ export default function NewInvoicePage() {
     </AppShell>
   );
 }
-function CrewSpend({ docId }: { docId: string }) {
+type CostEstimate = { parts?: string; gas?: string; tools?: string; lunch?: string; otherFees?: { amount?: string }[] };
+
+/** Owner only: what the crew actually spent on this job next to the cost estimate. Never changes the invoice. */
+function CrewSpend({ docId, estimate }: { docId: string; estimate: CostEstimate }) {
   const [rows, setRows] = useState<{ id: string; worker_name: string; kind: string; amount: string; note: string; receipt: string }[]>([]);
   useEffect(() => {
     if (!docId) return;
     supabase.from("crew_expenses").select("*").eq("doc_id", docId).then(({ data }) => setRows(data || []));
   }, [docId]);
   if (!rows.length) return null;
+  const num = (value: unknown) => Number(String(value ?? "").replace(/[^0-9.-]/g, "")) || 0;
+  const spent = (kinds: string[]) => rows.filter((row) => kinds.includes(row.kind)).reduce((sum, row) => sum + num(row.amount), 0);
+  const groups: [string, number, number][] = [
+    ["Gas / diesel", num(estimate.gas), spent(["gas"])],
+    ["Parts and materials", num(estimate.parts) + num(estimate.tools), spent(["parts"])],
+    ["Dump fees and other", (estimate.otherFees || []).reduce((sum, fee) => sum + num(fee.amount), 0) + num(estimate.lunch), spent(["dump", "other"])],
+  ];
+  const totalEstimate = groups.reduce((sum, [, est]) => sum + est, 0);
+  const totalActual = groups.reduce((sum, [, , actual]) => sum + actual, 0);
+  const diffClass = (diff: number) => (diff > 0.005 ? "font-semibold text-red-600" : diff < -0.005 ? "text-teal-700" : "");
+  const diffText = (diff: number) => (Math.abs(diff) < 0.005 ? "on estimate" : diff > 0 ? `+$${diff.toFixed(2)} over` : `$${(-diff).toFixed(2)} under`);
   return (
-    <div className="mt-4 rounded-xl border border-amber-300/40 p-3 text-sm">
-      <p className="font-medium">Crew reported spend</p>
-      <p className="mt-1 text-xs text-[var(--cr-muted)]">Check the receipt before you change your fee. This does not change the invoice.</p>
+    <div className="print-hide mt-4 rounded-xl border border-amber-300/40 p-3 text-sm" data-testid="crew-vs-estimate">
+      <p className="font-medium">Crew spend vs your estimate</p>
+      <table className="mt-2 w-full text-left text-sm">
+        <thead><tr className="text-xs text-[var(--cr-muted)]"><th className="font-normal">Cost</th><th className="text-right font-normal">Estimate</th><th className="text-right font-normal">Crew spent</th><th className="text-right font-normal">Difference</th></tr></thead>
+        <tbody>
+          {groups.filter(([, est, actual]) => est > 0 || actual > 0).map(([label, est, actual]) => (
+            <tr key={label} data-testid="cve-row"><td>{label}</td><td className="text-right tabular-nums">${est.toFixed(2)}</td><td className="text-right tabular-nums">${actual.toFixed(2)}</td><td className={`text-right tabular-nums ${diffClass(actual - est)}`}>{diffText(actual - est)}</td></tr>
+          ))}
+          <tr className="border-t border-slate-200 font-semibold" data-testid="cve-total"><td>Total</td><td className="text-right tabular-nums">${totalEstimate.toFixed(2)}</td><td className="text-right tabular-nums">${totalActual.toFixed(2)}</td><td className={`text-right tabular-nums ${diffClass(totalActual - totalEstimate)}`}>{diffText(totalActual - totalEstimate)}</td></tr>
+        </tbody>
+      </table>
+      <p className="mt-2 text-xs text-[var(--cr-muted)]">Receipts from your crew. Check them before you change your fee. This does not change the invoice or your costs.</p>
       {rows.map((row) => (
         <div key={row.id} className="mt-2">
-          <p>{row.worker_name} · {row.kind} · ${row.amount} · {row.note}</p>
-          {row.receipt && <a href={row.receipt} target="_blank" className="text-xs underline">Open receipt</a>}
+          <p>{row.worker_name} · {row.kind} · ${num(row.amount).toFixed(2)} · {row.note}</p>
+          {row.receipt && <a href={row.receipt} download={`receipt-${row.id}.jpg`} className="text-xs underline">Save receipt</a>}
         </div>
       ))}
     </div>
