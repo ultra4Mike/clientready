@@ -72,14 +72,16 @@ export default function BackupPage() {
   return (
     <AppShell title="Backup">
 
-      <section className="mx-auto max-w-2xl px-6 py-10">
-        <h1 className="text-2xl font-semibold">Backup your data</h1>
-        <p className="mt-2 text-slate-600">
+      <section className="mx-auto max-w-2xl px-0 py-2 sm:px-4 sm:py-6">
+        <h1 className="text-2xl font-bold tracking-tight">Backup your data</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-600 sm:text-base">
           Download a copy of your profile, clients, documents, and appointments.
           Restore it if this browser is cleared.
         </p>
 
-        <div className="mt-8 space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
+        <div className="mt-6 divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="space-y-3 p-5 sm:p-6">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Download</h2>
           <button
             type="button"
             onClick={downloadBackup}
@@ -87,18 +89,22 @@ export default function BackupPage() {
           >
             Download backup
           </button>
+          </div>
+          <div className="space-y-3 p-5 sm:p-6">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Restore</h2>
 
           <label className="block text-sm font-medium text-slate-600">
             Restore from a backup file
             <input
               type="file"
               accept="application/json"
-              className="mt-2 block w-full text-sm"
+              className="mt-2 block w-full rounded-lg border border-dashed border-slate-300 p-3 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-teal-500 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-slate-950"
               onChange={(event) => restoreBackup(event.target.files?.[0])}
             />
           </label>
 
-          {message && <p className="text-sm text-slate-600">{message}</p>}
+          {message && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-slate-600">{message}</p>}
+          </div>
         </div>
       </section>
     </AppShell>
