@@ -7,6 +7,7 @@ import { runDueRecurring } from "@/lib/recurring";
 import { ApprovalBadge } from "@/components/Approval";
 import { readApproval } from "@/lib/approval";
 import AppShell from "@/components/AppShell";
+import PageHeader from "@/components/PageHeader";
 import { documentTotals } from "@/lib/discount";
 import { balanceDue, isOpenBalance, paidTotal, readPayments } from "@/lib/payments";
 import { searchWithNumbers } from "@/lib/doc-number";
@@ -172,25 +173,24 @@ export default function DocumentsPage() {
 
   return (
     <AppShell title="Documents">
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-[var(--cr-muted)] sm:text-base">
-          Invoices and proposals live here. Press Open to edit one.
-        </p>
-        <div className="grid grid-cols-2 gap-2 sm:flex">
+      <PageHeader
+        title="All documents"
+        subtitle="Invoices and proposals live here. Press Open to edit one."
+        actions={<>
           <a
-            href="/invoice"
-            className="rounded-full bg-teal-500 px-4 py-2 text-center text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400"
-          >
-            New invoice
-          </a>
-          <a
-            href="/proposal"
-            className="rounded-full border border-teal-500/40 px-4 py-2 text-center text-sm font-medium transition hover:border-teal-400"
-          >
-            New proposal
-          </a>
-        </div>
-      </div>
+              href="/invoice"
+              className="rounded-full bg-teal-500 px-4 py-2 text-center text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400"
+            >
+              New invoice
+            </a>
+            <a
+              href="/proposal"
+              className="rounded-full border border-teal-500/40 px-4 py-2 text-center text-sm font-medium transition hover:border-teal-400"
+            >
+              New proposal
+            </a>
+        </>}
+      />
 
       <div className="grid gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 sm:grid-cols-2 lg:grid-cols-4">
         <input
@@ -241,9 +241,12 @@ export default function DocumentsPage() {
         {filtersOn && <button type="button" className="font-medium text-teal-600 dark:text-teal-300" onClick={() => { setSearch(""); setTypeFilter("all"); setStatusFilter("all"); setFromDate(""); setToDate(""); }}>Clear filters</button>}
       </div>
 
-      <div className="mt-6 space-y-3">
+      <div className="mt-6 overflow-hidden rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] shadow-sm">
+        <div className="hidden gap-4 border-b border-teal-500/20 bg-teal-500/5 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)] md:grid md:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_7.5rem_7rem_7.5rem_13rem]">
+          <span>Document</span><span>Client</span><span>Created</span><span>Status</span><span className="text-right">Total</span><span className="text-right">Actions</span>
+        </div>
         {documents.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-teal-500/30 bg-[var(--cr-card)] p-8 text-center">
+          <div className="p-10 text-center">
             <p className="font-medium">No documents yet</p>
             <p className="mt-1 text-sm text-[var(--cr-muted)]">
               Create your first invoice or proposal.
@@ -252,7 +255,7 @@ export default function DocumentsPage() {
         )}
 
         {documents.length > 0 && visibleDocs.length === 0 && (
-          <p className="rounded-2xl border border-dashed border-teal-500/30 p-8 text-center text-sm text-[var(--cr-muted)]">
+          <p className="p-10 text-center text-sm text-[var(--cr-muted)]">
             No documents match that search.
           </p>
         )}
@@ -260,30 +263,34 @@ export default function DocumentsPage() {
         {visibleDocs.map((doc) => (
           <div
             key={doc.id}
-            className="flex flex-col gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/50 sm:p-5 sm:flex-row sm:items-center sm:justify-between"
+            className="grid grid-cols-2 gap-x-4 gap-y-2 border-b border-teal-500/10 px-4 py-4 transition last:border-b-0 hover:bg-teal-500/5 md:items-center md:px-5 md:py-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_7.5rem_7rem_7.5rem_13rem]"
           >
-            <button type="button" onClick={() => openDocument(doc)} className="min-w-0 text-left">
-              <p className="truncate text-base font-semibold">{doc.title || "Untitled"}</p>
-              <p className="mt-1 flex flex-wrap items-center gap-x-1 text-sm text-[var(--cr-text)] opacity-85">
-                {doc.type} · {doc.clientName || "No client"} · {doc.createdAt}
-                {doc.data?.status ? <> · <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold capitalize ${({ paid: "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300", draft: "border-slate-400/40 bg-slate-400/15", sent: "border-sky-500/40 bg-sky-500/15 text-sky-700 dark:text-sky-300", overdue: "border-red-500/40 bg-red-500/15 text-red-700 dark:text-red-300", accepted: "border-teal-500/40 bg-teal-500/15 text-teal-700 dark:text-teal-300" } as Record<string, string>)[String(doc.data.status)] || "border-teal-500/30"}`}>{String(doc.data.status)}</span></> : ""}
-                {(factsById.get(doc.id)?.total || 0) > 0 ? ` · $${(factsById.get(doc.id)?.total || 0).toFixed(2)}` : ""}
-                {(factsById.get(doc.id)?.owed || 0) > 0 && doc.data?.status !== "draft" ? ` · $${(factsById.get(doc.id)?.owed || 0).toFixed(2)} owed` : ""}
-                {doc.data?.outcome ? ` · ${doc.data.outcome}` : ""}
-              </p>
+            <button type="button" onClick={() => openDocument(doc)} className="col-span-2 min-w-0 text-left md:col-span-1">
+              <p className="truncate text-base font-semibold md:text-sm">{doc.title || "Untitled"}</p>
+              <p className="text-xs capitalize text-[var(--cr-muted)]">{doc.type}</p>
               <ApprovalBadge approval={readApproval(doc.data?.approval)} className="mt-1" />
             </button>
-            <div className="tap-row flex shrink-0 gap-4 border-t border-teal-500/10 pt-3 sm:border-0 sm:pt-0">
-              <button type="button" onClick={() => openDocument(doc)} className="text-sm font-medium text-teal-600 transition hover:underline dark:text-teal-300">
+            <div className="min-w-0 text-sm">
+              <p className="truncate">{doc.clientName || "No client"}</p>
+              {doc.data?.outcome ? <p className="truncate text-xs text-[var(--cr-muted)]">{doc.data.outcome}</p> : null}
+            </div>
+            <p className="text-right text-sm tabular-nums text-[var(--cr-muted)] md:text-left">{doc.createdAt}</p>
+            <div><span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize ${({ paid: "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300", draft: "border-slate-400/40 bg-slate-400/15", sent: "border-sky-500/40 bg-sky-500/15 text-sky-700 dark:text-sky-300", overdue: "border-red-500/40 bg-red-500/15 text-red-700 dark:text-red-300", accepted: "border-teal-500/40 bg-teal-500/15 text-teal-700 dark:text-teal-300" } as Record<string, string>)[String(doc.data?.status || "")] || "border-teal-500/30"}`}>{String(doc.data?.status || "—")}</span></div>
+            <div className="text-right text-sm tabular-nums">
+              <p className="font-semibold">{(factsById.get(doc.id)?.total || 0) > 0 ? `$${(factsById.get(doc.id)?.total || 0).toFixed(2)}` : "—"}</p>
+              {(factsById.get(doc.id)?.owed || 0) > 0 && doc.data?.status !== "draft" ? <p className="text-xs text-amber-600 dark:text-amber-300">${(factsById.get(doc.id)?.owed || 0).toFixed(2)} owed</p> : null}
+            </div>
+            <div className="tap-row col-span-2 flex justify-end gap-2 border-t border-teal-500/10 pt-3 md:col-span-1 md:border-0 md:pt-0">
+              <button type="button" onClick={() => openDocument(doc)} className="rounded-lg bg-teal-500 px-3 py-1.5 text-sm font-semibold text-slate-950! transition hover:bg-teal-400">
                 Open
               </button>
-              <button type="button" onClick={() => duplicateDocument(doc)} className="text-sm font-medium text-teal-600 transition hover:underline dark:text-teal-300">
+              <button type="button" onClick={() => duplicateDocument(doc)} className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400">
                 Duplicate
               </button>
               <button
                 type="button"
                 onClick={() => removeDocument(doc.id)}
-                className="text-sm text-[var(--cr-muted)] transition hover:text-red-500"
+                className="rounded-lg px-2 py-1.5 text-sm text-[var(--cr-muted)] transition hover:bg-red-500/10 hover:text-red-500"
               >
                 Remove
               </button>
