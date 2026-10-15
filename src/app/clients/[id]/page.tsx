@@ -54,21 +54,49 @@ export default function ClientRecordPage() {
   return (
     <AppShell title="Client">
       <section className="py-2 sm:py-4" data-testid="client-record" data-state={state} data-client-id={id}>
-        {state === "loading" && <p className="p-6 text-sm text-[var(--cr-muted)]">Loading…</p>}
+        {state === "loading" && (
+          <div className="space-y-4" aria-hidden="true">
+            <div className="h-36 animate-pulse rounded-2xl bg-teal-500/10" />
+            <div className="grid grid-cols-3 gap-3">{[0, 1, 2].map((n) => <div key={n} className="h-20 animate-pulse rounded-2xl bg-teal-500/10" />)}</div>
+            <div className="h-64 animate-pulse rounded-2xl bg-teal-500/10" />
+            <p className="sr-only">Loading…</p>
+          </div>
+        )}
         {state === "missing" && (
-          <p className="p-6 text-sm">This client was not found. <Link className="underline" href="/clients">Back to clients</Link></p>
+          <div className="mx-auto flex max-w-md flex-col items-center rounded-2xl border border-dashed border-teal-500/30 bg-[var(--cr-card)] px-6 py-14 text-center">
+            <span aria-hidden="true" className="flex h-14 w-14 items-center justify-center rounded-full bg-teal-500/15 text-2xl">👤</span>
+            <p className="mt-4 text-lg font-semibold">This client was not found.</p>
+            <p className="mt-1 text-sm text-[var(--cr-muted)]">It may have been removed, or the link is out of date.</p>
+            <Link className="mt-5 inline-flex min-h-11 items-center rounded-lg bg-teal-500 px-5 text-sm font-semibold text-slate-950! transition hover:bg-teal-400" href="/clients">Back to clients</Link>
+          </div>
         )}
         {client && view && (
           <>
-            <PageHeader title={client.name} subtitle={[client.company, client.email, client.phone].filter(Boolean).join(" · ")} actions={<Link href="/clients" className="text-sm underline">All clients</Link>} />
-            {client.address && <p className="mb-3 text-sm text-[var(--cr-muted)]" data-testid="client-address">{client.address}</p>}
-            <dl className="mb-6 grid grid-cols-3 gap-3 text-sm" data-testid="client-totals">
-              <div data-testid="client-billed" data-value={view.totals.billed.toFixed(2)}><dt className="text-[var(--cr-muted)]">Billed</dt><dd className="font-semibold">${view.totals.billed.toFixed(2)}</dd></div>
-              <div data-testid="client-paid" data-value={view.totals.paid.toFixed(2)}><dt className="text-[var(--cr-muted)]">Paid</dt><dd className="font-semibold">${view.totals.paid.toFixed(2)}</dd></div>
-              <div data-testid="client-owed" data-value={view.totals.owed.toFixed(2)}><dt className="text-[var(--cr-muted)]">Owed</dt><dd className="font-semibold">${view.totals.owed.toFixed(2)}</dd></div>
+            <div className="mb-5 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-6">
+              <Link href="/clients" className="mb-3 inline-flex text-xs font-medium text-[var(--cr-muted)] transition hover:text-teal-500">← All clients</Link>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex min-w-0 items-center gap-4">
+                  <span aria-hidden="true" className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-teal-500/15 text-xl font-bold text-teal-700 dark:text-teal-300">{(client.name || "?").trim().charAt(0).toUpperCase()}</span>
+                  <div className="min-w-0">
+                    <PageHeader title={client.name} subtitle={[client.company, client.email, client.phone].filter(Boolean).join(" · ")} />
+                    {client.address && <p className="-mt-4 text-sm text-[var(--cr-muted)]" data-testid="client-address">{client.address}</p>}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0 sm:flex-wrap sm:justify-end">
+                  {client.phone && <a href={`tel:${client.phone}`} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-teal-500/30 px-4 text-sm font-medium transition hover:border-teal-400 sm:min-h-10">Call</a>}
+                  {client.email && <a href={`mailto:${client.email}`} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-teal-500/30 px-4 text-sm font-medium transition hover:border-teal-400 sm:min-h-10">Email</a>}
+                  <a href="/invoice" className="inline-flex min-h-11 items-center justify-center rounded-lg bg-teal-500 px-4 text-sm font-semibold text-slate-950! transition hover:bg-teal-400 sm:min-h-10">New invoice</a>
+                </div>
+              </div>
+            </div>
+            <dl className="mb-5 grid grid-cols-3 gap-2 text-sm sm:gap-4" data-testid="client-totals">
+              <div className="min-w-0 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 shadow-sm sm:p-5" data-testid="client-billed" data-value={view.totals.billed.toFixed(2)}><dt className="text-[10px] font-semibold uppercase tracking-wide text-[var(--cr-muted)] sm:text-xs">Billed</dt><dd className="mt-1 truncate text-base font-bold tabular-nums sm:text-2xl">${view.totals.billed.toFixed(2)}</dd></div>
+              <div className="min-w-0 rounded-2xl border border-emerald-500/25 bg-[var(--cr-card)] p-3 shadow-sm sm:p-5" data-testid="client-paid" data-value={view.totals.paid.toFixed(2)}><dt className="text-[10px] font-semibold uppercase tracking-wide text-[var(--cr-muted)] sm:text-xs">Paid</dt><dd className="mt-1 truncate text-base font-bold tabular-nums text-emerald-700 sm:text-2xl dark:text-emerald-300">${view.totals.paid.toFixed(2)}</dd></div>
+              <div className={`min-w-0 rounded-2xl border bg-[var(--cr-card)] p-3 shadow-sm sm:p-5 ${view.totals.owed > 0 ? "border-amber-500/30" : "border-teal-500/20"}`} data-testid="client-owed" data-value={view.totals.owed.toFixed(2)}><dt className="text-[10px] font-semibold uppercase tracking-wide text-[var(--cr-muted)] sm:text-xs">Owed</dt><dd className={`mt-1 truncate text-base font-bold tabular-nums sm:text-2xl ${view.totals.owed > 0 ? "text-amber-600 dark:text-amber-300" : ""}`}>${view.totals.owed.toFixed(2)}</dd></div>
             </dl>
-            <div className="mb-6"><PortalShare clientName={client.name} clientId={client.id} compact /></div>
-            <div data-testid="client-timeline" data-count={view.items.length}>
+            <div className="mb-5"><PortalShare clientName={client.name} clientId={client.id} compact /></div>
+            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Activity</h2>
+            <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 shadow-sm sm:p-5" data-testid="client-timeline" data-count={view.items.length}>
               <Timeline
                 emptyText="No activity yet."
                 items={view.items.map((item) => ({
