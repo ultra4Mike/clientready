@@ -95,7 +95,7 @@ export default function SignaturePad({ value, onChange, defaultName = "" }: Prop
     setError("");
   }
 
-  const tab = (active: boolean) => `rounded-lg px-3 py-1 text-sm ${active ? "bg-slate-900 text-white" : "border border-slate-300"}`;
+  const tab = (active: boolean) => `rounded-lg px-3 py-1.5 text-sm font-semibold transition ${active ? "bg-teal-500 text-slate-950! shadow-sm" : "border border-slate-300 hover:border-teal-500"}`;
 
   return (
     <div className="space-y-2 rounded-xl border border-slate-200 p-4" data-testid="signature-pad">
@@ -108,7 +108,7 @@ export default function SignaturePad({ value, onChange, defaultName = "" }: Prop
       </div>
       <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder={defaultName ? `Signer name (${defaultName})` : "Signer name"} value={signerName} onChange={(event) => setSignerName(event.target.value)} />
       {mode === "drawn" ? (
-        <div className="sig-pad-surface w-full max-w-[400px] rounded-lg border border-dashed border-slate-400">
+        <div className="sig-pad-surface w-full max-w-[400px] rounded-lg border-2 border-dashed border-teal-500/50 bg-white shadow-inner">
         <canvas
           ref={canvasRef}
           width={WIDTH}
@@ -137,7 +137,7 @@ export default function SignaturePad({ value, onChange, defaultName = "" }: Prop
         <button type="button" onClick={clearAll} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Clear</button>
         {value && <span className="text-sm text-slate-600">Signed by {value.signerName} · {signedAtLabel(value.signedAt)}</span>}
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600">{error}</p>}
       <p className="text-xs text-slate-500">{SIGNATURE_DISCLAIMER}</p>
     </div>
   );
