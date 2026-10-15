@@ -206,7 +206,7 @@ export default function ClientsPage() {
   }
 
   return (
-    <AppShell title="Clients">
+    <AppShell title="Client list">
       <section className="py-2 sm:py-4">
         <PageHeader
           title="Client list"
