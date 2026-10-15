@@ -86,9 +86,7 @@ export default function UpcomingPage() {
 
         <div className="mt-8 space-y-3">
           {upcoming.length === 0 && (
-            <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600">
-              Nothing scheduled this week.
-            </p>
+            <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-teal-500/30 bg-[var(--cr-card)] px-6 py-12 text-center"><span className="flex h-12 w-12 items-center justify-center rounded-full bg-teal-500/15 text-xl">📅</span><p className="text-base font-semibold">Nothing scheduled this week.</p><p className="max-w-sm text-sm text-[var(--cr-muted)]">Invoices due and jobs in the next 7 days will appear here.</p><a href="/calendar" className="mt-2 rounded-lg border border-teal-500/30 px-4 py-2 text-sm font-medium">Open calendar</a></div>
           )}
 
           {upcoming.map((doc) => (
