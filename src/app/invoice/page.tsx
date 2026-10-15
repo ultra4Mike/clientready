@@ -647,8 +647,8 @@ export default function NewInvoicePage() {
 
   return (
     <AppShell title={isProposal ? "New proposal" : "New invoice"}>
-      <section className="print-reset mx-auto grid max-w-6xl gap-8 px-6 py-8 lg:grid-cols-2">
-        <form className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
+      <section className="print-reset mx-auto grid max-w-6xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-2 lg:gap-8">
+        <form className="space-y-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
 {locked && (
             <p
               className="rounded-lg border p-3 text-sm"
@@ -883,7 +883,7 @@ export default function NewInvoicePage() {
                 <p className="text-xs text-slate-500">Drafts are made when the app opens on or after the next run date. They are never sent or marked paid. Save the document to keep schedule changes.</p>
               </div>
             )}
-            <div className="flex flex-wrap gap-3">
+            <div className="print-hide sticky bottom-0 z-10 -mx-4 flex flex-wrap gap-3 border-t border-slate-200 bg-[var(--cr-card)] px-4 py-3 sm:-mx-6 sm:px-6">
               {!locked && <button type="button" onClick={saveDocument} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Save document</button>}
               {isProposal && !locked && (
                 <button type="button" onClick={createInvoiceFromProposal} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Create invoice</button>
