@@ -183,7 +183,7 @@ export default function DashboardPage() {
         };
 
   return (
-    <AppShell title={`${hello}${ownerName ? `, ${ownerName}` : ""}.`}>
+    <AppShell title="Dashboard">
       <PageHeader
         title={`${hello}${ownerName ? `, ${ownerName}` : ""}.`}
         subtitle={<>{!loaded ? "Loading your numbers…" : stats.invoiceCount === 0
