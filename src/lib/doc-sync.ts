@@ -23,6 +23,15 @@ function withCloudApproval<T extends AnyDoc>(winner: T, cloud: T): T {
   return { ...winner, data };
 }
 
+/** The schedule block merges on its own updatedAt, so a crew status change isn't lost to a newer local edit elsewhere. */
+function withNewerSchedule<T extends AnyDoc>(winner: T, local: T, cloud: T): T {
+  const a = local.data?.schedule as { updatedAt?: string } | undefined;
+  const b = cloud.data?.schedule as { updatedAt?: string } | undefined;
+  if (!a && !b) return winner;
+  const pick = !a ? b : !b ? a : Date.parse(b.updatedAt || "") > Date.parse(a.updatedAt || "") ? b : a;
+  return { ...winner, data: { ...(winner.data || {}), schedule: pick } };
+}
+
 /**
  * Merges cloud and local copies by id.
  * - Only in local: kept (uploaded later by syncLocalDocs).
@@ -46,11 +55,11 @@ export function mergeDocs<T extends AnyDoc>(local: T[], cloud: T[]) {
     const localTime = stampOf(mine);
     const cloudTime = stampOf(doc);
     if (localTime > cloudTime) {
-      const kept = withCloudApproval(mine, doc);
+      const kept = withNewerSchedule(withCloudApproval(mine, doc), mine, doc);
       merged.push(kept);
       pushUp.push(kept);
     } else {
-      merged.push(withCloudApproval({ ...doc, data: { ...(mine.data || {}), ...(doc.data || {}) } }, doc));
+      merged.push(withNewerSchedule(withCloudApproval({ ...doc, data: { ...(mine.data || {}), ...(doc.data || {}) } }, doc), mine, doc));
     }
   }
   for (const doc of local) if (!cloudById.has(doc.id)) merged.push(doc);

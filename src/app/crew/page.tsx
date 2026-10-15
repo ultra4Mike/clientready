@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { crewSetJobStatus, STATUS_CLASS, STATUS_LABEL, type JobStatus } from "@/lib/schedule";
 
 type Client = { id: string; name: string; phone: string; address: string };
 type Job = {
@@ -10,6 +11,8 @@ type Job = {
   client_name: string;
   client_phone: string;
   client_address: string;
+  client_email?: string;
+  schedule_status?: string;
   job_date: string;
   start_time: string;
   end_time: string;
@@ -127,7 +130,15 @@ function readReceipt(file: File | undefined, jobId: string) {
     load();
   }
 
-  const paid = jobs.filter((job) => job.status === "paid");
+  async function setJobStatus(job: Job, status: JobStatus) {
+    const error = await crewSetJobStatus(job.doc_id, status);
+    if (error) return setMessage("Could not update the status. Ask the owner to check your assignment.");
+    setMessage(`Marked ${STATUS_LABEL[status].toLowerCase()}.`);
+    load();
+  }
+
+  const isScheduleRow = (job: Job) => job.id.includes("-sched-");
+  const paid = jobs.filter((job) => job.status === "paid" && !isScheduleRow(job));
   const confirmedPay = paid.reduce((sum, job) => sum + (Number(job.pay) || 0), 0);
   const confirmedHours = paid.reduce((sum, job) => sum + (Number(job.hours) || 0), 0);
   const upcoming = jobs.filter((job) => job.status !== "paid");
@@ -180,12 +191,19 @@ function readReceipt(file: File | undefined, jobId: string) {
             <div key={job.id} className="rounded-2xl border border-teal-500/20 p-4">
               <div className="flex items-start justify-between gap-3">
                 <p className="font-medium">{job.client_name || job.invoice_number || "Job"}</p>
-                <p className="text-xs uppercase text-[var(--cr-muted)]">{job.status || "draft"}</p>
+                {isScheduleRow(job)
+                  ? (
+                    <select aria-label="Job status" data-testid={`crew-status-${job.doc_id}`} value={job.schedule_status || "scheduled"} onChange={(event) => setJobStatus(job, event.target.value as JobStatus)} className={`rounded border px-2 py-0.5 text-xs ${STATUS_CLASS[(job.schedule_status || "scheduled") as JobStatus] || ""}`}>
+                      {(Object.keys(STATUS_LABEL) as JobStatus[]).map((key) => <option key={key} value={key}>{STATUS_LABEL[key]}</option>)}
+                    </select>
+                  )
+                  : <p className="text-xs uppercase text-[var(--cr-muted)]">{job.status || "draft"}</p>}
               </div>
-              <p className="mt-1 text-sm text-[var(--cr-muted)]">{job.job_date || "No date"} · {job.start_time || "no time"} to {job.end_time || "no time"} · {job.hours || "0"} hrs</p>
-              {job.client_phone && <p className="text-sm">{job.client_phone}</p>}
+              <p className="mt-1 text-sm text-[var(--cr-muted)]">{job.job_date || "No date"} · {job.start_time || "no time"} to {job.end_time || "no time"}{isScheduleRow(job) ? "" : ` · ${job.hours || "0"} hrs`}</p>
+              {job.client_phone && <p className="text-sm"><a className="underline" href={`tel:${job.client_phone}`}>{job.client_phone}</a></p>}
+              {job.client_email && <p className="text-sm"><a className="underline" href={`mailto:${job.client_email}`}>{job.client_email}</a></p>}
               {job.client_address && <p className="text-sm">{job.client_address}</p>}
-              <p className="mt-1 text-sm">{job.status === "paid" ? `Pay $${Number(job.pay || 0).toFixed(2)}` : "Pay not confirmed"}</p>
+              {!isScheduleRow(job) && <p className="mt-1 text-sm">{job.status === "paid" ? `Pay $${Number(job.pay || 0).toFixed(2)}` : "Pay not confirmed"}</p>}
 <div className="mt-3 grid gap-2 sm:grid-cols-3">
                 <select className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2 text-sm" value={spend[job.id]?.kind || "parts"} onChange={(event) => setSpend({ ...spend, [job.id]: { ...(spend[job.id] || { amount: "", note: "" }), kind: event.target.value } })}>
                   <option value="gas">Gas</option><option value="parts">Parts</option><option value="dump">Dump fee</option><option value="other">Other</option>

@@ -33,7 +33,8 @@ export async function saveCrewJobs(
   const { data } = await supabase.auth.getUser();
   const user = data.user;
   if (!user || !docId) return;
-  await supabase.from("crew_jobs").delete().eq("owner_id", user.id).eq("doc_id", docId);
+  // Pay rows only: schedule rows ("<doc>-sched-<worker>") are kept in step by syncScheduleCrewJobs.
+  await supabase.from("crew_jobs").delete().eq("owner_id", user.id).eq("doc_id", docId).not("id", "like", `${docId}-sched-%`);
   if (!crew.length) return;
   const { data: people } = await supabase.from("employees").select("id, email").eq("user_id", user.id);
   const emailById = new Map((people || []).map((person) => [person.id, person.email || ""]));

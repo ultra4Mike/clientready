@@ -73,6 +73,10 @@ export async function saveCloudDocument(doc: CloudDoc) {
       const cloudApproval = (current.data as Record<string, unknown> | null)?.approval;
       if (cloudApproval) doc.data.approval = cloudApproval;
       else delete doc.data.approval;
+      // A crew member may have updated the job status in the cloud since this copy was loaded.
+      const cloudSchedule = (current.data as Record<string, unknown> | null)?.schedule as { updatedAt?: string } | undefined;
+      const mine = doc.data.schedule as { updatedAt?: string } | undefined;
+      if (cloudSchedule && (!mine || Date.parse(cloudSchedule.updatedAt || "") > Date.parse(mine.updatedAt || ""))) doc.data.schedule = cloudSchedule;
     }
     await supabase
       .from("documents")

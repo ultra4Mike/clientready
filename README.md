@@ -57,3 +57,14 @@ out of the `documents` table, so the migration adds:
 
 Until it is run, "Share approval link" still creates links but customers will see
 "Could not load this document". No service-role key is used anywhere in the app.
+
+### `20261015010000_job_scheduling.sql` — job scheduling for crew (required for crew status updates)
+
+- Adds `client_email` and `schedule_status` columns to `crew_jobs` (schedule rows are written by the
+  owner's app with ids `<document id>-sched-<employee id>`; they carry date, times, client contact and
+  status, never prices or pay).
+- `crew_set_job_status(doc_id, status)` — `SECURITY DEFINER`, callable by signed-in users only. It
+  checks that the caller's email is assigned to that job and then changes only
+  `data.schedule.status`/`updatedAt` on the document and `schedule_status` on the crew rows.
+- Re-creates `get_document_by_approval_token` so the customer approval page never receives the
+  schedule (run it after the approval-links migration).

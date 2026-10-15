@@ -73,8 +73,10 @@ export default function DocumentsPage() {
 
   function duplicateDocument(doc: SavedDocument) {
     // A copy is a new document: it must not share the original's approval link.
-    const { approval: _approval, ...rest } = doc.data || {};
+    // A copy is a new job too: it isn't on the schedule yet.
+    const { approval: _approval, schedule: _schedule, ...rest } = doc.data || {};
     void _approval;
+    void _schedule;
     const copy: SavedDocument = {
       ...doc,
       id: Date.now().toString(),

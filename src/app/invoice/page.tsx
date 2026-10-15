@@ -14,6 +14,8 @@ import { normalizeCategory, type LineCategory } from "@/lib/line-split";
 import { appendChangeOrderNote, changeOrderData, changeOrdersFor, mergeChangeOrderNotes, readChangeOrderNotes, readChangeOrderOf, type ChangeOrderNote, type ChangeOrderOf } from "@/lib/change-orders";
 import ChangeOrderNotes from "@/components/ChangeOrderNotes";
 import { ApprovalBadge, ApprovalShare } from "@/components/Approval";
+import ScheduleEditor from "@/components/ScheduleEditor";
+import { readSchedule, readWorkers, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
 import { readApproval, refreshApproval, type Approval } from "@/lib/approval";
 import { generateNextNow, readRecurring, readRecurringFrom, scheduleFromForm, type Frequency, type RecurringFrom } from "@/lib/recurring";
 import PayQr from "@/components/PayQr";
@@ -132,6 +134,9 @@ export default function NewInvoicePage() {
   const [recLoadedNext, setRecLoadedNext] = useState("");
   const [recurringFrom, setRecurringFrom] = useState<RecurringFrom | null>(null);
   const [approval, setApproval] = useState<Approval | null>(null);
+  const [schedule, setSchedule] = useState<Schedule | null>(null);
+  const [scheduleKey, setScheduleKey] = useState(0);
+  const [workers, setWorkers] = useState<Worker[]>([]);
   const [items, setItems] = useState<LineItem[]>([{ ...emptyItem }]);
   const [businessName, setBusinessName] = useState("Your business");
   const [ownerName, setOwnerName] = useState("");
@@ -275,6 +280,9 @@ export default function NewInvoicePage() {
       setRecLoadedNext(schedule?.nextRunDate || "");
       setRecurringFrom(kind === "invoice" ? readRecurringFrom(data.recurringFrom) : null);
       setApproval(readApproval(data.approval));
+      setSchedule(readSchedule(doc.data as Record<string, unknown>));
+      setWorkers(readWorkers());
+      setScheduleKey((key) => key + 1);
       // The cloud is the source of truth for approval (the customer approves there).
       refreshApproval(doc.id).then((latest) => { if (latest !== undefined) setApproval(latest); });
       setItems(loadedItems);
@@ -383,7 +391,7 @@ export default function NewInvoicePage() {
     setDocId(""); setClientSearch(""); setClientName(""); setClientCompany(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
     setInvoiceNumber(nextNumber(docKind)); setInvoiceDate(ymd(new Date())); setDueDate(plusDays(14)); setJobStart(""); setJobEnd("");
     setNotes(isProposal ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
-    setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setSignature(null); setProposalSignature(null); setPadKey((key) => key + 1); setDocPayLink(""); setPhotos([]); setChangeOrderOf(null); setChangeOrderNotes([]); setRecFreq("off"); setRecNext(""); setRecLoadedNext(""); setRecurringFrom(null); setApproval(null); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
+    setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setSignature(null); setProposalSignature(null); setPadKey((key) => key + 1); setDocPayLink(""); setPhotos([]); setChangeOrderOf(null); setChangeOrderNotes([]); setRecFreq("off"); setRecNext(""); setRecLoadedNext(""); setRecurringFrom(null); setApproval(null); setSchedule(null); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
     setStyle("clean"); setJobTime(""); setCosts(emptyCosts); setCrew([]); setOtherFees([]);
   }
 
@@ -406,7 +414,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature, proposalSignature, payLink: docPayLink, photos, ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
+      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature, proposalSignature, payLink: docPayLink, photos, ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(stored?.data?.schedule ? { schedule: stored.data.schedule } : {}), items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -430,7 +438,20 @@ export default function NewInvoicePage() {
       startTime: jobStart,
       endTime: jobEnd,
     }, crew);
+    await syncScheduleCrewJobs(nextDoc);
+    setWorkers(readWorkers());
     setSaveMessage(isProposal ? "Proposal saved" : "Invoice saved");
+  }
+
+  async function saveJobSchedule(next: Schedule | null) {
+    try {
+      const saved = await saveSchedule(docId, next);
+      setSchedule(saved ? readSchedule(saved.data) : null);
+      setScheduleKey((key) => key + 1);
+      setSaveMessage(next ? "Schedule saved" : "Job unscheduled");
+    } catch {
+      setSaveMessage("Could not save the schedule.");
+    }
   }
 
   async function generateRecurringNow() {
@@ -716,6 +737,15 @@ export default function NewInvoicePage() {
                 <p className="font-semibold">Yours after set-aside: ${jobMath.yours.toFixed(2)}</p>
                 <CrewSpend docId={docId} />
               </div>
+            </div>
+            <div className="print-hide space-y-2 rounded-lg border border-slate-300 p-3 text-sm" data-testid="schedule-section">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold">Schedule</p>
+                {schedule && <span className="text-xs" data-testid="schedule-summary">{schedule.date}{schedule.startTime ? ` ${schedule.startTime}` : ""}{schedule.endTime ? `–${schedule.endTime}` : ""} · {STATUS_LABEL[schedule.status]}</span>}
+              </div>
+              {docId && !locked
+                ? <ScheduleEditor key={scheduleKey} value={schedule} workers={workers} onSave={saveJobSchedule} />
+                : <p className="text-xs text-slate-500">Save the document first, then schedule the job here or on the Calendar.</p>}
             </div>
             {docId && !locked && <ApprovalShare docId={docId} approval={approval} onChange={setApproval} />}
             {!isProposal && docId && (
