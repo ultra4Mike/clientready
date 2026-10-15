@@ -123,3 +123,18 @@ One no-login link per client (Invoice page → "Client portal for …" → Share
 sent invoice/proposal for that client (drafts never), the balance and payments, can approve and sign, and pay by
 card when Stripe is set up. Owner costs, crew, schedule notes, review state and approval tokens are never returned.
 "New link" replaces the old link; "Turn off link" revokes it. Needs `supabase/migrations/20261015050000_client_portal.sql`.
+
+## Email invoices, proposals and reminders (review before sending)
+
+Invoice page → "Email invoice…" / "Email proposal…" opens an editable To / Subject / Message with a preview
+(approval link, else the client portal link, plus your payment link). Nothing is sent until you click
+**Send email** (or **Open in email app**). Each email is logged on the document (`data.emailLog`: sentAt, to,
+subject, how); the status only changes if you tick "Also mark as sent". Customers never see the log
+(`supabase/migrations/20261015080000_email_log_private.sql`).
+
+Sending from the app is optional (server env, then redeploy):
+- `RESEND_API_KEY`: Resend → API Keys.
+- `EMAIL_FROM`: a sender on a domain verified in Resend, e.g. `Your Business <billing@yourdomain.com>`. Replies go to your login email.
+- Uses `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` (or `SUPABASE_URL`) to check the owner's session and that the document is theirs.
+
+Without these, the app opens your own email app (mailto) instead. `RESEND_API_BASE` is for tests only.

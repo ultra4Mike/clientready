@@ -87,6 +87,14 @@ export async function saveCloudDocument(doc: CloudDoc) {
       // Card payments recorded by Stripe on the server are never dropped by a save from an older copy.
       const withStripe = keepStripePayments(doc.data, current.data as Record<string, unknown> | null);
       if (withStripe !== doc.data) Object.assign(doc.data, withStripe);
+      // Emails logged from another device are kept too (append-only log, matched by time + recipient).
+      const cloudLog = (current.data as Record<string, unknown> | null)?.emailLog;
+      if (Array.isArray(cloudLog) && cloudLog.length) {
+        const mineLog = Array.isArray(doc.data.emailLog) ? (doc.data.emailLog as { sentAt?: string; to?: string }[]) : [];
+        const seen = new Set(mineLog.map((entry) => `${entry.sentAt}|${entry.to}`));
+        const missing = (cloudLog as { sentAt?: string; to?: string }[]).filter((entry) => entry && !seen.has(`${entry.sentAt}|${entry.to}`));
+        if (missing.length) doc.data.emailLog = [...missing, ...mineLog].sort((x, y) => String(x.sentAt).localeCompare(String(y.sentAt)));
+      }
     }
     const { error: writeError } = await supabase
       .from("documents")
