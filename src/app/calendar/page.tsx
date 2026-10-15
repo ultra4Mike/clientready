@@ -106,7 +106,7 @@ export default function CalendarPage() {
         data-status={job.schedule.status}
         onDragStart={(event) => event.dataTransfer.setData("text/plain", job.doc.id)}
         onClick={(event) => { event.stopPropagation(); setEditing({ docId: job.doc.id }); }}
-        className={`cursor-grab truncate rounded border px-1 py-0.5 text-left text-xs ${STATUS_CLASS[job.schedule.status]}`}
+        className={`cursor-grab truncate rounded-md border px-2 py-1 text-left text-xs font-medium shadow-sm ${STATUS_CLASS[job.schedule.status]}`}
         title={`${job.doc.title} · ${job.doc.clientName} · ${STATUS_LABEL[job.schedule.status]}${people ? ` · ${people}` : ""}`}
       >
         {job.schedule.startTime && <span className="font-semibold">{timeLabel(job.schedule.startTime)} </span>}
@@ -160,7 +160,7 @@ export default function CalendarPage() {
               <button type="button" onClick={() => shift(-1)} className="rounded-lg border border-slate-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400">Previous</button>
               <h1 className="min-w-0 flex-1 text-center text-lg font-bold tracking-tight sm:flex-none sm:px-2" data-testid="calendar-heading">{heading}</h1>
               <button type="button" onClick={() => shift(1)} className="rounded-lg border border-slate-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400">Next</button>
-              <button type="button" onClick={() => setAnchor(today)} className="rounded-lg bg-teal-400 px-3 py-1.5 text-sm font-semibold text-slate-950 transition hover:bg-teal-300">Today</button>
+              <button type="button" onClick={() => setAnchor(today)} className="rounded-lg bg-teal-500 px-3 py-1.5 text-sm font-semibold text-slate-950! transition hover:bg-teal-400">Today</button>
             </div>
           )}
         </div>
@@ -198,22 +198,22 @@ export default function CalendarPage() {
         <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_14rem]">
           <div className="min-w-0 overflow-x-auto">
             {view === "week" && (
-              <div className="grid min-w-[44rem] grid-cols-[3rem_repeat(7,minmax(0,1fr))] text-xs" data-testid="week-grid">
+              <div className="grid min-w-[44rem] grid-cols-[3.5rem_repeat(7,minmax(0,1fr))] text-xs" data-testid="week-grid">
                 <div />
                 {weekDays.map((day) => (
-                  <div key={day} className={`border-b border-slate-500/30 p-1.5 text-center font-semibold ${day === today ? "text-teal-600 dark:text-teal-300" : ""}`}>
+                  <div key={day} className={`border-b-2 border-slate-500/40 p-2 text-center text-sm font-semibold ${day === today ? "rounded-t-lg bg-teal-500/15 text-teal-600 dark:text-teal-300" : ""}`}>
                     {DAY_NAMES[parse(day).getDay()]} {parse(day).getDate()}
                   </div>
                 ))}
-                <div className="p-1 text-right opacity-60">Any</div>
+                <div className="p-1.5 pr-2 text-right font-medium opacity-80">Any</div>
                 {weekDays.map((day) => (
-                  <div key={`any-${day}`} data-testid={`slot-${day}-any`} onDragOver={(event) => event.preventDefault()} onDrop={dropOn(day, "")} className="min-h-8 space-y-0.5 border-b border-l border-slate-500/20 p-0.5">
+                  <div key={`any-${day}`} data-testid={`slot-${day}-any`} onDragOver={(event) => event.preventDefault()} onDrop={dropOn(day, "")} className={`min-h-10 space-y-1 border-b border-l border-slate-500/35 p-1 ${day === today ? "bg-teal-500/10" : ""}`}>
                     {jobs.filter((job) => job.schedule.date === day && !job.schedule.startTime).map((job) => chip(job, true))}
                   </div>
                 ))}
                 {HOURS.map((hour) => (
                   <div key={hour} className="contents">
-                    <div className="p-1 text-right opacity-60">{timeLabel(`${String(hour).padStart(2, "0")}:00`)}</div>
+                    <div className="p-1.5 pr-2 text-right font-medium opacity-80">{timeLabel(`${String(hour).padStart(2, "0")}:00`)}</div>
                     {weekDays.map((day) => {
                       const slot = `${String(hour).padStart(2, "0")}:00`;
                       const here = jobs.filter((job) => job.schedule.date === day && job.schedule.startTime && Number(job.schedule.startTime.slice(0, 2)) === hour);
@@ -224,7 +224,7 @@ export default function CalendarPage() {
                           onDragOver={(event) => event.preventDefault()}
                           onDrop={dropOn(day, slot)}
                           onClick={() => unscheduled.length ? setEditing({ docId: unscheduled[0].id, date: day, startTime: slot }) : setMessage("Every job is scheduled. Click a job to change it.")}
-                          className="min-h-10 space-y-0.5 border-b border-l border-slate-500/20 p-0.5 hover:bg-teal-500/5"
+                          className={`min-h-12 space-y-1 border-b border-l border-slate-500/35 p-1 hover:bg-teal-500/10 ${day === today ? "bg-teal-500/10" : ""}`}
                         >
                           {here.map((job) => chip(job))}
                         </div>
@@ -250,7 +250,7 @@ export default function CalendarPage() {
                       onDragOver={(event) => day && event.preventDefault()}
                       onDrop={day ? dropOn(day) : undefined}
                       onClick={() => day && unscheduled.length && setEditing({ docId: unscheduled[0].id, date: day })}
-                      className={`min-h-24 rounded-lg border p-1.5 text-xs transition hover:bg-teal-500/5 ${day ? "border-slate-500/30" : "border-transparent"} ${day === today ? "ring-2 ring-teal-400" : ""}`}
+                      className={`min-h-24 rounded-lg border p-1.5 text-xs transition hover:bg-teal-500/5 ${day ? "border-slate-500/40" : "border-transparent"} ${day === today ? "ring-2 ring-teal-400" : ""}`}
                     >
                       {day && <div className="font-medium">{parse(day).getDate()}</div>}
                       <div className="space-y-0.5">
