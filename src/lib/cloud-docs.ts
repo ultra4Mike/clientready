@@ -61,6 +61,19 @@ export async function saveCloudDocument(doc: CloudDoc) {
   if (!userId) return doc.id;
 
   if (isUuid(doc.id)) {
+    // The approval block is owned by the cloud (the customer approves there, and only the share/
+    // revoke actions change it), so an ordinary save always carries the cloud's current block.
+    const { data: current, error: readError } = await supabase
+      .from("documents")
+      .select("data")
+      .eq("id", doc.id)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!readError && current) {
+      const cloudApproval = (current.data as Record<string, unknown> | null)?.approval;
+      if (cloudApproval) doc.data.approval = cloudApproval;
+      else delete doc.data.approval;
+    }
     await supabase
       .from("documents")
       .update({

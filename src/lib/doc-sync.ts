@@ -13,6 +13,17 @@ function stampOf(doc: AnyDoc) {
 }
 
 /**
+ * The approval block always comes from the cloud, even when the local copy is newer: the customer
+ * approves in the cloud, and only the share/revoke actions (which write the cloud directly) change it.
+ */
+function withCloudApproval<T extends AnyDoc>(winner: T, cloud: T): T {
+  const data = { ...(winner.data || {}) };
+  if (cloud.data?.approval) data.approval = cloud.data.approval;
+  else delete data.approval;
+  return { ...winner, data };
+}
+
+/**
  * Merges cloud and local copies by id.
  * - Only in local: kept (uploaded later by syncLocalDocs).
  * - Only in cloud: added.
@@ -35,10 +46,11 @@ export function mergeDocs<T extends AnyDoc>(local: T[], cloud: T[]) {
     const localTime = stampOf(mine);
     const cloudTime = stampOf(doc);
     if (localTime > cloudTime) {
-      merged.push(mine);
-      pushUp.push(mine);
+      const kept = withCloudApproval(mine, doc);
+      merged.push(kept);
+      pushUp.push(kept);
     } else {
-      merged.push({ ...doc, data: { ...(mine.data || {}), ...(doc.data || {}) } });
+      merged.push(withCloudApproval({ ...doc, data: { ...(mine.data || {}), ...(doc.data || {}) } }, doc));
     }
   }
   for (const doc of local) if (!cloudById.has(doc.id)) merged.push(doc);

@@ -12,6 +12,8 @@ import PayQr from "@/components/PayQr";
 import { payUrlFor } from "@/lib/pay-link";
 import { SignatureBlock } from "@/components/SignaturePad";
 import { readSignature, type Signature } from "@/lib/signature";
+import { ApprovalBadge } from "@/components/Approval";
+import { readApproval, refreshApproval, type Approval } from "@/lib/approval";
 import { amountOf, documentTotals, discountLabel } from "@/lib/discount";
 
 type LineItem = {
@@ -57,6 +59,7 @@ export default function InvoiceViewPage() {
   const [jobTime, setJobTime] = useState("");
   const [paymentLink, setPaymentLink] = useState("");
   const [message, setMessage] = useState("");
+  const [approval, setApproval] = useState<Approval | null>(null);
 
   useEffect(() => {
     const profileRaw = window.localStorage.getItem("clientready-profile");
@@ -126,6 +129,8 @@ export default function InvoiceViewPage() {
     setItems(data.items || []);
     setStatus(data.status || "draft");
     setJobTime(data.jobTime || "");
+    setApproval(readApproval(doc.data?.approval));
+    refreshApproval(doc.id).then((latest) => { if (latest !== undefined) setApproval(latest); });
   }, []);
 
   const totals = useMemo(() => {
@@ -199,6 +204,7 @@ export default function InvoiceViewPage() {
               {jobTime && <p>Scheduled time: {jobTime}</p>}
             </div>
             <div className="shrink-0 text-right">
+              {approval && <div className="mb-1"><ApprovalBadge approval={approval} /></div>}
               {changeOrderOf && <p className="change-order-badge mb-1 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide" data-testid="change-order-badge">Change order</p>}
               <p className="text-xs uppercase tracking-wide text-slate-500">Invoice · {status}</p>
               <h1 className="text-xl font-semibold leading-tight">{invoiceNumber || "Invoice"}</h1>

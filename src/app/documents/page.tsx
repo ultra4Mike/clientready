@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchCloudDocuments, deleteCloudDocument, getUserId } from "@/lib/cloud-docs";
 import { mergeDocs, OWNER_KEY } from "@/lib/doc-sync";
 import { runDueRecurring } from "@/lib/recurring";
+import { ApprovalBadge } from "@/components/Approval";
+import { readApproval } from "@/lib/approval";
 import AppShell from "@/components/AppShell";
 
 type SavedDocument = {
@@ -70,13 +72,16 @@ export default function DocumentsPage() {
   }
 
   function duplicateDocument(doc: SavedDocument) {
+    // A copy is a new document: it must not share the original's approval link.
+    const { approval: _approval, ...rest } = doc.data || {};
+    void _approval;
     const copy: SavedDocument = {
       ...doc,
       id: Date.now().toString(),
       title: `${doc.title} copy`,
       createdAt: new Date().toLocaleDateString(),
       data: {
-        ...(doc.data || {}),
+        ...rest,
         status: "draft",
       },
     };
@@ -186,6 +191,7 @@ export default function DocumentsPage() {
                 {doc.data?.status ? ` · ${doc.data.status}` : ""}
                 {doc.data?.outcome ? ` · ${doc.data.outcome}` : ""}
               </p>
+              <ApprovalBadge approval={readApproval(doc.data?.approval)} className="mt-1" />
             </button>
             <div className="flex gap-3">
               <button type="button" onClick={() => openDocument(doc)} className="text-sm font-medium">

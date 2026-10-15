@@ -1,0 +1,193 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { approveByToken, fetchApprovalDoc, readApproval, type Approval } from "@/lib/approval";
+import { amountOf, documentTotals, discountLabel } from "@/lib/discount";
+import { balanceDue, paidTotal, readPayments } from "@/lib/payments";
+import { readPhotos } from "@/lib/photos";
+import { readSignature } from "@/lib/signature";
+import { payUrlFor } from "@/lib/pay-link";
+import { JobPhotoStrip } from "@/components/JobPhotos";
+import { SignatureBlock } from "@/components/SignaturePad";
+import LineSplit from "@/components/LineSplit";
+import PayQr from "@/components/PayQr";
+
+type LineItem = { description?: string; qty?: string; rate?: string; category?: string };
+type PublicDoc = NonNullable<Awaited<ReturnType<typeof fetchApprovalDoc>>>;
+
+const text = (value: unknown) => (typeof value === "string" ? value : "");
+
+/** Public, no-login page behind an approval link. Read-only, plus one Approve action. */
+export default function ApprovePage() {
+  const [token, setToken] = useState("");
+  const [doc, setDoc] = useState<PublicDoc | null>(null);
+  const [state, setState] = useState<"loading" | "ready" | "missing" | "error">("loading");
+  const [approval, setApproval] = useState<Approval | null>(null);
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("t") || "";
+    // Keep the token out of logs/analytics referrers on outbound links.
+    const meta = document.createElement("meta");
+    meta.name = "referrer";
+    meta.content = "no-referrer";
+    document.head.appendChild(meta);
+    fetchApprovalDoc(t)
+      .then((found) => {
+        setToken(t);
+        if (!found) return setState("missing");
+        setDoc(found);
+        setApproval(readApproval(found.data?.approval));
+        setState("ready");
+      })
+      .catch(() => setState("error"));
+  }, []);
+
+  const data = useMemo(() => doc?.data || {}, [doc]);
+  const items = useMemo(() => (Array.isArray(data.items) ? (data.items as LineItem[]) : []), [data]);
+  const payments = useMemo(() => readPayments(data), [data]);
+  const totals = useMemo(() => {
+    const subtotal = items.reduce((sum, item) => sum + amountOf(item.qty) * amountOf(item.rate), 0);
+    const base = documentTotals(subtotal, text(data.taxPercent), text(data.discountType), text(data.discountValue));
+    const paid = paidTotal(payments);
+    return { ...base, paid, balance: balanceDue(base.total, paid, text(data.status)) };
+  }, [items, payments, data]);
+
+  async function approve() {
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = await approveByToken(token, name);
+      if (result) {
+        setApproval(result);
+      } else {
+        // Already approved, or the link was turned off meanwhile: show what is stored now.
+        const latest = await fetchApprovalDoc(token);
+        if (!latest) setState("missing");
+        else setApproval(readApproval(latest.data?.approval));
+      }
+    } catch {
+      setMessage("Could not approve right now. Check your connection and try again.");
+    }
+    setBusy(false);
+  }
+
+  if (state !== "ready" || !doc) {
+    return (
+      <main className="mx-auto max-w-xl p-8 text-center text-slate-700">
+        <h1 className="text-xl font-semibold" data-testid="approve-state">
+          {state === "loading" ? "Loading…" : state === "missing" ? "This approval link is not valid" : "Could not load this document"}
+        </h1>
+        {state === "missing" && <p className="mt-2 text-sm">It may have been turned off or replaced. Ask the sender for a new link.</p>}
+        {state === "error" && <p className="mt-2 text-sm">Check your connection and reload the page.</p>}
+      </main>
+    );
+  }
+
+  const isProposal = doc.type === "proposal";
+  const number = text(data.invoiceNumber) || doc.title;
+  const changeOrderOf = data.changeOrderOf as { number?: string } | null | undefined;
+  const payUrl = payUrlFor(data.payLink, doc.business.paymentLink);
+  const signature = readSignature(data.signature);
+  const proposalSignature = readSignature(data.proposalSignature);
+  const approved = approval?.status === "approved";
+
+  return (
+    <main className="min-h-screen bg-slate-100 px-4 py-8 text-slate-900">
+      <section className="print-reset mx-auto max-w-3xl space-y-4">
+        <div className="print-hide rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm" data-testid="approve-panel">
+          {approved ? (
+            <p className="font-semibold text-emerald-700" data-testid="approve-done">
+              Approved{approval?.approvedAt ? ` on ${new Date(approval.approvedAt).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}
+              {approval?.approverName ? ` by ${approval.approverName}` : ""}. Thank you!
+            </p>
+          ) : (
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="flex min-w-0 flex-1 flex-col gap-1">
+                Your name (optional)
+                <input aria-label="Your name" value={name} maxLength={100} onChange={(event) => setName(event.target.value)} className="rounded border border-slate-300 px-2 py-1" />
+              </label>
+              <button type="button" disabled={busy} onClick={approve} className="rounded-lg bg-emerald-600 px-5 py-2 font-semibold text-white disabled:opacity-60">
+                {busy ? "Approving…" : `Approve ${isProposal ? "proposal" : "invoice"}`}
+              </button>
+            </div>
+          )}
+          {message && <p className="mt-2 text-red-600">{message}</p>}
+          <button type="button" onClick={() => window.print()} className="mt-3 text-xs underline">Print / Save PDF</button>
+        </div>
+
+        <div id="preview" className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 text-sm text-slate-600">
+              {/* eslint-disable-next-line @next/next/no-img-element -- data URL logo from the profile */}
+              {doc.business.logo && <img src={doc.business.logo} alt="Business logo" className="mb-2 h-10 w-auto" />}
+              <p className="font-semibold">{doc.business.name}</p>
+              <p>{[doc.business.email, doc.business.phone].filter(Boolean).join(" · ")}</p>
+            </div>
+            <div className="shrink-0 text-right">
+              {changeOrderOf?.number && <p className="change-order-badge mb-1 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide" data-testid="change-order-badge">Change order</p>}
+              <p className="text-xs uppercase tracking-wide text-slate-500">{isProposal ? "Proposal" : "Invoice"}</p>
+              <h1 className="text-xl font-semibold leading-tight">{number}</h1>
+              <p className="text-sm text-slate-600">Date: {text(data.invoiceDate) || "-"} · {isProposal ? "Valid until" : "Due"}: {text(data.dueDate) || "-"}</p>
+              {changeOrderOf?.number && <p className="text-sm text-slate-600">Change order to {changeOrderOf.number}</p>}
+            </div>
+          </div>
+
+          <div className="mt-4 text-sm">
+            <p className="text-xs text-slate-500">{isProposal ? "Prepared for" : "Bill to"}</p>
+            <p className="font-medium">{text(data.clientName) || doc.clientName}{text(data.clientCompany) && <span className="font-normal text-slate-600"> · {text(data.clientCompany)}</span>}</p>
+            {text(data.clientAddress) && <p className="text-slate-600">{text(data.clientAddress)}</p>}
+          </div>
+
+          <div className="mt-4 border-t border-slate-200 pt-1" data-testid="approve-items">
+            {items.map((item, index) => (
+              <div key={index} className="flex justify-between gap-4 py-1 text-sm">
+                <span>{item.description || "Item"} · {item.qty} x ${item.rate}</span>
+                <span>${(amountOf(item.qty) * amountOf(item.rate)).toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-2 grid grid-cols-2 gap-6 border-t border-slate-200 pt-2 text-sm">
+            <div className="space-y-0.5 text-slate-600">
+              <LineSplit items={items} />
+              {payments.filter((payment) => amountOf(payment.amount) > 0).map((payment) => (
+                <div key={payment.id} className="flex justify-between gap-2">
+                  <span>Paid{payment.date ? ` ${payment.date}` : ""}{payment.method ? ` · ${payment.method}` : ""}</span>
+                  <span>-${amountOf(payment.amount).toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="space-y-0.5">
+              <div className="flex justify-between"><span>Subtotal</span><span>${totals.subtotal.toFixed(2)}</span></div>
+              {totals.discount > 0 && <div className="flex justify-between"><span>{discountLabel(text(data.discountType), text(data.discountValue))}</span><span>-${totals.discount.toFixed(2)}</span></div>}
+              <div className="flex justify-between"><span>Tax</span><span>${totals.tax.toFixed(2)}</span></div>
+              <div className="flex justify-between font-semibold"><span>Total</span><span>${totals.total.toFixed(2)}</span></div>
+              {totals.paid > 0 && <div className="flex justify-between"><span>Paid</span><span>-${totals.paid.toFixed(2)}</span></div>}
+              {!isProposal && (
+                <div className="mt-1 flex justify-between border-t border-slate-200 pt-1 text-lg font-bold" data-testid="approve-owed">
+                  <span>Still owed</span><span>${totals.balance.toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {text(data.notes) && <p className="mt-3 text-sm text-slate-600">{text(data.notes)}</p>}
+          <JobPhotoStrip photos={readPhotos(data.photos)} />
+          {(payUrl || signature || proposalSignature) && (
+            <div className="print-keep mt-3 grid grid-cols-2 items-end gap-6 border-t border-slate-200 pt-3">
+              <div className="space-y-3">
+                <SignatureBlock signature={proposalSignature} label="Proposal accepted" />
+                <SignatureBlock signature={signature} />
+              </div>
+              <div className="flex justify-end">{!isProposal && <PayQr url={payUrl} />}</div>
+            </div>
+          )}
+          {approved && <p className="mt-3 text-sm font-semibold text-emerald-700">Approved{approval?.approverName ? ` by ${approval.approverName}` : ""}</p>}
+        </div>
+      </section>
+    </main>
+  );
+}

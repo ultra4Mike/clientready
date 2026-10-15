@@ -34,3 +34,26 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Database migrations (Supabase)
+
+SQL migrations live in `supabase/migrations/`. They are **not applied automatically**: run each new
+file once in the Supabase dashboard (SQL Editor → paste the file → Run), or with the Supabase CLI
+(`supabase db push`) if the project is linked.
+
+### `20261015000000_approval_links.sql` — client approval links (required)
+
+Approval links (`/approve?t=<token>`) let a customer view and approve one proposal or invoice
+without logging in. The app only has the public anon key, and row-level security keeps anon users
+out of the `documents` table, so the migration adds:
+
+- `get_document_by_approval_token(token)` — `SECURITY DEFINER`, returns a trimmed, read-only copy of
+  the single document whose `data.approval.token` matches (no token, owner job costs, crew,
+  schedule or internal ids) plus the business name/logo/contact/pay link.
+- `approve_document(token, name)` — `SECURITY DEFINER`, changes only `data.approval`
+  (status → approved, time, optional name up to 100 chars) and only while it is pending.
+- A trigger that stops an owner's stale save from turning an approved link back to pending.
+- An index on the token. `EXECUTE` is granted to `anon` and `authenticated` for the two functions.
+
+Until it is run, "Share approval link" still creates links but customers will see
+"Could not load this document". No service-role key is used anywhere in the app.
