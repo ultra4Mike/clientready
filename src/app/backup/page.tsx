@@ -72,7 +72,7 @@ export default function BackupPage() {
   return (
     <AppShell title="Backup">
 
-      <section className="mx-auto max-w-2xl px-0 py-2 sm:px-4 sm:py-6">
+      <section className="max-w-2xl py-2 sm:py-4">
         <h1 className="text-2xl font-bold tracking-tight">Backup your data</h1>
         <p className="mt-2 text-sm leading-6 text-slate-600 sm:text-base">
           Download a copy of your profile, clients, documents, and appointments.
