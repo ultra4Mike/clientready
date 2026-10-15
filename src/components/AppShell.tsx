@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { clearLocalBusiness } from "@/lib/account-cache";
 import { isCrewUser } from "@/lib/crew";
@@ -28,6 +29,7 @@ export default function AppShell({
   /** Show `title` in the desktop top bar. Off by default: every page renders its own PageHeader as the single title. */
   showTitle?: boolean;
 }) {
+  const pathname = usePathname() || "";
   const [theme, setTheme] = useState("dark");
 useEffect(() => {
     const savedTheme = window.localStorage.getItem("clientready-theme") || "dark";
@@ -53,7 +55,8 @@ useEffect(() => {
   }
 
   function linkClass(href: string) {
-    return "block rounded-lg px-3 py-2 text-sm font-medium transition hover:bg-teal-500/15";
+    const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(`${href}/`));
+    return `block rounded-lg px-3 py-2 text-sm font-medium transition ${active ? "bg-teal-500/15 font-semibold text-teal-700 dark:text-teal-300!" : "text-slate-700 hover:bg-teal-500/10 hover:text-slate-950 dark:text-[var(--cr-text)] dark:hover:text-[var(--cr-text)]"}`;
   }
 
   const nav = (
@@ -107,7 +110,7 @@ useEffect(() => {
   return (
     <div className="app-root min-h-screen bg-[var(--cr-bg)] text-[var(--cr-text)]">
       <div className="app-root min-[900px]:flex min-[900px]:min-h-screen">
-        <aside className="sticky top-0 hidden h-screen w-56 shrink-0 overflow-y-auto border-r border-teal-500/20 bg-[var(--cr-panel)] p-4 min-[900px]:block print:hidden">
+        <aside className="sticky top-0 hidden h-screen w-56 shrink-0 overflow-y-auto border-r border-slate-200 bg-[var(--cr-panel)] p-4 shadow-[1px_0_0_rgba(0,0,0,0.02)] min-[900px]:block dark:border-teal-500/20 print:hidden">
           <Logo />
           <div className="mt-6 flex min-h-[calc(100%-4rem)] flex-col">{nav}</div>
         </aside>
