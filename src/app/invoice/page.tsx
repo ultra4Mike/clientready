@@ -1,6 +1,7 @@
 "use client";
 
 import PortalShare from "@/components/PortalShare";
+import Section, { SectionDefaults, useOpenedExisting } from "@/components/Section";
 import EmailComposer from "@/components/EmailComposer";
 import StageBar from "@/components/StageBar";
 import { CREW_KINDS, crewKindLabel, estimateByKind, type CostFields } from "@/lib/cost-categories";
@@ -698,11 +699,18 @@ export default function NewInvoicePage() {
 
   const payUrl = payUrlFor(docPayLink, paymentLink);
 
+  // Collapsible sections: a new document opens with everything open; an existing one opens with the
+  // client details folded to a one-line summary. The user's own open/closed choices are kept per device.
+  const openedExisting = useOpenedExisting();
+  const sectionDefaults = useMemo(() => ({ collapsed: openedExisting ? ["client"] : [], scope: openedExisting ? "existing" : "new", scoped: ["client"] }), [openedExisting]);
+  const clientSummary = [clientName, clientPhone, clientAddress].map((part) => part.trim()).filter(Boolean).join(" · ") || "No client yet";
+
   const previewClass = style === "bold" ? "rounded-2xl border border-slate-900 bg-slate-900 p-6 text-white shadow-sm" : "rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm";
   const mutedClass = style === "bold" ? "text-slate-300" : "text-slate-600";
   const labelClass = style === "bold" ? "text-slate-400" : "text-slate-500";
 
   return (
+    <SectionDefaults.Provider value={sectionDefaults}>
     <AppShell title={isProposal ? "New proposal" : "New invoice"}>
       <div className="print-hide mb-6 flex flex-col gap-4 border-b border-teal-500/15 pb-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0" data-testid="doc-stage" data-stage={docStage.stage} data-next-action={docStage.next}>
@@ -754,7 +762,7 @@ export default function NewInvoicePage() {
               <button type="button" onClick={() => chooseKind("proposal")} className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${isProposal ? "bg-teal-500 text-slate-950! shadow-sm" : "border border-slate-300 hover:border-teal-500"}`}>Proposal</button>
             </div>
             <h1 className="text-xl font-bold tracking-tight">{isProposal ? "Proposal details" : "Invoice details"}</h1>
-            <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
+            <Section id="client" label="Client details" className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5" summary={clientSummary}>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Client</h2>
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Search clients by name" value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} />
             {filteredClients.length > 0 && (
@@ -773,8 +781,8 @@ export default function NewInvoicePage() {
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Client phone" value={clientPhone} onChange={(event) => setClientPhone(event.target.value)} />
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Client address" value={clientAddress} onChange={(event) => setClientAddress(event.target.value)} />
             <button type="button" onClick={saveClientFromForm} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Save as client</button>
-            </div>
-            <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
+            </Section>
+            <Section id="details" label="Details" className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Details & schedule</h2>
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder={isProposal ? "Proposal number" : "Invoice number"} value={invoiceNumber} onChange={(event) => setInvoiceNumber(event.target.value)} />
             <select className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={status} onChange={(event) => setStatus(event.target.value)}>
@@ -791,8 +799,8 @@ export default function NewInvoicePage() {
               <label className="text-sm text-slate-600">Job start<input type="time" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={jobStart} onChange={(event) => setJobStart(event.target.value)} /></label>
               <label className="text-sm text-slate-600">Job end<input type="time" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={jobEnd} onChange={(event) => setJobEnd(event.target.value)} /></label>
             </div>
-            </div>
-            <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
+            </Section>
+            <Section id="items" label="Line items" className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Line items & pricing</h2>
             <div className="space-y-3">
               <div className="flex items-center justify-between"><h2 className="font-medium">Line items</h2><button type="button" className="tap rounded-lg border border-teal-500/40 max-sm:min-h-11 px-3 py-1.5 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300" onClick={() => setItems((current) => [...current, { ...emptyItem }])}>Add item</button></div>
@@ -827,7 +835,7 @@ export default function NewInvoicePage() {
               <div className="flex justify-between"><span className="text-slate-600">Tax</span><span className="tabular-nums">${totals.tax.toFixed(2)}</span></div>
               <div className="flex justify-between border-t border-teal-500/30 pt-2 text-base font-bold"><span>Total</span><span className="tabular-nums">${totals.total.toFixed(2)}</span></div>
             </div>
-            <div className="space-y-2 rounded-xl border border-slate-200 p-4">
+            <Section id="payments" label="Payments" className="space-y-2 rounded-xl border border-slate-200 p-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-medium">{isProposal ? "Deposit received" : "Payments received"}</h2>
                 <button type="button" className="min-h-11 rounded-lg border border-teal-500/40 px-3 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 sm:min-h-9 dark:text-teal-300" onClick={addPayment}>{payments.length ? "Add another payment" : isProposal ? "Add deposit" : "Add payment"}</button>
@@ -845,10 +853,10 @@ export default function NewInvoicePage() {
                 <p className="text-sm text-slate-600">Total ${totals.total.toFixed(2)} · Paid ${totals.paid.toFixed(2)}</p>
                 <p className="text-right"><span className="block text-sm font-medium text-slate-600">Still owed</span><span data-testid="still-owed" className="text-2xl font-bold">${totals.balance.toFixed(2)}</span></p>
               </div>
-            </div>
+            </Section>
             {!isProposal && <StageEditor stages={stages} onChange={setStages} total={totals.total} balance={totals.balance} />}
-            </div>
-            <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
+            </Section>
+            <Section id="pay-photos" label="Payment, photos and notes" className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Payment, photos & notes</h2>
             {!isProposal && (
               <label className="block text-sm font-medium text-slate-600">
@@ -862,8 +870,8 @@ export default function NewInvoicePage() {
             <JobPhotosEditor photos={photos} onChange={setPhotos} showOnCopy={showPhotos} onShowOnCopyChange={setShowPhotos} />
             <SignaturePad key={padKey} value={signature} onChange={setSignature} defaultName={clientName} />
             <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
-            </div>
-            <div className="owner-costs space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-slate-900 sm:p-5">
+            </Section>
+            <Section id="costs" label="Your costs" className="owner-costs space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-slate-900 sm:p-5">
               <h2 className="font-medium">Your costs only</h2>
               <p className="text-sm text-slate-600">Wages fill from hours times the saved rate, plus any extra pay.</p>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -894,7 +902,7 @@ export default function NewInvoicePage() {
                   </div>
                 ))}
               </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-4 text-slate-900">
+              <Section id="crew" label="Crew on this job" className="rounded-xl border border-slate-200 bg-white p-4 text-slate-900">
                 <p className="text-sm font-medium text-slate-900">Crew on this job ({crew.length})</p>
                 <div className="mt-2 flex gap-2">
                   <select className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={pickedEmployee} onChange={(event) => setPickedEmployee(event.target.value)}>
@@ -944,7 +952,7 @@ export default function NewInvoicePage() {
                     <button type="button" onClick={() => removeCrewRow(row.id)} className="text-sm text-slate-700">Remove from job</button>
                   </div>
                 ))}
-              </div>
+              </Section>
               <label className="block text-sm">Cost notes<textarea className="mt-1.5 min-h-16 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={costs.notes} onChange={(event) => setCosts({ ...costs, notes: event.target.value })} /></label>
               <div className="space-y-1 text-sm">
                 <p>Job cost: ${jobMath.jobCost.toFixed(2)}</p>
@@ -955,8 +963,8 @@ export default function NewInvoicePage() {
                 <p className="font-semibold">Yours after set-aside: ${jobMath.yours.toFixed(2)}</p>
                 <CrewSpend docId={docId} estimate={{ ...costs, otherFees }} />
               </div>
-            </div>
-            <div className="print-hide space-y-3 rounded-xl border border-slate-200 p-4 text-sm sm:p-5" data-testid="schedule-section">
+            </Section>
+            <Section id="schedule" label="Schedule" className="print-hide space-y-3 rounded-xl border border-slate-200 p-4 text-sm sm:p-5" testId="schedule-section">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-semibold">Schedule</p>
                 {schedule && <span className="text-xs" data-testid="schedule-summary">{schedule.date}{schedule.startTime ? ` ${schedule.startTime}` : ""}{schedule.endTime ? `–${schedule.endTime}` : ""} · {STATUS_LABEL[schedule.status]}</span>}
@@ -965,11 +973,11 @@ export default function NewInvoicePage() {
                 ? <ScheduleEditor key={scheduleKey} value={schedule} workers={workers} onSave={saveJobSchedule} confirmRemove={(ids) => confirmRemoval(workLogged(crew, ids, clockHoursFor(docId)))} />
                 : <p className="text-xs text-slate-600">Save the document first, then schedule the job here or on the Calendar.</p>}
               {docId && <JobDonePanel docId={docId} schedule={schedule} onConfirmed={(next) => { setSchedule(next); setScheduleKey((key) => key + 1); }} />}
-            </div>
-            {docId && !locked && <ApprovalShare docId={docId} approval={approval} onChange={setApproval} />}
-            {docId && !locked && <PortalShare clientName={clientName} clientId={docClientId} />}
+            </Section>
+            {docId && !locked && <Section id="approval" label="Approval" headerFirst={false}><ApprovalShare docId={docId} approval={approval} onChange={setApproval} /></Section>}
+            {docId && !locked && <Section id="portal" label="Client portal" headerFirst={false}><PortalShare clientName={clientName} clientId={docClientId} /></Section>}
             {!isProposal && docId && (
-              <div className="space-y-3 rounded-xl border border-slate-200 p-4 text-sm sm:p-5" data-testid="recurring-section">
+              <Section id="recurring" label="Recurring" className="space-y-3 rounded-xl border border-slate-200 p-4 text-sm sm:p-5" testId="recurring-section">
                 <p className="font-semibold">Recurring</p>
                 <div className="flex flex-wrap items-end gap-3">
                   <label className="flex flex-col gap-1">Repeat
@@ -993,7 +1001,7 @@ export default function NewInvoicePage() {
                   {recFreq !== "off" && !locked && <button type="button" onClick={generateRecurringNow} className="rounded-lg border border-slate-300 max-sm:min-h-11 px-3 py-1.5 text-sm font-medium transition hover:border-teal-500">Generate next invoice now</button>}
                 </div>
                 <p className="text-xs text-slate-600">Drafts are made when the app opens on or after the next run date. They are never sent or marked paid. Save the document to keep schedule changes.</p>
-              </div>
+              </Section>
             )}
             {(fromProposal || madeInvoices.length > 0) && (
               <p className="print-hide text-sm text-slate-600" data-testid="proposal-link">
@@ -1124,6 +1132,7 @@ export default function NewInvoicePage() {
         </div>
       </section>
     </AppShell>
+    </SectionDefaults.Provider>
   );
 }
 type CostEstimate = CostFields;
