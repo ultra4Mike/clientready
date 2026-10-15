@@ -7,6 +7,7 @@ import { loadAccountIntoCache } from "@/lib/account-cache";
 import { amountOf, documentTotals } from "@/lib/discount";
 import { balanceDue, paidTotal, readPayments } from "@/lib/payments";
 import { uniqueDocs } from "@/lib/change-orders";
+import NeedsReview from "@/components/NeedsReview";
 
 type Client = {
   id: string;
@@ -186,6 +187,8 @@ export default function DashboardPage() {
           {recurringReady} recurring draft{recurringReady === 1 ? "" : "s"} ready for review
         </a>
       )}
+
+      <NeedsReview documents={documents} onDocuments={(docs) => setDocuments(uniqueDocs(docs as SavedDocument[]))} />
 
       <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center">
         <form onSubmit={handleSearch} className="flex-1">

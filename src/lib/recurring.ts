@@ -103,7 +103,7 @@ export function generatedFrom(docs: Doc[], templateId: string) {
 const NOT_COPIED = [
   "payments", "paymentAmount", "paymentMethod", "paymentDate", "paymentRef", "paidDate", "paidAt",
   "signature", "proposalSignature", "photos", "jobCosts", "crew",
-  "changeOrderOf", "fromProposal", "changeOrderNotes", "recurring", "recurringFrom", "recurringReview", "approval", "schedule", "jobTime", "updatedAt",
+  "changeOrderOf", "fromProposal", "changeOrderNotes", "recurring", "recurringFrom", "recurringReview", "approval", "schedule", "jobTime", "updatedAt", "reviews",
 ];
 
 /** Data for a fresh draft from the template: client, items (with tags), discount, tax, notes, pay link, style. */

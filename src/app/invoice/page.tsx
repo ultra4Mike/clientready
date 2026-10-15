@@ -504,7 +504,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(stored?.data?.schedule ? { schedule: stored.data.schedule } : {}), items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
+      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(stored?.data?.schedule ? { schedule: stored.data.schedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -1040,7 +1040,7 @@ function CrewSpend({ docId, estimate }: { docId: string; estimate: CostEstimate 
   const diffClass = (diff: number) => (diff > 0.005 ? "font-semibold text-red-600" : diff < -0.005 ? "text-teal-700" : "");
   const diffText = (diff: number) => (Math.abs(diff) < 0.005 ? "on estimate" : diff > 0 ? `+$${diff.toFixed(2)} over` : `$${(-diff).toFixed(2)} under`);
   return (
-    <div className="print-hide mt-4 rounded-xl border border-amber-300/40 p-3 text-sm" data-testid="crew-vs-estimate">
+    <div className="print-hide mt-4 rounded-xl border border-amber-300/40 p-3 text-sm" id="crew-spend" data-testid="crew-vs-estimate">
       <p className="font-medium">Crew spend vs your estimate</p>
       <table className="mt-2 w-full text-left text-sm">
         <thead><tr className="text-xs text-[var(--cr-muted)]"><th className="font-normal">Cost</th><th className="text-right font-normal">Estimate</th><th className="text-right font-normal">Crew spent</th><th className="text-right font-normal">Difference</th></tr></thead>
