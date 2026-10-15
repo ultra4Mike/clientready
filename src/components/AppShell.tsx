@@ -151,6 +151,22 @@ useEffect(() => {
     </div>
   );
 
+  const mobileActions = (
+    <div className="flex items-center gap-1">
+      <SyncPill />
+      <button
+        type="button"
+        aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        onClick={() => saveTheme(theme === "dark" ? "light" : "dark")}
+        className="flex h-11 w-11 items-center justify-center rounded-full transition hover:bg-teal-500/10"
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+          {theme === "dark" ? <path d="M12 4V2m0 20v-2m8-8h2M2 12h2m13.66-5.66 1.41-1.41M4.93 19.07l1.41-1.41m0-11.32L4.93 4.93m14.14 14.14-1.41-1.41M12 17a5 5 0 100-10 5 5 0 000 10z" /> : <path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" />}
+        </svg>
+      </button>
+    </div>
+  );
+
   return (
     <div className="app-root min-h-screen bg-[var(--cr-bg)] text-[var(--cr-text)]">
       {wide ? (
@@ -169,15 +185,15 @@ useEffect(() => {
         </div>
       ) : (
         <>
-          <header className="border-b border-teal-500/20 bg-[var(--cr-panel)] px-4 py-3">
+          <header className="border-b border-teal-500/20 bg-[var(--cr-panel)] px-4 py-1.5">
             <div className="flex items-center justify-between gap-3">
               <Logo />
-              {actions}
+              {mobileActions}
             </div>
           </header>
-          <div className="app-main p-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] print:pb-4">
-            <div className="mx-auto w-full max-w-6xl">
-            <h1 className="print-hide mb-4 text-2xl font-bold tracking-tight">{title}</h1>
+          <div className="app-main p-4 pb-[calc(10rem+env(safe-area-inset-bottom))] print:pb-4">
+            <div className="group/shell mx-auto w-full max-w-6xl">
+            <h1 className="print-hide mb-4 text-2xl font-bold tracking-tight group-has-[[data-page-header]]/shell:hidden">{title}</h1>
             {children}
             </div>
           </div>
@@ -191,6 +207,7 @@ useEffect(() => {
                 <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-slate-500/40" />
                 <div className="max-h-[60vh] space-y-4 overflow-y-auto">
                   {[...NAV_GROUPS, { label: "Settings", links: BOTTOM_LINKS }].map((group) => {
+                    const isSettings = group.label === "Settings";
                     const links = group.links.filter((link) => !TAB_HREFS.includes(link.href));
                     if (!links.length) return null;
                     return (
@@ -198,10 +215,15 @@ useEffect(() => {
                         <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)]">{group.label}</p>
                         <div className="grid grid-cols-2 gap-2">
                           {links.map((link) => (
-                            <a key={link.href} href={link.href} className="rounded-xl border border-teal-500/20 bg-[var(--cr-card)] px-4 py-3 text-sm font-medium transition hover:border-teal-400">
+                            <a key={link.href} href={link.href} className="flex min-h-11 items-center rounded-xl border border-teal-500/20 bg-[var(--cr-card)] px-4 py-3 text-sm font-medium transition hover:border-teal-400">
                               {link.label}
                             </a>
                           ))}
+                          {isSettings && (
+                            <button type="button" onClick={logOut} className="min-h-11 rounded-xl border border-rose-500/30 bg-[var(--cr-card)] px-4 py-3 text-left text-sm font-medium text-rose-600 transition hover:border-rose-400 dark:text-rose-300">
+                              Log out
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
@@ -210,12 +232,12 @@ useEffect(() => {
               </div>
             </div>
           )}
-          {createOpen && <div className="fixed inset-0 z-40 print:hidden" onClick={() => setCreateOpen(false)} />}
-          <div className="fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 flex flex-col items-end gap-2 print:hidden">
+          {createOpen && !moreOpen && <div className="fixed inset-0 z-40 bg-slate-950/50 print:hidden" onClick={() => setCreateOpen(false)} />}
+          <div className={`fixed right-4 ${moreOpen ? "hidden" : ""} bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 flex flex-col items-end gap-2 print:hidden`}>
             {createOpen && (
               <div className="w-48 overflow-hidden rounded-2xl border border-teal-500/20 bg-[var(--cr-panel)] py-1 shadow-2xl">
                 {QUICK_CREATE.map((item) => (
-                  <a key={item.href} href={item.href} className="block px-4 py-3 text-sm font-medium transition hover:bg-teal-500/10">
+                  <a key={item.href} href={item.href} className="flex min-h-11 items-center px-4 py-3 text-sm font-medium transition hover:bg-teal-500/10">
                     {item.label}
                   </a>
                 ))}
@@ -242,9 +264,10 @@ useEffect(() => {
               <button
                 type="button"
                 aria-expanded={moreOpen}
-                onClick={() => setMoreOpen(!moreOpen)}
-                className={`flex flex-col items-center gap-1 px-1 py-2.5 text-[11px] font-medium transition hover:text-teal-400 ${moreOpen ? "text-teal-400" : ""}`}
+                onClick={() => { setCreateOpen(false); setMoreOpen(!moreOpen); }}
+                className={`relative flex flex-col items-center gap-1 px-1 py-2.5 text-[11px] font-medium transition hover:text-teal-400 ${moreOpen ? "text-teal-500 dark:text-teal-300" : ""}`}
               >
+                {moreOpen && <span aria-hidden="true" className="absolute inset-x-3 top-0 h-0.5 rounded-full bg-teal-400" />}
                 <TabIcon name="more" />
                 More
               </button>
