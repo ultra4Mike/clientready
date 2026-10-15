@@ -97,17 +97,17 @@ export default function HomePage() {
       </section>
 
       <section className="mx-auto grid max-w-6xl gap-4 px-4 pb-16 sm:grid-cols-3">
-        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
           <p className="text-sm text-teal-400">1</p>
           <h2 className="mt-2 font-semibold">Write the proposal</h2>
           <p className="mt-2 text-sm text-[var(--cr-muted)]">Price the job. Your costs stay on your side. Turn it into an invoice when they say yes.</p>
         </div>
-        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
           <p className="text-sm text-teal-400">2</p>
           <h2 className="mt-2 font-semibold">Send the invoice</h2>
           <p className="mt-2 text-sm text-[var(--cr-muted)]">Add the crew. Hours and the saved rate fill the wage total.</p>
         </div>
-        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
           <p className="text-sm text-teal-400">3</p>
           <h2 className="mt-2 font-semibold">Mark it paid</h2>
           <p className="mt-2 text-sm text-[var(--cr-muted)]">Record the payment. The year log keeps the receipt and the pay.</p>

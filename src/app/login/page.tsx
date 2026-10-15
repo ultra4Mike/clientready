@@ -52,9 +52,9 @@ export default function LoginPage() {
       <a href="/" className="mb-8 text-sm text-slate-500">Back to ClientReady</a>
       <h1 className="text-2xl font-semibold">{resetMode ? "Reset password" : "Log in"}</h1>
       <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-        <input type="email" required placeholder="Email" className="w-full rounded-lg border border-slate-300 px-3 py-2" value={email} onChange={(event) => setEmail(event.target.value)} />
+        <input type="email" required placeholder="Email" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={email} onChange={(event) => setEmail(event.target.value)} />
         {!resetMode && (
-          <input type="password" required placeholder="Password" className="w-full rounded-lg border border-slate-300 px-3 py-2" value={password} onChange={(event) => setPassword(event.target.value)} />
+          <input type="password" required placeholder="Password" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={password} onChange={(event) => setPassword(event.target.value)} />
         )}
         <button type="submit" disabled={busy} className="w-full rounded-lg bg-slate-900 px-4 py-2 text-white disabled:opacity-60">
           {busy ? "Working" : resetMode ? "Send reset link" : "Log in"}

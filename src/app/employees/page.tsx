@@ -196,11 +196,11 @@ export default function EmployeesPage() {
         Add the email they will use to log in. That email opens the crew page, not the owner books.
       </p>
       <form onSubmit={handleSubmit} className="mt-6 grid gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 md:grid-cols-2">
-        <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" placeholder="Name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
-        <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" placeholder="Email they will use to log in" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
-        <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" placeholder="Phone" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
-        <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" placeholder="Role" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })} />
-        <select className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" value={form.kind} onChange={(event) => setForm({ ...form, kind: event.target.value as "employee" | "contractor" })}>
+        <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+        <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Email they will use to log in" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
+        <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Phone" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
+        <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Role" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })} />
+        <select className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={form.kind} onChange={(event) => setForm({ ...form, kind: event.target.value as "employee" | "contractor" })}>
           <option value="employee">Employee</option>
           <option value="contractor">Contractor</option>
         </select>
@@ -222,7 +222,7 @@ export default function EmployeesPage() {
       <div className="mt-6 space-y-3">
         {employees.length === 0 && <p className="text-[var(--cr-muted)]">No employees yet.</p>}
         {employees.map((person) => (
-          <div key={person.id} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+          <div key={person.id} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
             <p className="font-medium">{person.name} · ${Number(person.rate || 0).toFixed(2)}/hr</p>
             <p className="text-sm text-[var(--cr-muted)]">
               {person.kind} · {person.role || "No role"} · {person.active ? "Active" : "Inactive"}
@@ -238,8 +238,8 @@ export default function EmployeesPage() {
               <button type="button" onClick={() => remove(person)} className="text-sm text-[var(--cr-muted)]">Remove</button>
             </div>
             <div className="mt-4 grid gap-2 sm:grid-cols-3">
-              <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" placeholder="New rate" value={editingId === person.id ? raiseRate : ""} onChange={(event) => { setEditingId(person.id); setRaiseRate(event.target.value); }} />
-              <input type="date" className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" value={editingId === person.id ? raiseDate : ""} onChange={(event) => { setEditingId(person.id); setRaiseDate(event.target.value); }} />
+              <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="New rate" value={editingId === person.id ? raiseRate : ""} onChange={(event) => { setEditingId(person.id); setRaiseRate(event.target.value); }} />
+              <input type="date" className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={editingId === person.id ? raiseDate : ""} onChange={(event) => { setEditingId(person.id); setRaiseDate(event.target.value); }} />
               <button type="button" onClick={() => giveRaise(person)} className="rounded-lg border border-teal-500/40 px-3 py-2 text-sm">Save raise</button>
             </div>
           </div>

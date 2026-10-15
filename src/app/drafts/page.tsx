@@ -50,7 +50,7 @@ export default function DraftsPage() {
       <div className="mt-6 space-y-3">
         {drafts.length === 0 && <p className="text-[var(--cr-muted)]">No crew jobs yet.</p>}
         {drafts.map((draft) => (
-          <div key={draft.id} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+          <div key={draft.id} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
             <p className="font-medium">{draft.client_name} · {draft.worker_name}</p>
             <p className="text-sm text-[var(--cr-muted)]">
               {draft.work_date || "No date"} · {draft.hours || "0"} hrs · {draft.status}

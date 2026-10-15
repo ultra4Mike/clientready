@@ -185,15 +185,15 @@ export default function CollectPage() {
       <p className="text-[var(--cr-muted)]">Unpaid invoices and overdue amounts.</p>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
           <p className="text-sm text-[var(--cr-muted)]">Unpaid invoices</p>
           <p className="mt-2 text-2xl font-semibold">{totals.unpaidCount}</p>
         </div>
-        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
           <p className="text-sm text-[var(--cr-muted)]">Open amount</p>
           <p className="mt-2 text-2xl font-semibold">${totals.openAmount.toFixed(2)}</p>
         </div>
-        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
           <p className="text-sm text-[var(--cr-muted)]">Overdue</p>
           <p className="mt-2 text-2xl font-semibold">${totals.overdueAmount.toFixed(2)}</p>
         </div>
@@ -213,7 +213,7 @@ export default function CollectPage() {
         )}
 
         {unpaid.map((doc) => (
-          <div key={doc.id} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+          <div key={doc.id} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-medium">{doc.title}</p>
@@ -245,7 +245,7 @@ export default function CollectPage() {
             {payingId === doc.id && (
               <div className="mt-4 grid gap-3 border-t border-teal-500/20 pt-4 sm:grid-cols-2">
                 <select
-                  className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2"
+                  className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
                   value={method}
                   onChange={(event) => setMethod(event.target.value)}
                 >
@@ -257,18 +257,18 @@ export default function CollectPage() {
                 </select>
                 <input
                   type="date"
-                  className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2"
+                  className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
                   value={paidDate}
                   onChange={(event) => setPaidDate(event.target.value)}
                 />
                 <input
-                  className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2"
+                  className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
                   placeholder="Amount"
                   value={amount}
                   onChange={(event) => setAmount(event.target.value)}
                 />
                 <input
-                  className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2"
+                  className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
                   placeholder={refLabel}
                   value={paymentRef}
                   onChange={(event) => setPaymentRef(event.target.value)}
@@ -280,7 +280,7 @@ export default function CollectPage() {
                   <button
                     type="button"
                     onClick={() => savePaid(doc)}
-                    className="rounded-lg bg-teal-400 px-4 py-2 text-sm font-medium text-slate-950"
+                    className="rounded-lg bg-teal-400 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300 disabled:opacity-50"
                   >
                     {method === "Cash" ? "Save and print receipt" : "Save payment"}
                   </button>

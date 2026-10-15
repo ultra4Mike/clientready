@@ -208,7 +208,7 @@ export default function ClientsPage() {
               setEditingId("");
               setForm(emptyClient);
             }}
-            className="rounded-lg bg-teal-400 px-4 py-2 text-sm font-medium text-slate-950"
+            className="rounded-lg bg-teal-400 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300 disabled:opacity-50"
           >
             {showForm ? "Hide form" : "Add new client"}
           </button>
@@ -227,23 +227,23 @@ export default function ClientsPage() {
             className="mb-8 max-w-xl space-y-4 rounded-2xl border border-slate-200 bg-white p-6"
           >
             <h2 className="text-lg font-semibold">{editingId ? "Edit client" : "Add a client"}</h2>
-            <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Client name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
-            <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Company" value={form.company} onChange={(event) => setForm({ ...form, company: event.target.value })} />
-            <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
-            <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Phone" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
-            <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Address" value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} />
-            <label className="block text-sm text-slate-600">
+            <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Client name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+            <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Company" value={form.company} onChange={(event) => setForm({ ...form, company: event.target.value })} />
+            <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
+            <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Phone" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
+            <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Address" value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} />
+            <label className="block text-sm font-medium text-slate-600">
               Next visit
-              <input type="date" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={form.nextVisit} onChange={(event) => setForm({ ...form, nextVisit: event.target.value })} />
+              <input type="date" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={form.nextVisit} onChange={(event) => setForm({ ...form, nextVisit: event.target.value })} />
             </label>
-            <label className="block text-sm text-slate-600">
+            <label className="block text-sm font-medium text-slate-600">
               Start time
-              <input type="time" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={form.visitTime} onChange={(event) => setForm({ ...form, visitTime: event.target.value })} />
+              <input type="time" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={form.visitTime} onChange={(event) => setForm({ ...form, visitTime: event.target.value })} />
             </label>
-            <textarea className="min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+            <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
             <div className="flex gap-3">
-              <button type="submit" className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white">{editingId ? "Update client" : "Save client"}</button>
-              <button type="button" onClick={cancelEdit} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Cancel</button>
+              <button type="submit" className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400 disabled:opacity-50">{editingId ? "Update client" : "Save client"}</button>
+              <button type="button" onClick={cancelEdit} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Cancel</button>
             </div>
           </form>
         )}

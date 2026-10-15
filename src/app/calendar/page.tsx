@@ -178,7 +178,7 @@ export default function CalendarPage() {
             </div>
             {!readSchedule(editingDoc.data) && (
               <label className="mb-3 flex flex-col gap-1 text-sm">Job
-                <select aria-label="Job to schedule" value={editing.docId} onChange={(event) => setEditing({ ...editing, docId: event.target.value })} className="rounded border border-slate-300 bg-transparent px-2 py-1">
+                <select aria-label="Job to schedule" value={editing.docId} onChange={(event) => setEditing({ ...editing, docId: event.target.value })} className="rounded-md border border-slate-300 bg-transparent px-2 py-1.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30">
                   {unscheduled.map((doc) => <option key={doc.id} value={doc.id}>{doc.title} · {doc.clientName}</option>)}
                 </select>
               </label>

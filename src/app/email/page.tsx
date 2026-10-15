@@ -213,7 +213,7 @@ async function saveDocument() {
 
           <div>
             <input
-              className="w-full rounded-lg border border-slate-300 px-3 py-2"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
               placeholder="Search clients by name"
               value={clientSearch}
               onChange={(event) => setClientSearch(event.target.value)}
@@ -238,7 +238,7 @@ async function saveDocument() {
           </div>
 
           <select
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
             value={emailType}
             onChange={(event) => setEmailType(event.target.value)}
           >
@@ -250,25 +250,25 @@ async function saveDocument() {
           </select>
 
           <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
             placeholder="Client name"
             value={clientName}
             onChange={(event) => setClientName(event.target.value)}
           />
           <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
             placeholder="Client company"
             value={clientCompany}
             onChange={(event) => setClientCompany(event.target.value)}
           />
           <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
             placeholder="Client email"
             value={clientEmail}
             onChange={(event) => setClientEmail(event.target.value)}
           />
           <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
             placeholder="Subject / project"
             value={subject}
             onChange={(event) => setSubject(event.target.value)}
@@ -280,13 +280,13 @@ async function saveDocument() {
             onChange={(event) => setPoints(event.target.value)}
           />
           <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
             placeholder="Call to action"
             value={callToAction}
             onChange={(event) => setCallToAction(event.target.value)}
           />
           <select
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
             value={tone}
             onChange={(event) => setTone(event.target.value)}
           >
@@ -294,7 +294,7 @@ async function saveDocument() {
             <option value="friendly">Friendly</option>
           </select>
           <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
             placeholder="Your name"
             value={yourName}
             onChange={(event) => setYourName(event.target.value)}
@@ -304,14 +304,14 @@ async function saveDocument() {
             <button
               type="button"
               onClick={saveDocument}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white"
+              className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400 disabled:opacity-50"
             >
               Save document
             </button>
             <button
               type="button"
               onClick={saveClientFromForm}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
+              className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600"
             >
               Save as client
             </button>

@@ -279,9 +279,9 @@ export default function YearPage() {
   return (
     <AppShell title="Year packet">
       <div className="mb-4 grid gap-3 md:grid-cols-4">
-        <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" value={year} onChange={(event) => setYear(event.target.value)} />
-        <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" placeholder="Search client, invoice, worker" value={search} onChange={(event) => setSearch(event.target.value)} />
-        <select className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" value={filter} onChange={(event) => { setFilter(event.target.value); setCrewType("all"); setWorker("all"); }}>
+        <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={year} onChange={(event) => setYear(event.target.value)} />
+        <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Search client, invoice, worker" value={search} onChange={(event) => setSearch(event.target.value)} />
+        <select className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={filter} onChange={(event) => { setFilter(event.target.value); setCrewType("all"); setWorker("all"); }}>
           <option value="all">All rows</option>
           <option value="in">Money in</option>
           <option value="out">Money out</option>
@@ -292,7 +292,7 @@ export default function YearPage() {
           <option value="Other fees">Other fees</option>
           <option value="employees">Employees</option>
         </select>
-        <select className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+        <select className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
           <option value="date">Date</option>
           <option value="client">Client</option>
           <option value="number">Invoice</option>
@@ -304,12 +304,12 @@ export default function YearPage() {
 
       {filter === "employees" && (
         <div className="mb-4 grid gap-3 md:grid-cols-2">
-          <select className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" value={crewType} onChange={(event) => { setCrewType(event.target.value); setWorker("all"); }}>
+          <select className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={crewType} onChange={(event) => { setCrewType(event.target.value); setWorker("all"); }}>
             <option value="all">Employees and contractors</option>
             <option value="employee">Employees</option>
             <option value="contractor">Contractors</option>
           </select>
-          <select className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" value={worker} onChange={(event) => setWorker(event.target.value)}>
+          <select className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={worker} onChange={(event) => setWorker(event.target.value)}>
             <option value="all">All names</option>
             {crewPeople.map((person) => <option key={person.name} value={person.name}>{person.name}</option>)}
           </select>

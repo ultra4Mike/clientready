@@ -78,7 +78,7 @@ export default function SchedulePage() {
         >
           <h1 className="text-xl font-semibold">Schedule a job</h1>
           <select
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
             value={form.clientName}
             onChange={(event) =>
               setForm({ ...form, clientName: event.target.value })
@@ -95,7 +95,7 @@ export default function SchedulePage() {
             Date
             <input
               type="date"
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+              className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
               value={form.date}
               onChange={(event) => setForm({ ...form, date: event.target.value })}
             />
@@ -104,20 +104,20 @@ export default function SchedulePage() {
             Start time
             <input
               type="time"
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+              className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
               value={form.time}
               onChange={(event) => setForm({ ...form, time: event.target.value })}
             />
           </label>
           <textarea
-            className="min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2"
+            className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
             placeholder="Job details"
             value={form.notes}
             onChange={(event) => setForm({ ...form, notes: event.target.value })}
           />
           <button
             type="submit"
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white"
+            className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400 disabled:opacity-50"
           >
             Save appointment
           </button>

@@ -52,13 +52,13 @@ export function ApprovalShare({ docId, approval, onChange }: { docId: string; ap
       {link && (
         <div className="flex flex-wrap gap-2">
           <input aria-label="Approval link" readOnly value={link} onFocus={(event) => event.target.select()} className="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1 text-xs" />
-          <button type="button" onClick={copy} className="rounded-lg border border-slate-300 px-3 py-1">Copy link</button>
+          <button type="button" onClick={copy} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium transition hover:border-teal-500">Copy link</button>
         </div>
       )}
       <div className="flex flex-wrap gap-2">
-        {!approval && <button type="button" disabled={busy} onClick={() => run("create")} className="rounded-lg border border-slate-300 px-3 py-1">Share approval link</button>}
-        {approval && <button type="button" disabled={busy} onClick={() => run("create")} className="rounded-lg border border-slate-300 px-3 py-1">New link</button>}
-        {approval && <button type="button" disabled={busy} onClick={() => run("revoke")} className="rounded-lg border border-slate-300 px-3 py-1">Revoke link</button>}
+        {!approval && <button type="button" disabled={busy} onClick={() => run("create")} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium transition hover:border-teal-500">Share approval link</button>}
+        {approval && <button type="button" disabled={busy} onClick={() => run("create")} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium transition hover:border-teal-500">New link</button>}
+        {approval && <button type="button" disabled={busy} onClick={() => run("revoke")} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium transition hover:border-teal-500">Revoke link</button>}
       </div>
       {message && <p className="text-xs text-slate-500" data-testid="approval-message">{message}</p>}
     </div>
