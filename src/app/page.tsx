@@ -25,13 +25,13 @@ export default function HomePage() {
       <header className="sticky top-0 z-20 border-b border-teal-500/20 bg-[var(--cr-panel)] print:hidden">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
           <a href="/" className="flex items-center gap-2 font-semibold">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-teal-400 text-sm font-bold text-slate-950">C</span>
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-teal-500 text-sm font-bold text-slate-950!">C</span>
             ClientReady
           </a>
           <div className="flex items-center gap-4 text-sm">
             <button type="button" onClick={toggleTheme} className="hidden font-medium transition hover:text-teal-500 sm:inline">{theme === "dark" ? "Light" : "Dark"}</button>
             <a href="/login" className="hidden font-medium transition hover:text-teal-500 sm:inline">Log in</a>
-            <a href="/signup" className="rounded-lg bg-teal-400 px-4 py-2 font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300">Start free</a>
+            <a href="/signup" className="rounded-lg bg-teal-500 px-4 py-2 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">Start free</a>
           </div>
         </div>
       </header>
@@ -48,7 +48,7 @@ export default function HomePage() {
           <li>Paid invoices, expenses, and pay in one year log. Your phone and computer share the account.</li>
         </ul>
         <div className="mt-8 grid gap-3 sm:flex sm:flex-wrap sm:items-center">
-          <a href="/signup" className="rounded-lg bg-teal-400 px-6 py-3 text-center text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300">Start free</a>
+          <a href="/signup" className="rounded-lg bg-teal-500 px-6 py-3 text-center text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">Start free</a>
           <a href="#pricing" className="rounded-lg border border-teal-400/40 px-6 py-3 text-center text-sm font-medium transition hover:border-teal-400">See pricing</a>
         </div>
         <p className="mt-3 text-sm text-[var(--cr-muted)]">14-day trial. No card to start.</p>

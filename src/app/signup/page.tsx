@@ -41,14 +41,14 @@ export default function SignupPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[var(--cr-bg)] px-4 py-10">
       <div className="w-full max-w-md">
-      <a href="/" className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition hover:text-teal-600"><span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-teal-400 text-xs font-bold text-slate-950">C</span>Back to ClientReady</a>
+      <a href="/" className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition hover:text-teal-600"><span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-teal-500 text-xs font-bold text-slate-950!">C</span>Back to ClientReady</a>
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
       <h1 className="text-2xl font-bold tracking-tight">Create your account</h1>
       <p className="mt-2 text-sm text-slate-600">14-day trial. No card to start. Crew use the email your boss saved.</p>
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <input type="email" required placeholder="Email" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={email} onChange={(event) => setEmail(event.target.value)} />
         <input type="password" required minLength={6} placeholder="Password" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={password} onChange={(event) => setPassword(event.target.value)} />
-        <button type="submit" disabled={busy} className="w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400 disabled:opacity-60">
+        <button type="submit" disabled={busy} className="w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 disabled:opacity-60">
           {busy ? "Creating account" : "Sign up"}
         </button>
       </form>

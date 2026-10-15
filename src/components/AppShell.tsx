@@ -26,7 +26,7 @@ const moreLinks = [
 function Logo() {
   return (
     <a href="/dashboard" className="flex items-center gap-2 font-semibold">
-      <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-teal-400 text-sm font-bold text-slate-950">
+      <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-teal-500 text-sm font-bold text-slate-950!">
         C
       </span>
       <span>ClientReady</span>

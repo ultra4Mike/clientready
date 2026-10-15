@@ -806,7 +806,7 @@ export default function NewInvoicePage() {
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
                   <p className="text-sm font-medium">Other fees</p>
-                  <button type="button" className="rounded-lg bg-teal-500 px-3 py-1.5 text-sm font-semibold text-slate-950! transition hover:bg-teal-400" onClick={() => setOtherFees((current) => [...current, { id: Date.now().toString(), name: "", amount: "" }])}>Add fee</button>
+                  <button type="button" className="rounded-lg bg-teal-500 px-3 py-1.5 text-sm font-semibold text-slate-950! transition hover:bg-teal-500" onClick={() => setOtherFees((current) => [...current, { id: Date.now().toString(), name: "", amount: "" }])}>Add fee</button>
                 </div>
                 {otherFees.map((fee) => (
                   <div key={fee.id} className="grid gap-2 sm:grid-cols-[1fr_8rem_auto]">
@@ -825,7 +825,7 @@ export default function NewInvoicePage() {
                       <option key={person.id} value={person.id}>{person.name} · ${Number(person.rate || 0).toFixed(2)}/hr</option>
                     ))}
                   </select>
-                  <button type="button" onClick={addCrew} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Add</button>
+                  <button type="button" onClick={addCrew} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 disabled:opacity-50">Add</button>
                 </div>
                 {crew.map((row) => (
                   <div key={row.id} className="mt-3 space-y-2 border-t border-amber-200 pt-3 text-slate-900">

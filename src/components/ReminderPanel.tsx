@@ -30,13 +30,13 @@ export default function ReminderPanel({ input, phone, email, onClose }: { input:
         <p className="text-sm font-semibold">Payment reminder</p>
         <div className="inline-flex rounded-lg border border-teal-500/30 p-0.5" role="tablist">
           {TONES.map(([key, label]) => (
-            <button key={key} type="button" role="tab" aria-selected={tone === key} data-testid={`tone-${key}`} onClick={() => setTone(key)} className={`rounded-md px-3 py-1 text-sm ${tone === key ? "bg-teal-400 font-semibold text-slate-950" : ""}`}>{label}</button>
+            <button key={key} type="button" role="tab" aria-selected={tone === key} data-testid={`tone-${key}`} onClick={() => setTone(key)} className={`rounded-md px-3 py-1 text-sm ${tone === key ? "bg-teal-500 font-semibold text-slate-950!" : ""}`}>{label}</button>
           ))}
         </div>
       </div>
       <textarea aria-label="Reminder text" data-testid="reminder-text" className="min-h-32 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={text} onChange={(event) => setEdited((current) => ({ ...current, [tone]: event.target.value }))} />
       <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-        <button type="button" onClick={copy} data-testid="reminder-copy" className="rounded-lg bg-teal-400 px-3 py-2 text-sm font-semibold text-slate-950 transition hover:bg-teal-300">{copied ? "Copied" : "Copy text"}</button>
+        <button type="button" onClick={copy} data-testid="reminder-copy" className="rounded-lg bg-teal-500 px-3 py-2 text-sm font-semibold text-slate-950! transition hover:bg-teal-400">{copied ? "Copied" : "Copy text"}</button>
         {phone ? <a className={button} data-testid="reminder-sms" href={smsHref(phone, text)}>Open in Messages</a> : <span className={`${button} opacity-50`}>No phone on file</span>}
         {email ? <a className={button} data-testid="reminder-email" href={mailtoHref(email, subject, text)}>Open in email</a> : <span className={`${button} opacity-50`}>No email on file</span>}
         {onClose && <button type="button" className="text-sm text-[var(--cr-muted)]" onClick={onClose}>Close</button>}

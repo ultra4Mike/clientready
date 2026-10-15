@@ -60,7 +60,7 @@ export default function DraftsPage() {
             <p className="mt-1 text-sm text-[var(--cr-muted)]">
               Parts ${draft.parts_cost || "0"} · Collected ${draft.collected_amount || "0"} {draft.collected_method || ""}
             </p>
-            <button type="button" onClick={() => openAsInvoice(draft)} className="mt-4 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 sm:w-auto">Open as invoice</button>
+            <button type="button" onClick={() => openAsInvoice(draft)} className="mt-4 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 sm:w-auto">Open as invoice</button>
           </div>
         ))}
       </div>

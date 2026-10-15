@@ -211,7 +211,7 @@ export default function ClientsPage() {
               setEditingId("");
               setForm(emptyClient);
             }}
-            className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50"
+            className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 disabled:opacity-50"
           >
             {showForm ? "Hide form" : "Add new client"}
           </button>

@@ -342,7 +342,7 @@ export default function CrewPage() {
               </div>
               <input className={input} placeholder="Reason, e.g. forgot to clock out" value={fixing.reason} onChange={(event) => setFixing({ ...fixing, reason: event.target.value })} aria-label="Reason" />
               <div className="flex gap-2">
-                <button type="button" onClick={saveFix} className="flex-1 rounded-xl bg-teal-500 px-3 py-2.5 font-semibold text-slate-950! transition hover:bg-teal-400 sm:flex-none">Save time</button>
+                <button type="button" onClick={saveFix} className="flex-1 rounded-xl bg-teal-500 px-3 py-2.5 font-semibold text-slate-950! transition hover:bg-teal-500 sm:flex-none">Save time</button>
                 <button type="button" onClick={() => setFixing(null)} className="flex-1 rounded-xl border border-teal-500/30 px-3 py-2.5 font-medium transition hover:border-teal-400 sm:flex-none">Cancel</button>
               </div>
             </div>
@@ -366,7 +366,7 @@ export default function CrewPage() {
               {/* eslint-disable-next-line @next/next/no-img-element -- local data URL preview */}
               {spend.receipt && <img src={spend.receipt} alt="Receipt preview" className="max-h-40 rounded-lg" data-testid="receipt-preview" />}
               <div className="flex gap-2">
-                <button type="button" disabled={busy !== ""} onClick={() => saveExpense(card)} className="flex-1 rounded-xl bg-teal-500 px-3 py-2.5 font-semibold text-slate-950! transition hover:bg-teal-400 disabled:opacity-60">Save expense</button>
+                <button type="button" disabled={busy !== ""} onClick={() => saveExpense(card)} className="flex-1 rounded-xl bg-teal-500 px-3 py-2.5 font-semibold text-slate-950! transition hover:bg-teal-500 disabled:opacity-60">Save expense</button>
                 <button type="button" onClick={() => setSpendOpen("")} className="rounded-xl border border-teal-500/30 px-4 py-2.5 font-medium transition hover:border-teal-400">Cancel</button>
               </div>
             </div>
@@ -488,7 +488,7 @@ export default function CrewPage() {
 
         {tab === "reports" && (
           <section className="space-y-3">
-            <button type="button" onClick={() => setReportOpen(!reportOpen)} className="w-full rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">{reportOpen ? "Close" : "New job report"}</button>
+            <button type="button" onClick={() => setReportOpen(!reportOpen)} className="w-full rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500">{reportOpen ? "Close" : "New job report"}</button>
             {reportOpen && (
               <form onSubmit={saveDraft} className={`${cardClass} space-y-3`}>
                 <select className={input} onChange={(event) => { const client = clients.find((item) => item.id === event.target.value); if (client) setForm({ ...form, clientName: client.name, clientPhone: client.phone || "", clientAddress: client.address || "" }); }}>
@@ -509,7 +509,7 @@ export default function CrewPage() {
                 <input className={input} placeholder="What it was" value={form.partsNote} onChange={(event) => setForm({ ...form, partsNote: event.target.value })} />
                 <textarea className={`${input} min-h-16`} placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
                 <label className="flex items-center gap-3 rounded-xl border border-teal-500/20 px-3 py-3 text-sm font-medium"><input className="h-4 w-4 accent-teal-500" type="checkbox" checked={form.finished} onChange={(event) => setForm({ ...form, finished: event.target.checked })} /> Job is finished</label>
-                <button type="submit" className="sticky bottom-3 w-full rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! shadow-lg transition hover:bg-teal-400">Send job report</button>
+                <button type="submit" className="sticky bottom-3 w-full rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! shadow-lg transition hover:bg-teal-500">Send job report</button>
               </form>
             )}
             <h2 className="pt-2 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Reports you sent</h2>

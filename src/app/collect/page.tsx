@@ -248,7 +248,7 @@ export default function CollectPage() {
                 <button type="button" data-testid={`reminder-${doc.id}`} onClick={() => setReminderId(reminderId === doc.id ? "" : doc.id)} className="rounded-lg border border-teal-500/30 px-4 py-2.5 text-sm font-medium transition hover:border-teal-400">
                   Reminder
                 </button>
-                <button type="button" onClick={() => startPaid(doc)} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">
+                <button type="button" onClick={() => startPaid(doc)} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500">
                   Record payment
                 </button>
               </div>
@@ -310,7 +310,7 @@ export default function CollectPage() {
                   <button
                     type="button"
                     onClick={() => savePaid(doc)}
-                    className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50"
+                    className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 disabled:opacity-50"
                   >
                     {method === "Cash" ? "Save and print receipt" : "Save payment"}
                   </button>
