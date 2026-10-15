@@ -4,6 +4,8 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
+import PortalShare from "@/components/PortalShare";
+import { backfillClientIds, renamePortalClient } from "@/lib/portal";
 
 type Client = {
   id: string;
@@ -50,6 +52,7 @@ export default function ClientsPage() {
   const [message, setMessage] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
+  const [portalFor, setPortalFor] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -78,6 +81,8 @@ export default function ClientsPage() {
       const next = rows.map((row) => fromRow(row as Record<string, string>));
       setClients(next);
       window.localStorage.setItem("clientready-clients", JSON.stringify(next));
+      // Once per account: tie older documents to these clients by id (unique name matches only).
+      await backfillClientIds(next);
     }
 
     load();
@@ -122,6 +127,8 @@ export default function ClientsPage() {
           })
           .eq("id", editingId)
           .eq("user_id", userId);
+        const before = clients.find((client) => client.id === editingId);
+        if (!error && before && before.name.trim() !== form.name.trim()) await renamePortalClient(editingId, form.name);
         setMessage(error ? "Updated locally. Cloud update failed." : "Client updated.");
       }
       setEditingId("");
@@ -280,9 +287,15 @@ export default function ClientsPage() {
               </div>
               <p className="line-clamp-2 text-sm text-slate-600">{client.notes}</p>
               <div className="flex gap-2 md:justify-end">
+                <button type="button" aria-expanded={portalFor === client.id} data-testid="client-portal-toggle" onClick={() => setPortalFor(portalFor === client.id ? "" : client.id)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium transition hover:border-teal-500">Portal</button>
                 <button type="button" onClick={() => editClient(client)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium transition hover:border-teal-500">Edit</button>
                 <button type="button" onClick={() => removeClient(client.id)} className="rounded-lg px-3 py-2 text-sm text-slate-500 transition hover:bg-red-500/10 hover:text-red-600">Remove</button>
               </div>
+              {portalFor === client.id && (
+                <div className="md:col-span-5" data-testid="client-portal">
+                  <PortalShare clientName={client.name} clientId={client.id} compact />
+                </div>
+              )}
             </div>
           ))}
         </div>

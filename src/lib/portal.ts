@@ -18,45 +18,123 @@ export function portalDocUrl(token: string, docId: string) {
   return `/approve?p=${encodeURIComponent(token)}&d=${encodeURIComponent(docId)}`;
 }
 
+/** A client as the portal sees it: the saved client's id when known (stable across renames), plus the name. */
+export type PortalClient = { name: string; id?: string };
+const asClient = (client: PortalClient | string): PortalClient => (typeof client === "string" ? { name: client } : client);
+
+/** PostgREST filter for this client's rows: its id (plus older name-keyed rows without an id). */
+function idFilter(client: PortalClient) {
+  const quote = (value: string) => `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  return `client_id.eq.${quote(client.id || "")},and(client_id.is.null,client_key.eq.${quote(clientKey(client.name))})`;
+}
+
 /** The active portal token for a client, "" when none, null when it could not be checked. */
-export async function activePortal(clientName: string): Promise<string | null> {
+export async function activePortal(input: PortalClient | string): Promise<string | null> {
+  const client = asClient(input);
   const userId = await getUserId();
-  if (!userId || !clientKey(clientName)) return null;
-  const { data, error } = await supabase
-    .from("client_portals")
-    .select("token")
-    .eq("owner_id", userId)
-    .eq("client_key", clientKey(clientName))
-    .is("revoked_at", null)
+  if (!userId || !clientKey(client.name)) return null;
+  const base = supabase.from("client_portals").select("token, client_id").eq("owner_id", userId).is("revoked_at", null);
+  const { data, error } = await (client.id ? base.or(idFilter(client)) : base.eq("client_key", clientKey(client.name)))
     .order("created_at", { ascending: false })
     .limit(1);
   if (error) return null;
-  return (Array.isArray(data) && data[0]?.token) || "";
+  const row = Array.isArray(data) ? (data[0] as { token?: string; client_id?: string | null } | undefined) : undefined;
+  if (row?.token && client.id && !row.client_id) {
+    // Older name-keyed link: tie it to the client id so a later rename keeps the same portal.
+    await supabase.from("client_portals").update({ client_id: client.id }).eq("owner_id", userId).eq("token", row.token);
+  }
+  return row?.token || "";
 }
 
 /** Turns off every active link for the client. */
-export async function revokePortal(clientName: string) {
+export async function revokePortal(input: PortalClient | string) {
+  const client = asClient(input);
   const userId = await getUserId();
   if (!userId) return "Sign in first.";
-  const { error } = await supabase
-    .from("client_portals")
-    .update({ revoked_at: new Date().toISOString() })
-    .eq("owner_id", userId)
-    .eq("client_key", clientKey(clientName))
-    .is("revoked_at", null);
+  const base = supabase.from("client_portals").update({ revoked_at: new Date().toISOString() }).eq("owner_id", userId).is("revoked_at", null);
+  const { error } = await (client.id ? base.or(idFilter(client)) : base.eq("client_key", clientKey(client.name)));
   return error ? "Could not reach your account. The link was not changed." : "";
 }
 
 /** New link for the client; the old one (if any) stops working. */
-export async function createPortal(clientName: string): Promise<{ token: string; error: string }> {
+export async function createPortal(input: PortalClient | string): Promise<{ token: string; error: string }> {
+  const client = asClient(input);
   const userId = await getUserId();
   if (!userId) return { token: "", error: "Sign in and save to your account first. Portal links only show documents synced to your account." };
-  if (!clientKey(clientName)) return { token: "", error: "Add the client name first." };
-  const revokeError = await revokePortal(clientName);
+  if (!clientKey(client.name)) return { token: "", error: "Add the client name first." };
+  const revokeError = await revokePortal(client);
   if (revokeError) return { token: "", error: revokeError };
   const token = newApprovalToken();
-  const { error } = await supabase.from("client_portals").insert({ token, owner_id: userId, client_key: clientKey(clientName), client_name: clientName.trim() });
+  const { error } = await supabase.from("client_portals").insert({
+    token,
+    owner_id: userId,
+    client_key: clientKey(client.name),
+    client_name: client.name.trim(),
+    ...(client.id ? { client_id: client.id } : {}),
+  });
   return error ? { token: "", error: "Could not reach your account. No link was made." } : { token, error: "" };
+}
+
+/** After a client is renamed: the portal page header follows the new name (contents are keyed by id). */
+export async function renamePortalClient(clientId: string, name: string) {
+  const userId = await getUserId();
+  if (!userId || !clientId || !name.trim()) return;
+  await supabase.from("client_portals").update({ client_name: name.trim() }).eq("owner_id", userId).eq("client_id", clientId);
+}
+
+type IdDoc = { id: string; type: string; clientName: string; data: Record<string, unknown> };
+
+/** The saved client a document belongs to: its stored clientId, else a unique name match (legacy docs). */
+export function clientIdFor(doc: { clientName?: string; data?: Record<string, unknown> }, clients: { id: string; name: string }[]) {
+  const stored = String(doc.data?.clientId || "");
+  if (stored) return stored;
+  const key = clientKey(String(doc.data?.clientName || doc.clientName || ""));
+  const hits = key ? clients.filter((client) => clientKey(client.name) === key) : [];
+  return hits.length === 1 ? hits[0].id : "";
+}
+
+/**
+ * One-time backfill (per account): give invoices/proposals without a clientId the id of the one saved
+ * client whose name matches. Only adds data.clientId; nothing else on the document changes.
+ * Ambiguous or unmatched names are left alone and keep matching by name.
+ */
+export async function backfillClientIds(clients: { id: string; name: string }[]) {
+  const userId = await getUserId();
+  if (!userId || !clients.length) return 0;
+  const flag = `clientready-clientid-backfill-${userId}`;
+  if (window.localStorage.getItem(flag)) return 0;
+  const { data: rows, error } = await supabase.from("documents").select("id, type, client_name, data").eq("user_id", userId);
+  if (error || !Array.isArray(rows)) return 0;
+  const patched: Record<string, string> = {};
+  for (const row of rows as { id: string; type: string; client_name?: string; data?: Record<string, unknown> }[]) {
+    if (!["invoice", "proposal"].includes(row.type) || row.data?.clientId) continue;
+    const id = clientIdFor({ clientName: row.client_name, data: row.data }, clients);
+    if (!id) continue;
+    const { error: saveError } = await supabase
+      .from("documents")
+      .update({ data: { ...(row.data || {}), clientId: id, updatedAt: new Date().toISOString() } })
+      .eq("id", row.id)
+      .eq("user_id", userId);
+    if (saveError) return 0; // try again next time
+    patched[row.id] = id;
+  }
+  try {
+    const raw = window.localStorage.getItem("clientready-documents");
+    const docs = raw ? (JSON.parse(raw) as IdDoc[]) : [];
+    let changed = false;
+    for (const doc of docs) {
+      const id = patched[doc.id] || (!doc.data?.clientId && ["invoice", "proposal"].includes(doc.type) ? clientIdFor(doc, clients) : "");
+      if (id && !doc.data?.clientId) {
+        doc.data = { ...(doc.data || {}), clientId: id };
+        changed = true;
+      }
+    }
+    if (changed) window.localStorage.setItem("clientready-documents", JSON.stringify(docs));
+  } catch {
+    // local copy is refreshed from the cloud on the next load anyway
+  }
+  window.localStorage.setItem(flag, new Date().toISOString());
+  return Object.keys(patched).length;
 }
 
 export type PortalDoc = { id: string; type: string; title: string; clientName: string; data: Record<string, unknown> };

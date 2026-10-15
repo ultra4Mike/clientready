@@ -4,19 +4,20 @@ import { useEffect, useState } from "react";
 import { activePortal, createPortal, portalUrl, revokePortal } from "@/lib/portal";
 
 /** Owner controls for the client's portal link: make, copy, replace or turn off. */
-export default function PortalShare({ clientName }: { clientName: string }) {
+export default function PortalShare({ clientName, clientId = "", compact = false }: { clientName: string; clientId?: string; compact?: boolean }) {
   const [token, setToken] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const name = clientName.trim();
+  const client = { name, id: clientId || undefined };
 
   useEffect(() => {
     let live = true;
-    if (name) activePortal(name).then((found) => live && setToken(found));
+    if (name) activePortal({ name, id: clientId || undefined }).then((found) => live && setToken(found));
     return () => {
       live = false;
     };
-  }, [name]);
+  }, [name, clientId]);
 
   if (!name || name === "No client") return null;
   const link = token ? portalUrl(token) : "";
@@ -24,7 +25,7 @@ export default function PortalShare({ clientName }: { clientName: string }) {
   async function make() {
     if (token && !window.confirm("Make a new portal link? The old link will stop working.")) return;
     setBusy(true);
-    const result = await createPortal(name);
+    const result = await createPortal(client);
     setBusy(false);
     if (result.error) return setMessage(result.error);
     setToken(result.token);
@@ -34,7 +35,7 @@ export default function PortalShare({ clientName }: { clientName: string }) {
   async function revoke() {
     if (!window.confirm(`Turn off the portal link for ${name}? It will stop working right away.`)) return;
     setBusy(true);
-    const error = await revokePortal(name);
+    const error = await revokePortal(client);
     setBusy(false);
     if (error) return setMessage(error);
     setToken("");
@@ -53,7 +54,7 @@ export default function PortalShare({ clientName }: { clientName: string }) {
   return (
     <div className="print-hide space-y-2 rounded-lg border border-slate-300 p-3 text-sm" data-testid="portal-share">
       <p className="font-semibold">Client portal for {name}</p>
-      <p className="text-xs text-slate-500">One link where {name} can see every sent invoice and proposal, approve, sign and pay. Drafts and your costs are never shown.</p>
+      {!compact && <p className="text-xs text-slate-500">One link where {name} can see every sent invoice and proposal, approve, sign and pay. Drafts and your costs are never shown.</p>}
       {link && (
         <div className="flex flex-wrap gap-2">
           <input aria-label="Portal link" readOnly value={link} onFocus={(event) => event.target.select()} className="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1 text-xs" />
