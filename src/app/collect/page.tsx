@@ -239,16 +239,16 @@ export default function CollectPage() {
                 )}
               </div>
               <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                <button type="button" onClick={() => openInvoice(doc.id)} className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm font-medium transition hover:border-teal-400">
+                <button type="button" onClick={() => openInvoice(doc.id)} className="rounded-lg border border-teal-500/30 px-4 py-2.5 text-sm font-medium transition hover:border-teal-400">
                   Open
                 </button>
-                <button type="button" onClick={() => setStatus(doc.id, "sent")} className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm font-medium transition hover:border-teal-400">
+                <button type="button" onClick={() => setStatus(doc.id, "sent")} className="rounded-lg border border-teal-500/30 px-4 py-2.5 text-sm font-medium transition hover:border-teal-400">
                   Mark sent
                 </button>
-                <button type="button" data-testid={`reminder-${doc.id}`} onClick={() => setReminderId(reminderId === doc.id ? "" : doc.id)} className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm font-medium transition hover:border-teal-400">
+                <button type="button" data-testid={`reminder-${doc.id}`} onClick={() => setReminderId(reminderId === doc.id ? "" : doc.id)} className="rounded-lg border border-teal-500/30 px-4 py-2.5 text-sm font-medium transition hover:border-teal-400">
                   Reminder
                 </button>
-                <button type="button" onClick={() => startPaid(doc)} className="rounded-lg bg-teal-400 px-3 py-2 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300">
+                <button type="button" onClick={() => startPaid(doc)} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">
                   Record payment
                 </button>
               </div>
@@ -310,7 +310,7 @@ export default function CollectPage() {
                   <button
                     type="button"
                     onClick={() => savePaid(doc)}
-                    className="rounded-lg bg-teal-400 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300 disabled:opacity-50"
+                    className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50"
                   >
                     {method === "Cash" ? "Save and print receipt" : "Save payment"}
                   </button>
