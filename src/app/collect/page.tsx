@@ -6,6 +6,7 @@ import { saveCloudDocument } from "@/lib/cloud-docs";
 import { amountOf, documentTotals } from "@/lib/discount";
 import { balanceDue, paidTotal, paymentFields, paymentMethods, readPayments } from "@/lib/payments";
 import { uniqueDocs } from "@/lib/change-orders";
+import { isPendingRecurringDraft } from "@/lib/recurring";
 
 type LineItem = {
   qty?: string;
@@ -159,7 +160,10 @@ export default function CollectPage() {
   }
 
   const invoices = documents.filter((doc) => doc.type === "invoice");
-  const unpaid = invoices.filter((doc) => (doc.data?.status || "draft") !== "paid");
+  // Recurring drafts nobody has reviewed yet are not money to collect: keep them out of the
+  // list and totals, and point to them below so they aren't lost.
+  const pendingDrafts = invoices.filter(isPendingRecurringDraft).length;
+  const unpaid = invoices.filter((doc) => (doc.data?.status || "draft") !== "paid" && !isPendingRecurringDraft(doc));
 
   const totals = useMemo(() => {
     const openAmount = unpaid.reduce((sum, doc) => sum + balance(doc), 0);
@@ -196,6 +200,12 @@ export default function CollectPage() {
       </div>
 
       <div className="mt-8 space-y-3">
+        {pendingDrafts > 0 && (
+          <p data-testid="recurring-pending-note" className="text-sm text-[var(--cr-muted)]">
+            {pendingDrafts} recurring draft{pendingDrafts === 1 ? "" : "s"} awaiting review, not counted here.{" "}
+            <a href="/documents" className="text-teal-300 underline">Review in Documents</a>
+          </p>
+        )}
         {unpaid.length === 0 && (
           <p className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 text-[var(--cr-muted)]">
             Nothing to collect. Unpaid invoices will show here.
