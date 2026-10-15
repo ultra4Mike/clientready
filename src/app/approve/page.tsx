@@ -76,7 +76,7 @@ export default function ApprovePage() {
 
   if (state !== "ready" || !doc) {
     return (
-      <main className="mx-auto max-w-xl p-8 text-center text-slate-700">
+      <main className="mx-auto max-w-xl px-4 py-16 text-center text-slate-700">
         <h1 className="text-xl font-semibold" data-testid="approve-state">
           {state === "loading" ? "Loading…" : state === "missing" ? "This approval link is not valid" : "Could not load this document"}
         </h1>
@@ -95,30 +95,30 @@ export default function ApprovePage() {
   const approved = approval?.status === "approved";
 
   return (
-    <main className="min-h-screen bg-slate-100 px-4 py-8 text-slate-900">
+    <main className="min-h-screen bg-slate-100 px-3 py-6 text-slate-900 sm:px-4 sm:py-10">
       <section className="print-reset mx-auto max-w-3xl space-y-4">
-        <div className="print-hide rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm" data-testid="approve-panel">
+        <div className="print-hide rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm sm:p-5" data-testid="approve-panel">
           {approved ? (
             <p className="font-semibold text-emerald-700" data-testid="approve-done">
               Approved{approval?.approvedAt ? ` on ${new Date(approval.approvedAt).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}
               {approval?.approverName ? ` by ${approval.approverName}` : ""}. Thank you!
             </p>
           ) : (
-            <div className="flex flex-wrap items-end gap-3">
-              <label className="flex min-w-0 flex-1 flex-col gap-1">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <label className="flex min-w-0 flex-1 flex-col gap-1.5 font-medium text-slate-600">
                 Your name (optional)
-                <input aria-label="Your name" value={name} maxLength={100} onChange={(event) => setName(event.target.value)} className="rounded border border-slate-300 px-2 py-1" />
+                <input aria-label="Your name" value={name} maxLength={100} onChange={(event) => setName(event.target.value)} className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal text-slate-900 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" />
               </label>
-              <button type="button" disabled={busy} onClick={approve} className="rounded-lg bg-emerald-600 px-5 py-2 font-semibold text-white disabled:opacity-60">
+              <button type="button" disabled={busy} onClick={approve} className="w-full rounded-lg bg-emerald-600 px-5 py-2.5 font-semibold text-white shadow-sm transition hover:bg-emerald-500 disabled:opacity-60 sm:w-auto">
                 {busy ? "Approving…" : `Approve ${isProposal ? "proposal" : "invoice"}`}
               </button>
             </div>
           )}
-          {message && <p className="mt-2 text-red-600">{message}</p>}
-          <button type="button" onClick={() => window.print()} className="mt-3 text-xs underline">Print / Save PDF</button>
+          {message && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{message}</p>}
+          <button type="button" onClick={() => window.print()} className="mt-3 text-xs font-medium text-slate-500 underline-offset-2 hover:text-teal-600 hover:underline">Print / Save PDF</button>
         </div>
 
-        <div id="preview" className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div id="preview" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 text-sm text-slate-600">
               {/* eslint-disable-next-line @next/next/no-img-element -- data URL logo from the profile */}
@@ -129,28 +129,28 @@ export default function ApprovePage() {
             <div className="shrink-0 text-right">
               {changeOrderOf?.number && <p className="change-order-badge mb-1 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide" data-testid="change-order-badge">Change order</p>}
               <p className="text-xs uppercase tracking-wide text-slate-500">{isProposal ? "Proposal" : "Invoice"}</p>
-              <h1 className="text-xl font-semibold leading-tight">{number}</h1>
+              <h1 className="text-2xl font-bold leading-tight tracking-tight">{number}</h1>
               <p className="text-sm text-slate-600">Date: {text(data.invoiceDate) || "-"} · {isProposal ? "Valid until" : "Due"}: {text(data.dueDate) || "-"}</p>
               {changeOrderOf?.number && <p className="text-sm text-slate-600">Change order to {changeOrderOf.number}</p>}
             </div>
           </div>
 
-          <div className="mt-4 text-sm">
-            <p className="text-xs text-slate-500">{isProposal ? "Prepared for" : "Bill to"}</p>
+          <div className="mt-6 text-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{isProposal ? "Prepared for" : "Bill to"}</p>
             <p className="font-medium">{text(data.clientName) || doc.clientName}{text(data.clientCompany) && <span className="font-normal text-slate-600"> · {text(data.clientCompany)}</span>}</p>
             {text(data.clientAddress) && <p className="text-slate-600">{text(data.clientAddress)}</p>}
           </div>
 
-          <div className="mt-4 border-t border-slate-200 pt-1" data-testid="approve-items">
+          <div className="mt-6 divide-y divide-slate-100 border-t border-slate-200" data-testid="approve-items">
             {items.map((item, index) => (
-              <div key={index} className="flex justify-between gap-4 py-1 text-sm">
+              <div key={index} className="flex justify-between gap-4 py-2 text-sm">
                 <span>{item.description || "Item"} · {item.qty} x ${item.rate}</span>
                 <span>${(amountOf(item.qty) * amountOf(item.rate)).toFixed(2)}</span>
               </div>
             ))}
           </div>
 
-          <div className="mt-2 grid grid-cols-2 gap-6 border-t border-slate-200 pt-2 text-sm">
+          <div className="mt-2 grid gap-4 border-t border-slate-200 pt-3 text-sm sm:grid-cols-2 sm:gap-6">
             <div className="space-y-0.5 text-slate-600">
               <LineSplit items={items} />
               {payments.filter((payment) => amountOf(payment.amount) > 0).map((payment) => (
@@ -177,7 +177,7 @@ export default function ApprovePage() {
           {text(data.notes) && <p className="mt-3 text-sm text-slate-600">{text(data.notes)}</p>}
           <JobPhotoStrip photos={readPhotos(data.photos)} />
           {(payUrl || signature || proposalSignature) && (
-            <div className="print-keep mt-3 grid grid-cols-2 items-end gap-6 border-t border-slate-200 pt-3">
+            <div className="print-keep mt-4 grid items-end gap-6 border-t border-slate-200 pt-4 sm:grid-cols-2">
               <div className="space-y-3">
                 <SignatureBlock signature={proposalSignature} label="Proposal accepted" />
                 <SignatureBlock signature={signature} />
