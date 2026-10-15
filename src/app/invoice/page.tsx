@@ -726,7 +726,7 @@ export default function NewInvoicePage() {
             <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Line items & pricing</h2>
             <div className="space-y-3">
-              <div className="flex items-center justify-between"><h2 className="font-medium">Line items</h2><button type="button" className="text-sm" onClick={() => setItems((current) => [...current, { ...emptyItem }])}>Add item</button></div>
+              <div className="flex items-center justify-between"><h2 className="font-medium">Line items</h2><button type="button" className="tap text-sm" onClick={() => setItems((current) => [...current, { ...emptyItem }])}>Add item</button></div>
               {items.map((item, index) => (
                 <div key={index} className="grid gap-2 sm:grid-cols-4">
                   <input className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Description" value={item.description} onChange={(event) => updateItem(index, "description", event.target.value)} />
@@ -760,7 +760,7 @@ export default function NewInvoicePage() {
                   <label className="text-sm text-slate-600">Method<select className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={payment.method} onChange={(event) => updatePayment(payment.id, { method: event.target.value })}>{paymentMethods.map((method) => <option key={method} value={method}>{method}</option>)}</select></label>
                   <label className="text-sm text-slate-600">Date paid<input type="date" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={payment.date} onChange={(event) => updatePayment(payment.id, { date: event.target.value })} /></label>
                   <label className="text-sm text-slate-600">Reference / note<input className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Check number, confirmation, last 4" value={payment.ref} onChange={(event) => updatePayment(payment.id, { ref: event.target.value })} /></label>
-                  <button type="button" className="text-left text-sm text-slate-600" onClick={() => setPayments((current) => current.filter((item) => item.id !== payment.id))}>Remove payment</button>
+                  <button type="button" className="tap text-left text-sm text-slate-600" onClick={() => setPayments((current) => current.filter((item) => item.id !== payment.id))}>Remove payment</button>
                 </div>
               ))}
               <div className="flex items-end justify-between border-t border-slate-200 pt-3">

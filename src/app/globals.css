@@ -365,3 +365,16 @@ html.dark input.sig-typed,
     font-size: 8pt !important;
   }
 }
+
+/* Phone tap targets: on touch screens give small text buttons/links a ~40px hit area (no visual change on desktop). */
+@media (pointer: coarse) {
+  .tap,
+  .tap-row > a,
+  .tap-row > button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    min-width: 40px;
+  }
+}

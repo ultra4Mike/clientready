@@ -99,7 +99,7 @@ useEffect(() => {
   );
 
   const actions = (
-    <div className="flex flex-wrap items-center gap-3 text-sm font-medium sm:gap-4">
+    <div className="tap-row flex flex-wrap items-center gap-3 text-sm font-medium sm:gap-4">
       <SyncPill />
       <button type="button" onClick={() => saveTheme(theme === "dark" ? "light" : "dark")}>
         {theme === "dark" ? "Light" : "Dark"}

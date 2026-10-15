@@ -270,7 +270,7 @@ export default function DocumentsPage() {
               </p>
               <ApprovalBadge approval={readApproval(doc.data?.approval)} className="mt-1" />
             </button>
-            <div className="flex shrink-0 gap-4 border-t border-teal-500/10 pt-3 sm:border-0 sm:pt-0">
+            <div className="tap-row flex shrink-0 gap-4 border-t border-teal-500/10 pt-3 sm:border-0 sm:pt-0">
               <button type="button" onClick={() => openDocument(doc)} className="text-sm font-medium text-teal-600 transition hover:underline dark:text-teal-300">
                 Open
               </button>

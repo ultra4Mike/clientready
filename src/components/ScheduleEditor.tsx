@@ -72,14 +72,14 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
       <div data-testid="crew-chips">
         <div className="mb-1 flex flex-wrap items-center gap-2">
           <span>Crew</span>
-          <button type="button" onClick={() => { setPicked([]); setPicking(true); }} className="rounded-lg border border-teal-500 px-2 py-0.5 text-xs font-medium text-teal-600 dark:text-teal-300">+ Add crew</button>
+          <button type="button" onClick={() => { setPicked([]); setPicking(true); }} className="tap rounded-lg border border-teal-500 px-2 py-0.5 text-xs font-medium text-teal-600 dark:text-teal-300">+ Add crew</button>
         </div>
         {workerIds.length === 0 && <p className="text-xs opacity-70">No one assigned yet.</p>}
         <div className="flex flex-wrap gap-2">
           {workerIds.map((id) => (
             <span key={id} data-testid={`crew-chip-${id}`} className="inline-flex items-center gap-1 rounded-full border border-slate-400 px-2 py-0.5 text-xs">
               {names.get(id) || "Former worker"}
-              <button type="button" aria-label={`Remove ${names.get(id) || "worker"}`} onClick={() => changeWorkers(workerIds.filter((item) => item !== id))} className="leading-none opacity-70 hover:opacity-100">×</button>
+              <button type="button" aria-label={`Remove ${names.get(id) || "worker"}`} onClick={() => changeWorkers(workerIds.filter((item) => item !== id))} className="tap leading-none opacity-70 hover:opacity-100">×</button>
             </span>
           ))}
         </div>

@@ -288,7 +288,7 @@ export default function CrewPage() {
             : <span className="flex min-h-11 items-center justify-center rounded-xl border border-dashed border-teal-500/20 px-3 py-2 text-center opacity-50">No address</span>}
         </div>
         {card.client_address && <p className="mt-2 text-sm text-[var(--cr-muted)]">{card.client_address}</p>}
-        {card.client_email && <p className="text-sm"><a className="underline" href={`mailto:${card.client_email}`}>{card.client_email}</a></p>}
+        {card.client_email && <p className="text-sm"><a className="tap underline" href={`mailto:${card.client_email}`}>{card.client_email}</a></p>}
         {(card.crewNote || card.payRow?.note) && (
           <p className="mt-2 rounded-xl bg-teal-500/10 px-3 py-2 text-sm" data-testid="crew-note">📝 {card.crewNote || card.payRow?.note}</p>
         )}
@@ -409,8 +409,8 @@ export default function CrewPage() {
           </div>
           <div className="flex items-center gap-3 text-sm">
             {open && <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-200 tabular-nums" data-testid="header-timer">⏱ {fmtTimer((now) - Date.parse(open.started_at))}</span>}
-            <button type="button" onClick={switchTheme} className="rounded-lg px-2 py-1 font-medium transition hover:bg-teal-500/10">{theme === "dark" ? "Light" : "Dark"}</button>
-            <button type="button" className="rounded-lg px-2 py-1 font-medium transition hover:bg-teal-500/10" onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}>Log out</button>
+            <button type="button" onClick={switchTheme} className="tap rounded-lg px-2 py-1 font-medium transition hover:bg-teal-500/10">{theme === "dark" ? "Light" : "Dark"}</button>
+            <button type="button" className="tap rounded-lg px-2 py-1 font-medium transition hover:bg-teal-500/10" onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}>Log out</button>
           </div>
         </div>
         <nav className="mx-auto mt-3 grid max-w-2xl grid-cols-4 gap-1 rounded-xl border border-teal-500/20 bg-[var(--cr-card)] p-1 text-xs sm:text-sm" role="tablist">
