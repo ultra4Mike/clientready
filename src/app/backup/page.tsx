@@ -79,13 +79,13 @@ export default function BackupPage() {
           Restore it if this browser is cleared.
         </p>
 
-        <div className="mt-6 divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="mt-6 divide-y divide-teal-500/20 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] shadow-sm">
           <div className="space-y-3 p-5 sm:p-6">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Download</h2>
           <button
             type="button"
             onClick={downloadBackup}
-            className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400 disabled:opacity-50"
+            className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-500 disabled:opacity-50"
           >
             Download backup
           </button>
@@ -98,7 +98,7 @@ export default function BackupPage() {
             <input
               type="file"
               accept="application/json"
-              className="mt-2 block w-full rounded-lg border border-dashed border-slate-300 p-3 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-teal-500 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-slate-950"
+              className="mt-2 block w-full rounded-lg border border-dashed border-teal-500/40 p-3 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-teal-500 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-slate-950!"
               onChange={(event) => restoreBackup(event.target.files?.[0])}
             />
           </label>
