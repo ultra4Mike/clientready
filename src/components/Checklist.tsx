@@ -8,7 +8,8 @@
  *   { label: "Send your first invoice", done: false, href: "/invoice" },
  * ]} />
  */
-export type ChecklistItem = { label: string; done: boolean; href?: string };
+/** `attrs`: optional data-* hooks put on the row (no visual effect). */
+export type ChecklistItem = { label: string; done: boolean; href?: string; attrs?: Record<string, string> };
 
 export default function Checklist({ items, title = "Getting started", subtitle }: { items: ChecklistItem[]; title?: string; subtitle?: string }) {
   const done = items.filter((item) => item.done).length;
@@ -41,7 +42,7 @@ export default function Checklist({ items, title = "Getting started", subtitle }
             </>
           );
           return (
-            <li key={item.label}>
+            <li key={item.label} {...item.attrs}>
               {item.href && !item.done ? (
                 <a href={item.href} className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2.5 transition hover:bg-teal-500/10">{row}</a>
               ) : (

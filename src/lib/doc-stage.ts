@@ -54,6 +54,8 @@ export function documentStage(doc: Doc, allDocs: Doc[] = []): { stage: DocStage;
   return { stage: "invoiced", next: owed > 0.004 ? "collect-payment" : "none" };
 }
 
+/** Pipeline order (for steppers). */
+export const STAGES: DocStage[] = ["draft", "sent", "approved", "scheduled", "invoiced", "paid"];
 export const STAGE_LABEL: Record<DocStage, string> = { draft: "Draft", sent: "Sent", approved: "Approved", scheduled: "Scheduled", invoiced: "Invoiced", paid: "Paid" };
 export const NEXT_LABEL: Record<NextAction, string> = {
   send: "Send it", "await-approval": "Waiting for approval", schedule: "Schedule the job", "create-invoice": "Create the invoice",

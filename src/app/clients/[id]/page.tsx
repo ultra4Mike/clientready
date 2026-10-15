@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import PortalShare from "@/components/PortalShare";
+import Timeline from "@/components/Timeline";
 import { supabase } from "@/lib/supabase";
 import { loadAccountIntoCache } from "@/lib/account-cache";
 import { uniqueDocs } from "@/lib/change-orders";
@@ -67,20 +68,20 @@ export default function ClientRecordPage() {
               <div data-testid="client-owed" data-value={view.totals.owed.toFixed(2)}><dt className="text-[var(--cr-muted)]">Owed</dt><dd className="font-semibold">${view.totals.owed.toFixed(2)}</dd></div>
             </dl>
             <div className="mb-6"><PortalShare clientName={client.name} clientId={client.id} compact /></div>
-            {view.items.length === 0 ? (
-              <p className="text-sm text-[var(--cr-muted)]" data-testid="client-timeline-empty">No activity yet.</p>
-            ) : (
-              <ol className="space-y-2" data-testid="client-timeline">
-                {view.items.map((item) => (
-                  <li key={item.key} data-testid="timeline-item" data-type={item.type} data-date={item.date} data-status={item.status || ""} className="text-sm">
-                    {item.href ? <a href={item.href} className="font-medium underline-offset-2 hover:underline">{item.title}</a> : <span className="font-medium">{item.title}</span>}
-                    {item.status && <span className="ml-2 text-xs text-[var(--cr-muted)]">{item.status}</span>}
-                    {typeof item.amount === "number" && <span className="ml-2 tabular-nums">${item.amount.toFixed(2)}</span>}
-                    <span className="block text-xs text-[var(--cr-muted)]">{item.date ? niceYmd(item.date) : item.type === "note" ? "Notes" : ""}</span>
-                  </li>
-                ))}
-              </ol>
-            )}
+            <div data-testid="client-timeline" data-count={view.items.length}>
+              <Timeline
+                emptyText="No activity yet."
+                items={view.items.map((item) => ({
+                  date: item.date ? niceYmd(item.date) : "Notes",
+                  type: item.type,
+                  title: item.title,
+                  amount: item.amount,
+                  status: item.status,
+                  href: item.href,
+                  attrs: { "data-testid": "timeline-item", "data-type": item.type, "data-date": item.date, "data-status": item.status || "" },
+                }))}
+              />
+            </div>
           </>
         )}
       </section>

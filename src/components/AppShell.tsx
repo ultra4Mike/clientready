@@ -15,6 +15,7 @@ const mainLinks = [
 ];
 
 const moreLinks = [
+  { href: "/today", label: "Today" },
   { href: "/upcoming", label: "This week" },
   { href: "/history", label: "History" },
   { href: "/employees", label: "Employees" },
@@ -26,7 +27,7 @@ const moreLinks = [
 const ALL_LINKS = [...mainLinks, ...moreLinks];
 const byHref = (href: string) => ALL_LINKS.find((link) => link.href === href)!;
 const NAV_GROUPS = [
-  { label: "Work", links: ["/dashboard", "/calendar", "/upcoming", "/drafts"].map(byHref) },
+  { label: "Work", links: ["/dashboard", "/today", "/calendar", "/upcoming", "/drafts"].map(byHref) },
   { label: "Clients", links: ["/clients", "/history"].map(byHref) },
   { label: "Money", links: ["/documents", "/collect", "/year"].map(byHref) },
   { label: "Team", links: ["/employees"].map(byHref) },

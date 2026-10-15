@@ -10,7 +10,8 @@
  * `type`: invoice | proposal | payment | job | note | email (others get a dot).
  * `status`: free text; paid/approved/done read green, overdue/declined red, sent/scheduled teal, else neutral.
  */
-export type TimelineItem = { date: string; type: string; title: string; amount?: number; status?: string; href?: string };
+/** `attrs`: optional data-* hooks put on the row (no visual effect). */
+export type TimelineItem = { date: string; type: string; title: string; amount?: number; status?: string; href?: string; attrs?: Record<string, string> };
 
 const ICONS: Record<string, string> = { invoice: "🧾", proposal: "📝", payment: "💵", job: "🛠️", note: "🗒️", email: "✉️" };
 
@@ -42,7 +43,7 @@ export default function Timeline({ items, emptyText = "No activity yet." }: { it
           </>
         );
         return (
-          <li key={`${item.date}-${item.title}-${i}`}>
+          <li key={`${item.date}-${item.title}-${i}`} {...item.attrs}>
             {item.href ? (
               <a href={item.href} className="flex items-start gap-3 rounded-xl p-1.5 transition hover:bg-teal-500/5">{body}</a>
             ) : (
