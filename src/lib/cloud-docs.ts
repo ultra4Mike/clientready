@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { allTombstones, flushDeletes, recordDelete } from "./doc-tombstones";
 import { markSynced, markUnsynced } from "./sync-status";
 import { keepStripePayments } from "./payments";
 
@@ -21,10 +22,15 @@ export async function getUserId() {
   const { data } = await supabase.auth.getUser();
   return data.user?.id || "";
 }
+/**
+ * Deletes a document everywhere. The delete is remembered on this device first (so no merge brings it
+ * back) and queued; it is sent now if online, otherwise on the next sync.
+ */
 export async function deleteCloudDocument(id: string) {
+  recordDelete(id);
   const userId = await getUserId();
   if (!userId) return;
-  await supabase.from("documents").delete().eq("id", id).eq("user_id", userId);
+  await flushDeletes(userId);
 }
 
 /** Cloud documents for the signed-in user, or null when signed out or the fetch failed. */
@@ -37,7 +43,8 @@ export async function fetchCloudDocuments(): Promise<CloudDoc[] | null> {
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
   if (error || !data) return null;
-  return data.map((row) => ({
+  const deleted = await allTombstones(userId);
+  return data.filter((row) => !deleted.has(row.id)).map((row) => ({
     id: row.id,
     type: row.type,
     title: row.title || "",

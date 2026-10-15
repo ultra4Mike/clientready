@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { fetchCloudDocuments, type CloudDoc } from "@/lib/cloud-docs";
+import { flushDeletes } from "@/lib/doc-tombstones";
 import { DOCS_KEY, mergeDocs, OWNER_KEY, parkDocsFor, parkUnsyncedDocs, syncLocalDocs, takeParkedDocs } from "@/lib/doc-sync";
 
 const keys = [
@@ -12,6 +13,8 @@ const keys = [
   "clientready-clock-entries",
   "clientready-unsynced-ids",
   "clientready-id-remap",
+  "clientready-deleted-docs",
+  "clientready-pending-deletes",
 ];
 
 /** Wipes the business cache (sign-out). Never-uploaded documents are parked for the same account first. */
@@ -116,6 +119,9 @@ export async function loadAccountIntoCache(): Promise<boolean> {
     )
   );
 
+  // Deletes made offline go first, then nothing deleted (here or on another device) is merged back in.
+  // (fetchCloudDocuments drops tombstoned rows and mergeDocs drops tombstoned local copies.)
+  await flushDeletes(user.id);
   const cloud = await fetchCloudDocuments();
   if (!cloud) return false; // fetch failed: keep local documents untouched
 

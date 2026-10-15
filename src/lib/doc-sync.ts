@@ -1,5 +1,6 @@
 import { isUuid, saveCloudDocument, type CloudDoc } from "@/lib/cloud-docs";
 import { keepStripePayments } from "@/lib/payments";
+import { localTombstones } from "@/lib/doc-tombstones";
 
 export const OWNER_KEY = "clientready-cache-owner";
 export const DOCS_KEY = "clientready-documents";
@@ -41,7 +42,11 @@ function withNewerSchedule<T extends AnyDoc>(winner: T, local: T, cloud: T): T {
  *   data keys the cloud copy lacks (e.g. changeOrderNotes, payments) are filled from local so nothing is lost.
  * Returns the merged list plus local docs that are newer than cloud and should be pushed up.
  */
-export function mergeDocs<T extends AnyDoc>(local: T[], cloud: T[]) {
+export function mergeDocs<T extends AnyDoc>(allLocal: T[], allCloud: T[]) {
+  // A deleted document (on this or another device) never comes back, whichever copy is newer.
+  const deleted = typeof window === "undefined" ? {} : localTombstones();
+  const local = allLocal.filter((doc) => !deleted[doc.id]);
+  const cloud = allCloud.filter((doc) => !deleted[doc.id]);
   const cloudById = new Map(cloud.map((doc) => [doc.id, doc]));
   const localById = new Map<string, T>();
   for (const doc of local) localById.set(doc.id, doc);

@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { loadAccountIntoCache } from "@/lib/account-cache";
 import { currentSyncState, isSyncing, onSyncChange, pendingIds, setSyncing, type SyncState } from "@/lib/sync-status";
 
-/** Uploads documents saved while offline. Uses the normal merge (by id/updatedAt); never deletes. */
+/** Uploads documents saved while offline and sends queued deletes. Uses the normal merge (by id/updatedAt). */
 export async function flushPending() {
   if (isSyncing() || navigator.onLine === false || !pendingIds().length) return;
   const { data } = await supabase.auth.getSession();

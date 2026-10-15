@@ -4,6 +4,8 @@
  * remembers which ids still need uploading. The upload itself uses the normal account sync
  * (merge by id/updatedAt, nothing is deleted).
  */
+import { pendingDeleteIds } from "./doc-tombstones";
+
 export type SyncState = "local" | "syncing" | "synced" | "offline";
 
 const DIRTY_KEY = "clientready-unsynced-ids";
@@ -25,8 +27,9 @@ function write(ids: string[]) {
   window.dispatchEvent(new Event(EVENT));
 }
 
+/** Unsynced saves plus queued deletes (both are sent by the next sync). */
 export function pendingIds() {
-  return typeof window === "undefined" ? [] : read();
+  return typeof window === "undefined" ? [] : [...read(), ...pendingDeleteIds().map((id) => `delete:${id}`)];
 }
 
 export function markUnsynced(id: string) {
@@ -54,7 +57,7 @@ export function setSyncing(value: boolean) {
 export function currentSyncState(): SyncState {
   if (typeof navigator !== "undefined" && navigator.onLine === false) return "offline";
   if (syncing) return "syncing";
-  return read().length ? "local" : "synced";
+  return pendingIds().length ? "local" : "synced";
 }
 
 export function onSyncChange(listener: () => void) {
