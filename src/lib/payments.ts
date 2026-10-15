@@ -44,9 +44,13 @@ export function paidTotal(payments: Payment[]) {
   return round(payments.reduce((sum, payment) => sum + Math.max(num(payment.amount), 0), 0));
 }
 
-/** What is still owed. Never below 0. An invoice marked paid owes nothing. */
+/**
+ * What is still owed: total minus payments, never below 0.
+ * "Marked paid" only counts as fully paid for older invoices that have no payment amounts recorded;
+ * once payments exist, the real math wins.
+ */
 export function balanceDue(total: number, amountPaid: number, status?: unknown) {
-  if (status === "paid") return 0;
+  if (status === "paid" && amountPaid <= 0) return 0;
   return round(Math.max(total - amountPaid, 0));
 }
 

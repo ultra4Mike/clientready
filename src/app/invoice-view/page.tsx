@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { balanceDue, paidTotal, readPayments, type Payment } from "@/lib/payments";
-import { documentTotals, discountLabel } from "@/lib/discount";
+import { amountOf, documentTotals, discountLabel } from "@/lib/discount";
 
 type LineItem = {
   description: string;
@@ -100,7 +100,7 @@ export default function InvoiceViewPage() {
 
   const totals = useMemo(() => {
     const subtotal = items.reduce((sum, item) => {
-      return sum + (Number(item.qty) || 0) * (Number(item.rate) || 0);
+      return sum + amountOf(item.qty) * amountOf(item.rate);
     }, 0);
     const base = documentTotals(subtotal, taxPercent, discountType, discountValue);
     const paid = paidTotal(payments);
@@ -183,7 +183,7 @@ export default function InvoiceViewPage() {
 
           <div className="mt-8 border-t border-slate-200 pt-4">
             {items.map((item, index) => {
-              const amount = (Number(item.qty) || 0) * (Number(item.rate) || 0);
+              const amount = amountOf(item.qty) * amountOf(item.rate);
               return (
                 <div key={index} className="flex justify-between py-2 text-sm">
                   <span>
@@ -214,18 +214,16 @@ export default function InvoiceViewPage() {
               <span>Total</span>
               <span>${totals.total.toFixed(2)}</span>
             </div>
-            {payments.filter((payment) => Number(payment.amount) > 0).map((payment) => (
+            {payments.filter((payment) => amountOf(payment.amount) > 0).map((payment) => (
               <div key={payment.id} className="flex justify-between text-slate-600">
                 <span>Paid{payment.date ? ` ${payment.date}` : ""}{payment.method ? ` · ${payment.method}` : ""}{payment.ref ? ` · ${payment.ref}` : ""}</span>
-                <span>-${(Number(payment.amount) || 0).toFixed(2)}</span>
+                <span>-${amountOf(payment.amount).toFixed(2)}</span>
               </div>
             ))}
-            {(totals.paid > 0 || status === "paid") && (
-              <div className="flex justify-between text-base font-semibold">
-                <span>Balance due</span>
-                <span>${totals.balance.toFixed(2)}</span>
-              </div>
-            )}
+            <div className="mt-2 flex justify-between border-t border-slate-200 pt-2 text-xl font-bold">
+              <span>Still owed</span>
+              <span>${totals.balance.toFixed(2)}</span>
+            </div>
           </div>
 
           {notes && <p className="mt-8 text-sm text-slate-600">{notes}</p>}

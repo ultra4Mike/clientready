@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { saveCloudDocument } from "@/lib/cloud-docs";
-import { documentTotals } from "@/lib/discount";
+import { amountOf, documentTotals } from "@/lib/discount";
 import { balanceDue, paidTotal, paymentFields, paymentMethods, readPayments } from "@/lib/payments";
 
 type LineItem = {
@@ -38,7 +38,7 @@ const methods = paymentMethods;
 function invoiceTotal(doc: SavedDocument) {
   const items = doc.data?.items || [];
   const subtotal = items.reduce((sum, item) => {
-    return sum + (Number(item.qty) || 0) * (Number(item.rate) || 0);
+    return sum + amountOf(item.qty) * amountOf(item.rate);
   }, 0);
   return documentTotals(subtotal, doc.data?.taxPercent, doc.data?.discountType, doc.data?.discountValue).total;
 }

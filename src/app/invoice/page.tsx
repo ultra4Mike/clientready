@@ -7,7 +7,7 @@ import AppShell from "@/components/AppShell";
 import { getTrialState } from "@/lib/trial";
 import { saveCrewJobs } from "@/lib/crew";
 import { balanceDue, paidTotal, paymentFields, paymentMethods, readPayments, type Payment } from "@/lib/payments";
-import { documentTotals, discountLabel, normalizeDiscountType, type DiscountType } from "@/lib/discount";
+import { amountOf, documentTotals, discountLabel, normalizeDiscountType, type DiscountType } from "@/lib/discount";
 
 type LineItem = { description: string; qty: string; rate: string };
 type SavedClient = { id: string; name: string; company: string; email: string; phone: string; address: string };
@@ -250,7 +250,7 @@ export default function NewInvoicePage() {
   });
   
   const totals = useMemo(() => {
-    const subtotal = items.reduce((sum, item) => sum + (Number(item.qty) || 0) * (Number(item.rate) || 0), 0);
+    const subtotal = items.reduce((sum, item) => sum + amountOf(item.qty) * amountOf(item.rate), 0);
     const base = documentTotals(subtotal, taxPercent, discountType, discountValue);
     const paid = paidTotal(payments);
     return { ...base, paid, balance: balanceDue(base.total, paid, status) };
@@ -503,7 +503,10 @@ export default function NewInvoicePage() {
                   <button type="button" className="text-left text-sm text-slate-600" onClick={() => setPayments((current) => current.filter((item) => item.id !== payment.id))}>Remove payment</button>
                 </div>
               ))}
-              <p className="text-sm text-slate-600">Paid ${totals.paid.toFixed(2)} · Still owed ${totals.balance.toFixed(2)}</p>
+              <div className="flex items-end justify-between border-t border-slate-200 pt-3">
+                <p className="text-sm text-slate-600">Total ${totals.total.toFixed(2)} · Paid ${totals.paid.toFixed(2)}</p>
+                <p className="text-right"><span className="block text-sm text-slate-600">Still owed</span><span data-testid="still-owed" className="text-2xl font-bold">${totals.balance.toFixed(2)}</span></p>
+              </div>
             </div>
             <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
             <div className="owner-costs space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-slate-900">
@@ -612,7 +615,7 @@ export default function NewInvoicePage() {
             </div>
             <div className="mt-8 border-t border-slate-500 pt-4">
               {items.map((item, index) => {
-                const amount = (Number(item.qty) || 0) * (Number(item.rate) || 0);
+                const amount = amountOf(item.qty) * amountOf(item.rate);
                 return <div key={index} className="flex justify-between py-2 text-sm"><span>{item.description || "Item"}</span><span>${amount.toFixed(2)}</span></div>;
               })}
             </div>
@@ -621,10 +624,8 @@ export default function NewInvoicePage() {
               {totals.discount > 0 && <div className="flex justify-between"><span>{discountLabel(discountType, discountValue)}</span><span>-${totals.discount.toFixed(2)}</span></div>}
               <div className="flex justify-between"><span>Tax</span><span>${totals.tax.toFixed(2)}</span></div>
               <div className="flex justify-between text-base font-semibold"><span>Total</span><span>${totals.total.toFixed(2)}</span></div>
-              {(totals.paid > 0 || status === "paid") && <>
-                {totals.paid > 0 && <div className="flex justify-between"><span>{isProposal ? "Deposit paid" : "Paid"}</span><span>-${totals.paid.toFixed(2)}</span></div>}
-                <div className="flex justify-between text-base font-semibold"><span>Balance due</span><span>${totals.balance.toFixed(2)}</span></div>
-              </>}
+              {totals.paid > 0 && <div className="flex justify-between"><span>{isProposal ? "Deposit paid" : "Paid"}</span><span>-${totals.paid.toFixed(2)}</span></div>}
+              {(!isProposal || totals.paid > 0) && <div className="mt-2 flex justify-between border-t border-slate-500 pt-2 text-xl font-bold"><span>{isProposal ? "Balance after deposit" : "Still owed"}</span><span data-testid="preview-still-owed">${totals.balance.toFixed(2)}</span></div>}
             </div>
             <p className={`mt-8 text-sm ${mutedClass}`}>{notes}</p>
             {!isProposal && paymentLink && <p className={`mt-4 text-sm ${mutedClass}`}>Pay here: {paymentLink}</p>}

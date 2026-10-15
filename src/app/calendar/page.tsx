@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
-import { documentTotals } from "@/lib/discount";
+import { amountOf, documentTotals } from "@/lib/discount";
 
 type LineItem = {
   description?: string;
@@ -56,7 +56,7 @@ function agendaLabel(date: string) {
 function invoiceTotal(doc: SavedDocument) {
   const items = doc.data?.items || [];
   const subtotal = items.reduce((sum, item) => {
-    return sum + (Number(item.qty) || 0) * (Number(item.rate) || 0);
+    return sum + amountOf(item.qty) * amountOf(item.rate);
   }, 0);
   return documentTotals(subtotal, doc.data?.taxPercent, doc.data?.discountType, doc.data?.discountValue).total;
 }

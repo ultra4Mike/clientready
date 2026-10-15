@@ -1,5 +1,10 @@
 export type DiscountType = "percent" | "amount";
 
+/** Parse a typed amount like "550", "$550", "1,550.00". Blank or junk is 0. */
+export function amountOf(value: unknown) {
+  return num(value);
+}
+
 function num(value: unknown) {
   return Number(String(value ?? "").replace(/[^0-9.-]/g, "")) || 0;
 }
