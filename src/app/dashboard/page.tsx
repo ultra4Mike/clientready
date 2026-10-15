@@ -58,7 +58,7 @@ function monthKey(value: string) {
 
 function IconWrap({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal-500/10 text-teal-300 ring-1 ring-teal-400/30">
+    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal-500/10 text-teal-600 ring-1 dark:text-teal-300 ring-teal-400/30">
       {children}
     </span>
   );
@@ -204,43 +204,43 @@ export default function DashboardPage() {
         </a>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 shadow-sm">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5">
           <div className="flex items-start justify-between">
-            <p className="text-xs font-medium uppercase tracking-wider text-[var(--cr-muted)]">Total outstanding</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Total outstanding</p>
             <IconWrap>$</IconWrap>
           </div>
-          <p className="mt-3 text-2xl font-semibold tabular-nums tracking-tight sm:text-3xl">${stats.outstanding.toFixed(2)}</p>
+          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight sm:text-3xl">${stats.outstanding.toFixed(2)}</p>
           <p className="mt-2 text-xs text-[var(--cr-muted)]">
             {stats.outstanding === 0 ? "No outstanding invoices" : "Not marked paid"}
           </p>
         </div>
-        <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 shadow-sm">
+        <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5">
           <div className="flex items-start justify-between">
-            <p className="text-xs font-medium uppercase tracking-wider text-[var(--cr-muted)]">Paid</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Paid</p>
             <IconWrap>✓</IconWrap>
           </div>
-          <p className="mt-3 text-2xl font-semibold tabular-nums tracking-tight sm:text-3xl">${stats.paid.toFixed(2)}</p>
+          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight sm:text-3xl">${stats.paid.toFixed(2)}</p>
           <p className="mt-2 text-xs text-[var(--cr-muted)]">
             {stats.paid === 0 ? "No payments yet" : `${stats.paidRate}% marked paid`}
           </p>
         </div>
-        <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 shadow-sm">
+        <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5">
           <div className="flex items-start justify-between">
-            <p className="text-xs font-medium uppercase tracking-wider text-[var(--cr-muted)]">Overdue</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Overdue</p>
             <IconWrap>!</IconWrap>
           </div>
-          <p className="mt-3 text-2xl font-semibold tabular-nums tracking-tight sm:text-3xl">${stats.overdue.toFixed(2)}</p>
+          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight sm:text-3xl">${stats.overdue.toFixed(2)}</p>
           <p className="mt-2 text-xs text-[var(--cr-muted)]">
             {stats.overdueCount === 0 ? "No overdue invoices" : `${stats.overdueCount} overdue`}
           </p>
         </div>
-        <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 shadow-sm">
+        <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5">
           <div className="flex items-start justify-between">
-            <p className="text-xs font-medium uppercase tracking-wider text-[var(--cr-muted)]">Clients</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Clients</p>
             <IconWrap>☺</IconWrap>
           </div>
-          <p className="mt-3 text-2xl font-semibold tabular-nums tracking-tight sm:text-3xl">{clients.length}</p>
+          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight sm:text-3xl">{clients.length}</p>
           <p className="mt-2 text-xs text-[var(--cr-muted)]">
             {clients.length === 0 ? "No clients added" : "Saved clients"}
           </p>
@@ -295,17 +295,17 @@ export default function DashboardPage() {
         QUICK ACTIONS
       </h2>
       <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <a href="/invoice" className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 transition hover:-translate-y-0.5 hover:border-teal-400/50">
+        <a href="/invoice" className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md">
           <IconWrap>+</IconWrap>
           <p className="mt-4 font-semibold">New invoice</p>
           <p className="mt-1 text-sm text-[var(--cr-muted)]">Create an invoice and send it to a client.</p>
         </a>
-        <button type="button" onClick={newProposal} className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 transition hover:-translate-y-0.5 hover:border-teal-400/50 text-left">
+        <button type="button" onClick={newProposal} className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md text-left">
           <IconWrap>✎</IconWrap>
           <p className="mt-4 font-semibold">New proposal</p>
           <p className="mt-1 text-sm text-[var(--cr-muted)]">Create a proposal and share it with a prospect.</p>
         </button>
-        <a href={thirdAction.href} className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 transition hover:-translate-y-0.5 hover:border-teal-400/50">
+        <a href={thirdAction.href} className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md">
           <IconWrap>{thirdAction.icon}</IconWrap>
           <p className="mt-4 font-semibold">{thirdAction.title}</p>
           <p className="mt-1 text-sm text-[var(--cr-muted)]">{thirdAction.text}</p>
