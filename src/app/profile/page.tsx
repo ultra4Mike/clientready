@@ -138,7 +138,7 @@ export default function ProfilePage() {
     <AppShell title="Profile">
       <form
         onSubmit={handleSubmit}
-        className="mx-auto mt-2 max-w-2xl space-y-5 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:mt-6 sm:p-6"
+        className="mt-2 max-w-2xl space-y-5 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:mt-6 sm:p-6"
       >
         <h1 className="text-xl font-bold tracking-tight">Your business details</h1>
         <p className="text-sm text-[var(--cr-muted)]">
@@ -192,7 +192,7 @@ export default function ProfilePage() {
         <p className="-mt-1 text-xs text-[var(--cr-muted)]">Default is 30%. This is a cushion for taxes. It is not a tax return.</p>
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
           Logo
-          <input type="file" accept="image/*" className="mt-1.5 block w-full rounded-lg border border-dashed border-teal-500/40 p-3 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-teal-500 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-slate-950!" onChange={(event) => handleLogo(event.target.files?.[0])} />
+          <input type="file" accept="image/*" className={`mt-1.5 block w-full rounded-lg border border-dashed border-teal-500/40 p-3 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-teal-500 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-slate-950! ${profile.logo ? "text-[var(--cr-muted)]/60 text-xs" : ""}`} onChange={(event) => handleLogo(event.target.files?.[0])} />
         </label>
         {profile.logo && <img src={profile.logo} alt="Business logo" className="h-16 w-auto rounded-lg border border-teal-500/20 bg-white p-1" />}
         </div>
@@ -202,7 +202,7 @@ export default function ProfilePage() {
         {message && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-[var(--cr-muted)]">{message}</p>}
       </form>
 
-      <form onSubmit={changePassword} className="mx-auto mt-6 max-w-2xl space-y-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-6">
+      <form onSubmit={changePassword} className="mt-6 max-w-2xl space-y-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-6">
         <h2 className="text-lg font-bold tracking-tight">Login password</h2>
         <p className="text-sm text-[var(--cr-muted)]">Login email: {loginEmail || "Not signed in"}</p>
         <input type="password" className="w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Current password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
