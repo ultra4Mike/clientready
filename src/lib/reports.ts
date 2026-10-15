@@ -1,0 +1,89 @@
+import { docAmounts } from "@/lib/doc-stage";
+import { readPayments } from "@/lib/payments";
+import { isPendingRecurringDraft } from "@/lib/recurring";
+import { uniqueDocs } from "@/lib/change-orders";
+
+type Doc = { id: string; type: string; title?: string; clientName?: string; createdAt?: string; data?: Record<string, unknown> };
+type CrewExpense = { amount?: unknown; created_at?: string };
+
+export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function money(value: unknown) {
+  const n = Number(String(value ?? "").replace(/[$,]/g, ""));
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** "2026-03-05" or a saved local date like "3/5/2026" -> { year, month 0-11 }, or null. */
+export function yearMonth(value: unknown): { year: string; month: number } | null {
+  const text = String(value || "");
+  const iso = text.match(/^(\d{4})-(\d{2})/);
+  if (iso) return { year: iso[1], month: Number(iso[2]) - 1 };
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? null : { year: String(parsed.getFullYear()), month: parsed.getMonth() };
+}
+
+/** The owner's job cost, same formula as the invoice page: parts + gas + labor + tools + lunch + other fees. */
+export function ownerJobCost(data: Record<string, unknown> = {}) {
+  const costs = (data.jobCosts || {}) as Record<string, unknown>;
+  const fees = Array.isArray(costs.otherFees) ? (costs.otherFees as { amount?: unknown }[]) : [];
+  const otherTotal = fees.reduce((sum, fee) => sum + money(fee.amount), 0);
+  return money(costs.parts) + money(costs.gas) + money(costs.labor) + money(costs.tools) + money(costs.lunch) + otherTotal;
+}
+
+export type MonthRow = { month: number; billed: number; collected: number; jobCosts: number; crewReceipts: number };
+export type JobRow = { id: string; type: string; number: string; client: string; date: string; month: number; total: number; cost: number; profit: number };
+
+/**
+ * One year by month. Billed: sent invoices by invoice date. Collected: payments by the date received.
+ * Job costs: owner job costs by invoice date. Crew receipts: logged by crew (shown, not added to job
+ * costs, as on the year packet). Jobs: each billed invoice's total minus its owner job cost.
+ */
+export function buildReport(allDocs: Doc[], crewExpenses: CrewExpense[], year: string) {
+  const docs = uniqueDocs(allDocs);
+  const months: MonthRow[] = MONTHS.map((_, month) => ({ month, billed: 0, collected: 0, jobCosts: 0, crewReceipts: 0 }));
+  const jobs: JobRow[] = [];
+  for (const doc of docs) {
+    if (doc.type !== "invoice" || isPendingRecurringDraft(doc)) continue;
+    const data = doc.data || {};
+    const { total } = docAmounts(doc);
+    const payments = readPayments(data).filter((payment) => money(payment.amount) > 0);
+    for (const payment of payments) {
+      const when = yearMonth(payment.date || data.invoiceDate || doc.createdAt);
+      if (when?.year === year) months[when.month].collected += money(payment.amount);
+    }
+    if (!payments.length && data.status === "paid") {
+      // Older invoices marked paid without an amount: the whole total, as on the year packet.
+      const when = yearMonth(data.paymentDate || data.invoiceDate || doc.createdAt);
+      if (when?.year === year) months[when.month].collected += total;
+    }
+    if (String(data.status || "draft") === "draft") continue;
+    const when = yearMonth(data.invoiceDate || doc.createdAt);
+    if (when?.year !== year) continue;
+    const cost = ownerJobCost(data);
+    months[when.month].billed += total;
+    months[when.month].jobCosts += cost;
+    jobs.push({ id: doc.id, type: doc.type, number: String(data.invoiceNumber || doc.title || "Invoice"), client: doc.clientName || "No client", date: String(data.invoiceDate || doc.createdAt || ""), month: when.month, total, cost, profit: total - cost });
+  }
+  for (const item of crewExpenses) {
+    const when = yearMonth(item.created_at);
+    if (when?.year === year) months[when.month].crewReceipts += money(item.amount);
+  }
+  const sum = (key: keyof Omit<MonthRow, "month">) => months.reduce((total, row) => total + row[key], 0);
+  const totals = { billed: sum("billed"), collected: sum("collected"), jobCosts: sum("jobCosts"), crewReceipts: sum("crewReceipts"), profit: jobs.reduce((total, job) => total + job.profit, 0) };
+  jobs.sort((a, b) => a.month - b.month || a.date.localeCompare(b.date));
+  return { months, jobs, totals };
+}
+
+/** Years that have any invoice activity, newest first, always including the current year. */
+export function reportYears(docs: Doc[]) {
+  const years = new Set([String(new Date().getFullYear())]);
+  for (const doc of docs) {
+    if (doc.type !== "invoice") continue;
+    const data = doc.data || {};
+    for (const value of [data.invoiceDate, doc.createdAt, ...readPayments(data).map((payment) => payment.date)]) {
+      const when = yearMonth(value);
+      if (when && /^\d{4}$/.test(when.year)) years.add(when.year);
+    }
+  }
+  return [...years].sort().reverse();
+}

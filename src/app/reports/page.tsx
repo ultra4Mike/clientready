@@ -1,0 +1,127 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import AppShell from "@/components/AppShell";
+import PageHeader from "@/components/PageHeader";
+import { supabase } from "@/lib/supabase";
+import { buildReport, MONTHS, reportYears } from "@/lib/reports";
+
+type Doc = { id: string; type: string; title?: string; clientName?: string; createdAt?: string; data?: Record<string, unknown> };
+type CrewExpense = { amount?: unknown; created_at?: string };
+
+const usd = (value: number) => `${value < 0 ? "-" : ""}$${Math.abs(value).toFixed(2)}`;
+
+/** Owner-only (AppShell sends crew accounts to /crew). Reads the local cache; never changes anything. */
+export default function ReportsPage() {
+  const [documents, setDocuments] = useState<Doc[]>([]);
+  const [crewExpenses, setCrewExpenses] = useState<CrewExpense[]>([]);
+  const [year, setYear] = useState(String(new Date().getFullYear()));
+
+  useEffect(() => {
+    // Read after mount so the static render and the first client render match.
+    Promise.resolve().then(() => {
+      try {
+        setDocuments(JSON.parse(window.localStorage.getItem("clientready-documents") || "[]"));
+      } catch {
+        setDocuments([]);
+      }
+    });
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) return;
+      supabase.from("crew_expenses").select("amount, created_at").then(({ data: rows, error }) => {
+        if (!error && rows) setCrewExpenses(rows as CrewExpense[]);
+      });
+    });
+  }, []);
+
+  const years = useMemo(() => reportYears(documents), [documents]);
+  const report = useMemo(() => buildReport(documents, crewExpenses, year), [documents, crewExpenses, year]);
+  const cell = "px-2 py-1.5 text-right tabular-nums";
+
+  return (
+    <AppShell title="Reports">
+      <PageHeader title="Reports" subtitle="Billed, collected, costs and job profit by month." />
+      <div data-testid="reports" data-year={year} className="space-y-6">
+        <label className="flex items-center gap-2 text-sm">
+          Year
+          <select data-testid="report-year" value={year} onChange={(event) => setYear(event.target.value)} className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2 text-sm">
+            {years.map((option) => <option key={option} value={option}>{option}</option>)}
+          </select>
+        </label>
+
+        <div className="overflow-x-auto">
+          <table data-testid="report-months" className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-slate-500">
+                <th className="px-2 py-1.5 text-left">Month</th>
+                <th className={cell}>Billed</th>
+                <th className={cell}>Collected</th>
+                <th className={cell}>Job costs</th>
+                <th className={cell}>Crew receipts</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.months.map((row) => (
+                <tr key={row.month} data-testid="report-month" data-month={row.month + 1} data-billed={row.billed.toFixed(2)} data-collected={row.collected.toFixed(2)} data-job-costs={row.jobCosts.toFixed(2)} data-crew-receipts={row.crewReceipts.toFixed(2)} className="border-t border-slate-200/60">
+                  <td className="px-2 py-1.5">{MONTHS[row.month]}</td>
+                  <td className={cell}>{usd(row.billed)}</td>
+                  <td className={cell}>{usd(row.collected)}</td>
+                  <td className={cell}>{usd(row.jobCosts)}</td>
+                  <td className={cell}>{usd(row.crewReceipts)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr data-testid="report-total" data-billed={report.totals.billed.toFixed(2)} data-collected={report.totals.collected.toFixed(2)} data-job-costs={report.totals.jobCosts.toFixed(2)} data-crew-receipts={report.totals.crewReceipts.toFixed(2)} className="border-t border-slate-300 font-semibold">
+                <td className="px-2 py-1.5">Total</td>
+                <td className={cell}>{usd(report.totals.billed)}</td>
+                <td className={cell}>{usd(report.totals.collected)}</td>
+                <td className={cell}>{usd(report.totals.jobCosts)}</td>
+                <td className={cell}>{usd(report.totals.crewReceipts)}</td>
+              </tr>
+            </tfoot>
+          </table>
+          <p className="mt-1 text-xs text-slate-500">Collected counts payments by the date received. Crew receipts are shown for your records and not added to job costs.</p>
+        </div>
+
+        <div>
+          <h2 className="text-sm font-semibold">Profit by job</h2>
+          {report.jobs.length === 0 && <p data-testid="report-jobs-empty" className="mt-2 text-sm text-slate-500">No invoices sent in {year}.</p>}
+          {report.jobs.length > 0 && (
+            <div className="overflow-x-auto">
+              <table data-testid="report-jobs" data-profit={report.totals.profit.toFixed(2)} className="mt-2 w-full text-sm">
+                <thead>
+                  <tr className="text-xs text-slate-500">
+                    <th className="px-2 py-1.5 text-left">Job</th>
+                    <th className="px-2 py-1.5 text-left">Client</th>
+                    <th className={cell}>Invoice total</th>
+                    <th className={cell}>Job cost</th>
+                    <th className={cell}>Profit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.jobs.map((job) => (
+                    <tr key={job.id} data-testid="report-job" data-id={job.id} data-total={job.total.toFixed(2)} data-cost={job.cost.toFixed(2)} data-profit={job.profit.toFixed(2)} className="border-t border-slate-200/60">
+                      <td className="px-2 py-1.5"><Link href={`/invoice?id=${encodeURIComponent(job.id)}`} className="text-teal-600 hover:underline">{job.number}</Link> <span className="text-xs text-slate-500">{MONTHS[job.month]}</span></td>
+                      <td className="px-2 py-1.5">{job.client}</td>
+                      <td className={cell}>{usd(job.total)}</td>
+                      <td className={cell}>{usd(job.cost)}</td>
+                      <td className={cell}>{usd(job.profit)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-slate-300 font-semibold">
+                    <td className="px-2 py-1.5" colSpan={4}>Total profit</td>
+                    <td className={cell}>{usd(report.totals.profit)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </AppShell>
+  );
+}
