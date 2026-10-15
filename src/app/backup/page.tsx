@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import AppShell from "@/components/AppShell";
+import PageHeader from "@/components/PageHeader";
 
 function read(key: string) {
   const raw = window.localStorage.getItem(key);
@@ -70,14 +71,10 @@ export default function BackupPage() {
   }
 
   return (
-    <AppShell title="Backup">
+    <AppShell title="Backup your data">
 
       <section className="max-w-2xl py-2 sm:py-4">
-        <h1 className="text-2xl font-bold tracking-tight">Backup your data</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-600 sm:text-base">
-          Download a copy of your profile, clients, documents, and appointments.
-          Restore it if this browser is cleared.
-        </p>
+        <PageHeader title="Backup your data" subtitle="Download a copy of your profile, clients, documents, and appointments. Restore it if this browser is cleared." />
 
         <div className="mt-6 divide-y divide-teal-500/20 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] shadow-sm">
           <div className="space-y-3 p-5 sm:p-6">
