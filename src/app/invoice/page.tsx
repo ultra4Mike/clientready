@@ -667,6 +667,8 @@ export default function NewInvoicePage() {
               <button type="button" onClick={() => chooseKind("proposal")} className={`rounded-lg px-4 py-2 text-sm ${isProposal ? "bg-slate-900 text-white" : "border border-slate-300"}`}>Proposal</button>
             </div>
             <h1 className="text-xl font-semibold">{isProposal ? "Proposal details" : "Invoice details"}</h1>
+            <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Client</h2>
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Search clients by name" value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} />
             {filteredClients.length > 0 && (
               <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
@@ -684,6 +686,9 @@ export default function NewInvoicePage() {
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Client phone" value={clientPhone} onChange={(event) => setClientPhone(event.target.value)} />
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Client address" value={clientAddress} onChange={(event) => setClientAddress(event.target.value)} />
             <button type="button" onClick={saveClientFromForm} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Save as client</button>
+            </div>
+            <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Details & schedule</h2>
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder={isProposal ? "Proposal number" : "Invoice number"} value={invoiceNumber} onChange={(event) => setInvoiceNumber(event.target.value)} />
             <select className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={status} onChange={(event) => setStatus(event.target.value)}>
               <option value="draft">Draft</option>
@@ -699,6 +704,9 @@ export default function NewInvoicePage() {
               <label className="text-sm text-slate-600">Job start<input type="time" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={jobStart} onChange={(event) => setJobStart(event.target.value)} /></label>
               <label className="text-sm text-slate-600">Job end<input type="time" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={jobEnd} onChange={(event) => setJobEnd(event.target.value)} /></label>
             </div>
+            </div>
+            <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Line items & pricing</h2>
             <div className="space-y-3">
               <div className="flex items-center justify-between"><h2 className="font-medium">Line items</h2><button type="button" className="text-sm" onClick={() => setItems((current) => [...current, { ...emptyItem }])}>Add item</button></div>
               {items.map((item, index) => (
@@ -742,6 +750,9 @@ export default function NewInvoicePage() {
                 <p className="text-right"><span className="block text-sm font-medium text-slate-600">Still owed</span><span data-testid="still-owed" className="text-2xl font-bold">${totals.balance.toFixed(2)}</span></p>
               </div>
             </div>
+            </div>
+            <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Payment, photos & notes</h2>
             {!isProposal && (
               <label className="block text-sm font-medium text-slate-600">
                 Pay link for this invoice (optional)
@@ -753,7 +764,8 @@ export default function NewInvoicePage() {
             )}
             <JobPhotosEditor photos={photos} onChange={setPhotos} />
             <SignaturePad key={padKey} value={signature} onChange={setSignature} defaultName={clientName} />
-            <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
+            <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
+            </div>
             <div className="owner-costs space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-slate-900">
               <h2 className="font-medium">Your costs only</h2>
               <p className="text-sm text-slate-600">Wages fill from hours times the saved rate, plus any extra pay.</p>

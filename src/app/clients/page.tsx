@@ -227,6 +227,8 @@ export default function ClientsPage() {
             className="mb-8 max-w-xl space-y-4 rounded-2xl border border-slate-200 bg-white p-6"
           >
             <h2 className="text-lg font-semibold">{editingId ? "Edit client" : "Add a client"}</h2>
+            <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Contact & next visit</h2>
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Client name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Company" value={form.company} onChange={(event) => setForm({ ...form, company: event.target.value })} />
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
@@ -240,6 +242,7 @@ export default function ClientsPage() {
               Start time
               <input type="time" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={form.visitTime} onChange={(event) => setForm({ ...form, visitTime: event.target.value })} />
             </label>
+            </div>
             <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
             <div className="flex gap-3">
               <button type="submit" className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400 disabled:opacity-50">{editingId ? "Update client" : "Save client"}</button>

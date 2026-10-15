@@ -196,6 +196,8 @@ export default function EmployeesPage() {
         Add the email they will use to log in. That email opens the crew page, not the owner books.
       </p>
       <form onSubmit={handleSubmit} className="mt-6 grid gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 md:grid-cols-2">
+        <div className="grid gap-3 rounded-xl border border-teal-500/20 p-4 md:col-span-2 md:grid-cols-2">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-500 md:col-span-2">Person & role</h2>
         <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
         <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Email they will use to log in" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
         <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Phone" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
@@ -204,15 +206,19 @@ export default function EmployeesPage() {
           <option value="employee">Employee</option>
           <option value="contractor">Contractor</option>
         </select>
+        </div>
+        <div className="grid gap-3 rounded-xl border border-teal-500/20 p-4 md:col-span-2 md:grid-cols-2">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-500 md:col-span-2">Pay & start date</h2>
         <label className="text-sm">
           Hourly rate
-          <input className="mt-1 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" placeholder="24" value={form.rate} onChange={(event) => setForm({ ...form, rate: event.target.value })} />
+          <input className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="24" value={form.rate} onChange={(event) => setForm({ ...form, rate: event.target.value })} />
         </label>
         <label className="text-sm">
           Hire date
-          <input type="date" className="mt-1 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" value={form.hireDate} onChange={(event) => setForm({ ...form, hireDate: event.target.value })} />
+          <input type="date" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={form.hireDate} onChange={(event) => setForm({ ...form, hireDate: event.target.value })} />
         </label>
-        <button type="submit" className="rounded-lg bg-teal-400 px-4 py-2 text-sm font-medium text-slate-950 md:col-span-2">
+        </div>
+        <button type="submit" className="rounded-lg bg-teal-400 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300 md:col-span-2">
           {editingId ? "Update employee" : "Save employee"}
         </button>
         <p className="text-sm text-[var(--cr-muted)] md:col-span-2">No Social Security number, bank account, or routing number.</p>
