@@ -298,7 +298,7 @@ export default function CrewPage() {
             {(Object.keys(STATUS_LABEL) as JobStatus[]).map((key) => (
               <button key={key} type="button" aria-pressed={status === key} disabled={busy !== ""} data-testid={`status-${key}-${card.doc_id}`}
                 onClick={() => act(`status-${card.doc_id}`, () => crewSetJobStatus(card.doc_id, key), `Marked ${STATUS_LABEL[key].toLowerCase()}.`)}
-                className={`min-h-10 rounded-xl border px-2 py-2 text-xs font-semibold transition ${status === key ? `${STATUS_CLASS[key]} ring-1 ring-current` : "border-teal-500/20 hover:border-teal-400"} disabled:opacity-60`}>
+                className={`min-h-11 rounded-xl border px-2 py-2 text-sm font-semibold transition ${status === key ? `${STATUS_CLASS[key]} ring-2 ring-teal-400/60` : "border-teal-500/30 bg-[var(--cr-bg)] hover:border-teal-400 hover:bg-teal-500/10"} disabled:opacity-60`}>
                 {STATUS_LABEL[key]}
               </button>
             ))}
@@ -315,9 +315,9 @@ export default function CrewPage() {
               {running && <p className="text-xs text-[var(--cr-muted)]">Clocked in at {clockTime(running.started_at)} · {fmtHours(total)} total</p>}
             </div>
             {running ? (
-              <button type="button" disabled={busy !== ""} data-testid={`clock-out-${card.doc_id}`} onClick={() => act(`clock-${card.doc_id}`, () => crewClockOut(card.doc_id), "Clocked out.")} className="rounded-xl bg-amber-500 px-4 py-3 font-semibold text-slate-950">Clock out</button>
+              <button type="button" disabled={busy !== ""} data-testid={`clock-out-${card.doc_id}`} onClick={() => act(`clock-${card.doc_id}`, () => crewClockOut(card.doc_id), "Clocked out.")} className="rounded-xl bg-amber-500 px-4 py-3 font-semibold text-slate-950!">Clock out</button>
             ) : (
-              <button type="button" disabled={busy !== "" || Boolean(open)} data-testid={`clock-in-${card.doc_id}`} onClick={() => act(`clock-${card.doc_id}`, () => crewClockIn(card.doc_id), "Clocked in.")} className="rounded-xl bg-teal-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-40">{open ? "On another job" : "Clock in"}</button>
+              <button type="button" disabled={busy !== "" || Boolean(open)} data-testid={`clock-in-${card.doc_id}`} onClick={() => act(`clock-${card.doc_id}`, () => crewClockIn(card.doc_id), "Clocked in.")} className="rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! disabled:opacity-40">{open ? "On another job" : "Clock in"}</button>
             )}
           </div>
           {mine.length > 0 && (
@@ -342,7 +342,7 @@ export default function CrewPage() {
               </div>
               <input className={input} placeholder="Reason, e.g. forgot to clock out" value={fixing.reason} onChange={(event) => setFixing({ ...fixing, reason: event.target.value })} aria-label="Reason" />
               <div className="flex gap-2">
-                <button type="button" onClick={saveFix} className="flex-1 rounded-xl bg-teal-400 px-3 py-2.5 font-semibold text-slate-950 transition hover:bg-teal-300 sm:flex-none">Save time</button>
+                <button type="button" onClick={saveFix} className="flex-1 rounded-xl bg-teal-500 px-3 py-2.5 font-semibold text-slate-950! transition hover:bg-teal-400 sm:flex-none">Save time</button>
                 <button type="button" onClick={() => setFixing(null)} className="flex-1 rounded-xl border border-teal-500/30 px-3 py-2.5 font-medium transition hover:border-teal-400 sm:flex-none">Cancel</button>
               </div>
             </div>
@@ -366,7 +366,7 @@ export default function CrewPage() {
               {/* eslint-disable-next-line @next/next/no-img-element -- local data URL preview */}
               {spend.receipt && <img src={spend.receipt} alt="Receipt preview" className="max-h-40 rounded-lg" data-testid="receipt-preview" />}
               <div className="flex gap-2">
-                <button type="button" disabled={busy !== ""} onClick={() => saveExpense(card)} className="flex-1 rounded-xl bg-teal-400 px-3 py-2.5 font-semibold text-slate-950 transition hover:bg-teal-300 disabled:opacity-60">Save expense</button>
+                <button type="button" disabled={busy !== ""} onClick={() => saveExpense(card)} className="flex-1 rounded-xl bg-teal-500 px-3 py-2.5 font-semibold text-slate-950! transition hover:bg-teal-400 disabled:opacity-60">Save expense</button>
                 <button type="button" onClick={() => setSpendOpen("")} className="rounded-xl border border-teal-500/30 px-4 py-2.5 font-medium transition hover:border-teal-400">Cancel</button>
               </div>
             </div>
@@ -399,9 +399,9 @@ export default function CrewPage() {
   return (
     <main className="min-h-screen bg-[var(--cr-bg)] pb-24 text-[var(--cr-text)]">
       <header className="sticky top-0 z-10 border-b border-teal-500/20 bg-[var(--cr-bg)] px-4 py-3 shadow-sm print:hidden">
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-400 font-bold text-slate-950 shadow-sm">C</span>
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-500 font-bold text-slate-950! shadow-sm">C</span>
             <div>
               <p className="text-sm font-semibold leading-tight" data-testid="crew-name">{name || "Your jobs"}</p>
               <p className="text-xs text-[var(--cr-muted)]">Crew</p>
@@ -413,14 +413,14 @@ export default function CrewPage() {
             <button type="button" className="tap rounded-lg px-2 py-1 font-medium transition hover:bg-teal-500/10" onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}>Log out</button>
           </div>
         </div>
-        <nav className="mx-auto mt-3 grid max-w-2xl grid-cols-4 gap-1 rounded-xl border border-teal-500/20 bg-[var(--cr-card)] p-1 text-xs sm:text-sm" role="tablist">
+        <nav className="mx-auto mt-3 grid max-w-3xl grid-cols-4 gap-1 rounded-xl border border-teal-500/20 bg-[var(--cr-card)] p-1 text-xs sm:text-sm" role="tablist">
           {tabs.map(([key, label]) => (
-            <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)} className={`rounded-lg px-1 py-2 font-medium transition ${tab === key ? "bg-teal-400 font-semibold text-slate-950 shadow-sm" : "hover:bg-teal-500/10"}`}>{label}</button>
+            <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)} className={`rounded-lg px-1 py-2 font-medium transition ${tab === key ? "bg-teal-500 font-semibold text-slate-950! shadow-sm" : "hover:bg-teal-500/10"}`}>{label}</button>
           ))}
         </nav>
       </header>
 
-      <div className="mx-auto max-w-2xl space-y-5 px-4 pt-5">
+      <div className="mx-auto max-w-3xl space-y-5 px-4 pt-5">
         {message && <p className="rounded-xl border border-teal-500/30 px-3 py-2 text-sm" role="status" data-testid="crew-message">{message}</p>}
 
         {tab === "today" && (
@@ -488,7 +488,7 @@ export default function CrewPage() {
 
         {tab === "reports" && (
           <section className="space-y-3">
-            <button type="button" onClick={() => setReportOpen(!reportOpen)} className="w-full rounded-xl bg-teal-400 px-4 py-3 font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300">{reportOpen ? "Close" : "New job report"}</button>
+            <button type="button" onClick={() => setReportOpen(!reportOpen)} className="w-full rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">{reportOpen ? "Close" : "New job report"}</button>
             {reportOpen && (
               <form onSubmit={saveDraft} className={`${cardClass} space-y-3`}>
                 <select className={input} onChange={(event) => { const client = clients.find((item) => item.id === event.target.value); if (client) setForm({ ...form, clientName: client.name, clientPhone: client.phone || "", clientAddress: client.address || "" }); }}>
@@ -509,7 +509,7 @@ export default function CrewPage() {
                 <input className={input} placeholder="What it was" value={form.partsNote} onChange={(event) => setForm({ ...form, partsNote: event.target.value })} />
                 <textarea className={`${input} min-h-16`} placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
                 <label className="flex items-center gap-3 rounded-xl border border-teal-500/20 px-3 py-3 text-sm font-medium"><input className="h-4 w-4 accent-teal-500" type="checkbox" checked={form.finished} onChange={(event) => setForm({ ...form, finished: event.target.checked })} /> Job is finished</label>
-                <button type="submit" className="sticky bottom-3 w-full rounded-xl bg-teal-400 px-4 py-3 font-semibold text-slate-950 shadow-lg transition hover:bg-teal-300">Send job report</button>
+                <button type="submit" className="sticky bottom-3 w-full rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! shadow-lg transition hover:bg-teal-400">Send job report</button>
               </form>
             )}
             <h2 className="pt-2 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Reports you sent</h2>
