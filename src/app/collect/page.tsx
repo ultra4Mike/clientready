@@ -194,18 +194,18 @@ export default function CollectPage() {
     <AppShell title="Collect">
       <PageHeader title="Get paid" subtitle="Unpaid invoices and overdue amounts, with the next step on each one." actions={<a href="/invoice" className="rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">New invoice +</a>} />
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
-        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Unpaid invoices</p>
-          <p className="mt-2 text-2xl font-bold tabular-nums">{totals.unpaidCount}</p>
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="min-w-0 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 shadow-sm sm:p-6">
+          <p className="text-[10px] font-semibold uppercase leading-tight tracking-wide text-[var(--cr-muted)] sm:text-xs">Unpaid invoices</p>
+          <p className="mt-1 truncate text-base font-bold tabular-nums sm:mt-2 sm:text-2xl">{totals.unpaidCount}</p>
         </div>
-        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Open amount</p>
-          <p className="mt-2 text-2xl font-bold tabular-nums">${totals.openAmount.toFixed(2)}</p>
+        <div className="min-w-0 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 shadow-sm sm:p-6">
+          <p className="text-[10px] font-semibold uppercase leading-tight tracking-wide text-[var(--cr-muted)] sm:text-xs">Open amount</p>
+          <p className="mt-1 truncate text-base font-bold tabular-nums sm:mt-2 sm:text-2xl">${totals.openAmount.toFixed(2)}</p>
         </div>
-        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Overdue</p>
-          <p className="mt-2 text-2xl font-bold tabular-nums text-amber-600 dark:text-amber-300">${totals.overdueAmount.toFixed(2)}</p>
+        <div className="min-w-0 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 shadow-sm sm:p-6">
+          <p className="text-[10px] font-semibold uppercase leading-tight tracking-wide text-[var(--cr-muted)] sm:text-xs">Overdue</p>
+          <p className="mt-1 truncate text-base font-bold tabular-nums sm:mt-2 sm:text-2xl text-amber-600 dark:text-amber-300">${totals.overdueAmount.toFixed(2)}</p>
         </div>
       </div>
 
