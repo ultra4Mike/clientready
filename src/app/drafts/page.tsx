@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
+import PageHeader from "@/components/PageHeader";
 import { supabase } from "@/lib/supabase";
 
 type Draft = {
@@ -46,8 +47,8 @@ export default function DraftsPage() {
 
   return (
     <AppShell title="Crew drafts">
-      <p className="text-sm leading-6 text-[var(--cr-muted)] sm:text-base">Jobs the crew sent in. Open one, set the price, and save the invoice.</p>
-      <div className="mt-6 space-y-3">
+      <PageHeader title="Crew drafts" subtitle="Jobs the crew sent in. Open one, set the price, and save the invoice." />
+      <div className="space-y-3">
         {drafts.length === 0 && <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-teal-500/30 bg-[var(--cr-card)] px-6 py-12 text-center"><span className="flex h-12 w-12 items-center justify-center rounded-full bg-teal-500/15 text-xl">🧰</span><p className="text-base font-semibold">No crew jobs yet.</p><p className="max-w-sm text-sm text-[var(--cr-muted)]">When your crew sends a job report from their phone, it shows up here ready to price.</p></div>}
         {drafts.map((draft) => (
           <div key={draft.id} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
