@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
+import PageHeader from "@/components/PageHeader";
 
 type Client = {
   id: string;
@@ -199,26 +200,24 @@ export default function ClientsPage() {
   return (
     <AppShell title="Clients">
       <section className="py-2 sm:py-4">
-        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Client list</h1>
-            <p className="mt-1 text-sm text-slate-600">{clients.length} saved</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setShowForm((open) => !open);
-              setEditingId("");
-              setForm(emptyClient);
-            }}
-            className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50"
-          >
-            {showForm ? "Hide form" : "Add new client"}
-          </button>
-        </div>
+        <PageHeader
+          title="Client list"
+          subtitle={`${clients.length} saved`}
+          actions={<button
+              type="button"
+              onClick={() => {
+                setShowForm((open) => !open);
+                setEditingId("");
+                setForm(emptyClient);
+              }}
+              className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50"
+            >
+              {showForm ? "Hide form" : "Add new client"}
+            </button>}
+        />
 
         <input
-          className="mb-6 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
+          className="mb-6 w-full rounded-xl border border-teal-500/30 bg-[var(--cr-card)] px-4 py-3 shadow-sm text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
           placeholder="Search name, company, email, or phone"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
@@ -227,11 +226,11 @@ export default function ClientsPage() {
         {showForm && (
           <form
             onSubmit={handleSubmit}
-            className="mb-8 max-w-xl space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"
+            className="mb-8 max-w-2xl space-y-4 rounded-2xl border border-teal-500/30 bg-white p-4 shadow-md sm:p-6"
           >
             <h2 className="text-lg font-bold tracking-tight">{editingId ? "Edit client" : "Add a client"}</h2>
-            <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Contact & next visit</h2>
+            <div className="grid gap-3 rounded-xl border border-slate-200 p-4 sm:grid-cols-2 sm:p-5">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600 sm:col-span-2">Contact & next visit</h2>
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Client name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Company" value={form.company} onChange={(event) => setForm({ ...form, company: event.target.value })} />
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
@@ -256,21 +255,33 @@ export default function ClientsPage() {
 
         {message && <p className="mb-4 rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-slate-600">{message}</p>}
 
-        <div className="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {clients.length === 0 && <p className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-600 md:col-span-2 xl:col-span-3">No saved clients yet.</p>}
-          {clients.length > 0 && visible.length === 0 && <p className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-600 md:col-span-2 xl:col-span-3">No clients match that search.</p>}
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="hidden gap-4 border-b border-slate-200 bg-teal-500/5 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600 md:grid md:grid-cols-[minmax(0,1.6fr)_minmax(0,1.6fr)_9rem_minmax(0,1.2fr)_10rem]">
+            <span>Client</span><span>Contact</span><span>Next visit</span><span>Notes</span><span className="text-right">Actions</span>
+          </div>
+          {clients.length === 0 && <p className="p-10 text-center text-sm text-slate-600">No saved clients yet.</p>}
+          {clients.length > 0 && visible.length === 0 && <p className="p-10 text-center text-sm text-slate-600">No clients match that search.</p>}
           {visible.map((client) => (
-            <div key={client.id} className="flex h-full flex-col gap-0.5 rounded-2xl border border-slate-200 bg-white p-5 pb-4 shadow-sm transition hover:border-teal-500/60">
-              <p className="text-base font-semibold">{client.name}</p>
-              <p className="text-sm text-slate-600">{client.company}</p>
-              <p className="text-sm text-slate-600">{client.email}</p>
-              {client.phone && <p className="text-sm text-slate-600">{client.phone}</p>}
-              {client.nextVisit && <p className="mt-2 text-sm font-medium">Next visit: {client.nextVisit}</p>}
-              {client.visitTime && <p className="text-sm text-slate-600">Time: {client.visitTime}</p>}
-              {client.notes && <p className="mt-1 text-sm text-slate-600">{client.notes}</p>}
-              <div className="mt-auto flex gap-2 border-t border-slate-200 pt-3">
-                <button type="button" onClick={() => editClient(client)} className="mt-3 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium transition hover:border-teal-500">Edit</button>
-                <button type="button" onClick={() => removeClient(client.id)} className="mt-3 rounded-lg px-4 py-2 text-sm text-slate-500 transition hover:bg-red-500/10 hover:text-red-600">Remove</button>
+            <div key={client.id} className="grid gap-3 border-b border-slate-200 px-4 py-4 transition last:border-b-0 hover:bg-teal-500/5 md:items-center md:gap-4 md:px-5 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1.6fr)_9rem_minmax(0,1.2fr)_10rem]">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-500/15 text-sm font-bold uppercase text-teal-700 dark:text-teal-300">{client.name.slice(0, 1)}</span>
+                <div className="min-w-0">
+                  <p className="truncate font-semibold">{client.name}</p>
+                  {client.company && <p className="truncate text-sm text-slate-600">{client.company}</p>}
+                </div>
+              </div>
+              <div className="min-w-0 text-sm text-slate-600">
+                <p className="truncate">{client.email}</p>
+                {client.phone && <p className="truncate">{client.phone}</p>}
+              </div>
+              <div className="text-sm">
+                {client.nextVisit ? <p className="font-medium"><span className="md:hidden">Next visit: </span>{client.nextVisit}</p> : <p className="hidden text-slate-500 md:block">—</p>}
+                {client.visitTime && <p className="text-slate-600">{client.visitTime}</p>}
+              </div>
+              <p className="line-clamp-2 text-sm text-slate-600">{client.notes}</p>
+              <div className="flex gap-2 md:justify-end">
+                <button type="button" onClick={() => editClient(client)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium transition hover:border-teal-500">Edit</button>
+                <button type="button" onClick={() => removeClient(client.id)} className="rounded-lg px-3 py-2 text-sm text-slate-500 transition hover:bg-red-500/10 hover:text-red-600">Remove</button>
               </div>
             </div>
           ))}
