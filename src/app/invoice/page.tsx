@@ -663,17 +663,17 @@ export default function NewInvoicePage() {
           )}
           <fieldset disabled={locked} className="min-w-0 space-y-4">
             <div className="flex gap-2">
-              <button type="button" onClick={() => chooseKind("invoice")} className={`rounded-lg px-4 py-2 text-sm ${!isProposal ? "bg-slate-900 text-white" : "border border-slate-300"}`}>Invoice</button>
-              <button type="button" onClick={() => chooseKind("proposal")} className={`rounded-lg px-4 py-2 text-sm ${isProposal ? "bg-slate-900 text-white" : "border border-slate-300"}`}>Proposal</button>
+              <button type="button" onClick={() => chooseKind("invoice")} className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${!isProposal ? "bg-teal-500 text-slate-950 shadow-sm" : "border border-slate-300 hover:border-teal-500"}`}>Invoice</button>
+              <button type="button" onClick={() => chooseKind("proposal")} className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${isProposal ? "bg-teal-500 text-slate-950 shadow-sm" : "border border-slate-300 hover:border-teal-500"}`}>Proposal</button>
             </div>
-            <h1 className="text-xl font-semibold">{isProposal ? "Proposal details" : "Invoice details"}</h1>
+            <h1 className="text-xl font-bold tracking-tight">{isProposal ? "Proposal details" : "Invoice details"}</h1>
             <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Client</h2>
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Search clients by name" value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} />
             {filteredClients.length > 0 && (
               <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
                 {filteredClients.map((client) => (
-                  <button key={client.id} type="button" onClick={() => chooseClient(client)} className="block w-full border-b border-slate-100 px-3 py-2 text-left">
+                  <button key={client.id} type="button" onClick={() => chooseClient(client)} className="block w-full border-b border-slate-100 px-3 py-2.5 text-left transition last:border-0 hover:bg-teal-500/10">
                     <span className="block font-medium">{client.name}</span>
                     <span className="block text-sm text-slate-500">{client.company || client.email}</span>
                   </button>
@@ -725,8 +725,8 @@ export default function NewInvoicePage() {
             <div className="space-y-2">
               <p className="text-sm text-slate-600">Discount (taken off before tax)</p>
               <div className="flex gap-2">
-                <button type="button" onClick={() => setDiscountType("percent")} className={`rounded-lg px-4 py-2 text-sm ${discountType === "percent" ? "bg-slate-900 text-white" : "border border-slate-300"}`}>%</button>
-                <button type="button" onClick={() => setDiscountType("amount")} className={`rounded-lg px-4 py-2 text-sm ${discountType === "amount" ? "bg-slate-900 text-white" : "border border-slate-300"}`}>$</button>
+                <button type="button" onClick={() => setDiscountType("percent")} className={`rounded-lg px-4 py-2 text-sm font-medium transition ${discountType === "percent" ? "bg-teal-500 font-semibold text-slate-950" : "border border-slate-300 hover:border-teal-500"}`}>%</button>
+                <button type="button" onClick={() => setDiscountType("amount")} className={`rounded-lg px-4 py-2 text-sm font-medium transition ${discountType === "amount" ? "bg-teal-500 font-semibold text-slate-950" : "border border-slate-300 hover:border-teal-500"}`}>$</button>
                 <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" inputMode="decimal" placeholder={discountType === "percent" ? "Discount percent, e.g. 10" : "Discount amount, e.g. 50"} value={discountValue} onChange={(event) => setDiscountValue(event.target.value)} />
               </div>
             </div>
@@ -766,7 +766,7 @@ export default function NewInvoicePage() {
             <SignaturePad key={padKey} value={signature} onChange={setSignature} defaultName={clientName} />
             <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
             </div>
-            <div className="owner-costs space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-slate-900">
+            <div className="owner-costs space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-slate-900 sm:p-5">
               <h2 className="font-medium">Your costs only</h2>
               <p className="text-sm text-slate-600">Wages fill from hours times the saved rate, plus any extra pay.</p>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -779,14 +779,14 @@ export default function NewInvoicePage() {
                     <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Minutes" value={costs.driveMinutes} onChange={(event) => setCosts({ ...costs, driveMinutes: event.target.value })} />
                   </div>
                 </label>
-                <label className="text-sm">Labor / wages<input className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2" value={costs.labor} readOnly={crew.length > 0} onChange={(event) => setCosts({ ...costs, labor: event.target.value })} /></label>
+                <label className="text-sm">Labor / wages<input className="mt-1.5 w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2.5 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={costs.labor} readOnly={crew.length > 0} onChange={(event) => setCosts({ ...costs, labor: event.target.value })} /></label>
                 <label className="text-sm">Job supplies<input className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Bags, blades, gloves" value={costs.tools} onChange={(event) => setCosts({ ...costs, tools: event.target.value })} /></label>
                 <label className="text-sm">Lunch / meals cost<input className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={costs.lunch} onChange={(event) => setCosts({ ...costs, lunch: event.target.value })} /></label>
               </div>
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
                   <p className="text-sm font-medium">Other fees</p>
-                  <button type="button" className="rounded-lg bg-teal-400 px-3 py-1 text-sm font-medium text-slate-950" onClick={() => setOtherFees((current) => [...current, { id: Date.now().toString(), name: "", amount: "" }])}>Add fee</button>
+                  <button type="button" className="rounded-lg bg-teal-400 px-3 py-1.5 text-sm font-semibold text-slate-950 transition hover:bg-teal-300" onClick={() => setOtherFees((current) => [...current, { id: Date.now().toString(), name: "", amount: "" }])}>Add fee</button>
                 </div>
                 {otherFees.map((fee) => (
                   <div key={fee.id} className="grid gap-2 sm:grid-cols-[1fr_8rem_auto]">
@@ -799,7 +799,7 @@ export default function NewInvoicePage() {
               <div className="rounded-lg border border-amber-200 bg-white p-3 text-slate-900">
                 <p className="text-sm font-medium text-slate-900">Crew on this job ({crew.length})</p>
                 <div className="mt-2 flex gap-2">
-                  <select className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" value={pickedEmployee} onChange={(event) => setPickedEmployee(event.target.value)}>
+                  <select className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={pickedEmployee} onChange={(event) => setPickedEmployee(event.target.value)}>
                     <option value="">Add an employee</option>
                     {employees.filter((person) => person.active !== false).map((person) => (
                       <option key={person.id} value={person.id}>{person.name} · ${Number(person.rate || 0).toFixed(2)}/hr</option>
@@ -833,9 +833,9 @@ export default function NewInvoicePage() {
                           ))}
                           {clockFix && mine.some((entry) => entry.id === clockFix.id) && (
                             <div className="mt-2 flex flex-wrap items-end gap-2">
-                              <label>Start<input type="datetime-local" className="ml-1 rounded border border-slate-300 px-1" value={clockFix.start} onChange={(event) => setClockFix({ ...clockFix, start: event.target.value })} /></label>
-                              <label>End<input aria-label="Clock end" type="datetime-local" className="ml-1 rounded border border-slate-300 px-1" value={clockFix.end} onChange={(event) => setClockFix({ ...clockFix, end: event.target.value })} /></label>
-                              <button type="button" onClick={saveClockFix} className="rounded bg-slate-900 px-2 py-1 text-white">Save time</button>
+                              <label>Start<input type="datetime-local" className="ml-1 rounded-md border border-slate-300 px-1.5 py-0.5" value={clockFix.start} onChange={(event) => setClockFix({ ...clockFix, start: event.target.value })} /></label>
+                              <label>End<input aria-label="Clock end" type="datetime-local" className="ml-1 rounded-md border border-slate-300 px-1.5 py-0.5" value={clockFix.end} onChange={(event) => setClockFix({ ...clockFix, end: event.target.value })} /></label>
+                              <button type="button" onClick={saveClockFix} className="rounded-md bg-teal-500 px-3 py-1.5 text-sm font-semibold text-slate-950 transition hover:bg-teal-400">Save time</button>
                               <button type="button" onClick={() => setClockFix(null)} className="underline">Cancel</button>
                             </div>
                           )}
@@ -847,7 +847,7 @@ export default function NewInvoicePage() {
                   </div>
                 ))}
               </div>
-              <label className="block text-sm">Cost notes<textarea className="mt-1 min-h-16 w-full rounded-lg border border-slate-300 px-3 py-2" value={costs.notes} onChange={(event) => setCosts({ ...costs, notes: event.target.value })} /></label>
+              <label className="block text-sm">Cost notes<textarea className="mt-1.5 min-h-16 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={costs.notes} onChange={(event) => setCosts({ ...costs, notes: event.target.value })} /></label>
               <div className="space-y-1 text-sm">
                 <p>Job cost: ${jobMath.jobCost.toFixed(2)}</p>
                 {(costs.driveHours || costs.driveMinutes) && <p>Drive time: {costs.driveHours || "0"} hrs {costs.driveMinutes || "0"} min, not added to job cost</p>}
@@ -858,7 +858,7 @@ export default function NewInvoicePage() {
                 <CrewSpend docId={docId} />
               </div>
             </div>
-            <div className="print-hide space-y-2 rounded-lg border border-slate-300 p-3 text-sm" data-testid="schedule-section">
+            <div className="print-hide space-y-3 rounded-xl border border-slate-200 p-4 text-sm sm:p-5" data-testid="schedule-section">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-semibold">Schedule</p>
                 {schedule && <span className="text-xs" data-testid="schedule-summary">{schedule.date}{schedule.startTime ? ` ${schedule.startTime}` : ""}{schedule.endTime ? `–${schedule.endTime}` : ""} · {STATUS_LABEL[schedule.status]}</span>}
@@ -869,11 +869,11 @@ export default function NewInvoicePage() {
             </div>
             {docId && !locked && <ApprovalShare docId={docId} approval={approval} onChange={setApproval} />}
             {!isProposal && docId && (
-              <div className="space-y-2 rounded-lg border border-slate-300 p-3 text-sm" data-testid="recurring-section">
+              <div className="space-y-3 rounded-xl border border-slate-200 p-4 text-sm sm:p-5" data-testid="recurring-section">
                 <p className="font-semibold">Recurring</p>
                 <div className="flex flex-wrap items-end gap-3">
                   <label className="flex flex-col gap-1">Repeat
-                    <select aria-label="Repeat" value={recFreq} onChange={(event) => { const value = event.target.value as Frequency | "off"; setRecFreq(value); if (value !== "off" && !recNext) setRecNext(ymd(new Date())); }} className="rounded border border-slate-300 px-2 py-1">
+                    <select aria-label="Repeat" value={recFreq} onChange={(event) => { const value = event.target.value as Frequency | "off"; setRecFreq(value); if (value !== "off" && !recNext) setRecNext(ymd(new Date())); }} className="rounded-md border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30">
                       <option value="off">Off</option>
                       <option value="weekly">Weekly</option>
                       <option value="monthly">Monthly</option>
@@ -882,12 +882,12 @@ export default function NewInvoicePage() {
                   </label>
                   {recFreq === "days" && (
                     <label className="flex flex-col gap-1">Days
-                      <input aria-label="Interval days" type="number" min="1" value={recInterval} onChange={(event) => setRecInterval(event.target.value)} className="w-20 rounded border border-slate-300 px-2 py-1" />
+                      <input aria-label="Interval days" type="number" min="1" value={recInterval} onChange={(event) => setRecInterval(event.target.value)} className="w-20 rounded-md border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" />
                     </label>
                   )}
                   {recFreq !== "off" && (
                     <label className="flex flex-col gap-1">Next run
-                      <input aria-label="Next run date" type="date" value={recNext} onChange={(event) => setRecNext(event.target.value)} className="rounded border border-slate-300 px-2 py-1" />
+                      <input aria-label="Next run date" type="date" value={recNext} onChange={(event) => setRecNext(event.target.value)} className="rounded-md border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" />
                     </label>
                   )}
                   {recFreq !== "off" && !locked && <button type="button" onClick={generateRecurringNow} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium transition hover:border-teal-500">Generate next invoice now</button>}
@@ -895,8 +895,8 @@ export default function NewInvoicePage() {
                 <p className="text-xs text-slate-500">Drafts are made when the app opens on or after the next run date. They are never sent or marked paid. Save the document to keep schedule changes.</p>
               </div>
             )}
-            <div className="print-hide sticky bottom-0 z-10 -mx-4 flex flex-wrap gap-3 border-t border-slate-200 bg-[var(--cr-card)] px-4 py-3 sm:-mx-6 sm:px-6">
-              {!locked && <button type="button" onClick={saveDocument} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Save document</button>}
+            <div className="print-hide sticky bottom-0 z-10 -mx-4 grid grid-cols-2 gap-2 border-t border-slate-200 bg-[var(--cr-card)] px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:-mx-6 sm:flex sm:flex-wrap sm:gap-3 sm:px-6">
+              {!locked && <button type="button" onClick={saveDocument} className="col-span-2 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Save document</button>}
               {isProposal && !locked && (
                 <button type="button" onClick={createInvoiceFromProposal} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Create invoice</button>
               )}
@@ -905,11 +905,11 @@ export default function NewInvoicePage() {
               )}
               {!locked && <button type="button" onClick={clearForm} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Clear form</button>}
             </div>
-            {saveMessage && <p className="text-sm text-slate-600">{saveMessage}</p>}
+            {saveMessage && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-slate-600">{saveMessage}</p>}
           </fieldset>
         </form>
         <div>
-          <div className="print-hide mb-4 flex flex-wrap gap-3">
+          <div className="print-hide mb-4 flex flex-wrap gap-2 sm:gap-3">
             <button type="button" onClick={() => window.print()} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Print / Save PDF</button>
             {!locked && !isProposal && status !== "paid" && <button type="button" onClick={copyPayLink} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">{paymentLink.trim() ? "Pay / Copy pay link" : "Add how to pay"}</button>}
           </div>
