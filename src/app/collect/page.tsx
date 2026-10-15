@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
+import PageHeader from "@/components/PageHeader";
 import { saveCloudDocument } from "@/lib/cloud-docs";
 import { amountOf, documentTotals } from "@/lib/discount";
 import { balanceDue, isOpenBalance, paidTotal, paymentFields, paymentMethods, readPayments } from "@/lib/payments";
@@ -191,9 +192,9 @@ export default function CollectPage() {
 
   return (
     <AppShell title="Collect">
-      <p className="text-sm text-[var(--cr-muted)] sm:text-base">Unpaid invoices and overdue amounts.</p>
+      <PageHeader title="Get paid" subtitle="Unpaid invoices and overdue amounts, with the next step on each one." actions={<a href="/invoice" className="rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">New invoice +</a>} />
 
-      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
         <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Unpaid invoices</p>
           <p className="mt-2 text-2xl font-bold tabular-nums">{totals.unpaidCount}</p>
