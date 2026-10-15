@@ -77,9 +77,9 @@ export default function ClientRecordPage() {
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex min-w-0 items-center gap-4">
                   <span aria-hidden="true" className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-teal-500/15 text-xl font-bold text-teal-700 dark:text-teal-300">{(client.name || "?").trim().charAt(0).toUpperCase()}</span>
-                  <div className="min-w-0">
+                  <div className="min-w-0 [&>[data-page-header]]:mb-1 [&>[data-page-header]]:border-0 [&>[data-page-header]]:pb-0 [&_h2]:break-words">
                     <PageHeader title={client.name} subtitle={[client.company, client.email, client.phone].filter(Boolean).join(" · ")} />
-                    {client.address && <p className="-mt-4 text-sm text-[var(--cr-muted)]" data-testid="client-address">{client.address}</p>}
+                    {client.address && <p className="text-sm text-[var(--cr-muted)]" data-testid="client-address">{client.address}</p>}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0 sm:flex-wrap sm:justify-end">
