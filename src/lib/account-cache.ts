@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
-import { loadCloudDocuments } from "@/lib/cloud-docs";
+import { fetchCloudDocuments, type CloudDoc } from "@/lib/cloud-docs";
+import { DOCS_KEY, mergeDocs, OWNER_KEY, parkDocsFor, parkUnsyncedDocs, syncLocalDocs, takeParkedDocs } from "@/lib/doc-sync";
 
 const keys = [
   "clientready-profile",
@@ -10,22 +11,45 @@ const keys = [
   "clientready-new-type",
 ];
 
+/** Wipes the business cache (sign-out). Never-uploaded documents are parked for the same account first. */
 export function clearLocalBusiness() {
+  parkUnsyncedDocs();
   keys.forEach((key) => window.localStorage.removeItem(key));
+  window.localStorage.removeItem(OWNER_KEY);
 }
 
-export async function loadAccountIntoCache() {
-  clearLocalBusiness();
-  const { data } = await supabase.auth.getUser();
-  const user = data.user;
-  if (!user) return;
+function readLocalDocs(): CloudDoc[] {
+  try {
+    const raw = window.localStorage.getItem(DOCS_KEY);
+    return raw ? (JSON.parse(raw) as CloudDoc[]) : [];
+  } catch {
+    return [];
+  }
+}
 
-  const { data: profile } = await supabase
+/**
+ * Refreshes the local cache from Supabase without ever deleting local work:
+ * - Signed out, or any fetch fails: local data is left exactly as it is.
+ * - Same account (or a cache with no owner yet): cloud and local documents are merged by id
+ *   (newer updatedAt wins) and local-only/newer documents are uploaded.
+ * - A different account signs in: the previous account's never-uploaded documents are parked
+ *   under that account, and this account starts from its own cloud data only.
+ */
+export async function loadAccountIntoCache() {
+  const { data, error: userError } = await supabase.auth.getUser();
+  const user = data.user;
+  if (userError || !user) return;
+  const owner = window.localStorage.getItem(OWNER_KEY);
+  const switching = Boolean(owner && owner !== user.id);
+
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", user.id)
     .maybeSingle();
 
+  if (profileError) return;
+  if (switching) window.localStorage.removeItem("clientready-profile");
   if (profile) {
     window.localStorage.setItem(
       "clientready-profile",
@@ -45,15 +69,15 @@ export async function loadAccountIntoCache() {
     );
   }
 
-  const { data: clients } = await supabase
+  const { data: clients, error: clientsError } = await supabase
     .from("clients")
     .select("*")
     .eq("user_id", user.id);
 
-  window.localStorage.setItem(
+  if (!clientsError && clients) window.localStorage.setItem(
     "clientready-clients",
     JSON.stringify(
-      (clients || []).map((row) => ({
+      clients.map((row) => ({
         id: row.id,
         name: row.name || "",
         company: row.company || "",
@@ -67,15 +91,15 @@ export async function loadAccountIntoCache() {
     )
   );
 
-const { data: people } = await supabase
+  const { data: people, error: peopleError } = await supabase
     .from("employees")
     .select("*")
     .eq("user_id", user.id);
 
-  window.localStorage.setItem(
+  if (!peopleError && people) window.localStorage.setItem(
     "clientready-employees",
     JSON.stringify(
-      (people || []).map((row) => ({
+      people.map((row) => ({
         id: row.id,
         name: row.name || "",
         phone: row.phone || "",
@@ -89,6 +113,19 @@ const { data: people } = await supabase
     )
   );
 
-  const docs = await loadCloudDocuments();
-  window.localStorage.setItem("clientready-documents", JSON.stringify(docs || []));
+  const cloud = await fetchCloudDocuments();
+  if (!cloud) return; // fetch failed: keep local documents untouched
+
+  let local = readLocalDocs();
+  if (switching && owner) {
+    parkDocsFor(owner, local);
+    local = [];
+    window.localStorage.removeItem("clientready-open-document");
+  }
+  local = [...local, ...takeParkedDocs(user.id)];
+  const { merged, pushUp } = mergeDocs(local, cloud);
+  window.localStorage.setItem(DOCS_KEY, JSON.stringify(merged));
+  window.localStorage.setItem(OWNER_KEY, user.id);
+  const synced = await syncLocalDocs(merged, pushUp);
+  window.localStorage.setItem(DOCS_KEY, JSON.stringify(synced));
 }

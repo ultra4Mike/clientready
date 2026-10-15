@@ -9,7 +9,7 @@ export type CloudDoc = {
   data: Record<string, unknown>;
 };
 
-function isUuid(id: string) {
+export function isUuid(id: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
     id
   );
@@ -25,15 +25,16 @@ export async function deleteCloudDocument(id: string) {
   await supabase.from("documents").delete().eq("id", id).eq("user_id", userId);
 }
 
-export async function loadCloudDocuments() {
+/** Cloud documents for the signed-in user, or null when signed out or the fetch failed. */
+export async function fetchCloudDocuments(): Promise<CloudDoc[] | null> {
   const userId = await getUserId();
-  if (!userId) return [];
+  if (!userId) return null;
   const { data, error } = await supabase
     .from("documents")
     .select("*")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
-  if (error || !data) return [];
+  if (error || !data) return null;
   return data.map((row) => ({
     id: row.id,
     type: row.type,
@@ -46,7 +47,16 @@ export async function loadCloudDocuments() {
   })) as CloudDoc[];
 }
 
+/** Older callers: [] when signed out or on error. */
+export async function loadCloudDocuments() {
+  return (await fetchCloudDocuments()) || [];
+}
+
 export async function saveCloudDocument(doc: CloudDoc) {
+  // Every save records when it happened, so cloud/local merges can keep the newer copy.
+  // (Mutates doc.data so callers that store the same object locally keep the same stamp.)
+  doc.data = doc.data || {};
+  doc.data.updatedAt = new Date().toISOString();
   const userId = await getUserId();
   if (!userId) return doc.id;
 

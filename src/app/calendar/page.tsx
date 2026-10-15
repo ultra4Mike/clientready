@@ -135,6 +135,8 @@ export default function CalendarPage() {
         data: {
           ...(doc.data || {}),
           jobTime,
+          // Stamped so the next account sync keeps this edit and uploads it.
+          updatedAt: new Date().toISOString(),
         },
       };
     });

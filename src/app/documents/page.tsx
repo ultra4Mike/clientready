@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { loadCloudDocuments, deleteCloudDocument } from "@/lib/cloud-docs";
+import { fetchCloudDocuments, deleteCloudDocument, getUserId } from "@/lib/cloud-docs";
+import { mergeDocs, OWNER_KEY } from "@/lib/doc-sync";
 import AppShell from "@/components/AppShell";
 
 type SavedDocument = {
@@ -34,14 +35,14 @@ export default function DocumentsPage() {
       const local = raw ? JSON.parse(raw) : [];
       if (local.length) setDocuments(local);
 
-      const cloud = await loadCloudDocuments();
-      if (!cloud.length) return;
+      const cloud = await fetchCloudDocuments();
+      if (!cloud) return; // signed out or fetch failed: keep local as is
+      // Cache belongs to another account: the dashboard sync handles switching, so don't mix them here.
+      const owner = window.localStorage.getItem(OWNER_KEY);
+      if (owner && owner !== (await getUserId())) return;
 
-      const byId = new Map();
-      [...local, ...cloud].forEach((doc: { id: string }) => {
-        byId.set(doc.id, doc);
-      });
-      const merged = Array.from(byId.values());
+      // Same merge as the dashboard: keep local-only docs, newer copy wins for docs in both.
+      const { merged } = mergeDocs<SavedDocument>(local, cloud as SavedDocument[]);
       setDocuments(merged);
       window.localStorage.setItem("clientready-documents", JSON.stringify(merged));
     }

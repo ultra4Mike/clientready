@@ -86,7 +86,7 @@ export default function CollectPage() {
   }
 
   async function saveCloud(doc: SavedDocument) {
-    await saveCloudDocument({
+    const cloudId = await saveCloudDocument({
       id: doc.id,
       type: doc.type,
       title: doc.title,
@@ -94,12 +94,18 @@ export default function CollectPage() {
       createdAt: doc.createdAt,
       data: doc.data || {},
     });
+    // A never-uploaded doc gets a cloud id on first save; use it so later saves update, not duplicate.
+    if (cloudId !== doc.id) {
+      const raw = window.localStorage.getItem("clientready-documents");
+      const list = (raw ? JSON.parse(raw) : []) as SavedDocument[];
+      saveDocs(list.map((item) => (item.id === doc.id ? { ...item, id: cloudId } : item)));
+    }
   }
 
   async function setStatus(id: string, status: string) {
     const next = documents.map((doc) => {
       if (doc.id !== id) return doc;
-      return { ...doc, data: { ...(doc.data || {}), status } };
+      return { ...doc, data: { ...(doc.data || {}), status, updatedAt: new Date().toISOString() } };
     });
     saveDocs(next);
     const updated = next.find((doc) => doc.id === id);
@@ -125,6 +131,7 @@ export default function CollectPage() {
           ...(item.data || {}),
           ...paymentFields(payments),
           status: stillOwed <= 0 ? "paid" : item.data?.status === "draft" || !item.data?.status ? "sent" : item.data.status,
+          updatedAt: new Date().toISOString(),
         },
       };
     });
