@@ -49,7 +49,7 @@ export function StageEditor({ stages, onChange, total, balance }: { stages: Stag
     <div className="space-y-2 rounded-xl border border-slate-200 p-4" data-testid="stage-editor">
       <div className="flex items-center justify-between">
         <h2 className="font-medium">Payment stages (optional)</h2>
-        <button type="button" className="tap text-sm" onClick={add} data-testid="stage-add">Add stage</button>
+        <button type="button" className="tap min-h-11 rounded-lg border border-teal-500/40 px-3 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 sm:min-h-10 dark:text-teal-300" onClick={add} data-testid="stage-add">Add stage</button>
       </div>
       {stages.length === 0 && <p className="text-xs text-slate-500">Split this invoice into deposit / progress / final payments with due dates. The invoice total does not change.</p>}
       {plan.rows.map((row) => (
@@ -63,7 +63,7 @@ export function StageEditor({ stages, onChange, total, balance }: { stages: Stag
           <label className="text-xs text-slate-600">Due date<input aria-label="Stage due date" type="date" className={field} value={row.dueDate} onChange={(event) => update(row.id, { dueDate: event.target.value })} /></label>
           <p className="col-span-2 flex items-center justify-between text-xs text-slate-600 sm:col-span-5">
             <span data-testid="stage-edit-amount">${row.amount.toFixed(2)}{row.paid > 0 ? ` · $${row.paid.toFixed(2)} paid` : ""} · {row.state === "paid" ? "Paid" : row.state === "due" ? "Due now" : row.state === "overdue" ? "Overdue" : "Upcoming"}</span>
-            <button type="button" className="tap text-slate-500" onClick={() => onChange(stages.filter((stage) => stage.id !== row.id))}>Remove</button>
+            <button type="button" className="tap min-h-11 rounded-lg border border-rose-500/40 px-3 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10 sm:min-h-10 dark:text-rose-300" onClick={() => onChange(stages.filter((stage) => stage.id !== row.id))}>Remove</button>
           </p>
         </div>
       ))}
