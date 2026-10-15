@@ -31,6 +31,27 @@ export const STATUS_CLASS: Record<JobStatus, string> = {
   done: "border-emerald-500 bg-emerald-500/15 text-emerald-700 dark:text-emerald-200",
 };
 
+/** A done job is "awaiting" until the owner confirms it (schedule.confirmedAt), then "confirmed". */
+export type DoneState = "awaiting" | "confirmed";
+export function doneState(schedule: Pick<Schedule, "status" | "confirmedAt">): DoneState | null {
+  if (schedule.status !== "done") return null;
+  return schedule.confirmedAt ? "confirmed" : "awaiting";
+}
+export const DONE_LABEL: Record<DoneState, string> = { awaiting: "Done · awaiting confirmation", confirmed: "Done · confirmed" };
+/** Same look as done, dashed + amber edge while it still needs the owner's confirmation. */
+export const DONE_CLASS: Record<DoneState, string> = {
+  awaiting: "border-dashed border-amber-500 bg-emerald-500/10 text-emerald-800 dark:text-emerald-100",
+  confirmed: STATUS_CLASS.done,
+};
+export function statusLabel(schedule: Pick<Schedule, "status" | "confirmedAt">) {
+  const done = doneState(schedule);
+  return done ? DONE_LABEL[done] : STATUS_LABEL[schedule.status];
+}
+export function statusClass(schedule: Pick<Schedule, "status" | "confirmedAt">) {
+  const done = doneState(schedule);
+  return done ? DONE_CLASS[done] : STATUS_CLASS[schedule.status];
+}
+
 const DOCS_KEY = "clientready-documents";
 const isDate = (value: unknown) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
 const isTime = (value: unknown) => typeof value === "string" && /^\d{2}:\d{2}$/.test(value);

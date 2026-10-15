@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { loadAccountIntoCache } from "@/lib/account-cache";
 import { uniqueDocs } from "@/lib/change-orders";
 import { localYmd, niceYmd, scheduledJobs, timeLabel, type ScheduledJob } from "@/lib/scheduled-jobs";
-import { STATUS_LABEL } from "@/lib/schedule";
+import { doneState, statusLabel } from "@/lib/schedule";
 import PageHeader from "@/components/PageHeader";
 
 type Client = {
@@ -147,7 +147,7 @@ export default function SchedulePage() {
             <a key={`job-${doc.id}`} href={`/invoice?id=${encodeURIComponent(doc.id)}`} data-testid="schedule-job" className="block rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm transition hover:border-teal-400">
               <p className="text-base font-semibold">{doc.clientName || doc.title}</p>
               <p className="mt-0.5 text-sm font-medium text-teal-600">{niceYmd(schedule.date)}{schedule.startTime ? ` at ${timeLabel(schedule.startTime)}` : ""}</p>
-              <p className="mt-1 text-sm text-slate-600">{doc.title} · {STATUS_LABEL[schedule.status]}</p>
+              <p className="mt-1 text-sm text-slate-600">{doc.title} · <span data-done={doneState(schedule) || undefined}>{statusLabel(schedule)}</span></p>
             </a>
           ))}
           {jobs.length > 0 && appointments.length > 0 && <h2 className="pt-2 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Other appointments</h2>}

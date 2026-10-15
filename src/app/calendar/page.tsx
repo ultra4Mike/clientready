@@ -6,7 +6,7 @@ import PageHeader from "@/components/PageHeader";
 import ScheduleEditor from "@/components/ScheduleEditor";
 import { uniqueDocs } from "@/lib/change-orders";
 import { scheduledJobs } from "@/lib/scheduled-jobs";
-import { confirmRemovalFor, moveSchedule, readSchedule, readWorkers, saveSchedule, STATUS_CLASS, STATUS_LABEL, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
+import { confirmRemovalFor, moveSchedule, readSchedule, readWorkers, saveSchedule, DONE_CLASS, DONE_LABEL, doneState, STATUS_CLASS, STATUS_LABEL, statusClass, statusLabel, type DoneState, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
 
 type SavedDocument = {
   id: string;
@@ -103,14 +103,17 @@ export default function CalendarPage() {
         draggable
         data-testid={`job-${job.doc.id}`}
         data-status={job.schedule.status}
+        data-done={doneState(job.schedule) || undefined}
         onDragStart={(event) => event.dataTransfer.setData("text/plain", job.doc.id)}
         onClick={(event) => { event.stopPropagation(); setEditing({ docId: job.doc.id }); }}
-        className={`cursor-grab truncate rounded-md border px-2 py-1 text-left text-xs font-medium shadow-sm ${STATUS_CLASS[job.schedule.status]}`}
-        title={`${job.doc.title} · ${job.doc.clientName} · ${STATUS_LABEL[job.schedule.status]}${people ? ` · ${people}` : ""}`}
+        className={`cursor-grab truncate rounded-md border px-2 py-1 text-left text-xs font-medium shadow-sm ${statusClass(job.schedule)}`}
+        title={`${job.doc.title} · ${job.doc.clientName} · ${statusLabel(job.schedule)}${people ? ` · ${people}` : ""}`}
       >
         {job.schedule.startTime && <span className="font-semibold">{timeLabel(job.schedule.startTime)} </span>}
         {job.doc.clientName || job.doc.title}
         {!compact && people && <span className="block truncate opacity-80">{people}</span>}
+        {doneState(job.schedule) === "awaiting" && <span className="block truncate opacity-80" data-testid="done-awaiting">{compact ? "To confirm" : DONE_LABEL.awaiting}</span>}
+        {!compact && doneState(job.schedule) === "confirmed" && <span className="block truncate opacity-80">{DONE_LABEL.confirmed}</span>}
       </div>
     );
   }
@@ -165,7 +168,8 @@ export default function CalendarPage() {
           )}
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-          {(Object.keys(STATUS_LABEL) as JobStatus[]).map((key) => <span key={key} className={`rounded-full border px-2.5 py-0.5 font-medium ${STATUS_CLASS[key]}`}>{STATUS_LABEL[key]}</span>)}
+          {(Object.keys(STATUS_LABEL) as JobStatus[]).filter((key) => key !== "done").map((key) => <span key={key} className={`rounded-full border px-2.5 py-0.5 font-medium ${STATUS_CLASS[key]}`}>{STATUS_LABEL[key]}</span>)}
+          {(Object.keys(DONE_LABEL) as DoneState[]).map((key) => <span key={key} data-testid={`legend-done-${key}`} className={`rounded-full border px-2.5 py-0.5 font-medium ${DONE_CLASS[key]}`}>{DONE_LABEL[key]}</span>)}
           <span className="opacity-90">Drag a job to move it. Click a slot or job to edit.</span>
         </div>
         {message && <p className="mt-3 rounded-lg border border-teal-500/30 px-3 py-2 text-sm" data-testid="calendar-message">{message}</p>}
@@ -278,8 +282,8 @@ export default function CalendarPage() {
                   <div key={job.doc.id} className="space-y-1 rounded-xl border border-slate-500/30 bg-[var(--cr-card)] p-4 text-sm shadow-sm" data-testid={`worker-job-${job.doc.id}`}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="font-medium">{text(job.doc.data?.clientName) || job.doc.clientName} · {job.doc.title}</p>
-                      <select aria-label="Status" value={job.schedule.status} onChange={(event) => save(job.doc.id, { ...job.schedule, status: event.target.value as JobStatus })} className={`rounded border px-2 py-0.5 text-xs ${STATUS_CLASS[job.schedule.status]}`}>
-                        {(Object.keys(STATUS_LABEL) as JobStatus[]).map((key) => <option key={key} value={key}>{STATUS_LABEL[key]}</option>)}
+                      <select aria-label="Status" value={job.schedule.status} onChange={(event) => save(job.doc.id, { ...job.schedule, status: event.target.value as JobStatus })} data-done={doneState(job.schedule) || undefined} className={`rounded border px-2 py-0.5 text-xs ${statusClass(job.schedule)}`}>
+                        {(Object.keys(STATUS_LABEL) as JobStatus[]).map((key) => <option key={key} value={key}>{key === "done" ? statusLabel({ status: "done", confirmedAt: job.schedule.confirmedAt }) : STATUS_LABEL[key]}</option>)}
                       </select>
                     </div>
                     <p className="opacity-80">{parse(job.schedule.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} · {job.schedule.startTime ? timeLabel(job.schedule.startTime) : "any time"}{job.schedule.endTime ? ` to ${timeLabel(job.schedule.endTime)}` : ""}</p>

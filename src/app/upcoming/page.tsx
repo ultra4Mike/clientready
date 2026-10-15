@@ -7,7 +7,7 @@ import { amountOf, documentTotals } from "@/lib/discount";
 import { uniqueDocs } from "@/lib/change-orders";
 import { loadAccountIntoCache } from "@/lib/account-cache";
 import { addDaysYmd, localYmd, niceYmd, scheduledJobs, timeLabel } from "@/lib/scheduled-jobs";
-import { STATUS_LABEL } from "@/lib/schedule";
+import { doneState, statusLabel } from "@/lib/schedule";
 
 type LineItem = {
   description?: string;
@@ -101,7 +101,7 @@ export default function UpcomingPage() {
                 {doc.title} · {doc.clientName}
               </p>
               <p className="mt-0.5 text-sm text-slate-600">
-                {niceYmd(schedule.date)} · Job {STATUS_LABEL[schedule.status].toLowerCase()}
+                {niceYmd(schedule.date)} · <span data-done={doneState(schedule) || undefined}>Job {statusLabel(schedule).toLowerCase()}</span>
               </p>
             </a>
           ))}
