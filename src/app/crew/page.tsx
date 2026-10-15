@@ -125,24 +125,36 @@ export default function CrewPage() {
   async function load() {
     const { data } = await supabase.auth.getUser();
     const user = data.user;
+    const me = (user?.email || "").toLowerCase();
+    const ownRow = (row: object) => {
+      const worker = String((row as { worker_email?: unknown }).worker_email || "").toLowerCase();
+      return !worker || worker === me;
+    };
     if (!user) {
       window.location.href = "/login";
+      return;
+    }
+    // Only people on a crew list use this page. An owner who isn't on any employee list (their own
+    // included) goes to the dashboard before anything is loaded or shown.
+    const { data: person, error: personError } = await supabase.rpc("is_crew_email");
+    const row = Array.isArray(person) ? person[0] : person;
+    const cacheKey = `clientready-crew-cache-${user.id}`;
+    if (!personError && !row) {
+      window.localStorage.removeItem(cacheKey);
+      window.location.replace("/dashboard");
       return;
     }
     setUserId(user.id);
     setEmail(user.email || "");
     // Show what this person saw last time right away (cache is per signed-in user).
-    const cacheKey = `clientready-crew-cache-${user.id}`;
     try {
       const cached = JSON.parse(window.localStorage.getItem(cacheKey) || "null") as Cache | null;
       if (cached) {
-        setName(cached.name); setJobs(cached.jobs); setClock(cached.clock); setExpenses(cached.expenses); setDrafts(cached.drafts);
+        setName(cached.name); setJobs(cached.jobs.filter(ownRow)); setClock(cached.clock.filter(ownRow)); setExpenses(cached.expenses.filter(ownRow)); setDrafts(cached.drafts.filter(ownRow));
       }
     } catch {
       window.localStorage.removeItem(cacheKey);
     }
-    const { data: person } = await supabase.rpc("is_crew_email");
-    const row = Array.isArray(person) ? person[0] : person;
     if (row) {
       setEmployeeId(row.id || "");
       setOwnerId(row.user_id || "");
@@ -156,12 +168,14 @@ export default function CrewPage() {
       supabase.from("crew_expenses").select("*").order("created_at", { ascending: false }),
       supabase.from("job_drafts").select("*").order("created_at", { ascending: false }),
     ]);
+    // The database already limits crew to their own rows. An owner who is also on their own crew
+    // list can read all of their workers' rows (owner access), so keep only this person's rows here.
     const next: Cache = {
       name: employee.data?.name || user.email || "",
-      jobs: (jobRows.data || []) as Job[],
-      clock: (clockRows.data || []) as ClockEntry[],
-      expenses: (spendRows.data || []) as Expense[],
-      drafts: (draftRows.data || []) as Draft[],
+      jobs: ((jobRows.data || []) as Job[]).filter(ownRow),
+      clock: ((clockRows.data || []) as ClockEntry[]).filter(ownRow),
+      expenses: ((spendRows.data || []) as Expense[]).filter(ownRow),
+      drafts: ((draftRows.data || []) as Draft[]).filter(ownRow),
     };
     setName(next.name); setJobs(next.jobs); setClock(next.clock); setExpenses(next.expenses); setDrafts(next.drafts);
     setClients((clientRows.data || []) as Client[]);
