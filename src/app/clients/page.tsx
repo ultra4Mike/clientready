@@ -198,7 +198,7 @@ export default function ClientsPage() {
 
   return (
     <AppShell title="Clients">
-      <section className="mx-auto max-w-6xl py-2 sm:px-2 sm:py-4">
+      <section className="py-2 sm:py-4">
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Client list</h1>
