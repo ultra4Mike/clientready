@@ -82,7 +82,6 @@ export default function AppShell({
   showTitle?: boolean;
 }) {
   const [theme, setTheme] = useState("dark");
-  const [wide, setWide] = useState(true);
   const [moreOpen, setMoreOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
 useEffect(() => {
@@ -90,13 +89,9 @@ useEffect(() => {
     setTheme(savedTheme);
     document.documentElement.classList.toggle("dark", savedTheme === "dark");
     document.documentElement.classList.toggle("light", savedTheme === "light");
-    const onResize = () => setWide(window.innerWidth >= 900);
-    onResize();
-    window.addEventListener("resize", onResize);
     isCrewUser().then((crew) => {
       if (crew) window.location.href = "/crew";
     });
-    return () => window.removeEventListener("resize", onResize);
   }, []);
 
   function saveTheme(next: string) {
@@ -142,64 +137,49 @@ useEffect(() => {
     </nav>
   );
 
+  // One header action set for every size (SyncPill mounts once); size-specific bits use CSS breakpoints only.
   const actions = (
-    <div className="tap-row flex flex-wrap items-center gap-3 text-sm font-medium sm:gap-4">
-      <SyncPill />
-      <button type="button" onClick={() => saveTheme(theme === "dark" ? "light" : "dark")}>
-        {theme === "dark" ? "Light" : "Dark"}
-      </button>
-      <a href="/profile">Profile</a>
-      <button type="button" onClick={logOut}>
-        Log out
-      </button>
-    </div>
-  );
-
-  const mobileActions = (
-    <div className="flex items-center gap-1">
+    <div className="tap-row flex items-center gap-1 text-sm font-medium min-[900px]:flex-wrap min-[900px]:gap-4">
       <SyncPill />
       <button
         type="button"
         aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
         onClick={() => saveTheme(theme === "dark" ? "light" : "dark")}
-        className="flex h-11 w-11 items-center justify-center rounded-full transition hover:bg-teal-500/10"
+        className="flex h-11 w-11 items-center justify-center rounded-full transition hover:bg-teal-500/10 min-[900px]:h-auto min-[900px]:w-auto min-[900px]:rounded-none min-[900px]:hover:bg-transparent"
       >
-        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 min-[900px]:hidden" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
           {theme === "dark" ? <path d="M12 4V2m0 20v-2m8-8h2M2 12h2m13.66-5.66 1.41-1.41M4.93 19.07l1.41-1.41m0-11.32L4.93 4.93m14.14 14.14-1.41-1.41M12 17a5 5 0 100-10 5 5 0 000 10z" /> : <path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" />}
         </svg>
+        <span className="hidden min-[900px]:inline">{theme === "dark" ? "Light" : "Dark"}</span>
+      </button>
+      <a href="/profile" className="hidden min-[900px]:inline">Profile</a>
+      <button type="button" onClick={logOut} className="hidden min-[900px]:inline">
+        Log out
       </button>
     </div>
   );
 
   return (
     <div className="app-root min-h-screen bg-[var(--cr-bg)] text-[var(--cr-text)]">
-      {wide ? (
-        <div className="app-root flex min-h-screen">
-          <aside className="sticky top-0 h-screen w-56 shrink-0 overflow-y-auto border-r border-teal-500/20 bg-[var(--cr-panel)] p-4">
-            <Logo />
-            <div className="mt-6 flex min-h-[calc(100%-4rem)] flex-col">{nav}</div>
-          </aside>
-          <div className="min-w-0 flex-1">
-            <header className="sticky top-0 z-20 flex items-center justify-between border-b border-teal-500/20 bg-[var(--cr-bg)] px-6 py-3">
-              {showTitle ? <h1 className="text-lg font-semibold">{title}</h1> : <span className="sr-only">{title}</span>}
-              {actions}
-            </header>
-            <div className="app-main p-6"><div className="mx-auto w-full max-w-6xl">{children}</div></div>
-          </div>
-        </div>
-      ) : (
-        <>
-          <header className="border-b border-teal-500/20 bg-[var(--cr-panel)] px-4 py-1.5">
+      <div className="app-root min-[900px]:flex min-[900px]:min-h-screen">
+        <aside className="sticky top-0 hidden h-screen w-56 shrink-0 overflow-y-auto border-r border-teal-500/20 bg-[var(--cr-panel)] p-4 min-[900px]:block print:hidden">
+          <Logo />
+          <div className="mt-6 flex min-h-[calc(100%-4rem)] flex-col">{nav}</div>
+        </aside>
+        <div className="min-w-0 flex-1">
+          <header className="border-b border-teal-500/20 bg-[var(--cr-panel)] px-4 py-1.5 min-[900px]:sticky min-[900px]:top-0 min-[900px]:z-20 min-[900px]:bg-[var(--cr-bg)] min-[900px]:px-6 min-[900px]:py-3">
             <div className="flex items-center justify-between gap-3">
-              <Logo />
-              {mobileActions}
+              <div className="min-[900px]:hidden"><Logo /></div>
+              {showTitle ? <h1 className="hidden text-lg font-semibold min-[900px]:block">{title}</h1> : <span className="sr-only">{title}</span>}
+              {actions}
             </div>
           </header>
-          <div className="app-main p-4 pb-[calc(10rem+env(safe-area-inset-bottom))] print:pb-4">
-            <div className="mx-auto w-full max-w-6xl">
-            {children}
-            </div>
+          <div className="app-main p-4 pb-[calc(10rem+env(safe-area-inset-bottom))] min-[900px]:p-6 print:pb-4">
+            <div className="mx-auto w-full max-w-6xl">{children}</div>
           </div>
+        </div>
+      </div>
+      <div className="min-[900px]:hidden print:hidden">
           {moreOpen && (
             <div className="fixed inset-0 z-40 print:hidden" onClick={() => setMoreOpen(false)}>
               <div className="absolute inset-0 bg-slate-950/60" />
@@ -276,8 +256,7 @@ useEffect(() => {
               </button>
             </div>
           </nav>
-        </>
-      )}
+      </div>
     </div>
   );
 }
