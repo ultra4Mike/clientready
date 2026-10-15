@@ -196,9 +196,9 @@ export default function DocumentsPage() {
         </>}
       />
 
-      <div className="grid gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 sm:grid-cols-3 lg:grid-cols-5">
         <input
-          className="sm:col-span-2 lg:col-span-4 rounded-lg border border-teal-500/30 bg-[var(--cr-card)] px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
+          className="sm:col-span-3 lg:col-span-5 rounded-lg border border-teal-500/30 bg-[var(--cr-card)] px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
           placeholder="Search client, number, amount, email"
           aria-label="Search documents"
           value={search}
@@ -241,8 +241,8 @@ export default function DocumentsPage() {
           <option value="paid">Paid</option>
           <option value="accepted">Accepted</option>
         </select>
-        <label className="flex items-center gap-2 text-sm text-[var(--cr-muted)]">From<input type="date" aria-label="From date" className={`${field} min-w-0 flex-1`} value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></label>
-        <label className="flex items-center gap-2 text-sm text-[var(--cr-muted)]">To<input type="date" aria-label="To date" className={`${field} min-w-0 flex-1`} value={toDate} onChange={(event) => setToDate(event.target.value)} /></label>
+        <label className="flex min-w-0 items-center gap-2 whitespace-nowrap text-xs font-medium text-[var(--cr-muted)]">From<input type="date" aria-label="From date" className={`${field} min-w-0 flex-1`} value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></label>
+        <label className="flex min-w-0 items-center gap-2 whitespace-nowrap text-xs font-medium text-[var(--cr-muted)]">To<input type="date" aria-label="To date" className={`${field} min-w-0 flex-1`} value={toDate} onChange={(event) => setToDate(event.target.value)} /></label>
         </div>
       </div>
       <div className="mt-2 flex items-center justify-between text-xs text-[var(--cr-muted)]">
@@ -251,8 +251,8 @@ export default function DocumentsPage() {
       </div>
 
       <div className="mt-6 overflow-hidden rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] shadow-sm">
-        <div className="hidden gap-4 border-b border-teal-500/20 bg-teal-500/5 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)] md:grid md:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_7.5rem_7rem_7.5rem_13rem]">
-          <span>Document</span><span>Client</span><span>Created</span><span>Status</span><span className="text-right">Total</span><span className="text-right">Actions</span>
+        <div className="hidden gap-4 border-b border-teal-500/20 bg-teal-500/5 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)] md:grid md:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_6.5rem_minmax(6.5rem,auto)_auto] md:gap-x-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_6.5rem_6.5rem_minmax(6.5rem,auto)_auto]">
+          <span>Document</span><span>Client</span><span className="hidden xl:block">Created</span><span>Status</span><span className="text-right">Total</span><span className="w-[13.5rem] text-right max-xl:w-[10.5rem]">Actions</span>
         </div>
         {documents.length === 0 && (
           <div className="p-10 text-center">
@@ -276,7 +276,7 @@ export default function DocumentsPage() {
             data-stage={stageOf(doc).stage}
             data-next-action={stageOf(doc).next}
             title={`${STAGE_LABEL[stageOf(doc).stage]}${NEXT_LABEL[stageOf(doc).next] ? ` · Next: ${NEXT_LABEL[stageOf(doc).next]}` : ""}`}
-            className="grid grid-cols-2 gap-x-4 gap-y-2 border-b border-teal-500/10 px-4 py-4 transition last:border-b-0 hover:bg-teal-500/5 md:items-center md:px-5 md:py-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_7.5rem_7rem_7.5rem_13rem]"
+            className="grid grid-cols-2 gap-x-4 gap-y-2 border-b border-teal-500/10 px-4 py-4 transition last:border-b-0 hover:bg-teal-500/5 md:items-center md:px-5 md:py-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_6.5rem_minmax(6.5rem,auto)_auto] md:gap-x-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_6.5rem_6.5rem_minmax(6.5rem,auto)_auto]"
           >
             <button type="button" onClick={() => openDocument(doc)} className="col-span-2 min-w-0 text-left md:col-span-1">
               <p className="truncate text-base font-semibold md:text-sm">{doc.title || "Untitled"}</p>
@@ -290,25 +290,26 @@ export default function DocumentsPage() {
             </button>
             <div className="min-w-0 text-sm">
               <p className="truncate">{doc.clientName || "No client"}</p>
+              <p className="hidden text-xs tabular-nums text-[var(--cr-muted)] md:block xl:hidden">{doc.createdAt}</p>
               {doc.data?.outcome ? <p className="truncate text-xs text-[var(--cr-muted)]">{doc.data.outcome}</p> : null}
             </div>
-            <p className="text-right text-sm tabular-nums text-[var(--cr-muted)] md:text-left">{doc.createdAt}</p>
+            <p className="text-right text-sm tabular-nums text-[var(--cr-muted)] md:hidden xl:block xl:text-left">{doc.createdAt}</p>
             <div><span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize ${({ paid: "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300", draft: "border-slate-400/40 bg-slate-400/15", sent: "border-sky-500/40 bg-sky-500/15 text-sky-700 dark:text-sky-300", overdue: "border-red-500/40 bg-red-500/15 text-red-700 dark:text-red-300", accepted: "border-teal-500/40 bg-teal-500/15 text-teal-700 dark:text-teal-300" } as Record<string, string>)[String(doc.data?.status || "")] || "border-teal-500/30"}`}>{String(doc.data?.status || "—")}</span></div>
-            <div className="text-right text-sm tabular-nums">
+            <div className="whitespace-nowrap text-right text-sm tabular-nums">
               <p className="font-semibold">{(factsById.get(doc.id)?.total || 0) > 0 ? `$${(factsById.get(doc.id)?.total || 0).toFixed(2)}` : "—"}</p>
               {(factsById.get(doc.id)?.owed || 0) > 0 && doc.data?.status !== "draft" ? <p className="text-xs text-amber-600 dark:text-amber-300">${(factsById.get(doc.id)?.owed || 0).toFixed(2)} owed</p> : null}
             </div>
-            <div className="tap-row col-span-2 flex justify-end gap-2 border-t border-teal-500/10 pt-3 md:col-span-1 md:border-0 md:pt-0">
+            <div className="tap-row col-span-2 flex justify-end gap-2 border-t border-teal-500/10 pt-3 md:col-span-1 md:w-[13.5rem] md:shrink-0 md:gap-1.5 md:border-0 md:pt-0 md:max-xl:w-[10.5rem]">
               <button type="button" onClick={() => openDocument(doc)} className="rounded-lg bg-teal-500 px-3 py-1.5 text-sm font-semibold text-slate-950! transition hover:bg-teal-400 max-md:min-h-11 max-md:flex-1">
                 Open
               </button>
-              <button type="button" onClick={() => duplicateDocument(doc)} className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400 max-md:min-h-11 max-md:flex-1">
+              <button type="button" onClick={() => duplicateDocument(doc)} className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400 md:max-xl:px-2 md:max-xl:text-xs max-md:min-h-11 max-md:flex-1">
                 Duplicate
               </button>
               <button
                 type="button"
                 onClick={() => removeDocument(doc.id)}
-                className="rounded-lg border border-rose-500/40 px-2.5 py-1.5 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10 max-md:min-h-11 dark:text-rose-300"
+                className="rounded-lg border border-rose-500/40 px-2.5 py-1.5 text-sm font-medium text-rose-600 md:max-xl:px-2 md:max-xl:text-xs transition hover:bg-rose-500/10 max-md:min-h-11 dark:text-rose-300"
               >
                 Remove
               </button>
