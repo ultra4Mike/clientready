@@ -78,9 +78,9 @@ export default function UpcomingPage() {
   return (
     <AppShell title="Upcoming">
 
-      <section className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      <section className="mx-auto max-w-4xl py-2 sm:px-2 sm:py-4">
         <h1 className="text-2xl font-bold tracking-tight">This week</h1>
-        <p className="mt-2 text-slate-600">
+        <p className="mt-1 text-sm text-slate-600 sm:text-base">
           Invoices and jobs due in the next 7 days.
         </p>
 
@@ -98,11 +98,11 @@ export default function UpcomingPage() {
               onClick={() => openView(doc.id)}
               className="block w-full rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-500 hover:shadow-md"
             >
-              <p className="font-medium">
+              <p className="text-base font-semibold">
                 {doc.data?.jobTime ? `${doc.data.jobTime} · ` : ""}
                 {doc.title} · {doc.clientName}
               </p>
-              <p className="text-sm text-slate-600">
+              <p className="mt-0.5 text-sm text-slate-600">
                 {niceDate(doc.data?.dueDate || "")} · {doc.data?.status || "draft"} · $
                 {invoiceTotal(doc).toFixed(2)}
               </p>
