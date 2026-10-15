@@ -1,11 +1,11 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { isPendingRecurringDraft, recurringDraftsReady, runDueRecurring } from "@/lib/recurring";
+import { recurringDraftsReady, runDueRecurring } from "@/lib/recurring";
 import AppShell from "@/components/AppShell";
 import { loadAccountIntoCache } from "@/lib/account-cache";
 import { amountOf, documentTotals } from "@/lib/discount";
-import { balanceDue, paidTotal, readPayments } from "@/lib/payments";
+import { balanceDue, isOpenBalance, paidTotal, readPayments } from "@/lib/payments";
 import { uniqueDocs } from "@/lib/change-orders";
 import NeedsReview from "@/components/NeedsReview";
 
@@ -100,7 +100,7 @@ export default function DashboardPage() {
     const paid = paidDocs.reduce((sum, doc) => sum + invoiceTotal(doc), 0);
     const overdueDocs = invoices.filter((doc) => doc.data?.status === "overdue");
     const overdue = overdueDocs.reduce((sum, doc) => sum + balance(doc), 0);
-    const outstanding = invoices.filter((doc) => !isPendingRecurringDraft(doc)).reduce((sum, doc) => sum + balance(doc), 0);
+    const outstanding = invoices.filter((doc) => isOpenBalance(doc.data?.status, balance(doc))).reduce((sum, doc) => sum + balance(doc), 0);
     const paidRate = invoices.length
       ? Math.round((paidDocs.length / invoices.length) * 100)
       : 0;

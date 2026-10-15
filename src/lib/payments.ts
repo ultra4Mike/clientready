@@ -80,3 +80,12 @@ export function keepStripePayments(local: Record<string, unknown>, cloud: Record
   if (!missing.length) return local;
   return { ...local, ...paymentFields([...mine, ...missing]) };
 }
+
+/**
+ * Money to collect: a sent (non-draft) invoice with more than $0 still owed. Drafts, including
+ * recurring drafts awaiting review, were never sent, so Collect, the dashboard's Outstanding card,
+ * the Documents "Outstanding" filter and Needs review all leave them out.
+ */
+export function isOpenBalance(status: unknown, owed: number) {
+  return String(status || "draft") !== "draft" && owed > 0.004;
+}

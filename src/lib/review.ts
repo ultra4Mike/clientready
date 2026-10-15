@@ -1,5 +1,5 @@
 import { amountOf, documentTotals } from "@/lib/discount";
-import { balanceDue, paidTotal, readPayments } from "@/lib/payments";
+import { balanceDue, isOpenBalance, paidTotal, readPayments } from "@/lib/payments";
 import { readApproval } from "@/lib/approval";
 import { readSchedule } from "@/lib/schedule";
 import { isPendingRecurringDraft, readRecurring, ymd } from "@/lib/recurring";
@@ -85,7 +85,7 @@ export function reviewItems(docs: Doc[], expenses: ExpenseRow[], today = ymd(new
         title: `${numberOf(doc)} recurring invoice due`, detail: `Next run ${recurring.nextRunDate}${who(doc)}`, href: open(doc) });
     }
     const owed = balanceDue(docTotal(doc), paidTotal(readPayments(data as never)), data.status);
-    if (owed > 0) {
+    if (isOpenBalance(status, owed)) {
       all.push({ key: "balance", version: owed.toFixed(2), kind: "balance", docId: doc.id,
         title: `${numberOf(doc)} has ${money(owed)} owed`, detail: `${status}${data.dueDate ? ` · due ${data.dueDate}` : ""}${who(doc)}`, href: open(doc) });
     }

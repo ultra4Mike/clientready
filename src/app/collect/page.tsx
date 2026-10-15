@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { saveCloudDocument } from "@/lib/cloud-docs";
 import { amountOf, documentTotals } from "@/lib/discount";
-import { balanceDue, paidTotal, paymentFields, paymentMethods, readPayments } from "@/lib/payments";
+import { balanceDue, isOpenBalance, paidTotal, paymentFields, paymentMethods, readPayments } from "@/lib/payments";
 import { uniqueDocs } from "@/lib/change-orders";
 import { isPendingRecurringDraft } from "@/lib/recurring";
 import ReminderPanel from "@/components/ReminderPanel";
@@ -172,7 +172,7 @@ export default function CollectPage() {
   // Recurring drafts nobody has reviewed yet are not money to collect: keep them out of the
   // list and totals, and point to them below so they aren't lost.
   const pendingDrafts = invoices.filter(isPendingRecurringDraft).length;
-  const unpaid = invoices.filter((doc) => (doc.data?.status || "draft") !== "paid" && !isPendingRecurringDraft(doc) && !(amountPaid(doc) > 0 && balance(doc) <= 0));
+  const unpaid = invoices.filter((doc) => (doc.data?.status || "draft") !== "paid" && isOpenBalance(doc.data?.status, balance(doc)));
 
   const totals = useMemo(() => {
     const openAmount = unpaid.reduce((sum, doc) => sum + balance(doc), 0);

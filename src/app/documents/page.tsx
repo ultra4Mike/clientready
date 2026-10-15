@@ -8,8 +8,7 @@ import { ApprovalBadge } from "@/components/Approval";
 import { readApproval } from "@/lib/approval";
 import AppShell from "@/components/AppShell";
 import { documentTotals } from "@/lib/discount";
-import { balanceDue, paidTotal, readPayments } from "@/lib/payments";
-import { isPendingRecurringDraft } from "@/lib/recurring";
+import { balanceDue, isOpenBalance, paidTotal, readPayments } from "@/lib/payments";
 import { searchWithNumbers } from "@/lib/doc-number";
 
 type SavedDocument = {
@@ -145,7 +144,7 @@ export default function DocumentsPage() {
       const status = String(doc.data?.status || "draft");
       if (statusFilter === "outstanding") {
         // Same rule as the dashboard's Total outstanding card.
-        if (doc.type !== "invoice" || isPendingRecurringDraft(doc) || info.owed <= 0) return false;
+        if (doc.type !== "invoice" || !isOpenBalance(status, info.owed)) return false;
       } else if (statusFilter === "unpaid" ? !(doc.type === "invoice" && info.owed > 0 && status !== "draft") : statusFilter !== "all" && status !== statusFilter) return false;
       if (fromDate && (!info.date || info.date < fromDate)) return false;
       if (toDate && (!info.date || info.date > toDate)) return false;
