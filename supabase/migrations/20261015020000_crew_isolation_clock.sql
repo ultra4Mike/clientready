@@ -5,6 +5,85 @@
 -- only their own rows; owners read/write their own. Crew never write tables directly except
 -- their own job reports: everything else goes through SECURITY DEFINER functions that check the
 -- caller is assigned to the job.
+--
+-- Safe to re-run, and safe on projects that are missing some of the crew tables: every table the
+-- crew features use is created if missing (with the columns the app reads and writes) and any
+-- missing columns are added; existing tables and data are left as they are.
+
+-- Tables the app uses (created only if missing). -----------------------------------------------
+create table if not exists public.employees (id text not null, user_id uuid not null, primary key (user_id, id));
+alter table public.employees
+  add column if not exists name text default '',
+  add column if not exists email text default '',
+  add column if not exists phone text default '',
+  add column if not exists role text default '',
+  add column if not exists kind text default '',
+  add column if not exists rate text default '',
+  add column if not exists hire_date text default '',
+  add column if not exists active boolean default true,
+  add column if not exists rate_history jsonb default '[]'::jsonb;
+
+create table if not exists public.crew_jobs (id text primary key, owner_id uuid not null);
+alter table public.crew_jobs
+  add column if not exists employee_id text default '',
+  add column if not exists worker_name text default '',
+  add column if not exists worker_email text default '',
+  add column if not exists doc_id text default '',
+  add column if not exists job_date text default '',
+  add column if not exists invoice_number text default '',
+  add column if not exists hours text default '',
+  add column if not exists rate text default '',
+  add column if not exists pay numeric default 0,
+  add column if not exists note text default '',
+  add column if not exists client_name text default '',
+  add column if not exists client_phone text default '',
+  add column if not exists client_email text default '',
+  add column if not exists client_address text default '',
+  add column if not exists status text default '',
+  add column if not exists schedule_status text default '',
+  add column if not exists start_time text default '',
+  add column if not exists end_time text default '',
+  add column if not exists created_at timestamptz default now();
+
+-- Crew job reports (Reports tab on /crew, reviewed on /drafts).
+create table if not exists public.job_drafts (id text primary key, owner_id uuid not null);
+alter table public.job_drafts
+  add column if not exists employee_id text default '',
+  add column if not exists worker_name text default '',
+  add column if not exists worker_email text default '',
+  add column if not exists client_name text default '',
+  add column if not exists client_phone text default '',
+  add column if not exists client_address text default '',
+  add column if not exists work_done text default '',
+  add column if not exists work_date text default '',
+  add column if not exists start_time text default '',
+  add column if not exists end_time text default '',
+  add column if not exists hours text default '',
+  add column if not exists parts_cost text default '',
+  add column if not exists parts_note text default '',
+  add column if not exists drive_hours text default '',
+  add column if not exists drive_minutes text default '',
+  add column if not exists notes text default '',
+  add column if not exists finished boolean default false,
+  add column if not exists collected_amount text default '',
+  add column if not exists collected_method text default '',
+  add column if not exists status text default 'draft',
+  add column if not exists created_at timestamptz default now();
+
+-- Crew expenses with receipts (receipt = compressed JPEG data URL).
+create table if not exists public.crew_expenses (id text primary key default gen_random_uuid()::text, owner_id uuid not null);
+alter table public.crew_expenses
+  add column if not exists doc_id text default '',
+  add column if not exists worker_email text default '',
+  add column if not exists worker_name text default '',
+  add column if not exists employee_id text default '',
+  add column if not exists kind text default 'other',
+  add column if not exists amount text default '',
+  add column if not exists note text default '',
+  add column if not exists receipt text default '',
+  add column if not exists created_at timestamptz default now();
+
+grant select, insert, update, delete on public.employees, public.crew_jobs, public.job_drafts, public.crew_expenses to authenticated;
 
 create or replace function public.crew_email()
 returns text
@@ -33,8 +112,6 @@ create index if not exists crew_clock_worker_idx on public.crew_clock (lower(wor
 -- At most one running clock per worker.
 create unique index if not exists crew_clock_one_open on public.crew_clock (lower(worker_email)) where ended_at is null;
 
-alter table if exists public.crew_expenses add column if not exists employee_id text default '';
-alter table if exists public.crew_expenses add column if not exists created_at timestamptz default now();
 
 -- Repair row-level security: drop whatever policies exist on these tables and define them here.
 do $$
@@ -43,9 +120,6 @@ declare
   pol record;
 begin
   foreach t in array array['crew_jobs', 'crew_expenses', 'job_drafts', 'employees', 'crew_clock'] loop
-    if to_regclass('public.' || t) is null then
-      continue;
-    end if;
     execute format('alter table public.%I enable row level security', t);
     for pol in select policyname from pg_policies where schemaname = 'public' and tablename = t loop
       execute format('drop policy %I on public.%I', pol.policyname, t);
@@ -234,3 +308,35 @@ grant execute on function public.crew_clock_out(text) to authenticated;
 grant execute on function public.crew_edit_clock(uuid, timestamptz, timestamptz, text) to authenticated;
 grant execute on function public.crew_add_expense(text, text, text, text, text) to authenticated;
 grant execute on function public.crew_email() to authenticated;
+
+-- Crew login helpers the app calls. Created only if this project does not already have them
+-- (an existing version is left untouched).
+do $$
+begin
+  if to_regprocedure('public.is_crew_email()') is null then
+    execute $f$
+      create function public.is_crew_email()
+      returns table (id text, user_id uuid)
+      language sql stable security definer set search_path = public
+      as $b$
+        select e.id, e.user_id from public.employees e
+         where public.crew_email() <> '' and lower(e.email) = public.crew_email()
+           and coalesce(e.active, true)
+         limit 1
+      $b$
+    $f$;
+    revoke all on function public.is_crew_email() from public, anon;
+    grant execute on function public.is_crew_email() to authenticated;
+  end if;
+  if to_regprocedure('public.list_crew_clients()') is null then
+    -- Without a known clients layout, return nothing; crew can still type client details by hand.
+    execute $f$
+      create function public.list_crew_clients()
+      returns table (id text, name text, phone text, address text)
+      language sql stable security definer set search_path = public
+      as $b$ select null::text, null::text, null::text, null::text where false $b$
+    $f$;
+    revoke all on function public.list_crew_clients() from public, anon;
+    grant execute on function public.list_crew_clients() to authenticated;
+  end if;
+end $$;

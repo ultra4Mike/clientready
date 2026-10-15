@@ -86,3 +86,9 @@ Run after the job-scheduling migration. It:
   data URL stored in `crew_expenses.receipt`, max ~3 MB). Anonymous users cannot call any of them.
 
 If you had custom policies on those tables, re-add them after running this (it replaces them).
+
+Safe to re-run, including after a failed run. If `employees`, `crew_jobs`, `job_drafts` (crew job
+reports) or `crew_expenses` are missing, it creates them with the columns the app uses, and it adds
+any missing columns to existing tables. Existing data is not touched. It also creates the
+`is_crew_email()` and `list_crew_clients()` functions only if your project does not already have
+them; the fallback `list_crew_clients()` returns no clients.
