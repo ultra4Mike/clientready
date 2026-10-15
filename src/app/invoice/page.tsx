@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
 import { getTrialState } from "@/lib/trial";
 import { saveCrewJobs } from "@/lib/crew";
+import { balanceDue, paidTotal, paymentFields, paymentMethods, readPayments, type Payment } from "@/lib/payments";
 import { documentTotals, discountLabel, normalizeDiscountType, type DiscountType } from "@/lib/discount";
 
 type LineItem = { description: string; qty: string; rate: string };
@@ -104,6 +105,7 @@ export default function NewInvoicePage() {
   const [taxPercent, setTaxPercent] = useState("0");
   const [discountType, setDiscountType] = useState<DiscountType>("percent");
   const [discountValue, setDiscountValue] = useState("");
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [items, setItems] = useState<LineItem[]>([{ ...emptyItem }]);
   const [businessName, setBusinessName] = useState("Your business");
   const [ownerName, setOwnerName] = useState("");
@@ -221,6 +223,7 @@ export default function NewInvoicePage() {
       setTaxPercent(data.taxPercent || "0");
       setDiscountType(normalizeDiscountType(data.discountType));
       setDiscountValue(data.discountValue || "");
+      setPayments(readPayments(data));
       setItems(loadedItems);
       setClientSearch(data.clientName || "");
       setStatus(data.status || "draft");
@@ -248,8 +251,17 @@ export default function NewInvoicePage() {
   
   const totals = useMemo(() => {
     const subtotal = items.reduce((sum, item) => sum + (Number(item.qty) || 0) * (Number(item.rate) || 0), 0);
-    return documentTotals(subtotal, taxPercent, discountType, discountValue);
-  }, [items, taxPercent, discountType, discountValue]);
+    const base = documentTotals(subtotal, taxPercent, discountType, discountValue);
+    const paid = paidTotal(payments);
+    return { ...base, paid, balance: balanceDue(base.total, paid, status) };
+  }, [items, taxPercent, discountType, discountValue, payments, status]);
+
+  function addPayment() {
+    setPayments((current) => [...current, { id: Date.now().toString(), amount: current.length ? "" : (totals.balance || totals.total).toFixed(2), method: "Cash", date: ymd(new Date()), ref: "" }]);
+  }
+  function updatePayment(id: string, patch: Partial<Payment>) {
+    setPayments((current) => current.map((payment) => payment.id === id ? { ...payment, ...patch } : payment));
+  }
 
   function chooseKind(kind: DocKind) {
     if (locked) return;
@@ -317,7 +329,7 @@ export default function NewInvoicePage() {
     setDocId(""); setClientSearch(""); setClientName(""); setClientCompany(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
     setInvoiceNumber(nextNumber(docKind)); setInvoiceDate(ymd(new Date())); setDueDate(plusDays(14)); setJobStart(""); setJobEnd("");
     setNotes(isProposal ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
-    setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
+    setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
     setStyle("clean"); setJobTime(""); setCosts(emptyCosts); setCrew([]); setOtherFees([]);
   }
 
@@ -336,7 +348,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
+      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -372,7 +384,7 @@ export default function NewInvoicePage() {
       data: {
         clientName, clientCompany, clientEmail, clientPhone, clientAddress,
         invoiceNumber: number, invoiceDate: ymd(new Date()), dueDate: plusDays(14),
-        jobStart, jobEnd, notes: "Payment is due within 14 days.", taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), items,
+        jobStart, jobEnd, notes: "Payment is due within 14 days.", taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), items,
         status: "draft", style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew,
       },
     };
@@ -477,6 +489,22 @@ export default function NewInvoicePage() {
               </div>
             </div>
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Tax percent" value={taxPercent} onChange={(event) => setTaxPercent(event.target.value)} />
+            <div className="space-y-2 rounded-xl border border-slate-200 p-4">
+              <div className="flex items-center justify-between">
+                <h2 className="font-medium">{isProposal ? "Deposit received" : "Payments received"}</h2>
+                <button type="button" className="text-sm" onClick={addPayment}>{payments.length ? "Add another payment" : isProposal ? "Add deposit" : "Add payment"}</button>
+              </div>
+              {payments.map((payment) => (
+                <div key={payment.id} className="grid gap-2 border-t border-slate-100 pt-2 sm:grid-cols-2">
+                  <label className="text-sm text-slate-600">Amount paid<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" inputMode="decimal" placeholder="300" value={payment.amount} onChange={(event) => updatePayment(payment.id, { amount: event.target.value })} /></label>
+                  <label className="text-sm text-slate-600">Method<select className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={payment.method} onChange={(event) => updatePayment(payment.id, { method: event.target.value })}>{paymentMethods.map((method) => <option key={method} value={method}>{method}</option>)}</select></label>
+                  <label className="text-sm text-slate-600">Date paid<input type="date" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" value={payment.date} onChange={(event) => updatePayment(payment.id, { date: event.target.value })} /></label>
+                  <label className="text-sm text-slate-600">Reference / note<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Check number, confirmation, last 4" value={payment.ref} onChange={(event) => updatePayment(payment.id, { ref: event.target.value })} /></label>
+                  <button type="button" className="text-left text-sm text-slate-600" onClick={() => setPayments((current) => current.filter((item) => item.id !== payment.id))}>Remove payment</button>
+                </div>
+              ))}
+              <p className="text-sm text-slate-600">Paid ${totals.paid.toFixed(2)} · Still owed ${totals.balance.toFixed(2)}</p>
+            </div>
             <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
             <div className="owner-costs space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-slate-900">
               <h2 className="font-medium">Your costs only</h2>
@@ -593,6 +621,10 @@ export default function NewInvoicePage() {
               {totals.discount > 0 && <div className="flex justify-between"><span>{discountLabel(discountType, discountValue)}</span><span>-${totals.discount.toFixed(2)}</span></div>}
               <div className="flex justify-between"><span>Tax</span><span>${totals.tax.toFixed(2)}</span></div>
               <div className="flex justify-between text-base font-semibold"><span>Total</span><span>${totals.total.toFixed(2)}</span></div>
+              {(totals.paid > 0 || status === "paid") && <>
+                {totals.paid > 0 && <div className="flex justify-between"><span>{isProposal ? "Deposit paid" : "Paid"}</span><span>-${totals.paid.toFixed(2)}</span></div>}
+                <div className="flex justify-between text-base font-semibold"><span>Balance due</span><span>${totals.balance.toFixed(2)}</span></div>
+              </>}
             </div>
             <p className={`mt-8 text-sm ${mutedClass}`}>{notes}</p>
             {!isProposal && paymentLink && <p className={`mt-4 text-sm ${mutedClass}`}>Pay here: {paymentLink}</p>}

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
+import { balanceDue, paidTotal, readPayments, type Payment } from "@/lib/payments";
 import { documentTotals, discountLabel } from "@/lib/discount";
 
 type LineItem = {
@@ -32,6 +33,7 @@ export default function InvoiceViewPage() {
   const [taxPercent, setTaxPercent] = useState("0");
   const [discountType, setDiscountType] = useState("percent");
   const [discountValue, setDiscountValue] = useState("");
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [items, setItems] = useState<LineItem[]>([]);
   const [status, setStatus] = useState("");
   const [businessName, setBusinessName] = useState("");
@@ -68,6 +70,11 @@ export default function InvoiceViewPage() {
       taxPercent?: string;
       discountType?: string;
       discountValue?: string;
+      payments?: unknown;
+      paymentAmount?: string;
+      paymentMethod?: string;
+      paymentDate?: string;
+      paymentRef?: string;
       items?: LineItem[];
       status?: string;
       jobTime?: string;
@@ -85,6 +92,7 @@ export default function InvoiceViewPage() {
     setTaxPercent(data.taxPercent || "0");
     setDiscountType(data.discountType || "percent");
     setDiscountValue(data.discountValue || "");
+    setPayments(readPayments(data));
     setItems(data.items || []);
     setStatus(data.status || "draft");
     setJobTime(data.jobTime || "");
@@ -94,8 +102,10 @@ export default function InvoiceViewPage() {
     const subtotal = items.reduce((sum, item) => {
       return sum + (Number(item.qty) || 0) * (Number(item.rate) || 0);
     }, 0);
-    return documentTotals(subtotal, taxPercent, discountType, discountValue);
-  }, [items, taxPercent, discountType, discountValue]);
+    const base = documentTotals(subtotal, taxPercent, discountType, discountValue);
+    const paid = paidTotal(payments);
+    return { ...base, paid, balance: balanceDue(base.total, paid, status) };
+  }, [items, taxPercent, discountType, discountValue, payments, status]);
 
   function editInvoice() {
     if (!docId) return;
@@ -204,6 +214,18 @@ export default function InvoiceViewPage() {
               <span>Total</span>
               <span>${totals.total.toFixed(2)}</span>
             </div>
+            {payments.filter((payment) => Number(payment.amount) > 0).map((payment) => (
+              <div key={payment.id} className="flex justify-between text-slate-600">
+                <span>Paid{payment.date ? ` ${payment.date}` : ""}{payment.method ? ` · ${payment.method}` : ""}{payment.ref ? ` · ${payment.ref}` : ""}</span>
+                <span>-${(Number(payment.amount) || 0).toFixed(2)}</span>
+              </div>
+            ))}
+            {(totals.paid > 0 || status === "paid") && (
+              <div className="flex justify-between text-base font-semibold">
+                <span>Balance due</span>
+                <span>${totals.balance.toFixed(2)}</span>
+              </div>
+            )}
           </div>
 
           {notes && <p className="mt-8 text-sm text-slate-600">{notes}</p>}

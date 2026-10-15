@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { loadAccountIntoCache } from "@/lib/account-cache";
 import { documentTotals } from "@/lib/discount";
+import { balanceDue, paidTotal, readPayments } from "@/lib/payments";
 
 type Client = {
   id: string;
@@ -41,6 +42,10 @@ function invoiceTotal(doc: SavedDocument) {
     return sum + (Number(item.qty) || 0) * (Number(item.rate) || 0);
   }, 0);
   return documentTotals(subtotal, doc.data?.taxPercent, doc.data?.discountType, doc.data?.discountValue).total;
+}
+
+function balance(doc: SavedDocument) {
+  return balanceDue(invoiceTotal(doc), paidTotal(readPayments(doc.data)), doc.data?.status);
 }
 
 function monthKey(value: string) {
@@ -85,16 +90,16 @@ export default function DashboardPage() {
     hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
   const stats = useMemo(() => {
-    const invoiced = invoices.reduce((sum, doc) => sum + invoiceTotal(doc), 0);
     const paidDocs = invoices.filter((doc) => doc.data?.status === "paid");
     const paid = paidDocs.reduce((sum, doc) => sum + invoiceTotal(doc), 0);
     const overdueDocs = invoices.filter((doc) => doc.data?.status === "overdue");
-    const overdue = overdueDocs.reduce((sum, doc) => sum + invoiceTotal(doc), 0);
+    const overdue = overdueDocs.reduce((sum, doc) => sum + balance(doc), 0);
+    const outstanding = invoices.reduce((sum, doc) => sum + balance(doc), 0);
     const paidRate = invoices.length
       ? Math.round((paidDocs.length / invoices.length) * 100)
       : 0;
     return {
-      outstanding: Math.max(invoiced - paid, 0),
+      outstanding,
       paid,
       overdue,
       overdueCount: overdueDocs.length,

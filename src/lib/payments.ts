@@ -1,0 +1,64 @@
+export type Payment = { id: string; amount: string; method: string; date: string; ref: string };
+
+export const paymentMethods = ["Cash", "Check", "Venmo", "Cash App", "Zelle", "Bank", "Card", "Other"];
+
+type PaymentData = {
+  payments?: unknown;
+  paymentAmount?: unknown;
+  paymentMethod?: unknown;
+  paymentDate?: unknown;
+  paymentRef?: unknown;
+  status?: unknown;
+};
+
+function num(value: unknown) {
+  return Number(String(value ?? "").replace(/[^0-9.-]/g, "")) || 0;
+}
+
+function round(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+/** Payments saved on a document. Older docs that only have the single paymentAmount field become one payment. */
+export function readPayments(data?: PaymentData | null): Payment[] {
+  if (!data) return [];
+  if (Array.isArray(data.payments)) {
+    return data.payments.map((raw, index) => {
+      const item = (raw || {}) as Partial<Payment>;
+      return {
+        id: String(item.id || `p${index}`),
+        amount: String(item.amount ?? ""),
+        method: String(item.method || ""),
+        date: String(item.date || ""),
+        ref: String(item.ref || ""),
+      };
+    });
+  }
+  if (num(data.paymentAmount) > 0) {
+    return [{ id: "legacy", amount: String(data.paymentAmount), method: String(data.paymentMethod || ""), date: String(data.paymentDate || ""), ref: String(data.paymentRef || "") }];
+  }
+  return [];
+}
+
+export function paidTotal(payments: Payment[]) {
+  return round(payments.reduce((sum, payment) => sum + Math.max(num(payment.amount), 0), 0));
+}
+
+/** What is still owed. Never below 0. An invoice marked paid owes nothing. */
+export function balanceDue(total: number, amountPaid: number, status?: unknown) {
+  if (status === "paid") return 0;
+  return round(Math.max(total - amountPaid, 0));
+}
+
+/** Fields to save in document data. Keeps the older single-payment fields filled for pages that read them. */
+export function paymentFields(payments: Payment[]) {
+  const clean = payments.filter((payment) => num(payment.amount) > 0);
+  const latest = clean[clean.length - 1];
+  return {
+    payments: clean,
+    paymentAmount: clean.length ? paidTotal(clean).toFixed(2) : "",
+    paymentMethod: latest?.method || "",
+    paymentDate: latest?.date || "",
+    paymentRef: latest?.ref || "",
+  };
+}
