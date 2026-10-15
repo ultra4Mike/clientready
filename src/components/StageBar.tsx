@@ -10,6 +10,7 @@
  *
  * `current` is the zero-based index of the active stage. Provide `onNext` or `href` (not both)
  * together with `nextActionLabel` to show the call-to-action button.
+ * Pass `embedded` to drop the card chrome when placing it inside another card (e.g. an editor header).
  */
 export default function StageBar({
   stages,
@@ -17,23 +18,25 @@ export default function StageBar({
   nextActionLabel,
   onNext,
   href,
+  embedded = false,
 }: {
   stages: string[];
   current: number;
   nextActionLabel?: string;
   onNext?: () => void;
   href?: string;
+  embedded?: boolean;
 }) {
   const index = Math.max(0, Math.min(current, stages.length - 1));
   const pct = stages.length > 1 ? (index / (stages.length - 1)) * 100 : 100;
-  const cta = "inline-flex shrink-0 items-center justify-center rounded-lg bg-teal-500 px-4 py-2 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400";
+  const cta = "inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-1.5 rounded-lg bg-teal-500 px-4 py-2 text-sm md:min-h-10 md:w-auto font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400";
 
   return (
-    <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm print:hidden">
+    <div className={`print:hidden ${embedded ? "" : "rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm"}`}>
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-6">
         <div className="md:hidden">
           <div className="flex items-baseline justify-between text-sm">
-            <span className="font-semibold">{stages[index]}</span>
+            <span className="font-semibold text-teal-700 dark:text-teal-300">{stages[index]}</span>
             <span className="text-xs text-[var(--cr-muted)]">Step {index + 1} of {stages.length}</span>
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-500/20">
@@ -47,10 +50,10 @@ export default function StageBar({
             const active = i === index;
             return (
               <li key={stage} className={`flex min-w-0 items-center ${i < stages.length - 1 ? "flex-1" : ""}`} aria-current={active ? "step" : undefined}>
-                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${done ? "border-teal-500 bg-teal-500 text-slate-950!" : active ? "border-teal-400 bg-teal-500/15 text-teal-700 dark:text-teal-300" : "border-slate-500/40 text-[var(--cr-muted)]"}`}>
+                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${done ? "border-teal-500 bg-teal-500 text-slate-950!" : active ? "border-teal-400 bg-teal-500/20 text-teal-700 ring-4 ring-teal-500/15 dark:text-teal-300" : "border-slate-500/40 text-[var(--cr-muted)]"}`}>
                   {done ? "✓" : i + 1}
                 </span>
-                <span className={`ml-2 truncate text-sm ${active ? "font-semibold" : "text-[var(--cr-muted)]"}`}>{stage}</span>
+                <span className={`ml-2 truncate text-sm ${active ? "font-semibold text-teal-700 dark:text-teal-300" : done ? "" : "text-[var(--cr-muted)]"}`}>{stage}</span>
                 {i < stages.length - 1 && <span className={`mx-3 h-0.5 min-w-4 flex-1 rounded-full ${done ? "bg-teal-500" : "bg-slate-500/25"}`} />}
               </li>
             );
@@ -58,9 +61,9 @@ export default function StageBar({
         </ol>
 
         {nextActionLabel && (href ? (
-          <a href={href} className={cta}>{nextActionLabel}</a>
+          <a href={href} className={cta}>{nextActionLabel}<span aria-hidden="true">→</span></a>
         ) : onNext ? (
-          <button type="button" onClick={onNext} className={cta}>{nextActionLabel}</button>
+          <button type="button" onClick={onNext} className={cta}>{nextActionLabel}<span aria-hidden="true">→</span></button>
         ) : null)}
       </div>
     </div>
