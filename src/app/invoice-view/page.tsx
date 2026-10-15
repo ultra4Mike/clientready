@@ -4,6 +4,7 @@ import { StageSchedule } from "@/components/StageSchedule";
 import { readStages, type Stage } from "@/lib/stages";
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
+import PageHeader from "@/components/PageHeader";
 import { balanceDue, paidTotal, readPayments, type Payment } from "@/lib/payments";
 import { JobPhotoStrip } from "@/components/JobPhotos";
 import { readPhotos, type JobPhoto } from "@/lib/photos";
@@ -171,14 +172,27 @@ export default function InvoiceViewPage() {
   if (viewState !== "ready") {
     return (
       <AppShell title="Invoice">
-        <div data-testid="invoice-view-empty" data-state={viewState} className="mx-auto max-w-3xl py-12 text-center">
+        <PageHeader title="Invoice" subtitle="View, print or share a saved invoice." />
+        <div data-testid="invoice-view-empty" data-state={viewState} className="mx-auto flex max-w-xl flex-col items-center rounded-2xl border border-dashed border-teal-500/30 bg-[var(--cr-card)] px-6 py-14 text-center shadow-sm">
           {viewState === "loading" ? (
-            <p className="text-sm text-[var(--cr-muted)]">Loading…</p>
+            <>
+              <span className="h-12 w-12 animate-spin rounded-full border-4 border-teal-500/20 border-t-teal-500" aria-hidden="true" />
+              <p className="mt-4 text-sm font-medium text-[var(--cr-muted)]">Loading…</p>
+              <div className="mt-6 w-full max-w-sm space-y-2" aria-hidden="true">
+                <div className="h-3 animate-pulse rounded bg-teal-500/15" />
+                <div className="h-3 w-4/5 animate-pulse rounded bg-teal-500/15" />
+                <div className="h-3 w-3/5 animate-pulse rounded bg-teal-500/15" />
+              </div>
+            </>
           ) : (
             <>
-              <p className="text-base font-semibold">No invoice selected</p>
-              <p className="mt-1 text-sm text-[var(--cr-muted)]">Open an invoice from your documents to view or print it.</p>
-              <a href="/documents" className="mt-4 inline-block rounded-lg border border-teal-500/30 px-4 py-2 text-sm font-medium">Go to Documents</a>
+              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-teal-500/15 text-2xl" aria-hidden="true">🧾</span>
+              <p className="mt-4 text-lg font-semibold">No invoice selected</p>
+              <p className="mt-1 max-w-sm text-sm text-[var(--cr-muted)]">Open an invoice from your documents to view or print it.</p>
+              <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+                <a href="/documents" className="rounded-lg bg-teal-500 px-5 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">Go to Documents</a>
+                <a href="/invoice" className="rounded-lg border border-teal-500/30 px-5 py-2.5 text-sm font-medium transition hover:border-teal-400">New invoice</a>
+              </div>
             </>
           )}
         </div>
