@@ -60,23 +60,23 @@ export default function SchedulePage() {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <a href="/dashboard" className="text-sm text-slate-600">
+      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white shadow-sm print:hidden">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
+          <a href="/dashboard" className="text-sm font-medium text-slate-600 transition hover:text-teal-600">
             Back to dashboard
           </a>
-          <a href="/calendar" className="text-sm text-slate-600">
+          <a href="/calendar" className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:border-teal-500 hover:text-teal-600">
             Calendar
           </a>
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-6xl gap-8 px-6 py-8 lg:grid-cols-2">
+      <section className="mx-auto grid max-w-6xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-2 lg:gap-8">
         <form
           onSubmit={handleSubmit}
-          className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6"
+          className="h-fit space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 lg:sticky lg:top-20"
         >
-          <h1 className="text-xl font-semibold">Schedule a job</h1>
+          <h1 className="text-xl font-bold tracking-tight">Schedule a job</h1>
           <select
             className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
             value={form.clientName}
@@ -91,7 +91,8 @@ export default function SchedulePage() {
               </option>
             ))}
           </select>
-          <label className="text-sm text-slate-600">
+          <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block text-sm font-medium text-slate-600">
             Date
             <input
               type="date"
@@ -100,7 +101,7 @@ export default function SchedulePage() {
               onChange={(event) => setForm({ ...form, date: event.target.value })}
             />
           </label>
-          <label className="text-sm text-slate-600">
+          <label className="block text-sm font-medium text-slate-600">
             Start time
             <input
               type="time"
@@ -109,6 +110,7 @@ export default function SchedulePage() {
               onChange={(event) => setForm({ ...form, time: event.target.value })}
             />
           </label>
+          </div>
           <textarea
             className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
             placeholder="Job details"
@@ -117,7 +119,7 @@ export default function SchedulePage() {
           />
           <button
             type="submit"
-            className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400 disabled:opacity-50"
+            className="w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400 disabled:opacity-50 sm:w-auto"
           >
             Save appointment
           </button>
@@ -125,7 +127,7 @@ export default function SchedulePage() {
 
         <div className="space-y-3">
           {appointments.length === 0 && (
-            <p className="text-slate-600">No appointments yet.</p>
+            <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600">No appointments yet.</p>
           )}
           {appointments
             .slice()
@@ -133,10 +135,10 @@ export default function SchedulePage() {
             .map((item) => (
               <div
                 key={item.id}
-                className="rounded-2xl border border-slate-200 bg-white p-5"
+                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
               >
-                <p className="font-medium">{item.clientName}</p>
-                <p className="text-sm text-slate-600">
+                <p className="text-base font-semibold">{item.clientName}</p>
+                <p className="mt-0.5 text-sm font-medium text-teal-600">
                   {item.date} at {item.time}
                 </p>
                 {item.notes && (
@@ -145,7 +147,7 @@ export default function SchedulePage() {
                 <button
                   type="button"
                   onClick={() => removeAppointment(item.id)}
-                  className="mt-3 text-sm text-slate-500"
+                  className="mt-3 rounded-lg px-3 py-1.5 text-sm text-slate-500 transition hover:bg-red-500/10 hover:text-red-600"
                 >
                   Remove
                 </button>
