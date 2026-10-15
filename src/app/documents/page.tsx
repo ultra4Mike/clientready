@@ -107,9 +107,13 @@ export default function DocumentsPage() {
   function duplicateDocument(doc: SavedDocument) {
     // A copy is a new document: it must not share the original's approval link.
     // A copy is a new job too: it isn't on the schedule yet.
-    const { approval: _approval, schedule: _schedule, ...rest } = doc.data || {};
+    // Nor is it another period of a recurring schedule (one draft per period), or already reviewed.
+    const { approval: _approval, schedule: _schedule, recurringFrom: _from, recurringReview: _review, reviews: _reviews, ...rest } = (doc.data || {}) as Record<string, unknown>;
     void _approval;
     void _schedule;
+    void _from;
+    void _review;
+    void _reviews;
     const copy: SavedDocument = {
       ...doc,
       id: Date.now().toString(),

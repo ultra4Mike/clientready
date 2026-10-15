@@ -1,4 +1,7 @@
-import { saveCloudDocument } from "@/lib/cloud-docs";
+import { isUuid, saveCloudDocument } from "@/lib/cloud-docs";
+import { supabase } from "@/lib/supabase";
+import { markSynced } from "@/lib/sync-status";
+import { readSchedule, syncScheduleCrewJobs } from "@/lib/schedule";
 import { moneySnapshot } from "@/lib/change-orders";
 
 export type Frequency = "weekly" | "monthly" | "days";
@@ -123,6 +126,34 @@ export function recurringDraftData(template: Doc, number: string, period: string
     // or its status moves off draft anywhere (e.g. marked sent).
     recurringReview: "pending",
     recurringFrom: { id: template.id, number: numberOf(template), period },
+    ...nextJob(template, period),
+  };
+}
+
+/**
+ * When the template is a scheduled job, the draft gets the same job (time, crew, crew note)
+ * on its period date, status "scheduled". Past periods (catch-up) get no job.
+ */
+function nextJob(template: Doc, period: string) {
+  const schedule = readSchedule(template.data);
+  if (!schedule || period < ymd(new Date())) return {};
+  return { schedule: { ...schedule, date: period, status: "scheduled", updatedAt: new Date().toISOString() } };
+}
+
+/** A draft for this schedule + period that another device already put in the cloud, if any. */
+async function cloudDraftFor(templateId: string, period: string): Promise<Doc | null> {
+  if (!isUuid(templateId)) return null;
+  const { data, error } = await supabase
+    .from("documents")
+    .select("*")
+    .eq("data->recurringFrom->>id", templateId)
+    .eq("data->recurringFrom->>period", period)
+    .limit(1);
+  const row = !error && Array.isArray(data) ? data[0] : null;
+  if (!row) return null;
+  return {
+    id: row.id, type: row.type, title: row.title || "", clientName: row.client_name || "",
+    createdAt: row.created_at ? new Date(row.created_at).toLocaleDateString() : "", data: row.data || {},
   };
 }
 
@@ -176,7 +207,13 @@ async function generateOne(templateId: string, period: string, nextRun: string) 
   const existing = generatedFrom(docs, templateId).find((doc) => readRecurringFrom(doc.data?.recurringFrom)?.period === period);
   let draftId = existing?.id || "";
   let list = docs;
-  if (!existing) {
+  // Another device may have made it already (local copy not merged yet): adopt that one.
+  const remote = existing ? null : await cloudDraftFor(templateId, period);
+  if (remote) {
+    draftId = remote.id;
+    list = [...readDocs().filter((doc) => doc.id !== remote.id), remote];
+  }
+  if (!existing && !remote) {
     const number = nextInvoiceNumber(docs);
     const draft: Doc = {
       id: `${Date.now()}${Math.floor(Math.random() * 1000)}`,
@@ -186,7 +223,16 @@ async function generateOne(templateId: string, period: string, nextRun: string) 
       createdAt: new Date().toLocaleDateString(),
       data: recurringDraftData(template, number, period),
     };
+    const localId = draft.id;
     draft.id = await saveCloudDocument(draft);
+    // Insert refused (the database allows one draft per schedule + period): another device won the race.
+    const winner = !isUuid(draft.id) && isUuid(templateId) ? await cloudDraftFor(templateId, period) : null;
+    if (winner) {
+      markSynced(localId);
+      Object.assign(draft, winner);
+    } else if (draft.data.schedule) {
+      await syncScheduleCrewJobs(draft);
+    }
     draftId = draft.id;
     list = [...readDocs().filter((doc) => doc.id !== draft.id), draft];
   }
