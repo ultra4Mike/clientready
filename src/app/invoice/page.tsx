@@ -156,6 +156,8 @@ export default function NewInvoicePage() {
   const [photos, setPhotos] = useState<JobPhoto[]>([]);
   const [showPhotos, setShowPhotos] = useState(false);
   const [changeOrderOf, setChangeOrderOf] = useState<ChangeOrderOf | null>(null);
+  const [fromProposal, setFromProposal] = useState<{ id: string; number: string } | null>(null);
+  const [madeInvoices, setMadeInvoices] = useState<{ id: string; number: string }[]>([]);
   const [changeOrderNotes, setChangeOrderNotes] = useState<ChangeOrderNote[]>([]);
   const [recFreq, setRecFreq] = useState<Frequency | "off">("off");
   const [recInterval, setRecInterval] = useState("30");
@@ -275,7 +277,7 @@ export default function NewInvoicePage() {
       const data = (doc.data || {}) as {
         clientName?: string; clientCompany?: string; clientEmail?: string; clientPhone?: string; clientAddress?: string;
         invoiceNumber?: string; invoiceDate?: string; dueDate?: string; jobStart?: string; jobEnd?: string; notes?: string;
-        taxPercent?: string; discountType?: string; discountValue?: string; signature?: unknown; proposalSignature?: unknown; payLink?: string; photos?: unknown; showPhotos?: unknown; changeOrderOf?: unknown; changeOrderNotes?: unknown; recurring?: unknown; recurringFrom?: unknown; approval?: unknown; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
+        taxPercent?: string; discountType?: string; discountValue?: string; signature?: unknown; proposalSignature?: unknown; payLink?: string; photos?: unknown; showPhotos?: unknown; fromProposal?: { id?: string; number?: string }; changeOrderOf?: unknown; changeOrderNotes?: unknown; recurring?: unknown; recurringFrom?: unknown; approval?: unknown; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
       };
       const kind: DocKind = doc.type === "proposal" ? "proposal" : "invoice";
       const loadedItems = Array.isArray(data.items) && data.items.length ? data.items.map((item) => ({ ...item, category: normalizeCategory(item.category) })) : [{ ...emptyItem }];
@@ -305,6 +307,11 @@ export default function NewInvoicePage() {
       setPhotos(readPhotos(data.photos));
       setShowPhotos(data.showPhotos === true);
       setChangeOrderOf(kind === "invoice" ? readChangeOrderOf(data.changeOrderOf) : null);
+      setFromProposal(kind === "invoice" && data.fromProposal?.id ? { id: String(data.fromProposal.id), number: String(data.fromProposal.number || "proposal") } : null);
+      // Invoices already made from this proposal (the proposal itself is never changed).
+      setMadeInvoices(kind === "proposal" ? (docs as unknown as { id: string; type: string; title: string; data?: { invoiceNumber?: string; fromProposal?: { id?: string } } }[])
+        .filter((item) => item.type === "invoice" && item.data?.fromProposal?.id === doc.id)
+        .map((item) => ({ id: item.id, number: String(item.data?.invoiceNumber || item.title) })) : []);
       setChangeOrderNotes(readChangeOrderNotes(data.changeOrderNotes));
       const schedule = kind === "invoice" ? readRecurring(data.recurring) : null;
       setRecFreq(schedule && schedule.active ? schedule.frequency : "off");
@@ -474,7 +481,7 @@ export default function NewInvoicePage() {
     setDocId(""); setClientSearch(""); setClientName(""); setClientCompany(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
     setInvoiceNumber(nextNumber(docKind)); setInvoiceDate(ymd(new Date())); setDueDate(plusDays(14)); setJobStart(""); setJobEnd("");
     setNotes(isProposal ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
-    setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setSignature(null); setProposalSignature(null); setPadKey((key) => key + 1); setDocPayLink(""); setPhotos([]); setShowPhotos(false); setChangeOrderOf(null); setChangeOrderNotes([]); setRecFreq("off"); setRecNext(""); setRecLoadedNext(""); setRecurringFrom(null); setApproval(null); setSchedule(null); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
+    setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setSignature(null); setProposalSignature(null); setPadKey((key) => key + 1); setDocPayLink(""); setPhotos([]); setShowPhotos(false); setChangeOrderOf(null); setFromProposal(null); setMadeInvoices([]); setChangeOrderNotes([]); setRecFreq("off"); setRecNext(""); setRecLoadedNext(""); setRecurringFrom(null); setApproval(null); setSchedule(null); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
     setStyle("clean"); setJobTime(""); setCosts(emptyCosts); setCrew([]); setOtherFees([]);
   }
 
@@ -497,7 +504,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(stored?.data?.schedule ? { schedule: stored.data.schedule } : {}), items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
+      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(stored?.data?.schedule ? { schedule: stored.data.schedule } : {}), items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -599,6 +606,12 @@ export default function NewInvoicePage() {
       setSaveMessage("Trial ended. Subscribe to save. $7.99/mo or $19.99 for 3 months.");
       return;
     }
+    const proposalId = currentDocId(docId);
+    if (!proposalId) {
+      setSaveMessage("Save the proposal first, then create the invoice.");
+      return;
+    }
+    if (madeInvoices.length && !window.confirm(`An invoice was already made from this proposal (${madeInvoices.map((item) => item.number).join(", ")}). Make another one?`)) return;
     const raw = window.localStorage.getItem("clientready-documents");
     const docs = raw ? JSON.parse(raw) : [];
     const number = nextNumber("invoice");
@@ -612,7 +625,7 @@ export default function NewInvoicePage() {
       data: {
         clientName, clientCompany, clientEmail, clientPhone, clientAddress,
         invoiceNumber: number, invoiceDate: ymd(new Date()), dueDate: plusDays(14),
-        jobStart, jobEnd, notes: "Payment is due within 14 days.", taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature: null, proposalSignature: signature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), items,
+        jobStart, jobEnd, notes: "Payment is due within 14 days.", taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature: null, proposalSignature: signature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), fromProposal: { id: proposalId, number: invoiceNumber || "Proposal" }, items,
         status: "draft", style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew,
       },
     };
@@ -899,6 +912,11 @@ export default function NewInvoicePage() {
                 </div>
                 <p className="text-xs text-slate-500">Drafts are made when the app opens on or after the next run date. They are never sent or marked paid. Save the document to keep schedule changes.</p>
               </div>
+            )}
+            {(fromProposal || madeInvoices.length > 0) && (
+              <p className="print-hide text-sm text-slate-600" data-testid="proposal-link">
+                {fromProposal ? <>Made from proposal <a className="font-medium text-teal-600 underline" href={`/invoice?id=${encodeURIComponent(fromProposal.id)}`}>{fromProposal.number}</a></> : <>Invoice made from this proposal: {madeInvoices.map((item, index) => <span key={item.id}>{index ? ", " : ""}<a className="font-medium text-teal-600 underline" href={`/invoice?id=${encodeURIComponent(item.id)}`}>{item.number}</a></span>)}</>}
+              </p>
             )}
             <div className="print-hide sticky bottom-0 z-10 -mx-4 grid grid-cols-2 gap-2 border-t border-slate-200 bg-[var(--cr-card)] px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:-mx-6 sm:flex sm:flex-wrap sm:gap-3 sm:px-6">
               {!locked && <button type="button" onClick={saveDocument} className="col-span-2 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Save document</button>}
