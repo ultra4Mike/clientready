@@ -1,6 +1,5 @@
 "use client";
 
-import AppShell from "@/components/AppShell";
 import { FormEvent, useEffect, useState } from "react";
 
 type Client = {
@@ -60,16 +59,22 @@ export default function SchedulePage() {
   }
 
   return (
-    <AppShell title="Schedule">
-      <div className="mb-4 flex justify-end">
-        <a href="/calendar" className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400">
-          Open calendar
-        </a>
-      </div>
-      <section className="grid gap-6 lg:grid-cols-2 lg:gap-8">
+    <main className="min-h-screen bg-[var(--cr-bg)] text-[var(--cr-text)]">
+      <header className="sticky top-0 z-20 border-b border-teal-500/20 bg-[var(--cr-panel)] print:hidden">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
+          <a href="/dashboard" className="flex items-center gap-2 text-sm font-medium transition hover:text-teal-500"><span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-teal-500 text-sm font-bold text-slate-950!">C</span>
+            Back to dashboard
+          </a>
+          <a href="/calendar" className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400">
+            Calendar
+          </a>
+        </div>
+      </header>
+
+      <section className="mx-auto grid max-w-6xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-2 lg:gap-8">
         <form
           onSubmit={handleSubmit}
-          className="h-fit space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 lg:sticky lg:top-20"
+          className="h-fit space-y-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-6 lg:sticky lg:top-20"
         >
           <h1 className="text-xl font-bold tracking-tight">Schedule a job</h1>
           <select
@@ -122,7 +127,7 @@ export default function SchedulePage() {
 
         <div className="space-y-3">
           {appointments.length === 0 && (
-            <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600">No appointments yet.</p>
+            <p className="rounded-2xl border border-dashed border-teal-500/30 bg-[var(--cr-card)] p-8 text-center text-sm text-slate-600">No appointments yet.</p>
           )}
           {appointments
             .slice()
@@ -130,7 +135,7 @@ export default function SchedulePage() {
             .map((item) => (
               <div
                 key={item.id}
-                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm"
               >
                 <p className="text-base font-semibold">{item.clientName}</p>
                 <p className="mt-0.5 text-sm font-medium text-teal-600">
@@ -150,6 +155,6 @@ export default function SchedulePage() {
             ))}
         </div>
       </section>
-    </AppShell>
+    </main>
   );
 }
