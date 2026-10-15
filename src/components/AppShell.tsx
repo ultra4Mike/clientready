@@ -23,6 +23,24 @@ const moreLinks = [
   { href: "/backup", label: "Backup" },
 ];
 
+const TAB_HREFS = ["/dashboard", "/documents", "/calendar", "/clients"];
+
+const ICON_PATHS: Record<string, string> = {
+  "/dashboard": "M3 11l9-8 9 8v9a1 1 0 01-1 1h-5v-6h-6v6H4a1 1 0 01-1-1z",
+  "/documents": "M7 3h7l5 5v12a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zm7 0v5h5M9 13h6M9 17h6",
+  "/calendar": "M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1zm-1 5h16M8 3v4m8-4v4",
+  "/clients": "M16 20v-1a4 4 0 00-4-4H7a4 4 0 00-4 4v1m6.5-9a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM21 20v-1a4 4 0 00-3-3.9M16 4.1a3.5 3.5 0 010 6.8",
+  more: "M5 12h.01M12 12h.01M19 12h.01",
+};
+
+function TabIcon({ name }: { name: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={name === "more" ? 3 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d={ICON_PATHS[name]} />
+    </svg>
+  );
+}
+
 function Logo() {
   return (
     <a href="/dashboard" className="flex items-center gap-2 font-semibold">
@@ -134,14 +152,51 @@ useEffect(() => {
               <Logo />
               {actions}
             </div>
-            <div className="mt-3">{nav}</div>
           </header>
-          <div className="app-main p-4">
+          <div className="app-main p-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] print:pb-4">
             <div className="mx-auto w-full max-w-6xl">
             <h1 className="print-hide mb-4 text-2xl font-bold tracking-tight">{title}</h1>
             {children}
             </div>
           </div>
+          {moreOpen && (
+            <div className="fixed inset-0 z-40 print:hidden" onClick={() => setMoreOpen(false)}>
+              <div className="absolute inset-0 bg-slate-950/60" />
+              <div
+                className="absolute inset-x-0 bottom-0 rounded-t-3xl border-t border-teal-500/20 bg-[var(--cr-panel)] px-4 pt-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] shadow-2xl"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-slate-500/40" />
+                <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">More</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[...mainLinks.filter((link) => !TAB_HREFS.includes(link.href)), ...moreLinks].map((link) => (
+                    <a key={link.href} href={link.href} className="rounded-xl border border-teal-500/20 bg-[var(--cr-card)] px-4 py-3 text-sm font-medium transition hover:border-teal-400">
+                      {link.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-50 border-t border-teal-500/20 bg-[var(--cr-panel)]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur print:hidden">
+            <div className="mx-auto grid max-w-lg grid-cols-5">
+              {mainLinks.filter((link) => TAB_HREFS.includes(link.href)).map((link) => (
+                <a key={link.href} href={link.href} className="flex flex-col items-center gap-1 px-1 py-2.5 text-[11px] font-medium transition hover:text-teal-400">
+                  <TabIcon name={link.href} />
+                  {link.href === "/dashboard" ? "Home" : link.label}
+                </a>
+              ))}
+              <button
+                type="button"
+                aria-expanded={moreOpen}
+                onClick={() => setMoreOpen(!moreOpen)}
+                className={`flex flex-col items-center gap-1 px-1 py-2.5 text-[11px] font-medium transition hover:text-teal-400 ${moreOpen ? "text-teal-400" : ""}`}
+              >
+                <TabIcon name="more" />
+                More
+              </button>
+            </div>
+          </nav>
         </>
       )}
     </div>
