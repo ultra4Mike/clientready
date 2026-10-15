@@ -9,6 +9,7 @@ import { readApproval } from "@/lib/approval";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { documentTotals } from "@/lib/discount";
+import { documentStage, NEXT_LABEL, STAGE_LABEL } from "@/lib/doc-stage";
 import { balanceDue, isOpenBalance, paidTotal, readPayments } from "@/lib/payments";
 import { searchWithNumbers } from "@/lib/doc-number";
 
@@ -54,6 +55,8 @@ export default function DocumentsPage() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const deferredSearch = useDeferredValue(search);
+  const stages = useMemo(() => new Map(documents.map((doc) => [doc.id, documentStage(doc, documents)])), [documents]);
+  const stageOf = (doc: SavedDocument) => stages.get(doc.id) || documentStage(doc, documents);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -263,6 +266,10 @@ export default function DocumentsPage() {
         {visibleDocs.map((doc) => (
           <div
             key={doc.id}
+            data-testid="doc-row"
+            data-stage={stageOf(doc).stage}
+            data-next-action={stageOf(doc).next}
+            title={`${STAGE_LABEL[stageOf(doc).stage]}${NEXT_LABEL[stageOf(doc).next] ? ` · Next: ${NEXT_LABEL[stageOf(doc).next]}` : ""}`}
             className="grid grid-cols-2 gap-x-4 gap-y-2 border-b border-teal-500/10 px-4 py-4 transition last:border-b-0 hover:bg-teal-500/5 md:items-center md:px-5 md:py-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_7.5rem_7rem_7.5rem_13rem]"
           >
             <button type="button" onClick={() => openDocument(doc)} className="col-span-2 min-w-0 text-left md:col-span-1">

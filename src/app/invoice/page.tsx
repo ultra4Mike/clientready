@@ -2,6 +2,7 @@
 
 import PortalShare from "@/components/PortalShare";
 import EmailComposer from "@/components/EmailComposer";
+import { documentStage, NEXT_LABEL } from "@/lib/doc-stage";
 import { readEmailLog, type EmailLogEntry } from "@/lib/email";
 import { clientIdFor } from "@/lib/portal";
 import JobDonePanel from "@/components/JobDonePanel";
@@ -379,6 +380,11 @@ export default function NewInvoicePage() {
 
   // Picked client's id, else the one saved client with exactly this name (else none: match by name).
   const docClientId = clientId || clientIdFor({ clientName }, savedClients);
+  // Read-only stage of what is on screen (never changes status).
+  const docStage = documentStage(
+    { id: docId, type: isProposal ? "proposal" : "invoice", data: { status, approval, schedule, items, payments, taxPercent, discountType, discountValue } },
+    madeInvoices.length ? [{ type: "invoice", data: { fromProposal: { id: docId } } }] : []
+  );
 
   function addPayment() {
     setPayments((current) => [...current, { id: Date.now().toString(), amount: current.length ? "" : (totals.balance || totals.total).toFixed(2), method: "Cash", date: ymd(new Date()), ref: "" }]);
@@ -685,11 +691,12 @@ export default function NewInvoicePage() {
   return (
     <AppShell title={isProposal ? "New proposal" : "New invoice"}>
       <div className="print-hide mb-6 flex flex-col gap-4 border-b border-teal-500/15 pb-5 lg:flex-row lg:items-end lg:justify-between">
-        <div className="min-w-0">
+        <div className="min-w-0" data-testid="doc-stage" data-stage={docStage.stage} data-next-action={docStage.next}>
           <p className="text-xs font-semibold uppercase tracking-wider text-teal-600 dark:text-teal-300">{isProposal ? "Proposal" : "Invoice"}</p>
           <div className="mt-1 flex flex-wrap items-center gap-3">
             <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{invoiceNumber || (isProposal ? "New proposal" : "New invoice")}</h2>
             <span className="rounded-full border border-teal-500/40 bg-teal-500/10 px-3 py-0.5 text-xs font-semibold capitalize">{status}</span>
+            {docId && NEXT_LABEL[docStage.next] && <span data-testid="doc-next-action" className="text-xs text-[var(--cr-muted)]">Next: {NEXT_LABEL[docStage.next]}</span>}
           </div>
           <p className="mt-1 text-sm text-[var(--cr-muted)]">{clientName || "No client yet"} · Total ${totals.total.toFixed(2)}</p>
         </div>
