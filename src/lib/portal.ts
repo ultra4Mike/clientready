@@ -28,16 +28,39 @@ function idFilter(client: PortalClient) {
   return `client_id.eq.${quote(client.id || "")},and(client_id.is.null,client_key.eq.${quote(clientKey(client.name))})`;
 }
 
-/** The active portal token for a client, "" when none, null when it could not be checked. */
-export async function activePortal(input: PortalClient | string): Promise<string | null> {
+/**
+ * True when the database doesn't have client_portals.client_id yet (migration
+ * 20261015070000_portal_client_id.sql not run). Portal calls then fall back to matching by name.
+ */
+function noClientIdColumn(error: { code?: string; message?: string } | null) {
+  return Boolean(error && (error.code === "42703" || error.code === "PGRST204" || /client_id/.test(error.message || "")));
+}
+
+export type PortalStatus = { token: string | null; state: "ok" | "signed-out" | "error" };
+
+/** The active portal token for a client ("" when none) and whether it could be checked. */
+export async function portalStatus(input: PortalClient | string): Promise<PortalStatus> {
   const client = asClient(input);
   const userId = await getUserId();
-  if (!userId || !clientKey(client.name)) return null;
-  const base = supabase.from("client_portals").select("token, client_id").eq("owner_id", userId).is("revoked_at", null);
-  const { data, error } = await (client.id ? base.or(idFilter(client)) : base.eq("client_key", clientKey(client.name)))
-    .order("created_at", { ascending: false })
-    .limit(1);
-  if (error) return null;
+  if (!userId) return { token: null, state: "signed-out" };
+  if (!clientKey(client.name)) return { token: null, state: "error" };
+  const query = (byId: boolean) => {
+    const base = supabase.from("client_portals").select(byId ? "token, client_id" : "token").eq("owner_id", userId).is("revoked_at", null);
+    return (byId ? base.or(idFilter(client)) : base.eq("client_key", clientKey(client.name))).order("created_at", { ascending: false }).limit(1);
+  };
+  let { data, error } = await query(Boolean(client.id));
+  if (client.id && noClientIdColumn(error)) ({ data, error } = await query(false));
+  if (error) return { token: null, state: "error" };
+  const token = await linkRow(userId, client, data);
+  return { token, state: "ok" };
+}
+
+/** The active portal token for a client, "" when none, null when it could not be checked. */
+export async function activePortal(input: PortalClient | string): Promise<string | null> {
+  return (await portalStatus(input)).token;
+}
+
+async function linkRow(userId: string, client: PortalClient, data: unknown) {
   const row = Array.isArray(data) ? (data[0] as { token?: string; client_id?: string | null } | undefined) : undefined;
   if (row?.token && client.id && !row.client_id) {
     // Older name-keyed link: tie it to the client id so a later rename keeps the same portal.
@@ -51,8 +74,9 @@ export async function revokePortal(input: PortalClient | string) {
   const client = asClient(input);
   const userId = await getUserId();
   if (!userId) return "Sign in first.";
-  const base = supabase.from("client_portals").update({ revoked_at: new Date().toISOString() }).eq("owner_id", userId).is("revoked_at", null);
-  const { error } = await (client.id ? base.or(idFilter(client)) : base.eq("client_key", clientKey(client.name)));
+  const base = () => supabase.from("client_portals").update({ revoked_at: new Date().toISOString() }).eq("owner_id", userId).is("revoked_at", null);
+  let { error } = await (client.id ? base().or(idFilter(client)) : base().eq("client_key", clientKey(client.name)));
+  if (client.id && noClientIdColumn(error)) ({ error } = await base().eq("client_key", clientKey(client.name)));
   return error ? "Could not reach your account. The link was not changed." : "";
 }
 
@@ -65,13 +89,9 @@ export async function createPortal(input: PortalClient | string): Promise<{ toke
   const revokeError = await revokePortal(client);
   if (revokeError) return { token: "", error: revokeError };
   const token = newApprovalToken();
-  const { error } = await supabase.from("client_portals").insert({
-    token,
-    owner_id: userId,
-    client_key: clientKey(client.name),
-    client_name: client.name.trim(),
-    ...(client.id ? { client_id: client.id } : {}),
-  });
+  const row = { token, owner_id: userId, client_key: clientKey(client.name), client_name: client.name.trim() };
+  let { error } = await supabase.from("client_portals").insert({ ...row, ...(client.id ? { client_id: client.id } : {}) });
+  if (client.id && noClientIdColumn(error)) ({ error } = await supabase.from("client_portals").insert(row));
   return error ? { token: "", error: "Could not reach your account. No link was made." } : { token, error: "" };
 }
 

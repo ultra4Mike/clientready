@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { activePortal, createPortal, portalUrl, revokePortal } from "@/lib/portal";
+import { createPortal, portalStatus, portalUrl, revokePortal } from "@/lib/portal";
 
 /** Owner controls for the client's portal link: make, copy, replace or turn off. */
 export default function PortalShare({ clientName, clientId = "", compact = false }: { clientName: string; clientId?: string; compact?: boolean }) {
   const [token, setToken] = useState<string | null>(null);
+  const [checkState, setCheckState] = useState<"checking" | "ok" | "signed-out" | "error">("checking");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const name = clientName.trim();
@@ -13,7 +14,12 @@ export default function PortalShare({ clientName, clientId = "", compact = false
 
   useEffect(() => {
     let live = true;
-    if (name) activePortal({ name, id: clientId || undefined }).then((found) => live && setToken(found));
+    if (name)
+      portalStatus({ name, id: clientId || undefined }).then((found) => {
+        if (!live) return;
+        setToken(found.token);
+        setCheckState(found.state);
+      });
     return () => {
       live = false;
     };
@@ -29,6 +35,7 @@ export default function PortalShare({ clientName, clientId = "", compact = false
     setBusy(false);
     if (result.error) return setMessage(result.error);
     setToken(result.token);
+    setCheckState("ok");
     setMessage("Portal link ready. Copy it and send it to your customer.");
   }
 
@@ -52,7 +59,7 @@ export default function PortalShare({ clientName, clientId = "", compact = false
   }
 
   return (
-    <div className="print-hide space-y-2 rounded-lg border border-slate-300 p-3 text-sm" data-testid="portal-share">
+    <div className="print-hide space-y-2 rounded-lg border border-slate-300 p-3 text-sm" data-testid="portal-share" data-state={checkState}>
       <p className="font-semibold">Client portal for {name}</p>
       {!compact && <p className="text-xs text-slate-500">One link where {name} can see every sent invoice and proposal, approve, sign and pay. Drafts and your costs are never shown.</p>}
       {link && (
@@ -62,10 +69,11 @@ export default function PortalShare({ clientName, clientId = "", compact = false
         </div>
       )}
       <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={busy || token === null} onClick={make} data-testid="portal-make" className="rounded-lg border border-slate-300 max-sm:min-h-11 px-3 py-1.5 text-sm font-medium transition hover:border-teal-500">{token ? "New link" : "Share portal link"}</button>
+        <button type="button" disabled={busy || checkState === "checking" || checkState === "signed-out"} onClick={make} data-testid="portal-make" className="rounded-lg border border-slate-300 max-sm:min-h-11 px-3 py-1.5 text-sm font-medium transition hover:border-teal-500">{token ? "New link" : "Share portal link"}</button>
         {token && <button type="button" disabled={busy} onClick={revoke} data-testid="portal-revoke" className="rounded-lg border border-slate-300 max-sm:min-h-11 px-3 py-1.5 text-sm font-medium transition hover:border-teal-500">Turn off link</button>}
       </div>
-      {token === null && <p className="text-xs text-slate-500">Sign in and save to your account to share a portal link.</p>}
+      {token === null && checkState === "signed-out" && <p className="text-xs text-slate-500">Sign in and save to your account to share a portal link.</p>}
+      {token === null && checkState === "error" && <p className="text-xs text-slate-500" data-testid="portal-check-error">Could not check this client&apos;s portal link right now. You can still make a new one.</p>}
       {message && <p className="text-xs text-slate-500" data-testid="portal-message">{message}</p>}
     </div>
   );
