@@ -46,21 +46,21 @@ export default function DraftsPage() {
 
   return (
     <AppShell title="Crew drafts">
-      <p className="text-[var(--cr-muted)]">Jobs the crew sent in. Open one, set the price, and save the invoice.</p>
+      <p className="text-sm leading-6 text-[var(--cr-muted)] sm:text-base">Jobs the crew sent in. Open one, set the price, and save the invoice.</p>
       <div className="mt-6 space-y-3">
-        {drafts.length === 0 && <p className="text-[var(--cr-muted)]">No crew jobs yet.</p>}
+        {drafts.length === 0 && <p className="rounded-2xl border border-dashed border-teal-500/30 p-8 text-center text-sm text-[var(--cr-muted)]">No crew jobs yet.</p>}
         {drafts.map((draft) => (
           <div key={draft.id} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
-            <p className="font-medium">{draft.client_name} · {draft.worker_name}</p>
+            <p className="text-base font-semibold">{draft.client_name} · {draft.worker_name}</p>
             <p className="text-sm text-[var(--cr-muted)]">
               {draft.work_date || "No date"} · {draft.hours || "0"} hrs · {draft.status}
               {draft.finished ? " · finished" : ""}
             </p>
-            <p className="mt-2 text-sm">{draft.work_done}</p>
+            <p className="mt-3 text-sm leading-6">{draft.work_done}</p>
             <p className="mt-1 text-sm text-[var(--cr-muted)]">
               Parts ${draft.parts_cost || "0"} · Collected ${draft.collected_amount || "0"} {draft.collected_method || ""}
             </p>
-            <button type="button" onClick={() => openAsInvoice(draft)} className="mt-3 text-sm font-medium">Open as invoice</button>
+            <button type="button" onClick={() => openAsInvoice(draft)} className="mt-4 w-full rounded-lg bg-teal-400 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300 sm:w-auto">Open as invoice</button>
           </div>
         ))}
       </div>
