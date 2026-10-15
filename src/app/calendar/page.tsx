@@ -166,7 +166,7 @@ export default function CalendarPage() {
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
           {(Object.keys(STATUS_LABEL) as JobStatus[]).map((key) => <span key={key} className={`rounded-full border px-2.5 py-0.5 font-medium ${STATUS_CLASS[key]}`}>{STATUS_LABEL[key]}</span>)}
-          <span className="opacity-70">Drag a job to move it. Click a slot or job to edit.</span>
+          <span className="opacity-90">Drag a job to move it. Click a slot or job to edit.</span>
         </div>
         {message && <p className="mt-3 rounded-lg border border-teal-500/30 px-3 py-2 text-sm" data-testid="calendar-message">{message}</p>}
 
@@ -295,8 +295,8 @@ export default function CalendarPage() {
 
           <aside className="h-fit rounded-2xl border border-slate-500/30 bg-[var(--cr-card)] p-4 text-sm shadow-sm lg:sticky lg:top-20 print:hidden" data-testid="unscheduled">
             <p className="font-semibold">Unscheduled jobs</p>
-            <p className="mb-2 text-xs opacity-70">Drag onto the calendar, or click to set a time.</p>
-            {unscheduled.length === 0 && <p className="rounded-lg border border-dashed border-slate-500/40 p-3 text-center text-xs opacity-70">None.</p>}
+            <p className="mb-2 text-xs opacity-90">Drag onto the calendar, or click to set a time.</p>
+            {unscheduled.length === 0 && <p className="rounded-lg border border-dashed border-slate-500/40 p-3 text-center text-xs opacity-90">None.</p>}
             <div className="space-y-1.5">
               {unscheduled.map((doc) => (
                 <div
