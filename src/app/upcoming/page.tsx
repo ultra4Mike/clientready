@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
+import PageHeader from "@/components/PageHeader";
 import { amountOf, documentTotals } from "@/lib/discount";
 import { uniqueDocs } from "@/lib/change-orders";
 import { loadAccountIntoCache } from "@/lib/account-cache";
@@ -79,10 +80,7 @@ export default function UpcomingPage() {
     <AppShell title="Upcoming">
 
       <section className="max-w-4xl py-2 sm:py-4">
-        <h1 className="text-2xl font-bold tracking-tight">This week</h1>
-        <p className="mt-1 text-sm text-slate-600 sm:text-base">
-          Scheduled jobs and invoices due in the next 7 days.
-        </p>
+        <PageHeader title="This week" subtitle="Scheduled jobs and invoices due in the next 7 days." actions={<a href="/calendar" className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm font-medium transition hover:border-teal-400">Calendar</a>} />
 
         <div className="mt-8 space-y-3">
           {loaded && jobs.length === 0 && upcoming.length === 0 && (
