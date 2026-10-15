@@ -150,7 +150,7 @@ export default function ProfilePage() {
         <div className="min-w-0">
       <form
         onSubmit={handleSubmit}
-        className="max-w-3xl space-y-5 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none sm:mt-6 sm:p-6"
+        className="space-y-5 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none sm:p-6"
       >
         <h1 className="text-xl font-bold tracking-tight">Your business details</h1>
         <p className="text-sm text-[var(--cr-muted)]">
@@ -215,7 +215,7 @@ export default function ProfilePage() {
         {message && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-[var(--cr-muted)]">{message}</p>}
       </form>
 
-      <form id="password" onSubmit={changePassword} className="scroll-mt-24 mt-6 max-w-3xl space-y-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none sm:p-6">
+      <form id="password" onSubmit={changePassword} className="scroll-mt-24 mt-6 space-y-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none sm:p-6">
         <h2 className="text-lg font-bold tracking-tight">Login password</h2>
         <p className="text-sm text-[var(--cr-muted)]">Login email: {loginEmail || "Not signed in"}</p>
         <input type="password" className="w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Current password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
