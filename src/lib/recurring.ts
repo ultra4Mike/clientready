@@ -103,7 +103,7 @@ export function generatedFrom(docs: Doc[], templateId: string) {
 const NOT_COPIED = [
   "payments", "paymentAmount", "paymentMethod", "paymentDate", "paymentRef", "paidDate", "paidAt",
   "signature", "proposalSignature", "photos", "jobCosts", "crew",
-  "changeOrderOf", "changeOrderNotes", "recurring", "recurringFrom", "updatedAt",
+  "changeOrderOf", "changeOrderNotes", "recurring", "recurringFrom", "recurringReview", "updatedAt",
 ];
 
 /** Data for a fresh draft from the template: client, items (with tags), discount, tax, notes, pay link, style. */
@@ -119,6 +119,9 @@ export function recurringDraftData(template: Doc, number: string, period: string
     invoiceDate: period,
     dueDate: addDays(period, termDays),
     status: "draft",
+    // Pending until the user saves it in the form (the form rebuilds data without this key)
+    // or its status moves off draft anywhere (e.g. marked sent).
+    recurringReview: "pending",
     recurringFrom: { id: template.id, number: numberOf(template), period },
   };
 }
@@ -242,9 +245,13 @@ export async function generateNextNow(templateId: string) {
   return ran ? draftId : "";
 }
 
-/** Drafts made by a schedule that nobody has reviewed yet (still in draft). */
-export function recurringDraftsReady(docs: Doc[]) {
-  return docs.filter((doc) => doc.type === "invoice" && readRecurringFrom(doc.data?.recurringFrom) && (doc.data?.status || "draft") === "draft").length;
+/** A generated draft nobody has reviewed: still marked pending and still a draft. */
+export function isPendingRecurringDraft(doc: { type: string; data?: Record<string, unknown> }) {
+  return doc.type === "invoice" && doc.data?.recurringReview === "pending" && (doc.data?.status || "draft") === "draft";
+}
+
+export function recurringDraftsReady(docs: { type: string; data?: Record<string, unknown> }[]) {
+  return docs.filter(isPendingRecurringDraft).length;
 }
 
 /**
