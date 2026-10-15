@@ -191,7 +191,10 @@ export default function NewInvoicePage() {
 
   useEffect(() => {
     try {
-      const openId = window.localStorage.getItem("clientready-open-document");
+      // The document to open comes from the URL (?id=..., survives reloads and is per-tab) or,
+      // for older links, the one-shot "open-document" handoff key.
+      const urlId = new URLSearchParams(window.location.search).get("id");
+      const openId = urlId || window.localStorage.getItem("clientready-open-document");
       const raw = window.localStorage.getItem("clientready-documents");
       const wanted = window.localStorage.getItem("clientready-new-type");
       if (!openId) {
@@ -204,11 +207,19 @@ export default function NewInvoicePage() {
         setNotes(kind === "proposal" ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
         return;
       }
-      if (!raw) return;
-      const docs = JSON.parse(raw) as SavedDocument[];
+      const docs = raw ? (JSON.parse(raw) as SavedDocument[]) : [];
       const doc = docs.find((item) => item.id === openId && (item.type === "invoice" || item.type === "proposal"));
       window.localStorage.removeItem("clientready-open-document");
-      if (!doc) return;
+      window.localStorage.removeItem("clientready-new-type");
+      if (!doc) {
+        window.history.replaceState(null, "", "/invoice");
+        setInvoiceNumber(nextNumber("invoice"));
+        setInvoiceDate(ymd(new Date()));
+        setDueDate(plusDays(14));
+        setSaveMessage("That document was not found on this device, so a new invoice was started.");
+        return;
+      }
+      window.history.replaceState(null, "", `/invoice?id=${encodeURIComponent(doc.id)}`);
       const data = (doc.data || {}) as {
         clientName?: string; clientCompany?: string; clientEmail?: string; clientPhone?: string; clientAddress?: string;
         invoiceNumber?: string; invoiceDate?: string; dueDate?: string; jobStart?: string; jobEnd?: string; notes?: string;
@@ -342,6 +353,7 @@ export default function NewInvoicePage() {
 
   function clearForm() {
     if (locked) return;
+    window.history.replaceState(null, "", "/invoice");
     setDocId(""); setClientSearch(""); setClientName(""); setClientCompany(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
     setInvoiceNumber(nextNumber(docKind)); setInvoiceDate(ymd(new Date())); setDueDate(plusDays(14)); setJobStart(""); setJobEnd("");
     setNotes(isProposal ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
@@ -378,6 +390,7 @@ export default function NewInvoicePage() {
       return;
     }
     setDocId(cloudId);
+    window.history.replaceState(null, "", `/invoice?id=${encodeURIComponent(cloudId)}`);
     await saveCrewJobs(cloudId, {
       invoiceNumber,
       clientName,
@@ -420,8 +433,7 @@ export default function NewInvoicePage() {
       setSaveMessage(isQuotaError(error) ? "This browser's storage is full, so the invoice could not be created on this device. Remove some photos or delete old documents, then try again." : "Could not create the invoice on this device.");
       return;
     }
-    window.localStorage.setItem("clientready-open-document", cloudId);
-    window.location.href = "/invoice";
+    window.location.href = `/invoice?id=${encodeURIComponent(cloudId)}`;
   }
 
   async function copyPayLink() {

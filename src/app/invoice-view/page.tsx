@@ -127,8 +127,7 @@ export default function InvoiceViewPage() {
 
   function editInvoice() {
     if (!docId) return;
-    window.localStorage.setItem("clientready-open-document", docId);
-    window.location.href = "/invoice";
+    window.location.href = `/invoice?id=${encodeURIComponent(docId)}`;
   }
 
   async function copyPayLink() {

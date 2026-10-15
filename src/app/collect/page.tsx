@@ -147,8 +147,7 @@ export default function CollectPage() {
   }
 
   function openInvoice(id: string) {
-    window.localStorage.setItem("clientready-open-document", id);
-    window.location.href = "/invoice";
+    window.location.href = `/invoice?id=${encodeURIComponent(id)}`;
   }
 
   const invoices = documents.filter((doc) => doc.type === "invoice");

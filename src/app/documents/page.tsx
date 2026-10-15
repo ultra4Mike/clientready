@@ -55,7 +55,7 @@ export default function DocumentsPage() {
 
     function openDocument(doc: SavedDocument) {
     window.localStorage.setItem("clientready-open-document", doc.id);
-    window.location.href = "/invoice";
+    window.location.href = `/invoice?id=${encodeURIComponent(doc.id)}`;
   }
 
   function duplicateDocument(doc: SavedDocument) {
