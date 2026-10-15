@@ -28,7 +28,8 @@ export default function SignaturePad({ value, onChange, defaultName = "" }: Prop
     ctx.lineWidth = 2.5;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.strokeStyle = "#0f172a";
+    // Ink is always saved black on a transparent background; CSS recolors it for dark mode.
+    ctx.strokeStyle = "#000000";
     return ctx;
   }
 
@@ -107,22 +108,24 @@ export default function SignaturePad({ value, onChange, defaultName = "" }: Prop
       </div>
       <input className="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder={defaultName ? `Signer name (${defaultName})` : "Signer name"} value={signerName} onChange={(event) => setSignerName(event.target.value)} />
       {mode === "drawn" ? (
+        <div className="sig-pad-surface w-full max-w-[400px] rounded-lg border border-dashed border-slate-400">
         <canvas
           ref={canvasRef}
           width={WIDTH}
           height={HEIGHT}
           data-testid="signature-canvas"
-          className="block w-full max-w-[400px] rounded-lg border border-dashed border-slate-400 bg-white"
-          style={{ touchAction: "none", aspectRatio: `${WIDTH} / ${HEIGHT}`, background: "#ffffff" }}
+          className="sig-ink block w-full"
+          style={{ touchAction: "none", aspectRatio: `${WIDTH} / ${HEIGHT}` }}
           onPointerDown={start}
           onPointerMove={move}
           onPointerUp={end}
           onPointerLeave={end}
           onPointerCancel={end}
         />
+        </div>
       ) : (
         <input
-          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-3xl text-slate-900"
+          className="sig-typed w-full rounded-lg border border-slate-300 px-3 py-2 text-3xl"
           style={{ fontFamily: scriptFont }}
           placeholder="Type signature"
           value={typed}
@@ -140,16 +143,17 @@ export default function SignaturePad({ value, onChange, defaultName = "" }: Prop
   );
 }
 
-export function SignatureBlock({ signature, label = "Customer signature", muted = "text-slate-600" }: { signature: Signature | null; label?: string; muted?: string }) {
+/** `onDark` is for previews that are dark even in light mode (the "Bold modern" style). */
+export function SignatureBlock({ signature, label = "Customer signature", muted = "text-slate-600", onDark = false }: { signature: Signature | null; label?: string; muted?: string; onDark?: boolean }) {
   if (!signature) return null;
   return (
-    <div className="mt-8 border-t border-slate-500 pt-4" data-testid="signature-block">
+    <div className={`mt-8 border-t border-slate-500 pt-4 ${onDark ? "sig-on-dark" : ""}`} data-testid="signature-block">
       <p className={`text-sm ${muted}`}>{label}</p>
       {signature.type === "drawn" && signature.dataUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={signature.dataUrl} alt={`Signature of ${signature.signerName}`} className="mt-2 h-16 w-auto rounded bg-white" />
+        <img src={signature.dataUrl} alt={`Signature of ${signature.signerName}`} className="sig-ink mt-2 h-16 w-auto" />
       ) : (
-        <p className="mt-2 text-4xl" style={{ fontFamily: scriptFont }}>{signature.text}</p>
+        <p className="sig-typed mt-2 text-4xl" style={{ fontFamily: scriptFont }}>{signature.text}</p>
       )}
       <p className={`mt-1 text-sm ${muted}`}>Signed by {signature.signerName} · {signedAtLabel(signature.signedAt)}</p>
       <p className={`mt-1 text-xs ${muted}`}>{SIGNATURE_DISCLAIMER}</p>

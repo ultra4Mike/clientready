@@ -638,8 +638,8 @@ export default function NewInvoicePage() {
             </div>
             <p className={`mt-8 text-sm ${mutedClass}`}>{notes}</p>
             {!isProposal && paymentLink && <p className={`mt-4 text-sm ${mutedClass}`}>Pay here: {paymentLink}</p>}
-            {!isProposal && <SignatureBlock signature={proposalSignature} label="Proposal accepted" muted={mutedClass} />}
-            <SignatureBlock signature={signature} label={isProposal ? "Customer acceptance" : "Customer signature"} muted={mutedClass} />
+            {!isProposal && <SignatureBlock signature={proposalSignature} label="Proposal accepted" muted={mutedClass} onDark={style === "bold"} />}
+            <SignatureBlock signature={signature} label={isProposal ? "Customer acceptance" : "Customer signature"} muted={mutedClass} onDark={style === "bold"} />
           </div>
         </div>
       </section>

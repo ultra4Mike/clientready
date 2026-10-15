@@ -227,3 +227,40 @@ button.bg-slate-900 {
 .sample-owner .label {
   color: #92400e !important;
 }
+/* Signatures: drawn ink is saved black on transparent and recolored here. */
+.sig-pad-surface {
+  background: #ffffff;
+}
+.sig-typed {
+  color: #0f172a;
+}
+html.dark .sig-pad-surface {
+  background: var(--cr-bg);
+}
+html.dark .sig-ink,
+.sig-on-dark .sig-ink {
+  filter: invert(1);
+}
+html.dark .sig-typed,
+html.dark input.sig-typed,
+.sig-on-dark .sig-typed {
+  color: #f8fafc !important;
+}
+
+@media print {
+  .sig-ink,
+  html.dark .sig-ink,
+  .sig-on-dark .sig-ink {
+    filter: none !important;
+  }
+  .sig-typed,
+  html.dark .sig-typed,
+  .sig-on-dark .sig-typed {
+    color: #000000 !important;
+  }
+  #preview,
+  #preview * {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+}
