@@ -35,7 +35,7 @@ export function JobPhotosEditor({ photos, onChange }: EditorProps) {
   const pick = "cursor-pointer rounded-lg border border-slate-300 px-3 py-2 text-sm";
 
   return (
-    <div className="space-y-2 rounded-xl border border-slate-200 p-4" data-testid="photos-editor">
+    <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5" data-testid="photos-editor">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-medium">Job photos ({photos.length}/{MAX_PHOTOS})</h2>
         {!full && (
@@ -58,7 +58,7 @@ export function JobPhotosEditor({ photos, onChange }: EditorProps) {
             <div key={photo.id} className="space-y-1">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={photo.dataUrl} alt={photo.caption || "Job photo"} className="aspect-square w-full rounded-lg object-cover" />
-              <input className="w-full rounded-lg border border-slate-300 px-2 py-1 text-sm" maxLength={60} placeholder="Caption (optional)" value={photo.caption} onChange={(event) => onChange(photos.map((item) => item.id === photo.id ? { ...item, caption: event.target.value } : item))} />
+              <input className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" maxLength={60} placeholder="Caption (optional)" value={photo.caption} onChange={(event) => onChange(photos.map((item) => item.id === photo.id ? { ...item, caption: event.target.value } : item))} />
               <button type="button" className="text-sm text-slate-600" onClick={() => onChange(photos.filter((item) => item.id !== photo.id))}>Remove</button>
             </div>
           ))}

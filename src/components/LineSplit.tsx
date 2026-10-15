@@ -7,7 +7,7 @@ export default function LineSplit({ items, labelClass = "text-slate-500" }: { it
   const rows = ([["Labor", split.labor], ["Materials", split.materials], ["Other", split.other]] as [string, number][]).filter(([, amount]) => amount > 0);
   if (!rows.length) return null;
   return (
-    <div className="space-y-0.5 pb-1" data-testid="line-split">
+    <div className="space-y-1 pb-1.5" data-testid="line-split">
       <p className={`text-xs ${labelClass}`}>Billed by type (before discount and tax)</p>
       {rows.map(([label, amount]) => (
         <div key={label} className="flex justify-between gap-2">

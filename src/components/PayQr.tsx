@@ -24,7 +24,7 @@ export default function PayQr({ url, size = 104 }: { url: string; size?: number 
   }
   const box = count + QUIET * 2;
   return (
-    <div className="flex items-center gap-3" data-testid="pay-qr">
+    <div className="flex items-center gap-4" data-testid="pay-qr">
       <svg
         role="img"
         aria-label={`QR code for ${safe}`}

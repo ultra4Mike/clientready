@@ -13,13 +13,13 @@ export default function CrewSpend({ docId }: { docId: string }) {
   }, [docId]);
   if (!rows.length) return null;
   return (
-    <div className="mt-4 rounded-xl border border-amber-300/40 p-3 text-sm">
+    <div className="mt-4 rounded-xl border border-amber-300/40 bg-amber-400/5 p-4 text-sm">
       <p className="font-medium">Crew reported spend</p>
       <p className="mt-1 text-xs text-[var(--cr-muted)]">Check the receipt before you change your fee. This does not change the invoice.</p>
       {rows.map((row) => (
         <div key={row.id} className="mt-2">
           <p>{row.worker_name} · {row.kind} · ${row.amount} · {row.note}</p>
-          {row.receipt && <a href={row.receipt} target="_blank" className="text-xs underline">Open receipt</a>}
+          {row.receipt && <a href={row.receipt} target="_blank" className="text-xs font-medium text-teal-600 underline-offset-2 hover:underline dark:text-teal-300">Open receipt</a>}
         </div>
       ))}
     </div>

@@ -7,7 +7,7 @@ export default function ChangeOrderNotes({ notes, className = "text-xs text-slat
     <div className={className} data-testid="change-order-notes">
       {notes.map((note) => (
         <p key={note.id}>
-          Change order <a className="underline" href={`/invoice?id=${encodeURIComponent(note.id)}`}>{note.number}</a>
+          Change order <a className="underline underline-offset-2" href={`/invoice?id=${encodeURIComponent(note.id)}`}>{note.number}</a>
           {note.createdAt && noteDate(note.createdAt) ? ` created ${noteDate(note.createdAt)}` : ""}
         </p>
       ))}

@@ -71,7 +71,7 @@ useEffect(() => {
   }
 
   function linkClass(href: string) {
-    return "block rounded-lg px-3 py-2 text-sm hover:bg-teal-500/15";
+    return "block rounded-lg px-3 py-2 text-sm font-medium transition hover:bg-teal-500/15";
   }
 
   const nav = (
@@ -84,7 +84,7 @@ useEffect(() => {
       <button
         type="button"
         onClick={() => setMoreOpen(!moreOpen)}
-        className="block rounded-lg px-3 py-2 text-left text-sm hover:bg-teal-500/15"
+        className="block rounded-lg px-3 py-2 text-left text-sm font-medium transition hover:bg-teal-500/15"
       >
         More
       </button>
@@ -118,7 +118,7 @@ useEffect(() => {
             <div className="mt-6">{nav}</div>
           </aside>
           <div className="min-w-0 flex-1">
-            <header className="flex items-center justify-between border-b border-teal-500/20 px-6 py-3">
+            <header className="sticky top-0 z-20 flex items-center justify-between border-b border-teal-500/20 bg-[var(--cr-bg)] px-6 py-3">
               <h1 className="text-lg font-semibold">{title}</h1>
               {actions}
             </header>
@@ -135,7 +135,7 @@ useEffect(() => {
             <div className="mt-3">{nav}</div>
           </header>
           <div className="app-main p-4">
-            <h1 className="print-hide mb-4 text-2xl font-semibold">{title}</h1>
+            <h1 className="print-hide mb-4 text-2xl font-bold tracking-tight">{title}</h1>
             {children}
           </div>
         </>
