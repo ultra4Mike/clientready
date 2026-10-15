@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
+import PageHeader from "@/components/PageHeader";
 import { supabase } from "@/lib/supabase";
 
 type RateChange = { rate: string; effectiveDate: string };
@@ -192,12 +193,12 @@ export default function EmployeesPage() {
 
   return (
     <AppShell title="Employees">
-      <div className="max-w-4xl">
-      <p className="text-sm text-[var(--cr-muted)] sm:text-base">
-        Add the email they will use to log in. That email opens the crew page, not the owner books.
-      </p>
-      <form onSubmit={handleSubmit} className="mt-5 grid gap-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-6 md:grid-cols-2">
-        <div className="grid gap-3 rounded-xl border border-teal-500/20 p-4 md:col-span-2 md:grid-cols-2">
+      <PageHeader title="Team" subtitle="Add the email they will use to log in. That email opens the crew page, not the owner books." />
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
+      <div className="xl:sticky xl:top-20">
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Add or edit a person</h2>
+      <form onSubmit={handleSubmit} className="grid gap-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-6 md:grid-cols-2 xl:grid-cols-1">
+        <div className="grid gap-3 rounded-xl border border-teal-500/20 p-4 md:col-span-2 md:grid-cols-2 xl:col-span-1 xl:grid-cols-1">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-500 md:col-span-2">Person & role</h2>
         <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
         <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Email they will use to log in" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
@@ -208,7 +209,7 @@ export default function EmployeesPage() {
           <option value="contractor">Contractor</option>
         </select>
         </div>
-        <div className="grid gap-3 rounded-xl border border-teal-500/20 p-4 md:col-span-2 md:grid-cols-2">
+        <div className="grid gap-3 rounded-xl border border-teal-500/20 p-4 md:col-span-2 md:grid-cols-2 xl:col-span-1 xl:grid-cols-1">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-500 md:col-span-2">Pay & start date</h2>
         <label className="text-sm font-medium">
           Hourly rate
@@ -226,8 +227,10 @@ export default function EmployeesPage() {
       </form>
       {message && <p className="mt-3 rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-[var(--cr-muted)]">{message}</p>}
 
-      <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Team</h2>
-      <div className="mt-3 grid gap-4 lg:grid-cols-2">
+      </div>
+      <div className="min-w-0">
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">People ({employees.length})</h2>
+      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
         {employees.length === 0 && <p className="rounded-2xl border border-dashed border-teal-500/30 p-8 text-center text-sm text-[var(--cr-muted)] lg:col-span-2">No employees yet.</p>}
         {employees.map((person) => (
           <div key={person.id} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
@@ -252,6 +255,7 @@ export default function EmployeesPage() {
             </div>
           </div>
         ))}
+      </div>
       </div>
       </div>
     </AppShell>
