@@ -70,6 +70,8 @@ export default function DashboardPage() {
   const [documents, setDocuments] = useState<SavedDocument[]>([]);
   const [ownerName, setOwnerName] = useState("");
   const [search, setSearch] = useState("");
+  // false until the account/cache has been read: show placeholders, not $0 / 0 clients.
+  const [loaded, setLoaded] = useState(false);
   const recurringReady = recurringDraftsReady(documents);
 
   useEffect(() => {
@@ -86,6 +88,7 @@ export default function DashboardPage() {
       }
       setClients(clientsRaw ? JSON.parse(clientsRaw) : []);
       setDocuments(uniqueDocs(docsRaw ? JSON.parse(docsRaw) : []));
+      setLoaded(true);
     }
     load();
   }, []);
@@ -177,7 +180,7 @@ export default function DashboardPage() {
   return (
     <AppShell title={`${hello}${ownerName ? `, ${ownerName}` : ""}.`}>
       <p className="mb-6 text-sm text-[var(--cr-muted)] sm:text-base">
-        {stats.invoiceCount === 0
+        {!loaded ? "Loading your numbers…" : stats.invoiceCount === 0
           ? "Create your first invoice to see totals."
           : "Here is what is happening with your invoices today."}
       </p>
@@ -188,7 +191,7 @@ export default function DashboardPage() {
         </a>
       )}
 
-      <NeedsReview documents={documents} onDocuments={(docs) => setDocuments(uniqueDocs(docs as SavedDocument[]))} />
+      <NeedsReview loading={!loaded} documents={documents} onDocuments={(docs) => setDocuments(uniqueDocs(docs as SavedDocument[]))} />
 
       <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center">
         <form onSubmit={handleSearch} className="flex-1">
@@ -208,44 +211,44 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <a href="/documents?filter=outstanding" data-testid="stat-outstanding" className="block rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
+        <a href="/documents?filter=outstanding" data-testid="stat-outstanding" data-loading={loaded ? undefined : "true"} className="block rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
           <div className="flex items-start justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Total outstanding</p>
             <IconWrap>$</IconWrap>
           </div>
-          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight sm:text-3xl">${stats.outstanding.toFixed(2)}</p>
+          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight sm:text-3xl">{loaded ? `$${stats.outstanding.toFixed(2)}` : "—"}</p>
           <p className="mt-2 text-xs text-[var(--cr-muted)]">
-            {stats.outstanding === 0 ? "No outstanding invoices" : "Not marked paid"}
+            {!loaded ? "Loading…" : stats.outstanding === 0 ? "No outstanding invoices" : "Not marked paid"}
           </p>
         </a>
-        <a href="/documents?filter=paid" data-testid="stat-paid" className="block rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
+        <a href="/documents?filter=paid" data-testid="stat-paid" data-loading={loaded ? undefined : "true"} className="block rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
           <div className="flex items-start justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Paid</p>
             <IconWrap>✓</IconWrap>
           </div>
-          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight sm:text-3xl">${stats.paid.toFixed(2)}</p>
+          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight sm:text-3xl">{loaded ? `$${stats.paid.toFixed(2)}` : "—"}</p>
           <p className="mt-2 text-xs text-[var(--cr-muted)]">
-            {stats.paid === 0 ? "No payments yet" : `${stats.paidRate}% marked paid`}
+            {!loaded ? "Loading…" : stats.paid === 0 ? "No payments yet" : `${stats.paidRate}% marked paid`}
           </p>
         </a>
-        <a href="/documents?filter=overdue" data-testid="stat-overdue" className="block rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
+        <a href="/documents?filter=overdue" data-testid="stat-overdue" data-loading={loaded ? undefined : "true"} className="block rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
           <div className="flex items-start justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Overdue</p>
             <IconWrap>!</IconWrap>
           </div>
-          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight sm:text-3xl">${stats.overdue.toFixed(2)}</p>
+          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight sm:text-3xl">{loaded ? `$${stats.overdue.toFixed(2)}` : "—"}</p>
           <p className="mt-2 text-xs text-[var(--cr-muted)]">
-            {stats.overdueCount === 0 ? "No overdue invoices" : `${stats.overdueCount} overdue`}
+            {!loaded ? "Loading…" : stats.overdueCount === 0 ? "No overdue invoices" : `${stats.overdueCount} overdue`}
           </p>
         </a>
-        <a href="/clients" data-testid="stat-clients" className="block rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
+        <a href="/clients" data-testid="stat-clients" data-loading={loaded ? undefined : "true"} className="block rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
           <div className="flex items-start justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Clients</p>
             <IconWrap>☺</IconWrap>
           </div>
-          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight sm:text-3xl">{clients.length}</p>
+          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight sm:text-3xl">{loaded ? clients.length : "—"}</p>
           <p className="mt-2 text-xs text-[var(--cr-muted)]">
-            {clients.length === 0 ? "No clients added" : "Saved clients"}
+            {!loaded ? "Loading…" : clients.length === 0 ? "No clients added" : "Saved clients"}
           </p>
         </a>
       </div>

@@ -12,7 +12,7 @@ const LABEL: Record<ReviewKind, string> = {
 type Doc = { id: string; type: string; title: string; clientName?: string; data?: Record<string, unknown> };
 
 /** Owner dashboard list. Workers never reach the dashboard (AppShell sends them to /crew). */
-export default function NeedsReview({ documents, onDocuments }: { documents: Doc[]; onDocuments: (docs: Doc[]) => void }) {
+export default function NeedsReview({ documents, onDocuments, loading = false }: { documents: Doc[]; onDocuments: (docs: Doc[]) => void; loading?: boolean }) {
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [busy, setBusy] = useState("");
 
@@ -36,12 +36,14 @@ export default function NeedsReview({ documents, onDocuments }: { documents: Doc
   }
 
   return (
-    <section data-testid="needs-review" className="mb-8 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 sm:p-5">
+    <section data-testid="needs-review" data-loading={loading ? "true" : undefined} className="mb-8 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 sm:p-5">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-base font-semibold">Needs review</h2>
-        <span data-testid="needs-review-count" className="rounded-full bg-teal-500/15 px-2.5 py-0.5 text-xs font-semibold text-teal-700 dark:text-teal-200">{items.length}</span>
+        <span data-testid="needs-review-count" className="rounded-full bg-teal-500/15 px-2.5 py-0.5 text-xs font-semibold text-teal-700 dark:text-teal-200">{loading ? "…" : items.length}</span>
       </div>
-      {items.length === 0 ? (
+      {loading ? (
+        <p className="text-sm text-[var(--cr-muted)]">Loading…</p>
+      ) : items.length === 0 ? (
         <p className="text-sm text-[var(--cr-muted)]">Nothing waiting. You are all caught up.</p>
       ) : (
         <ul className="divide-y divide-teal-500/10">
