@@ -116,26 +116,26 @@ export default function DocumentsPage() {
   return (
     <AppShell title="Documents">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-[var(--cr-muted)]">
+        <p className="text-sm text-[var(--cr-muted)] sm:text-base">
           Invoices and proposals live here. Click a row to edit it.
         </p>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:flex">
           <a
             href="/invoice"
-            className="rounded-full bg-teal-400 px-4 py-2 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300"
+            className="rounded-full bg-teal-400 px-4 py-2 text-center text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300"
           >
             New invoice
           </a>
           <a
             href="/proposal"
-            className="rounded-full border border-teal-500/40 px-4 py-2 text-sm font-medium transition hover:border-teal-400"
+            className="rounded-full border border-teal-500/40 px-4 py-2 text-center text-sm font-medium transition hover:border-teal-400"
           >
             New proposal
           </a>
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 sm:grid-cols-2 md:grid-cols-[2fr_1fr_1fr]">
         <input
           className="rounded-lg border border-teal-500/30 bg-[var(--cr-card)] px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
           placeholder="Search title or client"
@@ -176,7 +176,7 @@ export default function DocumentsPage() {
         )}
 
         {documents.length > 0 && visibleDocs.length === 0 && (
-          <p className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 text-[var(--cr-muted)]">
+          <p className="rounded-2xl border border-dashed border-teal-500/30 p-8 text-center text-sm text-[var(--cr-muted)]">
             No documents match that search.
           </p>
         )}
@@ -186,16 +186,16 @@ export default function DocumentsPage() {
             key={doc.id}
             className="flex flex-col gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/50 sm:p-5 sm:flex-row sm:items-center sm:justify-between"
           >
-            <button type="button" onClick={() => openDocument(doc)} className="text-left">
-              <p className="font-medium">{doc.title || "Untitled"}</p>
-              <p className="text-sm text-[var(--cr-muted)]">
+            <button type="button" onClick={() => openDocument(doc)} className="min-w-0 text-left">
+              <p className="truncate text-base font-semibold">{doc.title || "Untitled"}</p>
+              <p className="mt-0.5 text-sm capitalize text-[var(--cr-muted)]">
                 {doc.type} · {doc.clientName || "No client"} · {doc.createdAt}
                 {doc.data?.status ? ` · ${doc.data.status}` : ""}
                 {doc.data?.outcome ? ` · ${doc.data.outcome}` : ""}
               </p>
               <ApprovalBadge approval={readApproval(doc.data?.approval)} className="mt-1" />
             </button>
-            <div className="flex gap-3">
+            <div className="flex shrink-0 gap-4 border-t border-teal-500/10 pt-3 sm:border-0 sm:pt-0">
               <button type="button" onClick={() => openDocument(doc)} className="text-sm font-medium text-teal-600 transition hover:underline dark:text-teal-300">
                 Open
               </button>
@@ -205,7 +205,7 @@ export default function DocumentsPage() {
               <button
                 type="button"
                 onClick={() => removeDocument(doc.id)}
-                className="text-sm text-[var(--cr-muted)]"
+                className="text-sm text-[var(--cr-muted)] transition hover:text-red-500"
               >
                 Remove
               </button>
