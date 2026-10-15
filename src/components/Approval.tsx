@@ -52,7 +52,7 @@ export function ApprovalShare({ docId, approval, onChange }: { docId: string; ap
       {link && (
         <div className="flex flex-wrap gap-2">
           <input aria-label="Approval link" readOnly value={link} onFocus={(event) => event.target.select()} className="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1 text-xs" />
-          <button type="button" onClick={copy} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium transition hover:border-teal-500">Copy link</button>
+          <button type="button" onClick={copy} className="rounded-lg border border-slate-300 max-sm:min-h-11 px-3 py-1.5 text-sm font-medium transition hover:border-teal-500">Copy link</button>
         </div>
       )}
       <div className="flex flex-wrap gap-2">
