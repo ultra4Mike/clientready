@@ -13,6 +13,8 @@ import LineSplit from "@/components/LineSplit";
 import PayQr from "@/components/PayQr";
 import SignaturePad from "@/components/SignaturePad";
 import { fetchPortalDoc, portalApprove } from "@/lib/portal";
+import { StageSchedule } from "@/components/StageSchedule";
+import { payNowAmount, readStages, todayYmd } from "@/lib/stages";
 import type { Signature } from "@/lib/signature";
 
 type LineItem = { description?: string; qty?: string; rate?: string; category?: string };
@@ -79,11 +81,11 @@ export default function ApprovePage() {
     return { ...base, paid, balance: balanceDue(base.total, paid, text(data.status)) };
   }, [items, payments, data]);
 
-  async function payByCard() {
+  async function payByCard(full = false) {
     setPaying(true);
     setPayMessage("");
     try {
-      const response = await fetch("/api/pay/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(portal ? { portal: portal.p, docId: portal.d } : { token }) });
+      const response = await fetch("/api/pay/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...(portal ? { portal: portal.p, docId: portal.d } : { token }), full }) });
       const result = (await response.json().catch(() => ({}))) as { url?: string; error?: string };
       if (response.ok && result.url && /^https?:\/\//.test(result.url)) {
         window.location.assign(result.url);
@@ -136,6 +138,8 @@ export default function ApprovePage() {
   const signature = readSignature(data.signature);
   const proposalSignature = readSignature(data.proposalSignature);
   const approved = approval?.status === "approved";
+  const stages = isProposal ? [] : readStages(data.stages);
+  const payNow = payNowAmount(totals.total, totals.balance, stages, todayYmd());
 
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-6 text-slate-900 sm:px-4 sm:py-10">
@@ -229,14 +233,20 @@ export default function ApprovePage() {
           {!isProposal && (cardEnabled || payMessage) && (
             <div className="print-hide mt-4 rounded-xl border border-teal-500/30 bg-teal-50 p-4 text-sm text-slate-800" data-testid="card-pay">
               {cardEnabled && totals.balance >= 0.5 && (
-                <button type="button" data-testid="pay-card" disabled={paying} onClick={payByCard} className="w-full rounded-lg bg-teal-600 px-4 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-teal-500 disabled:opacity-60 sm:w-auto">
-                  {paying ? "Opening secure checkout…" : `Pay $${totals.balance.toFixed(2)} by card`}
+                <button type="button" data-testid="pay-card" disabled={paying} onClick={() => payByCard(false)} className="w-full rounded-lg bg-teal-600 px-4 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-teal-500 disabled:opacity-60 sm:w-auto">
+                  {paying ? "Opening secure checkout…" : `Pay $${payNow.toFixed(2)} by card${payNow < totals.balance ? " (due now)" : ""}`}
+                </button>
+              )}
+              {cardEnabled && payNow < totals.balance && totals.balance >= 0.5 && (
+                <button type="button" data-testid="pay-card-full" disabled={paying} onClick={() => payByCard(true)} className="mt-2 block text-sm font-medium text-teal-700 underline sm:ml-1 sm:inline-block sm:mt-0">
+                  or pay the full balance ${totals.balance.toFixed(2)}
                 </button>
               )}
               {payMessage && <p className="mt-2" data-testid="pay-message">{payMessage}</p>}
-              {cardEnabled && totals.balance >= 0.5 && <p className="mt-2 text-xs text-slate-500">Secure checkout by Stripe. You pay what is still owed.</p>}
+              {cardEnabled && totals.balance >= 0.5 && <p className="mt-2 text-xs text-slate-500">Secure checkout by Stripe. {payNow < totals.balance ? "You pay the amount due now; the rest follows the payment schedule." : "You pay what is still owed."}</p>}
             </div>
           )}
+          {!isProposal && <StageSchedule stages={stages} total={totals.total} balance={totals.balance} />}
           {text(data.notes) && <p className="mt-3 text-sm text-slate-600">{text(data.notes)}</p>}
           {data.showPhotos === true && <JobPhotoStrip photos={readPhotos(data.photos)} />}
           {(payUrl || signature || proposalSignature) && (

@@ -1,5 +1,7 @@
 "use client";
 
+import { StageSchedule } from "@/components/StageSchedule";
+import { readStages, type Stage } from "@/lib/stages";
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { balanceDue, paidTotal, readPayments, type Payment } from "@/lib/payments";
@@ -46,6 +48,7 @@ export default function InvoiceViewPage() {
   const [discountType, setDiscountType] = useState("percent");
   const [discountValue, setDiscountValue] = useState("");
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [stages, setStages] = useState<Stage[]>([]);
   const [docPayLink, setDocPayLink] = useState("");
   const [photos, setPhotos] = useState<JobPhoto[]>([]);
   const [changeOrderOf, setChangeOrderOf] = useState<ChangeOrderOf | null>(null);
@@ -128,6 +131,7 @@ export default function InvoiceViewPage() {
     setChangeOrderNotes(mergeChangeOrderNotes(readChangeOrderNotes(data.changeOrderNotes), found));
     setProposalSignature(readSignature(data.proposalSignature));
     setItems(data.items || []);
+    setStages(doc.type === "invoice" ? readStages((doc.data as Record<string, unknown> | undefined)?.stages) : []);
     setStatus(data.status || "draft");
     setJobTime(data.jobTime || "");
     setApproval(readApproval(doc.data?.approval));
@@ -287,6 +291,7 @@ export default function InvoiceViewPage() {
             </div>
           </div>
 
+          <StageSchedule stages={stages} total={totals.total} balance={totals.balance} />
           {notes && <p className="mt-6 whitespace-pre-line text-sm text-slate-600">{notes}</p>}
           <JobPhotoStrip photos={photos} />
           {(payUrlFor(docPayLink, paymentLink) || signature || proposalSignature) && (

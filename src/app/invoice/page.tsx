@@ -1,6 +1,8 @@
 "use client";
 
 import PortalShare from "@/components/PortalShare";
+import { StageEditor, StageSchedule } from "@/components/StageSchedule";
+import { readStages, type Stage } from "@/lib/stages";
 import { useEffect, useMemo, useState } from "react";
 import { saveCloudDocument } from "@/lib/cloud-docs";
 import { supabase } from "@/lib/supabase";
@@ -156,6 +158,7 @@ export default function NewInvoicePage() {
   const [docPayLink, setDocPayLink] = useState("");
   const [photos, setPhotos] = useState<JobPhoto[]>([]);
   const [showPhotos, setShowPhotos] = useState(false);
+  const [stages, setStages] = useState<Stage[]>([]);
   const [changeOrderOf, setChangeOrderOf] = useState<ChangeOrderOf | null>(null);
   const [fromProposal, setFromProposal] = useState<{ id: string; number: string } | null>(null);
   const [madeInvoices, setMadeInvoices] = useState<{ id: string; number: string }[]>([]);
@@ -307,6 +310,7 @@ export default function NewInvoicePage() {
       setDocPayLink(data.payLink || "");
       setPhotos(readPhotos(data.photos));
       setShowPhotos(data.showPhotos === true);
+      setStages(readStages((data as Record<string, unknown>).stages));
       setChangeOrderOf(kind === "invoice" ? readChangeOrderOf(data.changeOrderOf) : null);
       setFromProposal(kind === "invoice" && data.fromProposal?.id ? { id: String(data.fromProposal.id), number: String(data.fromProposal.number || "proposal") } : null);
       // Invoices already made from this proposal (the proposal itself is never changed).
@@ -505,7 +509,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(stored?.data?.schedule ? { schedule: stored.data.schedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
+      data: { clientName, clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(stored?.data?.schedule ? { schedule: stored.data.schedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -771,6 +775,7 @@ export default function NewInvoicePage() {
                 <p className="text-right"><span className="block text-sm font-medium text-slate-600">Still owed</span><span data-testid="still-owed" className="text-2xl font-bold">${totals.balance.toFixed(2)}</span></p>
               </div>
             </div>
+            {!isProposal && <StageEditor stages={stages} onChange={setStages} total={totals.total} balance={totals.balance} />}
             </div>
             <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Payment, photos & notes</h2>
@@ -1003,6 +1008,7 @@ export default function NewInvoicePage() {
                 {(!isProposal || totals.paid > 0) && <div className="mt-1 flex justify-between border-t border-slate-500 pt-1 text-lg font-bold"><span>{isProposal ? "Balance after deposit" : "Still owed"}</span><span data-testid="preview-still-owed">${totals.balance.toFixed(2)}</span></div>}
               </div>
             </div>
+            {!isProposal && <StageSchedule stages={stages} total={totals.total} balance={totals.balance} muted={mutedClass} />}
             {notes && <p className={`mt-3 text-sm ${mutedClass}`}>{notes}</p>}
             {showPhotos && <JobPhotoStrip photos={photos} muted={mutedClass} />}
             {(payUrl && !isProposal) || signature || (proposalSignature && !isProposal) ? (

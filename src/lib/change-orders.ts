@@ -24,7 +24,7 @@ export function changeOrdersFor(docs: Doc[], originalId: string) {
  */
 export function changeOrderData(original: Doc, newNumber: string, today: string, due: string) {
   const data = { ...(original.data || {}) };
-  for (const key of ["payments", "paymentAmount", "paymentMethod", "paymentDate", "paymentRef", "signature", "proposalSignature", "photos", "jobCosts", "crew", "recurring", "recurringFrom", "recurringReview", "approval", "schedule", "jobTime", "changeOrderNotes", "fromProposal", "reviews", "updatedAt"]) {
+  for (const key of ["payments", "paymentAmount", "paymentMethod", "paymentDate", "paymentRef", "signature", "proposalSignature", "photos", "jobCosts", "crew", "recurring", "recurringFrom", "recurringReview", "approval", "schedule", "jobTime", "changeOrderNotes", "fromProposal", "reviews", "stages", "updatedAt"]) {
     delete data[key];
   }
   return {

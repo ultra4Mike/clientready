@@ -1,4 +1,4 @@
-import { serviceClient, stillOwed, stripeConfig } from "@/lib/stripe-server";
+import { amountToCharge, serviceClient, stripeConfig } from "@/lib/stripe-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,8 +14,10 @@ export async function POST(request: Request) {
   let token = "";
   let portal = "";
   let docId = "";
+  let full = false;
   try {
-    const body = (await request.json()) as { token?: unknown; portal?: unknown; docId?: unknown };
+    const body = (await request.json()) as { token?: unknown; portal?: unknown; docId?: unknown; full?: unknown };
+    full = body.full === true;
     token = String(body.token || "");
     portal = String(body.portal || "");
     docId = String(body.docId || "");
@@ -32,8 +34,9 @@ export async function POST(request: Request) {
   if (error || !doc) return Response.json({ error: "Link not found." }, { status: 404 });
   if (doc.type !== "invoice") return Response.json({ error: "Only invoices can be paid online." }, { status: 400 });
   const data = (doc.data || {}) as Record<string, unknown>;
-  const owed = stillOwed(data);
-  const cents = Math.round(owed * 100);
+  // Progress billing: the current stage's amount unless the customer chose to pay the full balance.
+  const { charge, staged } = amountToCharge(data, full);
+  const cents = Math.round(charge * 100);
   if (cents < 50) return Response.json({ error: "Nothing is owed on this invoice." }, { status: 400 });
 
   const origin = request.headers.get("origin") || new URL(request.url).origin;
@@ -48,7 +51,7 @@ export async function POST(request: Request) {
     "line_items[0][quantity]": "1",
     "line_items[0][price_data][currency]": config.currency,
     "line_items[0][price_data][unit_amount]": String(cents),
-    "line_items[0][price_data][product_data][name]": `${number} · balance due`,
+    "line_items[0][price_data][product_data][name]": `${number} · ${staged ? "payment due now" : "balance due"}`,
     "metadata[doc_id]": String(doc.id),
     "metadata[owed_cents]": String(cents),
     "payment_intent_data[metadata][doc_id]": String(doc.id),

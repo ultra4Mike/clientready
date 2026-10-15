@@ -1,4 +1,5 @@
 // Server-only helpers for Stripe Checkout. Never import from client components.
+import { payNowAmount, readStages, todayYmd } from "@/lib/stages";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { amountOf, documentTotals } from "@/lib/discount";
@@ -26,10 +27,21 @@ export function serviceClient() {
 
 /** Still owed on a document, with the same math the app uses everywhere. */
 export function stillOwed(data: Record<string, unknown>) {
+  return amountsFor(data).owed;
+}
+
+function amountsFor(data: Record<string, unknown>) {
   const items = Array.isArray(data.items) ? (data.items as { qty?: unknown; rate?: unknown }[]) : [];
   const subtotal = items.reduce((sum, item) => sum + amountOf(item.qty) * amountOf(item.rate), 0);
   const totals = documentTotals(subtotal, String(data.taxPercent ?? ""), String(data.discountType ?? ""), String(data.discountValue ?? ""));
-  return balanceDue(totals.total, paidTotal(readPayments(data)), data.status);
+  return { total: totals.total, owed: balanceDue(totals.total, paidTotal(readPayments(data)), data.status) };
+}
+
+/** What to charge now: the current payment stage's remainder, or the full balance (no stages / full=true). */
+export function amountToCharge(data: Record<string, unknown>, full: boolean) {
+  const { total, owed } = amountsFor(data);
+  const stages = readStages(data.stages);
+  return { owed, charge: payNowAmount(total, owed, stages, todayYmd(), full), staged: stages.length > 0 && !full };
 }
 
 /** Verifies a Stripe-Signature header (v1 HMAC-SHA256 over "timestamp.payload"), with a 5 minute window. */
