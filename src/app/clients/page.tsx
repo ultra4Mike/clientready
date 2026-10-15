@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import PortalShare from "@/components/PortalShare";
@@ -273,7 +274,7 @@ export default function ClientsPage() {
               <div className="flex min-w-0 items-center gap-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-500/15 text-sm font-bold uppercase text-teal-700 dark:text-teal-300">{client.name.slice(0, 1)}</span>
                 <div className="min-w-0">
-                  <p className="truncate font-semibold">{client.name}</p>
+                  <p className="truncate font-semibold"><Link href={`/clients/${encodeURIComponent(client.id)}`} data-testid="client-open" className="hover:underline">{client.name}</Link></p>
                   {client.company && <p className="truncate text-sm text-slate-600">{client.company}</p>}
                 </div>
               </div>

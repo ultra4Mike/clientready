@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { recurringDraftsReady, runDueRecurring } from "@/lib/recurring";
+import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { loadAccountIntoCache } from "@/lib/account-cache";
@@ -233,7 +234,7 @@ export default function DashboardPage() {
             {!loaded ? "Loading…" : stats.overdueCount === 0 ? "No overdue invoices" : `${stats.overdueCount} overdue`}
           </p>
         </a>
-        <a href="/clients" data-testid="stat-clients" data-loading={loaded ? undefined : "true"} className="group block data-[loading=true]:pointer-events-none data-[loading=true]:animate-pulse rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
+        <Link href="/clients" data-testid="stat-clients" data-loading={loaded ? undefined : "true"} className="group block data-[loading=true]:pointer-events-none data-[loading=true]:animate-pulse rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
           <div className="flex items-start justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Clients</p>
             <IconWrap>☺</IconWrap>
@@ -242,7 +243,7 @@ export default function DashboardPage() {
           <p className="mt-2 text-xs text-[var(--cr-muted)]">
             {!loaded ? "Loading…" : clients.length === 0 ? "No clients added" : "Saved clients"}
           </p>
-        </a>
+        </Link>
       </div>
 
       <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
