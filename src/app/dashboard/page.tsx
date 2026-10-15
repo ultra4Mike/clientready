@@ -253,11 +253,11 @@ export default function DashboardPage() {
         <div className="min-w-0 space-y-6">
       {stats.invoiceCount > 0 && (
         <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 sm:mb-4">
             <h2 className="text-base font-semibold">Invoice overview</h2>
             <span className="text-xs text-[var(--cr-muted)]">Last 6 months · {stats.paidRate}% of invoices marked paid</span>
           </div>
-          <svg viewBox={`0 0 ${width} ${height}`} className="h-56 w-full">
+          <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full sm:h-56">
             {[1, 2, 3, 4].map((line) => (
               <line
                 key={line}
@@ -283,9 +283,9 @@ export default function DashboardPage() {
                   x={x}
                   y={height - 2}
                   textAnchor="middle"
-                  fontSize="10"
                   fill="currentColor"
-                  opacity="0.7"
+                  opacity="0.8"
+                  className="text-[28px] sm:text-[10px]"
                 >
                   {point.label}
                 </text>
