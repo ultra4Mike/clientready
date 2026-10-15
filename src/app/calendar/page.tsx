@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
+import PageHeader from "@/components/PageHeader";
 import ScheduleEditor from "@/components/ScheduleEditor";
 import { uniqueDocs } from "@/lib/change-orders";
 import { scheduledJobs } from "@/lib/scheduled-jobs";
@@ -144,7 +145,8 @@ export default function CalendarPage() {
 
   return (
     <AppShell title="Calendar">
-      <section className="mx-auto max-w-7xl py-2 sm:py-4">
+      <PageHeader title="Schedule" subtitle="Drag jobs onto the week or month. Click a slot or job to edit it." actions={<a href="/invoice" className="rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">New job</a>} />
+      <section className="py-0">
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div className="inline-flex w-full gap-1 rounded-xl border border-slate-500/30 p-1 sm:w-auto" role="tablist">
             {(["week", "month", "worker"] as View[]).map((item) => (
