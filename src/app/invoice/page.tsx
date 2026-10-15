@@ -8,6 +8,7 @@ import { getTrialState } from "@/lib/trial";
 import { saveCrewJobs } from "@/lib/crew";
 import { balanceDue, paidTotal, paymentFields, paymentMethods, readPayments, type Payment } from "@/lib/payments";
 import { JobPhotosEditor, JobPhotoStrip } from "@/components/JobPhotos";
+import { currentDocId } from "@/lib/doc-sync";
 import { isQuotaError, readPhotos, type JobPhoto } from "@/lib/photos";
 import LineSplit from "@/components/LineSplit";
 import { normalizeCategory, type LineCategory } from "@/lib/line-split";
@@ -482,7 +483,7 @@ export default function NewInvoicePage() {
     }
     const raw = window.localStorage.getItem("clientready-documents");
     const docs = raw ? JSON.parse(raw) : [];
-    const localId = docId || Date.now().toString();
+    const localId = currentDocId(docId) || Date.now().toString();
     const labor = crew.length ? crew.reduce((sum, row) => sum + rowPay(row), 0).toFixed(2) : costs.labor;
     // Change-order notes are append-only: keep whatever is stored, plus what this form loaded.
     const stored = (docs as SavedDocument[]).find((item) => item.id === localId);

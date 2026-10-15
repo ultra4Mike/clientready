@@ -10,6 +10,8 @@ const keys = [
   "clientready-open-document",
   "clientready-new-type",
   "clientready-clock-entries",
+  "clientready-unsynced-ids",
+  "clientready-id-remap",
 ];
 
 /** Wipes the business cache (sign-out). Never-uploaded documents are parked for the same account first. */
@@ -36,10 +38,10 @@ function readLocalDocs(): CloudDoc[] {
  * - A different account signs in: the previous account's never-uploaded documents are parked
  *   under that account, and this account starts from its own cloud data only.
  */
-export async function loadAccountIntoCache() {
+export async function loadAccountIntoCache(): Promise<boolean> {
   const { data, error: userError } = await supabase.auth.getUser();
   const user = data.user;
-  if (userError || !user) return;
+  if (userError || !user) return false;
   const owner = window.localStorage.getItem(OWNER_KEY);
   const switching = Boolean(owner && owner !== user.id);
 
@@ -49,7 +51,7 @@ export async function loadAccountIntoCache() {
     .eq("id", user.id)
     .maybeSingle();
 
-  if (profileError) return;
+  if (profileError) return false;
   if (switching) window.localStorage.removeItem("clientready-profile");
   if (profile) {
     window.localStorage.setItem(
@@ -115,7 +117,7 @@ export async function loadAccountIntoCache() {
   );
 
   const cloud = await fetchCloudDocuments();
-  if (!cloud) return; // fetch failed: keep local documents untouched
+  if (!cloud) return false; // fetch failed: keep local documents untouched
 
   let local = readLocalDocs();
   if (switching && owner) {
@@ -129,4 +131,5 @@ export async function loadAccountIntoCache() {
   window.localStorage.setItem(OWNER_KEY, user.id);
   const synced = await syncLocalDocs(merged, pushUp);
   window.localStorage.setItem(DOCS_KEY, JSON.stringify(synced));
+  return true;
 }

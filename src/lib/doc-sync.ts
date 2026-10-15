@@ -107,6 +107,7 @@ export async function syncLocalDocs(docs: Doc[], pushUp: Doc[]) {
     list = remapped.next;
     remapped.changed.forEach((item) => toResave.set(item.id, item));
     if (window.localStorage.getItem("clientready-open-document") === oldId) window.localStorage.setItem("clientready-open-document", newId);
+    rememberIdChange(oldId, newId);
   }
   for (const doc of pushUp) if (isUuid(doc.id)) toResave.set(doc.id, list.find((item) => item.id === doc.id) || doc);
   for (const doc of toResave.values()) {
@@ -114,6 +115,29 @@ export async function syncLocalDocs(docs: Doc[], pushUp: Doc[]) {
     if (isUuid(current.id)) await saveCloudDocument(current);
   }
   return list;
+}
+
+const REMAP_KEY = "clientready-id-remap";
+
+/** A page that still holds a local id after a background upload can look up the cloud id. */
+function rememberIdChange(oldId: string, newId: string) {
+  try {
+    const map = JSON.parse(window.localStorage.getItem(REMAP_KEY) || "{}") as Record<string, string>;
+    map[oldId] = newId;
+    window.localStorage.setItem(REMAP_KEY, JSON.stringify(map));
+  } catch {
+    window.localStorage.setItem(REMAP_KEY, JSON.stringify({ [oldId]: newId }));
+  }
+}
+
+export function currentDocId(id: string) {
+  if (!id || isUuid(id)) return id;
+  try {
+    const map = JSON.parse(window.localStorage.getItem(REMAP_KEY) || "{}") as Record<string, string>;
+    return map[id] || id;
+  } catch {
+    return id;
+  }
 }
 
 /** Before signing out: park this owner's never-uploaded docs so a later sign-in can restore them. */

@@ -4,6 +4,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { clearLocalBusiness } from "@/lib/account-cache";
 import { isCrewUser } from "@/lib/crew";
+import SyncPill from "@/components/SyncPill";
 
 const mainLinks = [
   { href: "/dashboard", label: "Dashboard" },
@@ -99,6 +100,7 @@ useEffect(() => {
 
   const actions = (
     <div className="flex flex-wrap items-center gap-3 text-sm font-medium sm:gap-4">
+      <SyncPill />
       <button type="button" onClick={() => saveTheme(theme === "dark" ? "light" : "dark")}>
         {theme === "dark" ? "Light" : "Dark"}
       </button>

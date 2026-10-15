@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { markSynced, markUnsynced } from "./sync-status";
 
 export type CloudDoc = {
   id: string;
@@ -58,7 +59,12 @@ export async function saveCloudDocument(doc: CloudDoc) {
   doc.data = doc.data || {};
   doc.data.updatedAt = new Date().toISOString();
   const userId = await getUserId();
-  if (!userId) return doc.id;
+  if (!userId) {
+    // Signed in but unreachable (offline / network error): remember to upload it later.
+    const { data: session } = await supabase.auth.getSession();
+    if (session.session) markUnsynced(doc.id);
+    return doc.id;
+  }
 
   if (isUuid(doc.id)) {
     // The approval block is owned by the cloud (the customer approves there, and only the share/
@@ -78,7 +84,7 @@ export async function saveCloudDocument(doc: CloudDoc) {
       const mine = doc.data.schedule as { updatedAt?: string } | undefined;
       if (cloudSchedule && (!mine || Date.parse(cloudSchedule.updatedAt || "") > Date.parse(mine.updatedAt || ""))) doc.data.schedule = cloudSchedule;
     }
-    await supabase
+    const { error: writeError } = await supabase
       .from("documents")
       .update({
         type: doc.type,
@@ -88,10 +94,12 @@ export async function saveCloudDocument(doc: CloudDoc) {
       })
       .eq("id", doc.id)
       .eq("user_id", userId);
+    if (writeError) markUnsynced(doc.id);
+    else markSynced(doc.id);
     return doc.id;
   }
 
-  const { data } = await supabase
+  const { data, error: insertError } = await supabase
     .from("documents")
     .insert({
       user_id: userId,
@@ -103,5 +111,10 @@ export async function saveCloudDocument(doc: CloudDoc) {
     .select("id")
     .single();
 
-  return data?.id || doc.id;
+  if (insertError || !data?.id) {
+    markUnsynced(doc.id);
+    return doc.id;
+  }
+  markSynced(doc.id, data.id);
+  return data.id;
 }
