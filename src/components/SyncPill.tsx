@@ -73,11 +73,14 @@ export default function SyncPill() {
       data-state={state}
       onClick={() => flushPending()}
       title={state === "local" ? "Tap to try syncing now" : undefined}
-      className={`print-hide inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${STYLES[state]}`}
+      aria-label={LABELS[state]}
+      className={`print-hide inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 max-[899px]:h-11 max-[899px]:w-11 max-[899px]:justify-center max-[899px]:border-0 max-[899px]:bg-transparent max-[899px]:p-0 text-xs font-medium ${STYLES[state]}`}
     >
-      <span className={`h-1.5 w-1.5 rounded-full ${state === "synced" ? "bg-teal-500" : state === "syncing" ? "animate-pulse bg-teal-500" : "bg-amber-500"}`} />
-      {LABELS[state]}
-      {(state === "local" || state === "offline") && count > 0 ? ` (${count})` : ""}
+      <span className={`h-1.5 w-1.5 rounded-full max-[899px]:h-2.5 max-[899px]:w-2.5 ${state === "synced" ? "bg-teal-500" : state === "syncing" ? "animate-pulse bg-teal-500" : "bg-amber-500"}`} />
+      <span className="max-[899px]:sr-only">
+        {LABELS[state]}
+        {(state === "local" || state === "offline") && count > 0 ? ` (${count})` : ""}
+      </span>
     </button>
   );
 }
