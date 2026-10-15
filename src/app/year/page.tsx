@@ -393,7 +393,7 @@ export default function YearPage() {
         </div>
       )}
 
-      <button type="button" onClick={() => window.print()} className="mb-4 w-full rounded-lg bg-teal-400 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300 sm:w-auto print:hidden">Print / Save PDF</button>
+      <button type="button" onClick={() => window.print()} className="mb-4 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 sm:w-auto print:hidden">Print / Save PDF</button>
 
       <div className="mb-6 space-y-2 print:hidden">
         {visible.length === 0 && <p className="rounded-xl border border-dashed border-teal-500/30 p-6 text-center text-sm text-[var(--cr-muted)]">No rows match that search.</p>}
@@ -423,15 +423,15 @@ export default function YearPage() {
 
         <h2 className="mt-8 border-b border-slate-200 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-700">Money in</h2>
         {rows.filter((row) => row.kind === "in").map((row) => (
-          <p key={row.id} className="mt-2 text-sm">{row.date} · {row.client} · {row.number} · ${row.amount.toFixed(2)} · {row.method} {row.ref}</p>
+          <div key={row.id} className="flex flex-wrap gap-x-4 gap-y-0.5 border-b border-slate-200 py-2 text-sm last:border-b-0"><span className="w-24 tabular-nums text-slate-500">{row.date}</span><span className="flex-1">{row.client}</span><span>{row.number}</span><span className="text-slate-500">{row.method} {row.ref}</span><span className="w-24 text-right font-medium tabular-nums">${row.amount.toFixed(2)}</span></div>
         ))}
 
         <h2 className="mt-8 border-b border-slate-200 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-700">Crew pay</h2>
         {workers.map((person) => (
-          <div key={person.name} className="mt-4">
+          <div key={person.name} className="mt-4 w-full">
             <p className="font-medium">{person.name}: ${person.total.toFixed(2)} · {person.hours.toFixed(2)} hrs</p>
             {rows.filter((row) => row.worker === person.name).map((row) => (
-              <p key={row.id} className="mt-1 text-sm">{row.date} · {row.number} · {row.hours || "0"} hrs · ${Number(row.rate || 0).toFixed(2)}/hr · ${row.amount.toFixed(2)} {row.note}</p>
+              <div key={row.id} className="flex flex-wrap gap-x-4 gap-y-0.5 border-b border-slate-200 py-2 text-sm last:border-b-0"><span className="w-24 tabular-nums text-slate-500">{row.date}</span><span className="flex-1">{row.number}{row.note ? <span className="text-slate-500"> {row.note}</span> : null}</span><span className="tabular-nums text-slate-500">{row.hours || "0"} hrs @ ${Number(row.rate || 0).toFixed(2)}/hr</span><span className="w-24 text-right font-medium tabular-nums">${row.amount.toFixed(2)}</span></div>
             ))}
           </div>
         ))}
@@ -442,9 +442,9 @@ export default function YearPage() {
           const total = group.reduce((sum, row) => sum + row.amount, 0);
           if (!group.length) return null;
           return (
-            <div key={label} className="mt-4">
+            <div key={label} className="mt-4 w-full">
               <p className="font-medium">{label}: ${total.toFixed(2)}</p>
-              {group.map((row) => <p key={row.id} className="mt-1 text-sm">{row.date} · {row.number} · ${row.amount.toFixed(2)} · {row.note}</p>)}
+              {group.map((row) => <div key={row.id} className="flex flex-wrap gap-x-4 gap-y-0.5 border-b border-slate-200 py-2 text-sm last:border-b-0"><span className="w-24 tabular-nums text-slate-500">{row.date}</span><span>{row.number}</span><span className="flex-1 text-slate-500">{row.note}</span><span className="w-24 text-right font-medium tabular-nums">${row.amount.toFixed(2)}</span></div>)}
             </div>
           );
         })}
@@ -475,7 +475,7 @@ export default function YearPage() {
         <div data-testid="year-deposits">
           {extras.deposits.length === 0 && <p className="mt-2 text-sm text-slate-500">No deposits recorded on proposals.</p>}
           {extras.deposits.map(({ doc, payment }) => (
-            <p key={`${doc.id}-${payment.id}`} className="mt-1 text-sm">{payment.date} · {doc.clientName} · {doc.title} · ${money(payment.amount).toFixed(2)} · {payment.method} {payment.ref}</p>
+            <div key={`${doc.id}-${payment.id}`} className="flex flex-wrap gap-x-4 gap-y-0.5 border-b border-slate-200 py-2 text-sm last:border-b-0"><span className="w-24 tabular-nums text-slate-500">{payment.date}</span><span className="flex-1">{doc.clientName}</span><span>{doc.title}</span><span className="text-slate-500">{payment.method} {payment.ref}</span><span className="w-24 text-right font-medium tabular-nums">${money(payment.amount).toFixed(2)}</span></div>
           ))}
           {extras.deposits.length > 0 && <p className="mt-1 text-xs text-slate-500">A deposit is counted in Money in once the proposal is turned into an invoice (the deposit is copied onto it).</p>}
         </div>
