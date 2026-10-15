@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { markSynced, markUnsynced } from "./sync-status";
+import { keepStripePayments } from "./payments";
 
 export type CloudDoc = {
   id: string;
@@ -83,6 +84,9 @@ export async function saveCloudDocument(doc: CloudDoc) {
       const cloudSchedule = (current.data as Record<string, unknown> | null)?.schedule as { updatedAt?: string } | undefined;
       const mine = doc.data.schedule as { updatedAt?: string } | undefined;
       if (cloudSchedule && (!mine || Date.parse(cloudSchedule.updatedAt || "") > Date.parse(mine.updatedAt || ""))) doc.data.schedule = cloudSchedule;
+      // Card payments recorded by Stripe on the server are never dropped by a save from an older copy.
+      const withStripe = keepStripePayments(doc.data, current.data as Record<string, unknown> | null);
+      if (withStripe !== doc.data) Object.assign(doc.data, withStripe);
     }
     const { error: writeError } = await supabase
       .from("documents")

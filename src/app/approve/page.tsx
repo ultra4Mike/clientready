@@ -26,6 +26,9 @@ export default function ApprovePage() {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [cardEnabled, setCardEnabled] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [payMessage, setPayMessage] = useState("");
 
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("t") || "";
@@ -34,6 +37,14 @@ export default function ApprovePage() {
     meta.name = "referrer";
     meta.content = "no-referrer";
     document.head.appendChild(meta);
+    const justPaid = new URLSearchParams(window.location.search).get("paid") === "1";
+    fetch("/api/pay/status")
+      .then((response) => (response.ok ? response.json() : { enabled: false }))
+      .then((result: { enabled?: boolean }) => {
+        setCardEnabled(Boolean(result.enabled));
+        if (justPaid) setPayMessage("Thank you! Your card payment went through. It can take a minute to show here.");
+      })
+      .catch(() => setCardEnabled(false));
     fetchApprovalDoc(t)
       .then((found) => {
         setToken(t);
@@ -54,6 +65,23 @@ export default function ApprovePage() {
     const paid = paidTotal(payments);
     return { ...base, paid, balance: balanceDue(base.total, paid, text(data.status)) };
   }, [items, payments, data]);
+
+  async function payByCard() {
+    setPaying(true);
+    setPayMessage("");
+    try {
+      const response = await fetch("/api/pay/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }) });
+      const result = (await response.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (response.ok && result.url && /^https?:\/\//.test(result.url)) {
+        window.location.assign(result.url);
+        return;
+      }
+      setPayMessage(result.error || "Card payment is not available right now.");
+    } catch {
+      setPayMessage("Card payment is not available right now.");
+    }
+    setPaying(false);
+  }
 
   async function approve() {
     setBusy(true);
@@ -174,6 +202,17 @@ export default function ApprovePage() {
             </div>
           </div>
 
+          {!isProposal && (cardEnabled || payMessage) && (
+            <div className="print-hide mt-4 rounded-xl border border-teal-500/30 bg-teal-50 p-4 text-sm text-slate-800" data-testid="card-pay">
+              {cardEnabled && totals.balance >= 0.5 && (
+                <button type="button" data-testid="pay-card" disabled={paying} onClick={payByCard} className="w-full rounded-lg bg-teal-600 px-4 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-teal-500 disabled:opacity-60 sm:w-auto">
+                  {paying ? "Opening secure checkout…" : `Pay $${totals.balance.toFixed(2)} by card`}
+                </button>
+              )}
+              {payMessage && <p className="mt-2" data-testid="pay-message">{payMessage}</p>}
+              {cardEnabled && totals.balance >= 0.5 && <p className="mt-2 text-xs text-slate-500">Secure checkout by Stripe. You pay what is still owed.</p>}
+            </div>
+          )}
           {text(data.notes) && <p className="mt-3 text-sm text-slate-600">{text(data.notes)}</p>}
           {data.showPhotos === true && <JobPhotoStrip photos={readPhotos(data.photos)} />}
           {(payUrl || signature || proposalSignature) && (

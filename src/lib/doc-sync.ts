@@ -1,4 +1,5 @@
 import { isUuid, saveCloudDocument, type CloudDoc } from "@/lib/cloud-docs";
+import { keepStripePayments } from "@/lib/payments";
 
 export const OWNER_KEY = "clientready-cache-owner";
 export const DOCS_KEY = "clientready-documents";
@@ -55,7 +56,8 @@ export function mergeDocs<T extends AnyDoc>(local: T[], cloud: T[]) {
     const localTime = stampOf(mine);
     const cloudTime = stampOf(doc);
     if (localTime > cloudTime) {
-      const kept = withNewerSchedule(withCloudApproval(mine, doc), mine, doc);
+      const base = withNewerSchedule(withCloudApproval(mine, doc), mine, doc);
+      const kept = { ...base, data: keepStripePayments(base.data || {}, doc.data) };
       merged.push(kept);
       pushUp.push(kept);
     } else {

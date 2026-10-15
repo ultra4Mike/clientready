@@ -172,7 +172,7 @@ export default function CollectPage() {
   // Recurring drafts nobody has reviewed yet are not money to collect: keep them out of the
   // list and totals, and point to them below so they aren't lost.
   const pendingDrafts = invoices.filter(isPendingRecurringDraft).length;
-  const unpaid = invoices.filter((doc) => (doc.data?.status || "draft") !== "paid" && !isPendingRecurringDraft(doc));
+  const unpaid = invoices.filter((doc) => (doc.data?.status || "draft") !== "paid" && !isPendingRecurringDraft(doc) && !(amountPaid(doc) > 0 && balance(doc) <= 0));
 
   const totals = useMemo(() => {
     const openAmount = unpaid.reduce((sum, doc) => sum + balance(doc), 0);

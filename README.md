@@ -92,3 +92,25 @@ reports) or `crew_expenses` are missing, it creates them with the columns the ap
 any missing columns to existing tables. Existing data is not touched. It also creates the
 `is_crew_email()` and `list_crew_clients()` functions only if your project does not already have
 them; the fallback `list_crew_clients()` returns no clients.
+
+### Card payments with Stripe Checkout (optional)
+
+Customers can pay what is still owed on an invoice by card from the approval link page
+(`/approve?t=…`). The amount is always calculated on the server from the saved invoice. When
+Stripe confirms the payment, it is added to the invoice's payments ("Card (Stripe)"), once per
+checkout. The invoice status is not changed automatically.
+
+1. Run `supabase/migrations/20261015030000_stripe_payments.sql` in the Supabase SQL editor (after the
+   approval-links migration). Only the server's service role can call its two functions.
+2. Set these environment variables on the server (e.g. Vercel → Settings → Environment Variables), then redeploy:
+   - `STRIPE_SECRET_KEY`: Stripe Dashboard → Developers → API keys → Secret key (`sk_live_…` or `sk_test_…`).
+   - `STRIPE_WEBHOOK_SECRET`: from step 3 (`whsec_…`).
+   - `SUPABASE_SERVICE_ROLE_KEY`: Supabase → Project Settings → API → `service_role` key. Server only; never expose it in the browser.
+   - Optional: `STRIPE_CURRENCY` (default `usd`).
+3. Stripe Dashboard → Developers → Webhooks → Add endpoint:
+   - URL: `https://YOUR-DOMAIN/api/stripe/webhook`
+   - Events: `checkout.session.completed` and `checkout.session.async_payment_succeeded`
+   - Copy the endpoint's signing secret into `STRIPE_WEBHOOK_SECRET`.
+
+If the keys are missing, the "Pay by card" button is hidden and the API routes answer 503.
+Card payments only work on invoices shared with an approval link.

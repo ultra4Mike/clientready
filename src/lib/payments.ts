@@ -66,3 +66,17 @@ export function paymentFields(payments: Payment[]) {
     paymentRef: latest?.ref || "",
   };
 }
+
+/**
+ * Payments recorded by Stripe live in the cloud copy first. When a local copy (possibly older) is
+ * saved or merged, keep any Stripe payments it doesn't have yet, so they are never dropped.
+ */
+export function keepStripePayments(local: Record<string, unknown>, cloud: Record<string, unknown> | null | undefined) {
+  if (!cloud) return local;
+  const remote = readPayments(cloud).filter((payment) => payment.id.startsWith("stripe_"));
+  if (!remote.length) return local;
+  const mine = readPayments(local);
+  const missing = remote.filter((payment) => !mine.some((item) => item.id === payment.id));
+  if (!missing.length) return local;
+  return { ...local, ...paymentFields([...mine, ...missing]) };
+}
