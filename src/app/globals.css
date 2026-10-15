@@ -7,7 +7,7 @@ html.light {
   --cr-bg: #f4fbfb;
   --cr-panel: #ffffff;
   --cr-text: #0f172a;
-  --cr-muted: #475569;
+  --cr-muted: #334155;
   --cr-card: #ffffff;
 }
 
@@ -15,7 +15,7 @@ html.dark {
   --cr-bg: #061418;
   --cr-panel: #0b1f24;
   --cr-text: #e2f6f4;
-  --cr-muted: #94b8b4;
+  --cr-muted: #b4d4d0;
   --cr-card: #10262c;
 }
 
@@ -65,7 +65,33 @@ html.dark option {
 
 html.dark input::placeholder,
 html.dark textarea::placeholder {
-  color: #9ec9c4 !important;
+  color: #a9d2cd !important;
+  opacity: 1;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+
+input[type="file"] {
+  font-size: 0.875rem;
+}
+
+input[type="file"]::file-selector-button {
+  margin-right: 0.75rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background-color: #14b8a6;
+  color: #042f2e;
+  font-weight: 600;
+  padding: 0.4rem 0.85rem;
+  cursor: pointer;
+}
+
+input[type="file"]::file-selector-button:hover {
+  background-color: #2dd4bf;
 }
 
 html.dark select option {
