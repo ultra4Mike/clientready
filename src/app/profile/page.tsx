@@ -138,9 +138,9 @@ export default function ProfilePage() {
     <AppShell title="Profile">
       <form
         onSubmit={handleSubmit}
-        className="mx-auto mt-8 max-w-2xl space-y-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-6"
+        className="mx-auto mt-2 max-w-2xl space-y-5 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:mt-6 sm:p-6"
       >
-        <h1 className="text-xl font-semibold">Your business details</h1>
+        <h1 className="text-xl font-bold tracking-tight">Your business details</h1>
         <p className="text-sm text-[var(--cr-muted)]">
           Payment instructions print on customer invoices. This is not a card processor.
         </p>
@@ -157,34 +157,34 @@ export default function ProfilePage() {
         </div>
         <div className="space-y-3 rounded-xl border border-teal-500/20 p-4 sm:p-5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Payments, savings & logo</h2>
-        <label className="block text-sm text-[var(--cr-muted)]">
+        <label className="block text-sm font-medium text-[var(--cr-muted)]">
           How customers pay you
           <input className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-base outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Venmo, Cash App, Zelle, or a payment URL" value={profile.paymentLink} onChange={(event) => update("paymentLink", event.target.value)} />
         </label>
-        <label className="block text-sm text-[var(--cr-muted)]">
+        <label className="block text-sm font-medium text-[var(--cr-muted)]">
           Set aside % of profit
           <input className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-base outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="30" value={profile.setAsidePercent} onChange={(event) => update("setAsidePercent", event.target.value)} />
         </label>
-        <p className="text-sm text-[var(--cr-muted)]">Default is 30%. This is a cushion for taxes. It is not a tax return.</p>
-        <label className="block text-sm text-[var(--cr-muted)]">
+        <p className="-mt-1 text-xs text-[var(--cr-muted)]">Default is 30%. This is a cushion for taxes. It is not a tax return.</p>
+        <label className="block text-sm font-medium text-[var(--cr-muted)]">
           Logo
-          <input type="file" accept="image/*" className="mt-1 block w-full text-sm" onChange={(event) => handleLogo(event.target.files?.[0])} />
+          <input type="file" accept="image/*" className="mt-1.5 block w-full rounded-lg border border-dashed border-teal-500/40 p-3 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-teal-400 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-slate-950" onChange={(event) => handleLogo(event.target.files?.[0])} />
         </label>
-        {profile.logo && <img src={profile.logo} alt="Business logo" className="h-16 w-auto" />}
+        {profile.logo && <img src={profile.logo} alt="Business logo" className="h-16 w-auto rounded-lg border border-teal-500/20 bg-white p-1" />}
         </div>
-        <button type="submit" className="rounded-lg bg-teal-400 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300 disabled:opacity-50">
+        <button type="submit" className="w-full rounded-lg bg-teal-400 px-6 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300 disabled:opacity-50 sm:w-auto">
           {saved ? "Saved" : "Save profile"}
         </button>
-        {message && <p className="text-sm text-[var(--cr-muted)]">{message}</p>}
+        {message && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-[var(--cr-muted)]">{message}</p>}
       </form>
 
-      <form onSubmit={changePassword} className="mx-auto mt-6 max-w-2xl space-y-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-6">
-        <h2 className="text-lg font-semibold">Login password</h2>
+      <form onSubmit={changePassword} className="mx-auto mt-6 max-w-2xl space-y-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-6">
+        <h2 className="text-lg font-bold tracking-tight">Login password</h2>
         <p className="text-sm text-[var(--cr-muted)]">Login email: {loginEmail || "Not signed in"}</p>
         <input type="password" className="w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Current password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
         <input type="password" className="w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="New password" value={nextPassword} onChange={(event) => setNextPassword(event.target.value)} />
-        <button type="submit" className="rounded-lg bg-teal-400 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300 disabled:opacity-50">Update password</button>
-        {passwordMessage && <p className="text-sm text-[var(--cr-muted)]">{passwordMessage}</p>}
+        <button type="submit" className="rounded-lg bg-teal-400 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300 disabled:opacity-50 w-full sm:w-auto">Update password</button>
+        {passwordMessage && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-[var(--cr-muted)]">{passwordMessage}</p>}
       </form>
     </AppShell>
   );
