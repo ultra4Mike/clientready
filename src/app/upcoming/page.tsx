@@ -78,7 +78,7 @@ export default function UpcomingPage() {
   return (
     <AppShell title="Upcoming">
 
-      <section className="mx-auto max-w-4xl py-2 sm:px-2 sm:py-4">
+      <section className="max-w-4xl py-2 sm:py-4">
         <h1 className="text-2xl font-bold tracking-tight">This week</h1>
         <p className="mt-1 text-sm text-slate-600 sm:text-base">
           Invoices and jobs due in the next 7 days.
