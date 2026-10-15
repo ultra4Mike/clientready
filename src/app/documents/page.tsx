@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { fetchCloudDocuments, deleteCloudDocument, getUserId } from "@/lib/cloud-docs";
 import { mergeDocs, OWNER_KEY } from "@/lib/doc-sync";
 import { runDueRecurring } from "@/lib/recurring";
 import { ApprovalBadge } from "@/components/Approval";
 import { readApproval } from "@/lib/approval";
 import AppShell from "@/components/AppShell";
+import { documentTotals } from "@/lib/discount";
+import { balanceDue, paidTotal, readPayments } from "@/lib/payments";
 
 type SavedDocument = {
   id: string;
@@ -22,11 +24,34 @@ type SavedDocument = {
   };
 };
 
+function num(value: unknown) {
+  return Number(String(value ?? "").replace(/[^0-9.-]/g, "")) || 0;
+}
+
+/** Amounts and dates used by search and filters (computed once per document list). */
+function facts(doc: SavedDocument) {
+  const data = doc.data || {};
+  const items = Array.isArray(data.items) ? (data.items as { qty?: unknown; rate?: unknown }[]) : [];
+  const subtotal = items.reduce((sum, item) => sum + num(item.qty) * num(item.rate), 0);
+  const total = documentTotals(subtotal, data.taxPercent as string, data.discountType as string, data.discountValue as string).total;
+  const owed = doc.type === "invoice" ? balanceDue(total, paidTotal(readPayments(data)), data.status) : 0;
+  const created = Date.parse(doc.createdAt);
+  const date = String(data.invoiceDate || "") || (Number.isNaN(created) ? "" : new Date(created).toISOString().slice(0, 10));
+  const updated = Date.parse(String(data.updatedAt || ""));
+  const stamp = !Number.isNaN(updated) ? updated : Number(doc.id) || (Number.isNaN(created) ? 0 : created);
+  const text = [doc.title, doc.clientName, doc.type, data.invoiceNumber, data.clientCompany, data.clientEmail, data.clientPhone, data.status, date, total.toFixed(2)].join(" ").toLowerCase();
+  return { total, owed, date, stamp, text };
+}
+
 export default function DocumentsPage() {
   const [documents, setDocuments] = useState<SavedDocument[]>([]);
   const [typeFilter, setTypeFilter] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const deferredSearch = useDeferredValue(search);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -97,21 +122,35 @@ export default function DocumentsPage() {
     deleteCloudDocument(id);
   }
 
+  const factsById = useMemo(() => new Map(documents.map((doc) => [doc.id, facts(doc)])), [documents]);
+
   const visibleDocs = useMemo(() => {
+    // Words must all match; a number like "450" or "$450.00" also matches the document total.
+    const words = deferredSearch.toLowerCase().replace(/\$/g, "").split(/\s+/).filter(Boolean);
     const filtered = documents.filter((doc) => {
-      const matchesType = typeFilter === "all" || doc.type === typeFilter;
-      const haystack = `${doc.title} ${doc.clientName} ${doc.type}`.toLowerCase();
-      const matchesSearch = haystack.includes(search.toLowerCase());
-      return matchesType && matchesSearch;
+      const info = factsById.get(doc.id) || facts(doc);
+      if (typeFilter !== "all" && doc.type !== typeFilter) return false;
+      const status = String(doc.data?.status || "draft");
+      if (statusFilter === "unpaid" ? !(doc.type === "invoice" && info.owed > 0 && status !== "draft") : statusFilter !== "all" && status !== statusFilter) return false;
+      if (fromDate && (!info.date || info.date < fromDate)) return false;
+      if (toDate && (!info.date || info.date > toDate)) return false;
+      return words.every((word) => info.text.includes(word) || (/^\d+(\.\d+)?$/.test(word) && Math.abs(info.total - Number(word)) < 0.005));
     });
 
     return filtered.sort((a, b) => {
+      const fa = factsById.get(a.id) || facts(a);
+      const fb = factsById.get(b.id) || facts(b);
       if (sortBy === "client") return a.clientName.localeCompare(b.clientName);
       if (sortBy === "type") return a.type.localeCompare(b.type);
-      if (sortBy === "oldest") return Number(a.id) - Number(b.id);
-      return Number(b.id) - Number(a.id);
+      if (sortBy === "amount") return fb.total - fa.total;
+      if (sortBy === "date") return fb.date.localeCompare(fa.date);
+      if (sortBy === "oldest") return fa.stamp - fb.stamp;
+      return fb.stamp - fa.stamp;
     });
-  }, [documents, typeFilter, sortBy, search]);
+  }, [documents, factsById, typeFilter, statusFilter, fromDate, toDate, sortBy, deferredSearch]);
+
+  const field = "rounded-lg border border-teal-500/30 bg-[var(--cr-card)] px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30";
+  const filtersOn = typeFilter !== "all" || statusFilter !== "all" || fromDate || toDate || search;
 
   return (
     <AppShell title="Documents">
@@ -135,10 +174,11 @@ export default function DocumentsPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 sm:grid-cols-2 md:grid-cols-[2fr_1fr_1fr]">
+      <div className="grid gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 sm:grid-cols-2 md:grid-cols-3">
         <input
           className="rounded-lg border border-teal-500/30 bg-[var(--cr-card)] px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
-          placeholder="Search title or client"
+          placeholder="Search client, number, amount, email"
+          aria-label="Search documents"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
@@ -162,7 +202,24 @@ export default function DocumentsPage() {
           <option value="oldest">Oldest first</option>
           <option value="client">Client name</option>
           <option value="type">Document type</option>
+          <option value="date">Document date</option>
+          <option value="amount">Amount</option>
         </select>
+        <select className={field} aria-label="Status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+          <option value="all">Any status</option>
+          <option value="unpaid">Unpaid (still owed)</option>
+          <option value="draft">Draft</option>
+          <option value="sent">Sent</option>
+          <option value="overdue">Overdue</option>
+          <option value="paid">Paid</option>
+          <option value="accepted">Accepted</option>
+        </select>
+        <label className="flex items-center gap-2 text-sm text-[var(--cr-muted)]">From<input type="date" aria-label="From date" className={`${field} min-w-0 flex-1`} value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></label>
+        <label className="flex items-center gap-2 text-sm text-[var(--cr-muted)]">To<input type="date" aria-label="To date" className={`${field} min-w-0 flex-1`} value={toDate} onChange={(event) => setToDate(event.target.value)} /></label>
+      </div>
+      <div className="mt-2 flex items-center justify-between text-xs text-[var(--cr-muted)]">
+        <span data-testid="doc-count">{visibleDocs.length} of {documents.length} documents</span>
+        {filtersOn && <button type="button" className="font-medium text-teal-600 dark:text-teal-300" onClick={() => { setSearch(""); setTypeFilter("all"); setStatusFilter("all"); setFromDate(""); setToDate(""); }}>Clear filters</button>}
       </div>
 
       <div className="mt-6 space-y-3">
@@ -191,6 +248,8 @@ export default function DocumentsPage() {
               <p className="mt-0.5 text-sm text-[var(--cr-muted)]">
                 {doc.type} · {doc.clientName || "No client"} · {doc.createdAt}
                 {doc.data?.status ? ` · ${doc.data.status}` : ""}
+                {(factsById.get(doc.id)?.total || 0) > 0 ? ` · $${(factsById.get(doc.id)?.total || 0).toFixed(2)}` : ""}
+                {(factsById.get(doc.id)?.owed || 0) > 0 && doc.data?.status !== "draft" ? ` · $${(factsById.get(doc.id)?.owed || 0).toFixed(2)} owed` : ""}
                 {doc.data?.outcome ? ` · ${doc.data.outcome}` : ""}
               </p>
               <ApprovalBadge approval={readApproval(doc.data?.approval)} className="mt-1" />

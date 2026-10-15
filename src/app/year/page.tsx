@@ -4,6 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { documentTotals } from "@/lib/discount";
 import { uniqueDocs } from "@/lib/change-orders";
+import { readPayments } from "@/lib/payments";
+import { lineSplit } from "@/lib/line-split";
+import { isPendingRecurringDraft } from "@/lib/recurring";
+import { supabase } from "@/lib/supabase";
+
+type CrewExpense = { id: string; doc_id: string; worker_name?: string; kind?: string; amount?: string; note?: string; created_at?: string; receipt?: string };
 
 type OtherFee = { id?: string; name?: string; amount?: string };
 
@@ -49,7 +55,11 @@ type SavedDocument = {
     taxPercent?: string;
     discountType?: string;
     discountValue?: string;
-    items?: { qty?: string; rate?: string }[];
+    items?: { qty?: string; rate?: string; category?: string }[];
+    payments?: unknown;
+    changeOrderOf?: { id?: string; number?: string };
+    recurringFrom?: { id?: string; number?: string; period?: string };
+    recurringReview?: string;
     jobCosts?: JobCosts;
     crew?: CrewRow[];
   };
@@ -108,6 +118,7 @@ export default function YearPage() {
   const [crewType, setCrewType] = useState("all");
   const [worker, setWorker] = useState("all");
   const [sortBy, setSortBy] = useState("date");
+  const [crewExpenses, setCrewExpenses] = useState<CrewExpense[]>([]);
 
   useEffect(() => {
     const profileRaw = window.localStorage.getItem("clientready-profile");
@@ -121,6 +132,13 @@ export default function YearPage() {
     if (raw) setDocuments(uniqueDocs(JSON.parse(raw)));
     const peopleRaw = window.localStorage.getItem("clientready-employees");
     if (peopleRaw) setEmployees(JSON.parse(peopleRaw));
+    // Receipts crew members logged on their jobs (owner sees all of theirs; read-only here).
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) return;
+      supabase.from("crew_expenses").select("id, doc_id, worker_name, kind, amount, note, created_at").then(({ data: rows, error }) => {
+        if (!error && rows) setCrewExpenses(rows as CrewExpense[]);
+      });
+    });
   }, []);
 
   function kindFor(name: string, employeeId?: string) {
@@ -133,11 +151,18 @@ export default function YearPage() {
     documents.forEach((doc) => {
       const crew = doc.data?.crew || [];
       const hasCrew = crew.some((row) => crewPay(row) > 0);
-      if (doc.type === "invoice" && doc.data?.status === "paid") {
-        const date = doc.data?.paymentDate || doc.data?.invoiceDate || doc.createdAt || "";
-        if (String(date).includes(year) || String(doc.createdAt).includes(year)) {
+      const tags = [
+        doc.data?.changeOrderOf?.number ? `Change order for ${doc.data.changeOrderOf.number}` : "",
+        doc.data?.recurringFrom ? `Recurring${doc.data.recurringFrom.period ? ` (${doc.data.recurringFrom.period})` : ""}` : "",
+      ].filter(Boolean).join(" · ");
+      if (doc.type === "invoice" && !isPendingRecurringDraft(doc)) {
+        // Every payment and deposit recorded on the invoice counts once, in the year it was received.
+        const payments = readPayments(doc.data).filter((payment) => money(payment.amount) > 0);
+        payments.forEach((payment, index) => {
+          const date = payment.date || doc.data?.invoiceDate || doc.createdAt || "";
+          if (!String(date).startsWith(year) && !(!payment.date && String(doc.createdAt).includes(year))) return;
           list.push({
-            id: `in-${doc.id}`,
+            id: `in-${doc.id}-${payment.id || index}`,
             docId: doc.id,
             docType: doc.type,
             kind: "in",
@@ -145,11 +170,31 @@ export default function YearPage() {
             client: doc.clientName || "No client",
             number: doc.data?.invoiceNumber || doc.title,
             category: "Gross receipts",
-            amount: money(doc.data?.paymentAmount) || invoiceTotal(doc),
-            method: doc.data?.paymentMethod || "",
-            ref: doc.data?.paymentRef || "",
-            note: "",
+            amount: money(payment.amount),
+            method: payment.method || "",
+            ref: payment.ref || "",
+            note: [payments.length > 1 ? `Payment ${index + 1} of ${payments.length}` : "", tags].filter(Boolean).join(" · "),
           });
+        });
+        // Older invoices marked paid without an amount: the whole total, as before.
+        if (!payments.length && doc.data?.status === "paid") {
+          const date = doc.data?.paymentDate || doc.data?.invoiceDate || doc.createdAt || "";
+          if (String(date).includes(year) || String(doc.createdAt).includes(year)) {
+            list.push({
+              id: `in-${doc.id}`,
+              docId: doc.id,
+              docType: doc.type,
+              kind: "in",
+              date,
+              client: doc.clientName || "No client",
+              number: doc.data?.invoiceNumber || doc.title,
+              category: "Gross receipts",
+              amount: invoiceTotal(doc),
+              method: doc.data?.paymentMethod || "",
+              ref: doc.data?.paymentRef || "",
+              note: tags,
+            });
+          }
         }
       }
       const costs = doc.data?.jobCosts;
@@ -223,6 +268,31 @@ export default function YearPage() {
     });
     return list;
   }, [documents, employees, year]);
+
+  const inYear = (doc: SavedDocument) => String(doc.data?.invoiceDate || doc.createdAt || "").includes(year);
+  const extras = useMemo(() => {
+    const invoices = documents.filter((doc) => doc.type === "invoice" && !isPendingRecurringDraft(doc) && (doc.data?.status || "draft") !== "draft" && inYear(doc));
+    const split = { labor: 0, materials: 0, other: 0, tagged: 0 };
+    invoices.forEach((doc) => {
+      const part = lineSplit(doc.data?.items || []);
+      if (!part) return;
+      split.tagged += 1;
+      split.labor += part.labor;
+      split.materials += part.materials;
+      split.other += part.other;
+    });
+    const deposits = documents
+      .filter((doc) => doc.type === "proposal" && inYear(doc))
+      .flatMap((doc) => readPayments(doc.data).filter((payment) => money(payment.amount) > 0).map((payment) => ({ doc, payment })));
+    const changeOrders = invoices.filter((doc) => doc.data?.changeOrderOf?.number);
+    const recurring = invoices.filter((doc) => doc.data?.recurringFrom);
+    const docById = new Map(documents.map((doc) => [doc.id, doc]));
+    const receipts = crewExpenses
+      .filter((item) => String(item.created_at || "").startsWith(year))
+      .map((item) => ({ ...item, doc: docById.get(item.doc_id) }));
+    return { split, deposits, changeOrders, recurring, receipts, receiptTotal: receipts.reduce((sum, item) => sum + money(item.amount), 0) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documents, crewExpenses, year]);
 
   const crewPeople = useMemo(() => {
     const names = Array.from(new Set(rows.filter((row) => row.worker).map((row) => row.worker as string)));
@@ -372,8 +442,47 @@ export default function YearPage() {
           );
         })}
 
+        <h2 className="mt-8 border-b border-slate-200 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-700">Crew receipts</h2>
+        <div data-testid="year-crew-receipts">
+          {extras.receipts.length === 0 && <p className="mt-2 text-sm text-slate-500">No receipts logged by crew this year.</p>}
+          {extras.receipts.length > 0 && <p className="mt-2 font-medium">Logged by crew: ${extras.receiptTotal.toFixed(2)}</p>}
+          {extras.receipts.map((item) => (
+            <p key={item.id} className="mt-1 text-sm">{String(item.created_at || "").slice(0, 10)} · {item.worker_name || "Crew"} · {item.kind || "other"} · {item.doc?.data?.invoiceNumber || item.doc?.title || "Job"} · ${money(item.amount).toFixed(2)} {item.note}</p>
+          ))}
+          {extras.receipts.length > 0 && <p className="mt-1 text-xs text-slate-500">Shown for your records. Not added to Expenses above, so nothing is counted twice if you also entered it as a job cost.</p>}
+        </div>
+
+        <h2 className="mt-8 border-b border-slate-200 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-700">Billed labor and materials</h2>
+        <div data-testid="year-split">
+          {extras.split.tagged === 0 ? <p className="mt-2 text-sm text-slate-500">No invoices with items marked Labor or Materials this year.</p> : (
+            <div className="mt-2 max-w-md text-sm">
+              <div className="flex justify-between"><span>Labor</span><span className="tabular-nums">${extras.split.labor.toFixed(2)}</span></div>
+              <div className="flex justify-between"><span>Materials</span><span className="tabular-nums">${extras.split.materials.toFixed(2)}</span></div>
+              {extras.split.other > 0 && <div className="flex justify-between"><span>Other (not marked)</span><span className="tabular-nums">${extras.split.other.toFixed(2)}</span></div>}
+              <p className="mt-1 text-xs text-slate-500">From {extras.split.tagged} invoice{extras.split.tagged === 1 ? "" : "s"} with marked items, before discount and tax.</p>
+            </div>
+          )}
+        </div>
+
+        <h2 className="mt-8 border-b border-slate-200 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-700">Deposits on proposals</h2>
+        <div data-testid="year-deposits">
+          {extras.deposits.length === 0 && <p className="mt-2 text-sm text-slate-500">No deposits recorded on proposals.</p>}
+          {extras.deposits.map(({ doc, payment }) => (
+            <p key={`${doc.id}-${payment.id}`} className="mt-1 text-sm">{payment.date} · {doc.clientName} · {doc.title} · ${money(payment.amount).toFixed(2)} · {payment.method} {payment.ref}</p>
+          ))}
+          {extras.deposits.length > 0 && <p className="mt-1 text-xs text-slate-500">A deposit is counted in Money in once the proposal is turned into an invoice (the deposit is copied onto it).</p>}
+        </div>
+
+        <h2 className="mt-8 border-b border-slate-200 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-700">Change orders and recurring invoices</h2>
+        <div data-testid="year-co-recurring" className="text-sm">
+          <p className="mt-2">Change orders: {extras.changeOrders.length}{extras.changeOrders.length ? ` · $${extras.changeOrders.reduce((sum, doc) => sum + invoiceTotal(doc), 0).toFixed(2)} billed` : ""}</p>
+          {extras.changeOrders.map((doc) => <p key={doc.id} className="mt-1">{doc.data?.invoiceNumber || doc.title} · for {doc.data?.changeOrderOf?.number} · {doc.clientName} · ${invoiceTotal(doc).toFixed(2)}</p>)}
+          <p className="mt-2">Recurring invoices: {extras.recurring.length}{extras.recurring.length ? ` · $${extras.recurring.reduce((sum, doc) => sum + invoiceTotal(doc), 0).toFixed(2)} billed` : ""}</p>
+          {extras.recurring.map((doc) => <p key={doc.id} className="mt-1">{doc.data?.invoiceNumber || doc.title} · from {doc.data?.recurringFrom?.number} {doc.data?.recurringFrom?.period} · {doc.clientName} · ${invoiceTotal(doc).toFixed(2)}</p>)}
+        </div>
+
         <p className="mt-8 text-xs text-slate-500">
-          Sales and expense log. Not a tax return. Not tax advice. Meals may not be fully deductible.
+          Money in counts each payment and deposit recorded on an invoice, in the year it was received. Sales and expense log. Not a tax return. Not tax advice. Meals may not be fully deductible.
           Crew pay uses the rate saved on each job. Drive time is not added as a cost.
         </p>
       </div>
