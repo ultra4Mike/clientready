@@ -9,6 +9,7 @@ const keys = [
   "clientready-employees",
   "clientready-open-document",
   "clientready-new-type",
+  "clientready-clock-entries",
 ];
 
 /** Wipes the business cache (sign-out). Never-uploaded documents are parked for the same account first. */

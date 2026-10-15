@@ -10,6 +10,8 @@ export type Schedule = {
   workerIds: string[];
   status: JobStatus;
   updatedAt: string;
+  /** Note shown to the assigned crew (not the customer-facing invoice notes). */
+  crewNote?: string;
 };
 export type Worker = { id: string; name: string; email?: string; phone?: string; role?: string; rate?: string; active?: boolean };
 /** The older per-job crew/pay rows (data.crew). */
@@ -57,6 +59,7 @@ export function readSchedule(data: Record<string, unknown> | undefined): Schedul
       workerIds: Array.isArray(raw.workerIds) ? raw.workerIds.map(String) : [],
       status,
       updatedAt: String(raw.updatedAt || ""),
+      ...(raw.crewNote ? { crewNote: String(raw.crewNote).slice(0, 500) } : {}),
     };
   }
   if (data?.jobTime && isDate(data?.dueDate)) {
@@ -350,7 +353,7 @@ export async function syncScheduleCrewJobs(doc: CloudDoc) {
       hours: "",
       rate: "",
       pay: 0,
-      note: "",
+      note: schedule.crewNote || "",
       client_name: String(data.clientName || doc.clientName || ""),
       client_phone: String(data.clientPhone || ""),
       client_email: String(data.clientEmail || ""),

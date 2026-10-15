@@ -21,6 +21,7 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
   const [endTime, setEndTime] = useState(value?.endTime || "");
   const [workerIds, setWorkerIds] = useState<string[]>(value?.workerIds || []);
   const [status, setStatus] = useState<JobStatus>(value?.status || "scheduled");
+  const [crewNote, setCrewNote] = useState(value?.crewNote || "");
   const [error, setError] = useState("");
   const [picking, setPicking] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
@@ -50,7 +51,7 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
     if (!date) return setError("Pick a date.");
     if (startTime && endTime && endTime <= startTime) return setError("End time must be after the start time.");
     setError("");
-    onSave({ date, startTime, ...(endTime ? { endTime } : {}), workerIds, status, updatedAt: value?.updatedAt || "" });
+    onSave({ date, startTime, ...(endTime ? { endTime } : {}), workerIds, status, updatedAt: value?.updatedAt || "", ...(crewNote.trim() ? { crewNote: crewNote.trim() } : {}) });
   }
 
   return (
@@ -65,6 +66,9 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
           </select>
         </label>
       </div>
+      <label className="flex flex-col gap-1">Note for crew <span className="text-xs opacity-60">(shown to assigned crew only, not the customer)</span>
+        <input aria-label="Note for crew" value={crewNote} maxLength={500} onChange={(event) => setCrewNote(event.target.value)} placeholder="Gate code, parking, what to bring…" className="rounded border border-slate-300 bg-transparent px-2 py-1" />
+      </label>
       <div data-testid="crew-chips">
         <div className="mb-1 flex flex-wrap items-center gap-2">
           <span>Crew</span>

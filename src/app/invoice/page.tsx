@@ -15,6 +15,7 @@ import { appendChangeOrderNote, changeOrderData, changeOrdersFor, mergeChangeOrd
 import ChangeOrderNotes from "@/components/ChangeOrderNotes";
 import { ApprovalBadge, ApprovalShare } from "@/components/Approval";
 import ScheduleEditor from "@/components/ScheduleEditor";
+import { entryHours, fmtHours, hoursByWorker, ownerEditClock, refreshOwnerClock, type ClockEntry } from "@/lib/clock";
 import { confirmRemoval, crewForWorkers, crewIds, workLogged, clockHoursFor, dedupeWorkerIds, readSchedule, readWorkers, saveAssignment, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
 import { readApproval, refreshApproval, type Approval } from "@/lib/approval";
 import { generateNextNow, readRecurring, readRecurringFrom, scheduleFromForm, type Frequency, type RecurringFrom } from "@/lib/recurring";
@@ -53,6 +54,8 @@ type CrewRow = {
   bonus: string;
   paidToWorker: boolean;
   paidDate: string;
+  /** Hours were filled from the worker's clock entries (true) or typed by the owner (false/absent). */
+  hoursFromClock?: boolean;
 };
 type DocKind = "invoice" | "proposal";
 
@@ -91,6 +94,29 @@ function hoursBetween(start: string, end: string) {
 function rowPay(row: CrewRow) {
   return money(row.hours) * money(row.rate) + money(row.bonus);
 }
+function toLocalInput(iso: string) {
+  const date = new Date(iso);
+  return `${ymd(date)}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+/**
+ * Fills crew pay hours from clock entries. A row whose hours are empty or came from the clock
+ * gets the clocked total; hours the owner typed are kept (the clocked total is shown beside them).
+ * With several rows for one person, the clock fills only their first row.
+ */
+function feedClockHours(rows: CrewRow[], entries: ClockEntry[], docId: string) {
+  const totals = hoursByWorker(entries.filter((entry) => entry.ended_at), docId);
+  const filled = new Set<string>();
+  return rows.map((row) => {
+    const clocked = totals[row.employeeId] || 0;
+    if (!clocked || filled.has(row.employeeId)) return row;
+    filled.add(row.employeeId);
+    if (row.hours && !row.hoursFromClock) return row;
+    const hours = clocked.toFixed(2);
+    return row.hours === hours && row.hoursFromClock ? row : { ...row, hours, hoursFromClock: true };
+  });
+}
+
 function nextNumber(kind: DocKind) {
   const raw = window.localStorage.getItem("clientready-documents");
   const docs = raw ? (JSON.parse(raw) as SavedDocument[]) : [];
@@ -137,6 +163,8 @@ export default function NewInvoicePage() {
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [scheduleKey, setScheduleKey] = useState(0);
   const [workers, setWorkers] = useState<Worker[]>([]);
+  const [clockEntries, setClockEntries] = useState<ClockEntry[]>([]);
+  const [clockFix, setClockFix] = useState<{ id: string; start: string; end: string } | null>(null);
   const [items, setItems] = useState<LineItem[]>([{ ...emptyItem }]);
   const [businessName, setBusinessName] = useState("Your business");
   const [ownerName, setOwnerName] = useState("");
@@ -293,6 +321,11 @@ export default function NewInvoicePage() {
       setCosts({ ...emptyCosts, ...(data.jobCosts || {}), otherFees: loadedFees });
       setOtherFees(loadedFees);
       setCrew(loadedCrew.map((row) => ({ ...row, bonus: row.bonus || "" })));
+      // Clock entries from the crew app feed each worker's hours (see feedClockHours).
+      refreshOwnerClock().then((entries) => {
+        setClockEntries(entries);
+        setCrew((current) => feedClockHours(current, entries, doc.id));
+      });
     } catch {
       window.localStorage.removeItem("clientready-open-document");
       setSaveMessage("Could not open that document.");
@@ -390,6 +423,20 @@ export default function NewInvoicePage() {
     }
   }
 
+  async function saveClockFix() {
+    if (!clockFix) return;
+    const start = new Date(clockFix.start);
+    const end = new Date(clockFix.end);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return setSaveMessage("End time must be after the start time.");
+    const error = await ownerEditClock(clockFix.id, start.toISOString(), end.toISOString());
+    if (error) return setSaveMessage(`Could not fix the time: ${error}`);
+    const entries = await refreshOwnerClock();
+    setClockEntries(entries);
+    setCrew((current) => feedClockHours(current, entries, docId));
+    setClockFix(null);
+    setSaveMessage("Clock time fixed. Save the document to update pay.");
+  }
+
   function removeCrewRow(id: string) {
     const row = crew.find((item) => item.id === id);
     if (!row) return;
@@ -403,6 +450,8 @@ export default function NewInvoicePage() {
 
   function updateCrew(id: string, patch: Partial<CrewRow>) {
     if (!allowCrewChange()) return;
+    // Typing hours makes them the owner's: clock entries won't overwrite them after this.
+    if ("hours" in patch) patch = { ...patch, hoursFromClock: false };
     setCrew((current) => current.map((row) => {
       if (row.id !== id) return row;
       const next = { ...row, ...patch };
@@ -756,6 +805,31 @@ export default function NewInvoicePage() {
                       <label className="text-sm text-slate-900">End<input type="time" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" value={row.endTime} onChange={(event) => updateCrew(row.id, { endTime: event.target.value })} /></label>
                       <label className="text-sm text-slate-900 sm:col-span-2">Extra pay for this job<input className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" placeholder="100" value={row.bonus} onChange={(event) => updateCrew(row.id, { bonus: event.target.value })} /></label>
                     </div>
+                    {(() => {
+                      const mine = clockEntries.filter((entry) => entry.doc_id === docId && entry.employee_id === row.employeeId);
+                      if (!mine.length) return null;
+                      const clocked = mine.reduce((sum, entry) => sum + entryHours(entry), 0);
+                      return (
+                        <div className="rounded-lg bg-slate-50 p-2 text-xs text-slate-700" data-testid={`clock-${row.employeeId}`}>
+                          <p className="font-medium">Clocked {fmtHours(clocked)} ({mine.length} entr{mine.length === 1 ? "y" : "ies"}) · {row.hoursFromClock ? "hours above come from the clock" : "your typed hours are kept"}</p>
+                          {mine.map((entry) => (
+                            <div key={entry.id} className="mt-1 flex flex-wrap items-center gap-2" data-testid="owner-clock-entry">
+                              <span>{new Date(entry.started_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} – {entry.ended_at ? new Date(entry.ended_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : <b className="text-amber-700">still clocked in</b>}</span>
+                              {entry.edited_reason && <span className="italic">({entry.edited_reason})</span>}
+                              <button type="button" className="underline" onClick={() => setClockFix({ id: entry.id, start: toLocalInput(entry.started_at), end: toLocalInput(entry.ended_at || new Date().toISOString()) })}>Fix</button>
+                            </div>
+                          ))}
+                          {clockFix && mine.some((entry) => entry.id === clockFix.id) && (
+                            <div className="mt-2 flex flex-wrap items-end gap-2">
+                              <label>Start<input type="datetime-local" className="ml-1 rounded border border-slate-300 px-1" value={clockFix.start} onChange={(event) => setClockFix({ ...clockFix, start: event.target.value })} /></label>
+                              <label>End<input aria-label="Clock end" type="datetime-local" className="ml-1 rounded border border-slate-300 px-1" value={clockFix.end} onChange={(event) => setClockFix({ ...clockFix, end: event.target.value })} /></label>
+                              <button type="button" onClick={saveClockFix} className="rounded bg-slate-900 px-2 py-1 text-white">Save time</button>
+                              <button type="button" onClick={() => setClockFix(null)} className="underline">Cancel</button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                     <p className="text-sm text-slate-900">Paid this job: ${rowPay(row).toFixed(2)}</p>
                     <button type="button" onClick={() => removeCrewRow(row.id)} className="text-sm text-slate-700">Remove from job</button>
                   </div>

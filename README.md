@@ -68,3 +68,21 @@ Until it is run, "Share approval link" still creates links but customers will se
   `data.schedule.status`/`updatedAt` on the document and `schedule_status` on the crew rows.
 - Re-creates `get_document_by_approval_token` so the customer approval page never receives the
   schedule (run it after the approval-links migration).
+
+### `20261015020000_crew_isolation_clock.sql` — crew isolation, clock in/out, crew expenses (required for /crew)
+
+Run after the job-scheduling migration. It:
+
+- **Repairs row-level security** on `crew_jobs`, `crew_expenses`, `job_drafts`, `employees` and the new
+  `crew_clock`: it drops every existing policy on those tables and creates these:
+  owners (`owner_id`/`user_id = auth.uid()`) manage their own rows; a crew member (matched by the
+  email on their login) can only **read** rows addressed to their own email (and their own employee
+  record), and add their own job reports.
+- Adds `crew_clock` (clock entries: one per stretch of work, several per worker per job, at most one
+  running clock per worker).
+- Crew writes go only through `SECURITY DEFINER` functions that check the caller is assigned to the
+  job: `crew_clock_in`, `crew_clock_out`, `crew_edit_clock` (own entry, reason required — for a
+  forgotten clock-out), `crew_add_expense` (amount/category validated; receipt is a compressed JPEG
+  data URL stored in `crew_expenses.receipt`, max ~3 MB). Anonymous users cannot call any of them.
+
+If you had custom policies on those tables, re-add them after running this (it replaces them).

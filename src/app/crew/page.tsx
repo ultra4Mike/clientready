@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { crewSetJobStatus, STATUS_CLASS, STATUS_LABEL, type JobStatus } from "@/lib/schedule";
+import { compressImage, crewClockIn, crewClockOut, crewEditClock, entryHours, fmtHours, fmtTimer, type ClockEntry } from "@/lib/clock";
 
 type Client = { id: string; name: string; phone: string; address: string };
 type Job = {
@@ -23,15 +24,37 @@ type Job = {
   note: string;
   status: string;
 };
-type Expense = { id: string; doc_id: string; kind: string; amount: string; note: string; receipt?: string };
+type Card = Job & { scheduled: boolean; crewNote: string; payRow?: Job };
+type Expense = { id: string; doc_id: string; kind: string; amount: string; note: string; receipt?: string; created_at?: string };
 type Draft = { id: string; client_name: string; work_date: string; hours: string; work_done: string; status: string };
+type Tab = "today" | "week" | "hours" | "reports";
+type Cache = { name: string; jobs: Job[]; clock: ClockEntry[]; expenses: Expense[]; drafts: Draft[] };
 
 const empty = {
   clientName: "", clientPhone: "", clientAddress: "", workDone: "", workDate: "",
   startTime: "", endTime: "", hours: "", partsCost: "", partsNote: "",
   driveHours: "", driveMinutes: "", notes: "", finished: false, collectedAmount: "", collectedMethod: "cash",
 };
+const KINDS = [["gas", "Gas"], ["parts", "Parts"], ["dump", "Dump fee"], ["other", "Other"]] as const;
+const input = "w-full rounded-xl border border-teal-500/30 bg-transparent px-3 py-2";
+const cardClass = "rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm";
 
+function ymd(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+function addDays(value: string, days: number) {
+  const [y, m, d] = value.split("-").map(Number);
+  return ymd(new Date(y, m - 1, d + days));
+}
+function dayLabel(value: string) {
+  const [y, m, d] = value.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+function timeLabel(time: string) {
+  if (!time) return "";
+  const [h, m] = time.split(":").map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+}
 function hoursBetween(start: string, end: string) {
   if (!start || !end) return "";
   const [sh, sm] = start.split(":").map(Number);
@@ -39,47 +62,183 @@ function hoursBetween(start: string, end: string) {
   const mins = eh * 60 + em - (sh * 60 + sm);
   return mins > 0 ? (mins / 60).toFixed(2) : "";
 }
+function localInput(iso: string | null | undefined) {
+  if (!iso) return "";
+  const date = new Date(iso);
+  return `${ymd(date)}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+function clockTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+/** One card per job: schedule details (time, status, crew note) merged onto this worker's pay row. */
+function buildCards(jobs: Job[]): Card[] {
+  const cards: Card[] = [];
+  for (const job of jobs) {
+    if (job.id.includes("-sched-")) continue;
+    if (cards.some((card) => card.doc_id === job.doc_id)) {
+      // A second pay row on the same job (another day): keep it as its own card.
+      cards.push({ ...job, scheduled: false, crewNote: "", payRow: job });
+      continue;
+    }
+    cards.push({ ...job, scheduled: false, crewNote: "", payRow: job });
+  }
+  for (const sched of jobs.filter((job) => job.id.includes("-sched-"))) {
+    const index = cards.findIndex((card) => card.doc_id === sched.doc_id && !card.scheduled);
+    const merged = {
+      scheduled: true, schedule_status: sched.schedule_status, job_date: sched.job_date || "", start_time: sched.start_time,
+      end_time: sched.end_time, client_email: sched.client_email, crewNote: sched.note || "",
+    };
+    if (index >= 0) cards[index] = { ...cards[index], ...merged, job_date: sched.job_date || cards[index].job_date };
+    else cards.push({ ...sched, ...merged });
+  }
+  return cards.sort((a, b) => `${a.job_date || "9"}${a.start_time}`.localeCompare(`${b.job_date || "9"}${b.start_time}`));
+}
 
 export default function CrewPage() {
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [drafts, setDrafts] = useState<Draft[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [userId, setUserId] = useState("");
+  const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [ownerId, setOwnerId] = useState("");
   const [employeeId, setEmployeeId] = useState("");
-  const [email, setEmail] = useState("");
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState(empty);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [clock, setClock] = useState<ClockEntry[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [tab, setTab] = useState<Tab>("today");
+  const [now, setNow] = useState(0);
+  const [today, setToday] = useState("");
   const [message, setMessage] = useState("");
-  const [spend, setSpend] = useState<Record<string, { kind: string; amount: string; note: string; receipt?: string }>>({});
+  const [busy, setBusy] = useState("");
+  const [theme, setTheme] = useState("dark");
+  const [form, setForm] = useState(empty);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [spendOpen, setSpendOpen] = useState<string>("");
+  const [spend, setSpend] = useState<{ kind: string; amount: string; note: string; receipt: string }>({ kind: "parts", amount: "", note: "", receipt: "" });
+  const [fixing, setFixing] = useState<{ id: string; start: string; end: string; reason: string } | null>(null);
+
   async function load() {
     const { data } = await supabase.auth.getUser();
     const user = data.user;
-    if (!user) return (window.location.href = "/login");
+    if (!user) {
+      window.location.href = "/login";
+      return;
+    }
+    setUserId(user.id);
     setEmail(user.email || "");
+    // Show what this person saw last time right away (cache is per signed-in user).
+    const cacheKey = `clientready-crew-cache-${user.id}`;
+    try {
+      const cached = JSON.parse(window.localStorage.getItem(cacheKey) || "null") as Cache | null;
+      if (cached) {
+        setName(cached.name); setJobs(cached.jobs); setClock(cached.clock); setExpenses(cached.expenses); setDrafts(cached.drafts);
+      }
+    } catch {
+      window.localStorage.removeItem(cacheKey);
+    }
     const { data: person } = await supabase.rpc("is_crew_email");
     const row = Array.isArray(person) ? person[0] : person;
     if (row) {
       setEmployeeId(row.id || "");
       setOwnerId(row.user_id || "");
     }
-    const { data: employee } = await supabase.from("employees").select("name").ilike("email", user.email || "").maybeSingle();
-    setName(employee?.name || user.email || "");
-    const { data: clientRows } = await supabase.rpc("list_crew_clients");
-    setClients((clientRows || []) as Client[]);
-    const { data: jobRows } = await supabase.from("crew_jobs").select("*").order("job_date", { ascending: true });
-    setJobs((jobRows || []) as Job[]);
-    const { data: draftRows } = await supabase.from("job_drafts").select("*").order("created_at", { ascending: false });
-    setDrafts((draftRows || []) as Draft[]);
-    const { data: spendRows } = await supabase.from("crew_expenses").select("*").order("created_at", { ascending: false });
-    setExpenses((spendRows || []) as Expense[]);
+    // Every read below is limited to this person's own rows by the database (row-level security).
+    const [employee, clientRows, jobRows, clockRows, spendRows, draftRows] = await Promise.all([
+      supabase.from("employees").select("name").ilike("email", user.email || "").maybeSingle(),
+      supabase.rpc("list_crew_clients"),
+      supabase.from("crew_jobs").select("*").order("job_date", { ascending: true }),
+      supabase.from("crew_clock").select("*").order("started_at", { ascending: true }),
+      supabase.from("crew_expenses").select("*").order("created_at", { ascending: false }),
+      supabase.from("job_drafts").select("*").order("created_at", { ascending: false }),
+    ]);
+    const next: Cache = {
+      name: employee.data?.name || user.email || "",
+      jobs: (jobRows.data || []) as Job[],
+      clock: (clockRows.data || []) as ClockEntry[],
+      expenses: (spendRows.data || []) as Expense[],
+      drafts: (draftRows.data || []) as Draft[],
+    };
+    setName(next.name); setJobs(next.jobs); setClock(next.clock); setExpenses(next.expenses); setDrafts(next.drafts);
+    setClients((clientRows.data || []) as Client[]);
+    try {
+      // Receipts are left out of the cache to keep it small.
+      window.localStorage.setItem(cacheKey, JSON.stringify({ ...next, expenses: next.expenses.map((item) => ({ ...item, receipt: item.receipt ? "1" : "" })) }));
+    } catch {
+      // storage full: the page still works from the network
+    }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const saved = window.localStorage.getItem("clientready-theme") || "dark";
+    document.documentElement.classList.toggle("dark", saved === "dark");
+    document.documentElement.classList.toggle("light", saved === "light");
+    const tick = () => { setNow(Date.now()); setToday(ymd(new Date())); };
+    const first = window.setTimeout(tick, 0);
+    const timer = window.setInterval(tick, 1000);
+    const start = window.setTimeout(() => { setTheme(saved); load(); }, 0);
+    return () => { window.clearInterval(timer); window.clearTimeout(first); window.clearTimeout(start); };
+  }, []);
 
-  function pickClient(client: Client) {
-    setForm({ ...form, clientName: client.name, clientPhone: client.phone || "", clientAddress: client.address || "" });
+  function switchTheme() {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    window.localStorage.setItem("clientready-theme", next);
+    document.documentElement.classList.toggle("dark", next === "dark");
+    document.documentElement.classList.toggle("light", next === "light");
+  }
+
+  async function act(key: string, work: () => Promise<string>, done: string) {
+    setBusy(key);
+    const error = await work();
+    setBusy("");
+    setMessage(error ? `Could not do that: ${error}` : done);
+    if (!error) await load();
+  }
+
+  const cards = useMemo(() => buildCards(jobs), [jobs]);
+  const open = clock.find((entry) => !entry.ended_at);
+  const weekStart = today ? addDays(today, -new Date(`${today}T00:00:00`).getDay()) : "";
+  const weekDays = weekStart ? Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)) : [];
+  const todayCards = cards.filter((card) => card.job_date === today);
+  const weekCards = cards.filter((card) => weekDays.includes(card.job_date));
+  const undated = cards.filter((card) => !card.job_date);
+  const later = cards.filter((card) => card.job_date && weekDays.length > 0 && card.job_date > weekDays[6]).sort((a, b) => a.job_date.localeCompare(b.job_date));
+
+  const hoursByDay = weekDays.map((day) => {
+    const clocked = clock.filter((entry) => ymd(new Date(entry.started_at)) === day).reduce((sum, entry) => sum + entryHours(entry, now), 0);
+    const logged = jobs.filter((job) => !job.id.includes("-sched-") && job.job_date === day).reduce((sum, job) => sum + (Number(job.hours) || 0), 0);
+    return { day, clocked, logged };
+  });
+  const weekClocked = hoursByDay.reduce((sum, item) => sum + item.clocked, 0);
+  const weekLogged = hoursByDay.reduce((sum, item) => sum + item.logged, 0);
+  const paidRows = jobs.filter((job) => job.status === "paid" && !job.id.includes("-sched-"));
+  const confirmedPay = paidRows.reduce((sum, job) => sum + (Number(job.pay) || 0), 0);
+
+  async function saveExpense(card: Card) {
+    if (!spend.amount.trim()) return setMessage("Add the amount you spent.");
+    await act(`spend-${card.doc_id}`, async () => {
+      const { error } = await supabase.rpc("crew_add_expense", { p_doc_id: card.doc_id, p_kind: spend.kind, p_amount: spend.amount, p_note: spend.note, p_receipt: spend.receipt });
+      if (!error) { setSpend({ kind: "parts", amount: "", note: "", receipt: "" }); setSpendOpen(""); }
+      return error ? error.message : "";
+    }, "Expense added to this job.");
+  }
+
+  async function pickReceipt(file: File | undefined) {
+    if (!file) return;
+    try {
+      const receipt = await compressImage(file);
+      setSpend((current) => ({ ...current, receipt }));
+    } catch (error) {
+      setMessage((error as Error).message);
+    }
+  }
+
+  async function saveFix() {
+    if (!fixing) return;
+    if (fixing.reason.trim().length < 3) return setMessage("Say why you're changing the time (for your boss).");
+    await act(`fix-${fixing.id}`, () => crewEditClock(fixing.id, new Date(fixing.start).toISOString(), new Date(fixing.end).toISOString(), fixing.reason), "Time corrected. Your boss will see the reason.");
+    setFixing(null);
   }
 
   async function saveDraft(event: FormEvent) {
@@ -95,161 +254,276 @@ export default function CrewPage() {
     });
     if (error) return setMessage(error.message);
     setForm(empty);
-    setOpen(false);
+    setReportOpen(false);
     setMessage("Job report sent. The owner will review it.");
     load();
   }
 
-function readReceipt(file: File | undefined, jobId: string) {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const current = spend[jobId] || { kind: "parts", amount: "", note: "" };
-      setSpend({ ...spend, [jobId]: { ...current, receipt: String(reader.result || "") } });
-    };
-    reader.readAsDataURL(file);
-  }
-
-  async function addSpend(job: Job) {
-    const row = spend[job.id] || { kind: "parts", amount: "", note: "" };
-    if (!row.amount.trim()) return setMessage("Add the amount you spent.");
-        const { error } = await supabase.from("crew_expenses").insert({
-      id: Date.now().toString(),
-      owner_id: ownerId,
-      doc_id: job.doc_id,
-      worker_email: email,
-      worker_name: name,
-      kind: row.kind,
-      amount: row.amount,
-      note: row.note,
-      receipt: row.receipt || "",
-    });
-    if (error) return setMessage(error.message);
-    setSpend({ ...spend, [job.id]: { kind: "parts", amount: "", note: "" } });
-    setMessage("Expense added to this job.");
-    load();
-  }
-
-  async function setJobStatus(job: Job, status: JobStatus) {
-    const error = await crewSetJobStatus(job.doc_id, status);
-    if (error) return setMessage("Could not update the status. Ask the owner to check your assignment.");
-    setMessage(`Marked ${STATUS_LABEL[status].toLowerCase()}.`);
-    load();
-  }
-
-  const isScheduleRow = (job: Job) => job.id.includes("-sched-");
-  // One card per job: when a job has both a schedule row and pay row(s) for this worker, the
-  // schedule details (date, time, status, contact) are shown on the first pay row instead of twice.
-  const shown: (Job & { scheduled?: boolean })[] = [];
-  for (const job of jobs) {
-    if (isScheduleRow(job)) continue;
-    shown.push({ ...job });
-  }
-  for (const sched of jobs.filter(isScheduleRow)) {
-    const index = shown.findIndex((job) => job.doc_id === sched.doc_id && !job.scheduled);
-    if (index >= 0) shown[index] = { ...shown[index], scheduled: true, schedule_status: sched.schedule_status, job_date: sched.job_date, start_time: sched.start_time, end_time: sched.end_time, client_email: sched.client_email };
-    else shown.push({ ...sched, scheduled: true });
-  }
-  shown.sort((a, b) => `${a.job_date}${a.start_time}`.localeCompare(`${b.job_date}${b.start_time}`));
-  const paid = jobs.filter((job) => job.status === "paid" && !isScheduleRow(job));
-  const confirmedPay = paid.reduce((sum, job) => sum + (Number(job.pay) || 0), 0);
-  const confirmedHours = paid.reduce((sum, job) => sum + (Number(job.hours) || 0), 0);
-  const upcoming = jobs.filter((job) => job.status !== "paid");
-
-  return (
-    <main className="min-h-screen bg-[var(--cr-bg)] px-4 py-8 text-[var(--cr-text)]">
-      <div className="mx-auto max-w-2xl">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">{name || "Your jobs"}</h1>
-          <button type="button" onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }} className="text-sm">Log out</button>
+  function jobCard(card: Card) {
+    const status = (card.schedule_status || "scheduled") as JobStatus;
+    const mine = clock.filter((entry) => entry.doc_id === card.doc_id);
+    const running = mine.find((entry) => !entry.ended_at);
+    const total = mine.reduce((sum, entry) => sum + entryHours(entry, now), 0);
+    const jobSpend = expenses.filter((item) => item.doc_id === card.doc_id);
+    const mapUrl = card.client_address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(card.client_address)}` : "";
+    return (
+      <article key={`${card.id}`} className={cardClass} data-testid={`crew-card-${card.doc_id}`}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm text-teal-600 dark:text-teal-300">
+              {card.job_date ? dayLabel(card.job_date) : "No date yet"}
+              {card.start_time ? ` · ${timeLabel(card.start_time)}${card.end_time ? `–${timeLabel(card.end_time)}` : ""}` : ""}
+            </p>
+            <h3 className="truncate text-lg font-semibold">{card.client_name || card.invoice_number || "Job"}</h3>
+          </div>
+          {card.scheduled && <span className={`shrink-0 rounded-full border px-2 py-0.5 text-xs ${STATUS_CLASS[status]}`}>{STATUS_LABEL[status]}</span>}
         </div>
-        <p className="mt-2 text-sm text-[var(--cr-muted)]">Your schedule, the client, and what you spent. Company profit is not on this page.</p>
-        <button type="button" onClick={() => setOpen(!open)} className="mt-4 rounded-lg bg-teal-400 px-4 py-2 text-sm font-medium text-slate-950">{open ? "Close" : "New job report"}</button>
-        {message && <p className="mt-3 text-sm">{message}</p>}
 
-        {open && (
-          <form onSubmit={saveDraft} className="mt-4 space-y-3 rounded-2xl border border-teal-500/20 p-4">
-            <select className="w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" onChange={(event) => { const client = clients.find((item) => item.id === event.target.value); if (client) pickClient(client); }}>
-              <option value="">Pick a client</option>
-              {clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
-            </select>
-            <input className="w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" placeholder="Who it was for" value={form.clientName} onChange={(event) => setForm({ ...form, clientName: event.target.value })} />
-            <input className="w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" placeholder="Phone" value={form.clientPhone} onChange={(event) => setForm({ ...form, clientPhone: event.target.value })} />
-            <input className="w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" placeholder="Address" value={form.clientAddress} onChange={(event) => setForm({ ...form, clientAddress: event.target.value })} />
-            <textarea className="min-h-20 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" placeholder="What was done" value={form.workDone} onChange={(event) => setForm({ ...form, workDone: event.target.value })} />
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="text-sm">Date<input type="date" className="mt-1 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" value={form.workDate} onChange={(event) => setForm({ ...form, workDate: event.target.value })} /></label>
-              <label className="text-sm">Hours<input className="mt-1 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" value={form.hours} onChange={(event) => setForm({ ...form, hours: event.target.value })} /></label>
-              <label className="text-sm">Start<input type="time" className="mt-1 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" value={form.startTime} onChange={(event) => setForm({ ...form, startTime: event.target.value })} /></label>
-              <label className="text-sm">End<input type="time" className="mt-1 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" value={form.endTime} onChange={(event) => setForm({ ...form, endTime: event.target.value })} /></label>
-            </div>
-            <input className="w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" placeholder="Parts, gas, or dump fee you paid" value={form.partsCost} onChange={(event) => setForm({ ...form, partsCost: event.target.value })} />
-            <input className="w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" placeholder="What it was" value={form.partsNote} onChange={(event) => setForm({ ...form, partsNote: event.target.value })} />
-            <textarea className="min-h-16 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2" placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.finished} onChange={(event) => setForm({ ...form, finished: event.target.checked })} /> Job is finished</label>
-            <button type="submit" className="rounded-lg bg-teal-400 px-4 py-2 text-sm font-medium text-slate-950">Send job report</button>
-          </form>
+        <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+          {card.client_phone
+            ? <a href={`tel:${card.client_phone}`} className="rounded-xl border border-teal-500/30 px-3 py-2 text-center" data-testid="call">📞 Call {card.client_phone}</a>
+            : <span className="rounded-xl border border-teal-500/10 px-3 py-2 text-center opacity-50">No phone</span>}
+          {mapUrl
+            ? <a href={mapUrl} target="_blank" rel="noreferrer" className="rounded-xl border border-teal-500/30 px-3 py-2 text-center" data-testid="map">📍 Map</a>
+            : <span className="rounded-xl border border-teal-500/10 px-3 py-2 text-center opacity-50">No address</span>}
+        </div>
+        {card.client_address && <p className="mt-2 text-sm text-[var(--cr-muted)]">{card.client_address}</p>}
+        {card.client_email && <p className="text-sm"><a className="underline" href={`mailto:${card.client_email}`}>{card.client_email}</a></p>}
+        {(card.crewNote || card.payRow?.note) && (
+          <p className="mt-2 rounded-xl bg-teal-500/10 px-3 py-2 text-sm" data-testid="crew-note">📝 {card.crewNote || card.payRow?.note}</p>
         )}
 
-        <div className="mt-6 grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-teal-500/20 p-4"><p className="text-sm text-[var(--cr-muted)]">Paid hours</p><p className="mt-1 text-2xl font-semibold">{confirmedHours.toFixed(2)}</p></div>
-          <div className="rounded-2xl border border-teal-500/20 p-4"><p className="text-sm text-[var(--cr-muted)]">Confirmed pay</p><p className="mt-1 text-2xl font-semibold">${confirmedPay.toFixed(2)}</p></div>
-        </div>
-        <p className="mt-2 text-xs text-[var(--cr-muted)]">Confirmed pay is only jobs marked paid. A scheduled job is not pay yet.</p>
-
-        <h2 className="mt-8 font-semibold">Your week</h2>
-        <div className="mt-3 space-y-3">
-          {jobs.length === 0 && <p className="text-sm text-[var(--cr-muted)]">No jobs on your schedule.</p>}
-          {shown.map((job) => (
-            <div key={job.id} className="rounded-2xl border border-teal-500/20 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <p className="font-medium">{job.client_name || job.invoice_number || "Job"}</p>
-                {job.scheduled
-                  ? (
-                    <select aria-label="Job status" data-testid={`crew-status-${job.doc_id}`} value={job.schedule_status || "scheduled"} onChange={(event) => setJobStatus(job, event.target.value as JobStatus)} className={`rounded border px-2 py-0.5 text-xs ${STATUS_CLASS[(job.schedule_status || "scheduled") as JobStatus] || ""}`}>
-                      {(Object.keys(STATUS_LABEL) as JobStatus[]).map((key) => <option key={key} value={key}>{STATUS_LABEL[key]}</option>)}
-                    </select>
-                  )
-                  : <p className="text-xs uppercase text-[var(--cr-muted)]">{job.status || "draft"}</p>}
-              </div>
-              <p className="mt-1 text-sm text-[var(--cr-muted)]">{job.job_date || "No date"} · {job.start_time || "no time"} to {job.end_time || "no time"}{isScheduleRow(job) ? "" : ` · ${job.hours || "0"} hrs`}</p>
-              {job.client_phone && <p className="text-sm"><a className="underline" href={`tel:${job.client_phone}`}>{job.client_phone}</a></p>}
-              {job.client_email && <p className="text-sm"><a className="underline" href={`mailto:${job.client_email}`}>{job.client_email}</a></p>}
-              {job.client_address && <p className="text-sm">{job.client_address}</p>}
-              {!isScheduleRow(job) && <p className="mt-1 text-sm">{job.status === "paid" ? `Pay $${Number(job.pay || 0).toFixed(2)}` : "Pay not confirmed"}</p>}
-<div className="mt-3 grid gap-2 sm:grid-cols-3">
-                <select className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2 text-sm" value={spend[job.id]?.kind || "parts"} onChange={(event) => setSpend({ ...spend, [job.id]: { ...(spend[job.id] || { amount: "", note: "" }), kind: event.target.value } })}>
-                  <option value="gas">Gas</option><option value="parts">Parts</option><option value="dump">Dump fee</option><option value="other">Other</option>
-                </select>
-                <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2 text-sm" placeholder="Amount" value={spend[job.id]?.amount || ""} onChange={(event) => setSpend({ ...spend, [job.id]: { ...(spend[job.id] || { kind: "parts", note: "" }), amount: event.target.value } })} />
-                <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2 text-sm" placeholder="What it was" value={spend[job.id]?.note || ""} onChange={(event) => setSpend({ ...spend, [job.id]: { ...(spend[job.id] || { kind: "parts", amount: "" }), note: event.target.value } })} />
-              </div>
-              <label className="mt-2 block text-sm text-[var(--cr-muted)]">
-                Receipt photo
-                <input type="file" accept="image/*" className="mt-1 block w-full text-sm" onChange={(event) => readReceipt(event.target.files?.[0], job.id)} />
-              </label>
-              <button type="button" onClick={() => addSpend(job)} className="mt-3 rounded-lg bg-teal-400 px-4 py-2 text-sm font-medium text-slate-950">
-                Add expense to this job
+        {card.scheduled && (
+          <div className="mt-3 grid grid-cols-3 gap-2" role="group" aria-label="Job status">
+            {(Object.keys(STATUS_LABEL) as JobStatus[]).map((key) => (
+              <button key={key} type="button" aria-pressed={status === key} disabled={busy !== ""} data-testid={`status-${key}-${card.doc_id}`}
+                onClick={() => act(`status-${card.doc_id}`, () => crewSetJobStatus(card.doc_id, key), `Marked ${STATUS_LABEL[key].toLowerCase()}.`)}
+                className={`rounded-xl border px-2 py-2 text-xs font-medium ${status === key ? STATUS_CLASS[key] : "border-teal-500/20"}`}>
+                {STATUS_LABEL[key]}
               </button>
-              {expenses.filter((item) => item.doc_id === job.doc_id).map((item) => (
-                <p key={item.id} className="mt-2 text-sm text-[var(--cr-muted)]">{item.kind} · ${item.amount} · {item.note}{item.receipt ? " · receipt attached" : ""}</p>
-              ))}
+            ))}
+          </div>
+        )}
+
+        <div className="mt-3 rounded-xl border border-teal-500/20 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs text-[var(--cr-muted)]">Your time on this job</p>
+              <p className="text-xl font-semibold tabular-nums" data-testid={`timer-${card.doc_id}`}>
+                {running ? fmtTimer((now) - Date.parse(running.started_at)) : fmtHours(total)}
+              </p>
+              {running && <p className="text-xs text-[var(--cr-muted)]">Clocked in at {clockTime(running.started_at)} · {fmtHours(total)} total</p>}
             </div>
-          ))}
+            {running ? (
+              <button type="button" disabled={busy !== ""} data-testid={`clock-out-${card.doc_id}`} onClick={() => act(`clock-${card.doc_id}`, () => crewClockOut(card.doc_id), "Clocked out.")} className="rounded-xl bg-amber-500 px-4 py-3 font-semibold text-slate-950">Clock out</button>
+            ) : (
+              <button type="button" disabled={busy !== "" || Boolean(open)} data-testid={`clock-in-${card.doc_id}`} onClick={() => act(`clock-${card.doc_id}`, () => crewClockIn(card.doc_id), "Clocked in.")} className="rounded-xl bg-teal-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-40">{open ? "On another job" : "Clock in"}</button>
+            )}
+          </div>
+          {mine.length > 0 && (
+            <ul className="mt-2 space-y-1 text-sm">
+              {mine.map((entry) => (
+                <li key={entry.id} className="flex flex-wrap items-center justify-between gap-2" data-testid="clock-entry">
+                  <span>{dayLabel(ymd(new Date(entry.started_at)))} · {clockTime(entry.started_at)} – {entry.ended_at ? clockTime(entry.ended_at) : "now"}{entry.edited_reason ? ` · edited: ${entry.edited_reason}` : ""}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="tabular-nums">{fmtHours(entryHours(entry, now))}</span>
+                    <button type="button" className="text-xs underline" onClick={() => setFixing({ id: entry.id, start: localInput(entry.started_at), end: localInput(entry.ended_at || new Date().toISOString()), reason: "" })}>Fix time</button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {fixing && mine.some((entry) => entry.id === fixing.id) && (
+            <div className="mt-2 space-y-2 rounded-xl border border-amber-500/40 p-2 text-sm">
+              <p className="text-xs">Forgot to clock in or out? Set the real times and say why. Your boss sees the reason.</p>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs">Start<input type="datetime-local" className={input} value={fixing.start} onChange={(event) => setFixing({ ...fixing, start: event.target.value })} /></label>
+                <label className="text-xs">End<input type="datetime-local" className={input} value={fixing.end} onChange={(event) => setFixing({ ...fixing, end: event.target.value })} /></label>
+              </div>
+              <input className={input} placeholder="Reason, e.g. forgot to clock out" value={fixing.reason} onChange={(event) => setFixing({ ...fixing, reason: event.target.value })} aria-label="Reason" />
+              <div className="flex gap-2">
+                <button type="button" onClick={saveFix} className="rounded-xl bg-teal-400 px-3 py-2 font-medium text-slate-950">Save time</button>
+                <button type="button" onClick={() => setFixing(null)} className="rounded-xl border border-teal-500/30 px-3 py-2">Cancel</button>
+              </div>
+            </div>
+          )}
         </div>
 
-        <h2 className="mt-8 font-semibold">Reports you sent</h2>
-        <div className="mt-3 space-y-3">
-          {drafts.length === 0 && <p className="text-sm text-[var(--cr-muted)]">None yet.</p>}
-          {drafts.map((draft) => (
-            <div key={draft.id} className="rounded-2xl border border-teal-500/20 p-4">
-              <p className="font-medium">{draft.client_name}</p>
-              <p className="text-sm text-[var(--cr-muted)]">{draft.work_date || "No date"} · {draft.hours || "0"} hrs · waiting on owner</p>
-              <p className="mt-1 text-sm">{draft.work_done}</p>
+        <div className="mt-3">
+          {spendOpen === card.doc_id ? (
+            <div className="space-y-2 rounded-xl border border-teal-500/30 p-3" data-testid={`expense-form-${card.doc_id}`}>
+              <div className="grid grid-cols-2 gap-2">
+                <select aria-label="Category" className={input} value={spend.kind} onChange={(event) => setSpend({ ...spend, kind: event.target.value })}>
+                  {KINDS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+                <input aria-label="Amount" inputMode="decimal" className={input} placeholder="Amount $" value={spend.amount} onChange={(event) => setSpend({ ...spend, amount: event.target.value })} />
+              </div>
+              <input aria-label="What it was" className={input} placeholder="What it was" value={spend.note} onChange={(event) => setSpend({ ...spend, note: event.target.value })} />
+              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-teal-500/50 px-3 py-3 text-sm">
+                📷 {spend.receipt ? "Retake receipt photo" : "Snap receipt"}
+                <input aria-label="Receipt photo" type="file" accept="image/*" capture="environment" className="sr-only" onChange={(event) => pickReceipt(event.target.files?.[0])} />
+              </label>
+              {/* eslint-disable-next-line @next/next/no-img-element -- local data URL preview */}
+              {spend.receipt && <img src={spend.receipt} alt="Receipt preview" className="max-h-40 rounded-lg" data-testid="receipt-preview" />}
+              <div className="flex gap-2">
+                <button type="button" disabled={busy !== ""} onClick={() => saveExpense(card)} className="flex-1 rounded-xl bg-teal-400 px-3 py-2 font-semibold text-slate-950">Save expense</button>
+                <button type="button" onClick={() => setSpendOpen("")} className="rounded-xl border border-teal-500/30 px-3 py-2">Cancel</button>
+              </div>
             </div>
-          ))}
+          ) : (
+            <button type="button" data-testid={`add-expense-${card.doc_id}`} onClick={() => { setSpend({ kind: "parts", amount: "", note: "", receipt: "" }); setSpendOpen(card.doc_id); }} className="w-full rounded-xl border border-teal-500/40 px-3 py-2 text-sm font-medium">
+              🧾 Add expense / receipt
+            </button>
+          )}
+          {jobSpend.length > 0 && (
+            <ul className="mt-2 space-y-1 text-sm text-[var(--cr-muted)]">
+              {jobSpend.map((item) => (
+                <li key={item.id} data-testid="expense-item">{KINDS.find(([value]) => value === item.kind)?.[1] || item.kind} · ${item.amount}{item.note ? ` · ${item.note}` : ""}{item.receipt ? " · 🧾 receipt" : ""}</li>
+              ))}
+            </ul>
+          )}
         </div>
-        {upcoming.length > 0 && <p className="mt-6 text-xs text-[var(--cr-muted)]">{upcoming.length} job{upcoming.length === 1 ? "" : "s"} still not marked paid.</p>}
+
+        {card.payRow && (
+          <p className="mt-3 text-xs text-[var(--cr-muted)]">
+            {card.payRow.hours ? `${card.payRow.hours} hrs on your pay sheet · ` : ""}
+            {card.payRow.status === "paid" ? `Your pay $${Number(card.payRow.pay || 0).toFixed(2)}` : "Pay not confirmed yet"}
+          </p>
+        )}
+      </article>
+    );
+  }
+
+  const tabs: [Tab, string][] = [["today", "Today"], ["week", "This week"], ["hours", "My hours"], ["reports", "Reports"]];
+
+  return (
+    <main className="min-h-screen bg-[var(--cr-bg)] pb-24 text-[var(--cr-text)]">
+      <header className="sticky top-0 z-10 border-b border-teal-500/20 bg-[var(--cr-bg)]/95 px-4 py-3 backdrop-blur">
+        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-400 font-bold text-slate-950">C</span>
+            <div>
+              <p className="text-sm font-semibold leading-tight" data-testid="crew-name">{name || "Your jobs"}</p>
+              <p className="text-xs text-[var(--cr-muted)]">Crew</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 text-sm">
+            {open && <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-200 tabular-nums" data-testid="header-timer">⏱ {fmtTimer((now) - Date.parse(open.started_at))}</span>}
+            <button type="button" onClick={switchTheme}>{theme === "dark" ? "Light" : "Dark"}</button>
+            <button type="button" onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}>Log out</button>
+          </div>
+        </div>
+        <nav className="mx-auto mt-3 grid max-w-2xl grid-cols-4 gap-1 rounded-xl bg-[var(--cr-card)] p-1 text-sm" role="tablist">
+          {tabs.map(([key, label]) => (
+            <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)} className={`rounded-lg px-2 py-2 ${tab === key ? "bg-teal-400 font-semibold text-slate-950" : ""}`}>{label}</button>
+          ))}
+        </nav>
+      </header>
+
+      <div className="mx-auto max-w-2xl space-y-4 px-4 pt-4">
+        {message && <p className="rounded-xl border border-teal-500/30 px-3 py-2 text-sm" role="status" data-testid="crew-message">{message}</p>}
+
+        {tab === "today" && (
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold">{today ? dayLabel(today) : "Today"}</h2>
+            {todayCards.length === 0 && <p className={`${cardClass} text-sm text-[var(--cr-muted)]`}>Nothing scheduled for you today.</p>}
+            {todayCards.map(jobCard)}
+          </section>
+        )}
+
+        {tab === "week" && (
+          <section className="space-y-4">
+            {weekDays.map((day) => {
+              const list = weekCards.filter((card) => card.job_date === day);
+              if (!list.length) return null;
+              return (
+                <div key={day} className="space-y-2">
+                  <h2 className={`text-sm font-semibold ${day === today ? "text-teal-600 dark:text-teal-300" : "text-[var(--cr-muted)]"}`}>{dayLabel(day)}{day === today ? " · Today" : ""}</h2>
+                  {list.map(jobCard)}
+                </div>
+              );
+            })}
+            {weekCards.length === 0 && <p className={`${cardClass} text-sm text-[var(--cr-muted)]`}>No jobs for you this week.</p>}
+            {later.length > 0 && (
+              <div className="space-y-2" data-testid="coming-up">
+                <h2 className="text-sm font-semibold text-[var(--cr-muted)]">Coming up</h2>
+                {later.map(jobCard)}
+              </div>
+            )}
+            {undated.length > 0 && (
+              <div className="space-y-2">
+                <h2 className="text-sm font-semibold text-[var(--cr-muted)]">Not scheduled yet</h2>
+                {undated.map(jobCard)}
+              </div>
+            )}
+          </section>
+        )}
+
+        {tab === "hours" && (
+          <section className={cardClass} data-testid="my-hours">
+            <h2 className="text-lg font-semibold">My hours this week</h2>
+            <p className="text-xs text-[var(--cr-muted)]">Clocked is from your clock in/out. Pay sheet is what your boss logged for pay.</p>
+            <table className="mt-3 w-full text-sm">
+              <thead><tr className="text-left text-xs text-[var(--cr-muted)]"><th className="py-1">Day</th><th className="py-1 text-right">Clocked</th><th className="py-1 text-right">Pay sheet</th></tr></thead>
+              <tbody>
+                {hoursByDay.map((item) => (
+                  <tr key={item.day} className={`border-t border-teal-500/10 ${item.day === today ? "font-semibold" : ""}`} data-testid={`hours-${item.day}`}>
+                    <td className="py-1.5">{dayLabel(item.day)}</td>
+                    <td className="py-1.5 text-right tabular-nums">{item.clocked ? fmtHours(item.clocked) : "–"}</td>
+                    <td className="py-1.5 text-right tabular-nums">{item.logged ? `${item.logged.toFixed(2)} h` : "–"}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-teal-500/30 font-semibold" data-testid="hours-total"><td className="py-2">Total</td><td className="py-2 text-right tabular-nums">{fmtHours(weekClocked)}</td><td className="py-2 text-right tabular-nums">{weekLogged.toFixed(2)} h</td></tr>
+              </tfoot>
+            </table>
+            <div className="mt-4 rounded-xl bg-teal-500/10 p-3 text-sm">
+              <p className="text-xs text-[var(--cr-muted)]">Your confirmed pay (jobs marked paid)</p>
+              <p className="text-xl font-semibold">${confirmedPay.toFixed(2)}</p>
+              <p className="text-xs text-[var(--cr-muted)]">Only you can see this. A scheduled job is not pay yet.</p>
+            </div>
+          </section>
+        )}
+
+        {tab === "reports" && (
+          <section className="space-y-3">
+            <button type="button" onClick={() => setReportOpen(!reportOpen)} className="w-full rounded-xl bg-teal-400 px-4 py-3 font-semibold text-slate-950">{reportOpen ? "Close" : "New job report"}</button>
+            {reportOpen && (
+              <form onSubmit={saveDraft} className={`${cardClass} space-y-3`}>
+                <select className={input} onChange={(event) => { const client = clients.find((item) => item.id === event.target.value); if (client) setForm({ ...form, clientName: client.name, clientPhone: client.phone || "", clientAddress: client.address || "" }); }}>
+                  <option value="">Pick a client</option>
+                  {clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
+                </select>
+                <input className={input} placeholder="Who it was for" value={form.clientName} onChange={(event) => setForm({ ...form, clientName: event.target.value })} />
+                <input className={input} placeholder="Phone" value={form.clientPhone} onChange={(event) => setForm({ ...form, clientPhone: event.target.value })} />
+                <input className={input} placeholder="Address" value={form.clientAddress} onChange={(event) => setForm({ ...form, clientAddress: event.target.value })} />
+                <textarea className={`${input} min-h-20`} placeholder="What was done" value={form.workDone} onChange={(event) => setForm({ ...form, workDone: event.target.value })} />
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="text-sm">Date<input type="date" className={input} value={form.workDate} onChange={(event) => setForm({ ...form, workDate: event.target.value })} /></label>
+                  <label className="text-sm">Hours<input className={input} value={form.hours} onChange={(event) => setForm({ ...form, hours: event.target.value })} /></label>
+                  <label className="text-sm">Start<input type="time" className={input} value={form.startTime} onChange={(event) => setForm({ ...form, startTime: event.target.value })} /></label>
+                  <label className="text-sm">End<input type="time" className={input} value={form.endTime} onChange={(event) => setForm({ ...form, endTime: event.target.value })} /></label>
+                </div>
+                <input className={input} placeholder="Parts, gas, or dump fee you paid" value={form.partsCost} onChange={(event) => setForm({ ...form, partsCost: event.target.value })} />
+                <input className={input} placeholder="What it was" value={form.partsNote} onChange={(event) => setForm({ ...form, partsNote: event.target.value })} />
+                <textarea className={`${input} min-h-16`} placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.finished} onChange={(event) => setForm({ ...form, finished: event.target.checked })} /> Job is finished</label>
+                <button type="submit" className="w-full rounded-xl bg-teal-400 px-4 py-2 font-semibold text-slate-950">Send job report</button>
+              </form>
+            )}
+            <h2 className="font-semibold">Reports you sent</h2>
+            {drafts.length === 0 && <p className="text-sm text-[var(--cr-muted)]">None yet.</p>}
+            {drafts.map((draft) => (
+              <div key={draft.id} className={cardClass}>
+                <p className="font-medium">{draft.client_name}</p>
+                <p className="text-sm text-[var(--cr-muted)]">{draft.work_date || "No date"} · {draft.hours || "0"} hrs · waiting on owner</p>
+                <p className="mt-1 text-sm">{draft.work_done}</p>
+              </div>
+            ))}
+          </section>
+        )}
+        {userId && <p className="pt-4 text-center text-xs text-[var(--cr-muted)]">You only see your own jobs, time and expenses. Prices and company costs are not shown.</p>}
       </div>
     </main>
   );
