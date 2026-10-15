@@ -11,7 +11,12 @@ export type Schedule = {
   status: JobStatus;
   updatedAt: string;
 };
-export type Worker = { id: string; name: string; email?: string; phone?: string; role?: string; active?: boolean };
+export type Worker = { id: string; name: string; email?: string; phone?: string; role?: string; rate?: string; active?: boolean };
+/** The older per-job crew/pay rows (data.crew). */
+export type CrewRow = {
+  id: string; employeeId: string; name: string; rate: string; hours: string; startTime: string; endTime: string;
+  workDate: string; note: string; bonus: string; paidToWorker: boolean; paidDate: string;
+};
 
 export const STATUS_LABEL: Record<JobStatus, string> = { scheduled: "Scheduled", in_progress: "In progress", done: "Done" };
 export const STATUS_CLASS: Record<JobStatus, string> = {
@@ -91,6 +96,62 @@ export function moveSchedule(schedule: Schedule, date: string, startTime?: strin
   return { ...schedule, date, startTime: start, ...(endTime ? { endTime } : {}) };
 }
 
+function allEmployees(): Worker[] {
+  try {
+    const raw = window.localStorage.getItem("clientready-employees");
+    return raw ? (JSON.parse(raw) as Worker[]).filter((person) => person && person.id) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * One id per person: drops repeats, and folds ids of legacy duplicate employee records that share
+ * an email into the first id seen for that email.
+ */
+export function dedupeWorkerIds(ids: string[], people: Worker[] = allEmployees()) {
+  const emailOf = new Map(people.map((person) => [person.id, (person.email || "").trim().toLowerCase()]));
+  const seenIds = new Set<string>();
+  const seenEmails = new Set<string>();
+  const out: string[] = [];
+  for (const id of ids) {
+    if (!id || seenIds.has(id)) continue;
+    const email = emailOf.get(id) || "";
+    if (email && seenEmails.has(email)) continue;
+    seenIds.add(id);
+    if (email) seenEmails.add(email);
+    out.push(id);
+  }
+  return out;
+}
+
+export function crewIds(crew: unknown) {
+  return Array.isArray(crew) ? (crew as CrewRow[]).map((row) => row?.employeeId).filter(Boolean) : [];
+}
+
+/**
+ * The crew/pay rows that match an assignment: rows of people still assigned are kept untouched
+ * (hours, pay, notes intact); people newly assigned get an empty row at their saved rate;
+ * rows of people no longer assigned are dropped.
+ */
+export function crewForWorkers(crew: CrewRow[], workerIds: string[], schedule: Pick<Schedule, "date" | "startTime" | "endTime"> | null, people: Worker[] = allEmployees()) {
+  const keep = new Set(workerIds);
+  const kept = crew.filter((row) => keep.has(row.employeeId));
+  const have = new Set(kept.map((row) => row.employeeId));
+  const byId = new Map(people.map((person) => [person.id, person]));
+  const added = workerIds.filter((id) => !have.has(id)).map((id) => ({
+    id: `crew-${id}`, employeeId: id, name: byId.get(id)?.name || "Worker", rate: byId.get(id)?.rate || "",
+    hours: "", startTime: schedule?.startTime || "", endTime: schedule?.endTime || "", workDate: schedule?.date || "",
+    note: "", bonus: "", paidToWorker: false, paidDate: "",
+  }));
+  return [...kept, ...added];
+}
+
+/** Money snapshot without the crew rows (which assignment may add/remove), so other money can't move. */
+function moneyExceptCrew(data: Record<string, unknown> | undefined) {
+  return moneySnapshot({ ...(data || {}), crew: undefined });
+}
+
 function readDocs(): CloudDoc[] {
   try {
     const raw = window.localStorage.getItem(DOCS_KEY);
@@ -111,25 +172,77 @@ export function readWorkers(): Worker[] {
 }
 
 /**
- * Replaces only data.schedule on the stored doc (null clears it). Throws if any money,
- * status or payment field would change. Returns the updated doc, or null if not found.
+ * Sets data.schedule on the stored doc (null clears it) and keeps the crew/pay rows (data.crew)
+ * in step with schedule.workerIds, which is the one list of who is on the job:
+ * - first time a job is scheduled, people already in its crew rows are assigned too;
+ * - after that, crew rows follow workerIds (new people get an empty row, removed people's rows go).
+ * Unscheduling keeps the crew rows. Throws if any other money, status or payment field would
+ * change, or if a kept crew row would change.
  */
 export function applySchedule<T extends CloudDoc>(docs: T[], docId: string, schedule: Schedule | null) {
   const index = docs.findIndex((doc) => doc.id === docId);
   if (index < 0) return null;
   const doc = docs[index];
-  const before = moneySnapshot(doc.data);
+  const before = moneyExceptCrew(doc.data);
   const data: Record<string, unknown> = { ...(doc.data || {}) };
-  if (schedule) data.schedule = { ...schedule, updatedAt: new Date().toISOString() };
-  else delete data.schedule;
+  const crew = (Array.isArray(data.crew) ? data.crew : []) as CrewRow[];
+  if (schedule) {
+    const ids = dedupeWorkerIds(data.schedule ? schedule.workerIds : [...schedule.workerIds, ...crewIds(crew)]);
+    data.schedule = { ...schedule, workerIds: ids, updatedAt: new Date().toISOString() };
+    data.crew = crewForWorkers(crew, ids, schedule);
+  } else {
+    delete data.schedule;
+  }
   const updated = { ...doc, data } as T;
-  if (moneySnapshot(updated.data) !== before) throw new Error("Schedule change would touch money fields");
+  if (moneyExceptCrew(updated.data) !== before) throw new Error("Schedule change would touch money fields");
+  const keptBefore = new Map(crew.map((row) => [row.id, JSON.stringify(row)]));
+  for (const row of (updated.data.crew || []) as CrewRow[]) {
+    if (keptBefore.has(row.id) && keptBefore.get(row.id) !== JSON.stringify(row)) throw new Error("Schedule change would edit crew pay");
+  }
   const next = [...docs];
   next[index] = updated;
   return { docs: next, doc: updated };
 }
 
 /** Saves a schedule change locally and to the account, then refreshes the crew's job list. */
+/**
+ * Assign people to a job from either place (schedule chips or the crew/pay section).
+ * Scheduled jobs go through saveSchedule; unscheduled ones only update the crew rows.
+ */
+export async function saveAssignment(docId: string, workerIds: string[]) {
+  const doc = readDocs().find((item) => item.id === docId);
+  if (!doc) return null;
+  const current = (doc.data?.schedule ? readSchedule(doc.data) : null);
+  if (current) return saveSchedule(docId, { ...current, workerIds });
+  const before = moneyExceptCrew(doc.data);
+  const ids = dedupeWorkerIds(workerIds);
+  const crew = (Array.isArray(doc.data?.crew) ? doc.data.crew : []) as CrewRow[];
+  const next: CloudDoc = { ...doc, data: { ...(doc.data || {}), crew: crewForWorkers(crew, ids, null) } };
+  if (moneyExceptCrew(next.data) !== before) throw new Error("Assignment would touch money fields");
+  window.localStorage.setItem(DOCS_KEY, JSON.stringify(readDocs().map((item) => (item.id === docId ? next : item))));
+  const cloudId = await saveCloudDocument(next);
+  const saved = { ...next, id: cloudId };
+  window.localStorage.setItem(DOCS_KEY, JSON.stringify(readDocs().map((item) => (item.id === docId ? saved : item))));
+  await syncCrewPayRows(saved);
+  return saved;
+}
+
+/** Re-writes the crew pay rows (existing saveCrewJobs) from the stored crew list. */
+async function syncCrewPayRows(doc: CloudDoc) {
+  if (!isUuid(doc.id)) return;
+  const data = doc.data || {};
+  const { saveCrewJobs } = await import("@/lib/crew");
+  await saveCrewJobs(doc.id, {
+    invoiceNumber: String(data.invoiceNumber || doc.title || ""),
+    clientName: String(data.clientName || ""),
+    clientPhone: String(data.clientPhone || ""),
+    clientAddress: String(data.clientAddress || ""),
+    status: String(data.status || ""),
+    startTime: String(data.jobStart || ""),
+    endTime: String(data.jobEnd || ""),
+  }, (Array.isArray(data.crew) ? data.crew : []) as CrewRow[]);
+}
+
 export async function saveSchedule(docId: string, schedule: Schedule | null) {
   const applied = applySchedule(readDocs(), docId, schedule);
   if (!applied) return null;
@@ -139,6 +252,7 @@ export async function saveSchedule(docId: string, schedule: Schedule | null) {
   const latest = readDocs().map((doc) => (doc.id === docId ? { ...applied.doc, id: cloudId } : doc));
   window.localStorage.setItem(DOCS_KEY, JSON.stringify(latest));
   await syncScheduleCrewJobs({ ...applied.doc, id: cloudId });
+  await syncCrewPayRows({ ...applied.doc, id: cloudId });
   return { ...applied.doc, id: cloudId };
 }
 
@@ -155,10 +269,10 @@ export async function syncScheduleCrewJobs(doc: CloudDoc) {
   const schedule = readSchedule(doc.data);
   await supabase.from("crew_jobs").delete().eq("owner_id", user.id).eq("doc_id", doc.id).like("id", `${doc.id}-sched-%`);
   if (!schedule || !doc.data?.schedule || !schedule.workerIds.length) return;
-  const workers = new Map(readWorkers().map((person) => [person.id, person]));
+  const workers = new Map(allEmployees().map((person) => [person.id, person]));
   const data = doc.data || {};
   await supabase.from("crew_jobs").insert(
-    schedule.workerIds.map((workerId) => ({
+    dedupeWorkerIds(schedule.workerIds).map((workerId) => ({
       id: `${doc.id}-sched-${workerId}`,
       owner_id: user.id,
       employee_id: workerId,

@@ -23,10 +23,21 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
   const [picking, setPicking] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
   const names = new Map(workers.map((person) => [person.id, person.name]));
-  const available = workers.filter((person) => !workerIds.includes(person.id));
+  // Not already on the job, by id or (for older duplicate employee records) by email.
+  const takenEmails = new Set(workers.filter((person) => workerIds.includes(person.id)).map((person) => (person.email || "").trim().toLowerCase()).filter(Boolean));
+  const available = workers.filter((person) => !workerIds.includes(person.id) && !takenEmails.has((person.email || "").trim().toLowerCase()));
 
   /** Chips update at once; a job that is already scheduled saves the new crew right away. */
-  function changeWorkers(next: string[]) {
+  function changeWorkers(list: string[]) {
+    const emails = new Map(workers.map((person) => [person.id, (person.email || "").trim().toLowerCase()]));
+    const seen = new Set<string>();
+    const next = list.filter((id) => {
+      const key = emails.get(id) || `id:${id}`;
+      if (seen.has(key) || seen.has(`id:${id}`)) return false;
+      seen.add(key);
+      seen.add(`id:${id}`);
+      return true;
+    });
     setWorkerIds(next);
     if (value) onSave({ ...value, workerIds: next }, { keepOpen: true });
   }

@@ -15,7 +15,7 @@ import { appendChangeOrderNote, changeOrderData, changeOrdersFor, mergeChangeOrd
 import ChangeOrderNotes from "@/components/ChangeOrderNotes";
 import { ApprovalBadge, ApprovalShare } from "@/components/Approval";
 import ScheduleEditor from "@/components/ScheduleEditor";
-import { readSchedule, readWorkers, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
+import { crewForWorkers, crewIds, dedupeWorkerIds, readSchedule, readWorkers, saveAssignment, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
 import { readApproval, refreshApproval, type Approval } from "@/lib/approval";
 import { generateNextNow, readRecurring, readRecurringFrom, scheduleFromForm, type Frequency, type RecurringFrom } from "@/lib/recurring";
 import PayQr from "@/components/PayQr";
@@ -361,15 +361,40 @@ export default function NewInvoicePage() {
   function addCrew() {
     const person = employees.find((item) => item.id === pickedEmployee);
     if (!person) return setSaveMessage("Pick an employee, then click Add");
+    if (crew.some((row) => row.employeeId === person.id) || !dedupeWorkerIds([...crewIds(crew), person.id]).includes(person.id)) {
+      return setSaveMessage(`${person.name} is already on this job.`);
+    }
     if (!allowCrewChange()) return;
     const nextCrew = [...crew, {
-      id: Date.now().toString(), employeeId: person.id, name: person.name, rate: person.rate,
+      id: `crew-${person.id}`, employeeId: person.id, name: person.name, rate: person.rate,
       hours: "", startTime: jobStart, endTime: jobEnd, workDate: invoiceDate, note: "", bonus: "", paidToWorker: false, paidDate: "",
     }];
     setCrew(nextCrew);
     setCosts((current) => ({ ...current, labor: nextCrew.reduce((sum, row) => sum + rowPay(row), 0).toFixed(2) }));
     setPickedEmployee("");
     setSaveMessage(`${person.name} added. Pick the next person and click Add again.`);
+    void shareAssignment(nextCrew);
+  }
+
+  /** Crew/pay section changed who is on the job: save it as the job's assignment (schedule.workerIds). */
+  async function shareAssignment(nextCrew: CrewRow[]) {
+    if (!docId) return;
+    try {
+      const saved = await saveAssignment(docId, dedupeWorkerIds(crewIds(nextCrew)));
+      if (saved?.data?.schedule) {
+        setSchedule(readSchedule(saved.data));
+        setScheduleKey((key) => key + 1);
+      }
+    } catch {
+      setSaveMessage("Could not save the crew change.");
+    }
+  }
+
+  function removeCrewRow(id: string) {
+    if (!allowCrewChange()) return;
+    const nextCrew = crew.filter((item) => item.id !== id);
+    setCrew(nextCrew);
+    void shareAssignment(nextCrew);
   }
 
   function updateCrew(id: string, patch: Partial<CrewRow>) {
@@ -446,7 +471,11 @@ export default function NewInvoicePage() {
   async function saveJobSchedule(next: Schedule | null, options?: { keepOpen?: boolean }) {
     try {
       const saved = await saveSchedule(docId, next);
-      setSchedule(saved ? readSchedule(saved.data) : null);
+      const savedSchedule = saved ? readSchedule(saved.data) : null;
+      setSchedule(savedSchedule);
+      // Same people in the crew/pay section: add empty rows for new people, drop removed ones,
+      // leave everyone else's hours and pay as typed.
+      if (savedSchedule) setCrew((current) => crewForWorkers(current, savedSchedule.workerIds, savedSchedule) as CrewRow[]);
       // Crew add/remove keeps the editor as is (other unsaved edits stay); a full save reloads it.
       if (!options?.keepOpen) setScheduleKey((key) => key + 1);
       setSaveMessage(next ? "Schedule saved" : "Job unscheduled");
@@ -724,7 +753,7 @@ export default function NewInvoicePage() {
                       <label className="text-sm text-slate-900 sm:col-span-2">Extra pay for this job<input className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900" placeholder="100" value={row.bonus} onChange={(event) => updateCrew(row.id, { bonus: event.target.value })} /></label>
                     </div>
                     <p className="text-sm text-slate-900">Paid this job: ${rowPay(row).toFixed(2)}</p>
-                    <button type="button" onClick={() => allowCrewChange() && setCrew((current) => current.filter((item) => item.id !== row.id))} className="text-sm text-slate-700">Remove from job</button>
+                    <button type="button" onClick={() => removeCrewRow(row.id)} className="text-sm text-slate-700">Remove from job</button>
                   </div>
                 ))}
               </div>

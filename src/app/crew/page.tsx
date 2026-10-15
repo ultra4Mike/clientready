@@ -138,6 +138,19 @@ function readReceipt(file: File | undefined, jobId: string) {
   }
 
   const isScheduleRow = (job: Job) => job.id.includes("-sched-");
+  // One card per job: when a job has both a schedule row and pay row(s) for this worker, the
+  // schedule details (date, time, status, contact) are shown on the first pay row instead of twice.
+  const shown: (Job & { scheduled?: boolean })[] = [];
+  for (const job of jobs) {
+    if (isScheduleRow(job)) continue;
+    shown.push({ ...job });
+  }
+  for (const sched of jobs.filter(isScheduleRow)) {
+    const index = shown.findIndex((job) => job.doc_id === sched.doc_id && !job.scheduled);
+    if (index >= 0) shown[index] = { ...shown[index], scheduled: true, schedule_status: sched.schedule_status, job_date: sched.job_date, start_time: sched.start_time, end_time: sched.end_time, client_email: sched.client_email };
+    else shown.push({ ...sched, scheduled: true });
+  }
+  shown.sort((a, b) => `${a.job_date}${a.start_time}`.localeCompare(`${b.job_date}${b.start_time}`));
   const paid = jobs.filter((job) => job.status === "paid" && !isScheduleRow(job));
   const confirmedPay = paid.reduce((sum, job) => sum + (Number(job.pay) || 0), 0);
   const confirmedHours = paid.reduce((sum, job) => sum + (Number(job.hours) || 0), 0);
@@ -187,11 +200,11 @@ function readReceipt(file: File | undefined, jobId: string) {
         <h2 className="mt-8 font-semibold">Your week</h2>
         <div className="mt-3 space-y-3">
           {jobs.length === 0 && <p className="text-sm text-[var(--cr-muted)]">No jobs on your schedule.</p>}
-          {jobs.map((job) => (
+          {shown.map((job) => (
             <div key={job.id} className="rounded-2xl border border-teal-500/20 p-4">
               <div className="flex items-start justify-between gap-3">
                 <p className="font-medium">{job.client_name || job.invoice_number || "Job"}</p>
-                {isScheduleRow(job)
+                {job.scheduled
                   ? (
                     <select aria-label="Job status" data-testid={`crew-status-${job.doc_id}`} value={job.schedule_status || "scheduled"} onChange={(event) => setJobStatus(job, event.target.value as JobStatus)} className={`rounded border px-2 py-0.5 text-xs ${STATUS_CLASS[(job.schedule_status || "scheduled") as JobStatus] || ""}`}>
                       {(Object.keys(STATUS_LABEL) as JobStatus[]).map((key) => <option key={key} value={key}>{STATUS_LABEL[key]}</option>)}
