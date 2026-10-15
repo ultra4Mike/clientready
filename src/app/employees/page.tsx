@@ -197,9 +197,9 @@ export default function EmployeesPage() {
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
       <div className="order-2 xl:order-none xl:sticky xl:top-20">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Add or edit a person</h2>
-      <form onSubmit={handleSubmit} className="grid gap-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none sm:p-6 md:grid-cols-2 xl:grid-cols-1">
-        <div className="grid gap-3 rounded-xl border border-teal-500/20 p-4 md:col-span-2 md:grid-cols-2 xl:col-span-1 xl:grid-cols-1">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-500 md:col-span-2">Person & role</h2>
+      <form onSubmit={handleSubmit} className="grid gap-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none sm:p-6">
+        <div className="grid min-w-0 gap-3 rounded-xl border border-teal-500/20 p-4 sm:grid-cols-2 xl:grid-cols-1 [&>*]:min-w-0">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-500 col-span-full">Person & role</h2>
         <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
         <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Email they will use to log in" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
         <input className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Phone" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
@@ -209,8 +209,8 @@ export default function EmployeesPage() {
           <option value="contractor">Contractor</option>
         </select>
         </div>
-        <div className="grid gap-3 rounded-xl border border-teal-500/20 p-4 md:col-span-2 md:grid-cols-2 xl:col-span-1 xl:grid-cols-1">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-500 md:col-span-2">Pay & start date</h2>
+        <div className="grid min-w-0 gap-3 rounded-xl border border-teal-500/20 p-4 sm:grid-cols-2 xl:grid-cols-1 [&>*]:min-w-0">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-500 col-span-full">Pay & start date</h2>
         <label className="text-sm font-medium">
           Hourly rate
           <input className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="24" value={form.rate} onChange={(event) => setForm({ ...form, rate: event.target.value })} />
@@ -220,10 +220,10 @@ export default function EmployeesPage() {
           <input type="date" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={form.hireDate} onChange={(event) => setForm({ ...form, hireDate: event.target.value })} />
         </label>
         </div>
-        <button type="submit" className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 md:col-span-2 md:justify-self-end md:px-8">
+        <button type="submit" className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 sm:justify-self-end sm:px-8">
           {editingId ? "Update employee" : "Save employee"}
         </button>
-        <p className="flex items-center gap-2 rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs font-medium text-[var(--cr-text)] md:col-span-2">🔒 No Social Security number, bank account, or routing number.</p>
+        <p className="flex items-center gap-2 rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs font-medium text-[var(--cr-text)]">🔒 No Social Security number, bank account, or routing number.</p>
       </form>
       {message && <p className="mt-3 rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-[var(--cr-muted)]">{message}</p>}
 
