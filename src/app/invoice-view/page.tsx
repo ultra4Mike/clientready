@@ -163,15 +163,15 @@ export default function InvoiceViewPage() {
 
   return (
     <AppShell title="Invoice">
-      <div className="print-hide mb-4 flex flex-wrap items-center justify-between gap-3">
-        <a href="/documents" className="text-sm text-[var(--cr-muted)]">
+      <div className="print-hide mx-auto mb-6 flex max-w-3xl flex-wrap items-center justify-between gap-3">
+        <a href="/documents" className="text-sm font-medium text-[var(--cr-muted)] transition hover:text-teal-300">
           Back to documents
         </a>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => window.print()}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
+            className="rounded-xl border border-teal-500/30 px-4 py-2 text-sm font-medium text-teal-200 transition hover:border-teal-400/60 hover:bg-teal-500/10"
           >
             Print / Save PDF
           </button>
@@ -179,7 +179,7 @@ export default function InvoiceViewPage() {
             <button
               type="button"
               onClick={copyPayLink}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
+              className="rounded-xl border border-teal-500/30 px-4 py-2 text-sm font-medium text-teal-200 transition hover:border-teal-400/60 hover:bg-teal-500/10"
             >
               {paymentLink.trim() ? "Pay / Copy pay link" : "Add how to pay"}
             </button>
@@ -187,16 +187,16 @@ export default function InvoiceViewPage() {
           <button
             type="button"
             onClick={editInvoice}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white"
+            className="rounded-xl bg-teal-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400"
           >
             Edit invoice
           </button>
         </div>
       </div>
-      {message && <p className="print-hide mb-3 text-sm text-[var(--cr-muted)]">{message}</p>}
+      {message && <p className="print-hide mx-auto mb-4 max-w-3xl rounded-xl border border-teal-500/20 bg-teal-500/5 px-4 py-2 text-sm text-[var(--cr-muted)]">{message}</p>}
 
       <section className="print-reset mx-auto max-w-3xl">
-        <div id="preview" className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm">
+        <div id="preview" className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-lg sm:p-10">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 text-sm text-slate-600">
               {logo && <img src={logo} alt="Business logo" className="mb-2 h-10 w-auto" />}
@@ -207,7 +207,7 @@ export default function InvoiceViewPage() {
               {approval && <div className="mb-1"><ApprovalBadge approval={approval} /></div>}
               {changeOrderOf && <p className="change-order-badge mb-1 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide" data-testid="change-order-badge">Change order</p>}
               <p className="text-xs uppercase tracking-wide text-slate-500">Invoice · {status}</p>
-              <h1 className="text-xl font-semibold leading-tight">{invoiceNumber || "Invoice"}</h1>
+              <h1 className="mt-0.5 text-2xl font-bold leading-tight tracking-tight">{invoiceNumber || "Invoice"}</h1>
               <p className="text-sm text-slate-600">Date: {invoiceDate || "-"} · Due: {dueDate || "-"}</p>
               {changeOrderOf && (
                 <p className="text-sm text-slate-600" data-testid="change-order-link">
@@ -218,8 +218,8 @@ export default function InvoiceViewPage() {
             </div>
           </div>
 
-          <div className="mt-4 text-sm">
-            <p className="text-xs text-slate-500">Bill to</p>
+          <div className="mt-8 text-sm">
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">Bill to</p>
             <p className="font-medium">
               {clientName || "Client"}
               {clientCompany && <span className="font-normal text-slate-600"> · {clientCompany}</span>}
@@ -228,11 +228,11 @@ export default function InvoiceViewPage() {
             {clientAddress && <p className="text-slate-600">{clientAddress}</p>}
           </div>
 
-          <div className="mt-4 border-t border-slate-200 pt-1">
+          <div className="mt-8 border-t border-slate-200 pt-2">
             {items.map((item, index) => {
               const amount = amountOf(item.qty) * amountOf(item.rate);
               return (
-                <div key={index} className="flex justify-between gap-4 py-1 text-sm">
+                <div key={index} className="flex justify-between gap-4 border-b border-slate-100 py-2 text-sm last:border-b-0">
                   <span>
                     {item.description || "Item"} · {item.qty} x ${item.rate}
                   </span>
@@ -242,7 +242,7 @@ export default function InvoiceViewPage() {
             })}
           </div>
 
-          <div className="mt-2 grid grid-cols-2 gap-6 border-t border-slate-200 pt-2 text-sm">
+          <div className="mt-4 grid grid-cols-1 gap-6 border-t border-slate-200 pt-4 text-sm sm:grid-cols-2">
             <div className="space-y-0.5 text-slate-600">
               <LineSplit items={items} />
               {payments.some((payment) => amountOf(payment.amount) > 0) && <p className="text-xs text-slate-500">Payments</p>}
@@ -254,7 +254,7 @@ export default function InvoiceViewPage() {
               ))}
               {paymentLink && <p className="break-all pt-1 text-xs">Pay here: {paymentLink}</p>}
             </div>
-            <div className="space-y-0.5">
+            <div className="space-y-1">
               <div className="flex justify-between">
                 <span>Subtotal</span>
                 <span>${totals.subtotal.toFixed(2)}</span>
@@ -279,14 +279,14 @@ export default function InvoiceViewPage() {
                   <span>-${totals.paid.toFixed(2)}</span>
                 </div>
               )}
-              <div className="mt-1 flex justify-between border-t border-slate-200 pt-1 text-lg font-bold">
+              <div className="mt-2 flex justify-between border-t border-slate-200 pt-2 text-lg font-bold">
                 <span>Still owed</span>
                 <span>${totals.balance.toFixed(2)}</span>
               </div>
             </div>
           </div>
 
-          {notes && <p className="mt-3 text-sm text-slate-600">{notes}</p>}
+          {notes && <p className="mt-6 whitespace-pre-line text-sm text-slate-600">{notes}</p>}
           <JobPhotoStrip photos={photos} />
           {(payUrlFor(docPayLink, paymentLink) || signature || proposalSignature) && (
             <div className="print-keep mt-3 grid grid-cols-2 items-end gap-6 border-t border-slate-200 pt-3">

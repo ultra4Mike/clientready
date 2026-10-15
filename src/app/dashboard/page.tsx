@@ -58,7 +58,7 @@ function monthKey(value: string) {
 
 function IconWrap({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-teal-400/50 text-teal-300">
+    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal-500/10 text-teal-300 ring-1 ring-teal-400/30">
       {children}
     </span>
   );
@@ -175,22 +175,22 @@ export default function DashboardPage() {
 
   return (
     <AppShell title={`${hello}${ownerName ? `, ${ownerName}` : ""}.`}>
-      <p className="mb-6 text-[var(--cr-muted)]">
+      <p className="mb-6 text-sm text-[var(--cr-muted)] sm:text-base">
         {stats.invoiceCount === 0
           ? "Create your first invoice to see totals."
           : "Here is what is happening with your invoices today."}
       </p>
 
       {recurringReady > 0 && (
-        <a href="/documents?q=draft" data-testid="recurring-ready" className="mb-4 block rounded-xl border border-teal-500/40 bg-[var(--cr-card)] px-4 py-3 text-sm text-teal-300">
+        <a href="/documents?q=draft" data-testid="recurring-ready" className="mb-6 flex items-center justify-between rounded-xl border border-teal-500/40 bg-teal-500/10 px-4 py-3 text-sm font-medium text-teal-200 transition hover:bg-teal-500/15">
           {recurringReady} recurring draft{recurringReady === 1 ? "" : "s"} ready for review
         </a>
       )}
 
-      <div className="mb-6 flex flex-col gap-3 lg:flex-row">
+      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center">
         <form onSubmit={handleSearch} className="flex-1">
           <input
-            className="w-full rounded-full border border-teal-500/30 bg-[var(--cr-card)] px-4 py-2 text-sm"
+            className="w-full rounded-xl border border-teal-500/20 bg-[var(--cr-card)] px-4 py-2.5 text-sm placeholder:text-[var(--cr-muted)] focus:border-teal-400/60 focus:outline-none focus:ring-2 focus:ring-teal-400/20"
             placeholder="Search invoices, clients, documents..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -198,49 +198,49 @@ export default function DashboardPage() {
         </form>
         <a
           href="/invoice"
-          className="rounded-full border border-teal-400 px-4 py-2 text-center text-sm text-teal-300"
+          className="shrink-0 rounded-xl bg-teal-500 px-5 py-2.5 text-center text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-400"
         >
           New invoice +
         </a>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 shadow-sm">
           <div className="flex items-start justify-between">
-            <p className="text-sm text-[var(--cr-muted)]">Total outstanding</p>
+            <p className="text-xs font-medium uppercase tracking-wider text-[var(--cr-muted)]">Total outstanding</p>
             <IconWrap>$</IconWrap>
           </div>
-          <p className="mt-3 text-2xl font-semibold">${stats.outstanding.toFixed(2)}</p>
+          <p className="mt-3 text-2xl font-semibold tabular-nums tracking-tight sm:text-3xl">${stats.outstanding.toFixed(2)}</p>
           <p className="mt-2 text-xs text-[var(--cr-muted)]">
             {stats.outstanding === 0 ? "No outstanding invoices" : "Not marked paid"}
           </p>
         </div>
-        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+        <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 shadow-sm">
           <div className="flex items-start justify-between">
-            <p className="text-sm text-[var(--cr-muted)]">Paid</p>
+            <p className="text-xs font-medium uppercase tracking-wider text-[var(--cr-muted)]">Paid</p>
             <IconWrap>✓</IconWrap>
           </div>
-          <p className="mt-3 text-2xl font-semibold">${stats.paid.toFixed(2)}</p>
+          <p className="mt-3 text-2xl font-semibold tabular-nums tracking-tight sm:text-3xl">${stats.paid.toFixed(2)}</p>
           <p className="mt-2 text-xs text-[var(--cr-muted)]">
             {stats.paid === 0 ? "No payments yet" : `${stats.paidRate}% marked paid`}
           </p>
         </div>
-        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+        <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 shadow-sm">
           <div className="flex items-start justify-between">
-            <p className="text-sm text-[var(--cr-muted)]">Overdue</p>
+            <p className="text-xs font-medium uppercase tracking-wider text-[var(--cr-muted)]">Overdue</p>
             <IconWrap>!</IconWrap>
           </div>
-          <p className="mt-3 text-2xl font-semibold">${stats.overdue.toFixed(2)}</p>
+          <p className="mt-3 text-2xl font-semibold tabular-nums tracking-tight sm:text-3xl">${stats.overdue.toFixed(2)}</p>
           <p className="mt-2 text-xs text-[var(--cr-muted)]">
             {stats.overdueCount === 0 ? "No overdue invoices" : `${stats.overdueCount} overdue`}
           </p>
         </div>
-        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+        <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 shadow-sm">
           <div className="flex items-start justify-between">
-            <p className="text-sm text-[var(--cr-muted)]">Clients</p>
+            <p className="text-xs font-medium uppercase tracking-wider text-[var(--cr-muted)]">Clients</p>
             <IconWrap>☺</IconWrap>
           </div>
-          <p className="mt-3 text-2xl font-semibold">{clients.length}</p>
+          <p className="mt-3 text-2xl font-semibold tabular-nums tracking-tight sm:text-3xl">{clients.length}</p>
           <p className="mt-2 text-xs text-[var(--cr-muted)]">
             {clients.length === 0 ? "No clients added" : "Saved clients"}
           </p>
@@ -248,10 +248,10 @@ export default function DashboardPage() {
       </div>
 
       {stats.invoiceCount > 0 && (
-        <div className="mt-6 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5">
+        <div className="mt-6 rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold">Invoice overview</h2>
-            <span className="text-sm text-[var(--cr-muted)]">Last 6 months</span>
+            <h2 className="text-base font-semibold">Invoice overview</h2>
+            <span className="text-xs text-[var(--cr-muted)]">Last 6 months</span>
           </div>
           <svg viewBox={`0 0 ${width} ${height}`} className="h-48 w-full">
             {[1, 2, 3, 4].map((line) => (
@@ -291,23 +291,23 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <h2 className="mt-8 text-sm font-semibold tracking-wide text-[var(--cr-muted)]">
+      <h2 className="mt-10 text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">
         QUICK ACTIONS
       </h2>
-      <div className="mt-3 grid gap-3 md:grid-cols-3">
-        <a href="/invoice" className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4">
+      <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <a href="/invoice" className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 transition hover:-translate-y-0.5 hover:border-teal-400/50">
           <IconWrap>+</IconWrap>
-          <p className="mt-3 font-medium">New invoice</p>
+          <p className="mt-4 font-semibold">New invoice</p>
           <p className="mt-1 text-sm text-[var(--cr-muted)]">Create an invoice and send it to a client.</p>
         </a>
-        <button type="button" onClick={newProposal} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 text-left">
+        <button type="button" onClick={newProposal} className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 transition hover:-translate-y-0.5 hover:border-teal-400/50 text-left">
           <IconWrap>✎</IconWrap>
-          <p className="mt-3 font-medium">New proposal</p>
+          <p className="mt-4 font-semibold">New proposal</p>
           <p className="mt-1 text-sm text-[var(--cr-muted)]">Create a proposal and share it with a prospect.</p>
         </button>
-        <a href={thirdAction.href} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4">
+        <a href={thirdAction.href} className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 transition hover:-translate-y-0.5 hover:border-teal-400/50">
           <IconWrap>{thirdAction.icon}</IconWrap>
-          <p className="mt-3 font-medium">{thirdAction.title}</p>
+          <p className="mt-4 font-semibold">{thirdAction.title}</p>
           <p className="mt-1 text-sm text-[var(--cr-muted)]">{thirdAction.text}</p>
         </a>
       </div>
