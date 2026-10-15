@@ -192,7 +192,7 @@ export default function EmployeesPage() {
   }
 
   return (
-    <AppShell title="Employees">
+    <AppShell title="Team">
       <PageHeader title="Team" subtitle="Add the email they will use to log in. That email opens the crew page, not the owner books." />
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
       <div className="order-2 xl:order-none xl:sticky xl:top-20">
