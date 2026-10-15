@@ -36,8 +36,8 @@ const empty = {
   driveHours: "", driveMinutes: "", notes: "", finished: false, collectedAmount: "", collectedMethod: "cash",
 };
 const KINDS = [["gas", "Gas"], ["parts", "Parts"], ["dump", "Dump fee"], ["other", "Other"]] as const;
-const input = "w-full rounded-xl border border-teal-500/30 bg-transparent px-3 py-2";
-const cardClass = "rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm";
+const input = "w-full rounded-xl border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30";
+const cardClass = "rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5";
 
 function ymd(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;

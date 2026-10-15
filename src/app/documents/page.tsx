@@ -122,13 +122,13 @@ export default function DocumentsPage() {
         <div className="flex flex-wrap gap-2">
           <a
             href="/invoice"
-            className="rounded-full border border-teal-400 px-4 py-2 text-sm text-teal-300"
+            className="rounded-full bg-teal-400 px-4 py-2 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-teal-300"
           >
             New invoice
           </a>
           <a
             href="/proposal"
-            className="rounded-full border border-teal-500/40 px-4 py-2 text-sm"
+            className="rounded-full border border-teal-500/40 px-4 py-2 text-sm font-medium transition hover:border-teal-400"
           >
             New proposal
           </a>
@@ -137,13 +137,13 @@ export default function DocumentsPage() {
 
       <div className="grid gap-3 md:grid-cols-3">
         <input
-          className="rounded-lg border border-teal-500/30 bg-[var(--cr-card)] px-3 py-2"
+          className="rounded-lg border border-teal-500/30 bg-[var(--cr-card)] px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
           placeholder="Search title or client"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
         <select
-          className="rounded-lg border border-teal-500/30 bg-[var(--cr-card)] px-3 py-2"
+          className="rounded-lg border border-teal-500/30 bg-[var(--cr-card)] px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
           value={typeFilter}
           onChange={(event) => setTypeFilter(event.target.value)}
         >
@@ -154,7 +154,7 @@ export default function DocumentsPage() {
           <option value="report">Reports</option>
         </select>
         <select
-          className="rounded-lg border border-teal-500/30 bg-[var(--cr-card)] px-3 py-2"
+          className="rounded-lg border border-teal-500/30 bg-[var(--cr-card)] px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
           value={sortBy}
           onChange={(event) => setSortBy(event.target.value)}
         >
@@ -167,7 +167,7 @@ export default function DocumentsPage() {
 
       <div className="mt-6 space-y-3">
         {documents.length === 0 && (
-          <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-6">
+          <div className="rounded-2xl border border-dashed border-teal-500/30 bg-[var(--cr-card)] p-8 text-center">
             <p className="font-medium">No documents yet</p>
             <p className="mt-1 text-sm text-[var(--cr-muted)]">
               Create your first invoice or proposal.
@@ -184,7 +184,7 @@ export default function DocumentsPage() {
         {visibleDocs.map((doc) => (
           <div
             key={doc.id}
-            className="flex flex-col gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 sm:flex-row sm:items-center sm:justify-between"
+            className="flex flex-col gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/50 sm:p-5 sm:flex-row sm:items-center sm:justify-between"
           >
             <button type="button" onClick={() => openDocument(doc)} className="text-left">
               <p className="font-medium">{doc.title || "Untitled"}</p>
@@ -196,10 +196,10 @@ export default function DocumentsPage() {
               <ApprovalBadge approval={readApproval(doc.data?.approval)} className="mt-1" />
             </button>
             <div className="flex gap-3">
-              <button type="button" onClick={() => openDocument(doc)} className="text-sm font-medium">
+              <button type="button" onClick={() => openDocument(doc)} className="text-sm font-medium text-teal-600 transition hover:underline dark:text-teal-300">
                 Open
               </button>
-              <button type="button" onClick={() => duplicateDocument(doc)} className="text-sm font-medium">
+              <button type="button" onClick={() => duplicateDocument(doc)} className="text-sm font-medium text-teal-600 transition hover:underline dark:text-teal-300">
                 Duplicate
               </button>
               <button
