@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { saveCloudDocument } from "@/lib/cloud-docs";
 import AppShell from "@/components/AppShell";
+import PageHeader from "@/components/PageHeader";
 
 type SavedClient = {
   id: string;
@@ -165,10 +166,11 @@ async function saveDocument() {
 
   return (
     <AppShell title="Report">
+      <PageHeader title="Report" subtitle="Build a progress report for a client, then print or save it." />
 
       <section className="mx-auto grid max-w-6xl gap-6 py-2 sm:py-4 lg:grid-cols-2 lg:gap-8">
         <form className="space-y-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-          <h1 className="text-xl font-bold tracking-tight">Report details</h1>
+          <h2 className="text-lg font-semibold tracking-tight">Report details</h2>
 
           <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Client & period</h2>
