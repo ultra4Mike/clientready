@@ -36,24 +36,24 @@ export default function HomePage() {
         </div>
       </header>
 
-      <section className="mx-auto max-w-6xl px-4 py-12 sm:py-20">
+      <section className="mx-auto max-w-6xl px-4 py-12 sm:py-20 lg:text-center">
         <p className="inline-flex rounded-full border border-teal-500/30 bg-teal-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-teal-600 dark:text-teal-300">For small businesses</p>
-        <h1 className="mt-4 max-w-3xl text-4xl font-bold leading-tight tracking-tight md:text-6xl">Get paid. Stay client-ready.</h1>
-        <p className="mt-5 max-w-2xl text-lg leading-8 text-[var(--cr-muted)]">
+        <h1 className="mt-4 max-w-3xl text-4xl lg:mx-auto font-bold leading-tight tracking-tight md:text-6xl">Get paid. Stay client-ready.</h1>
+        <p className="mt-5 max-w-2xl text-lg lg:mx-auto leading-8 text-[var(--cr-muted)]">
           The customer gets a clean invoice. You keep the crew, the job costs, and a year log in one place.
         </p>
-        <ul className="mt-5 max-w-2xl list-inside list-disc space-y-2 text-sm text-[var(--cr-muted)] marker:text-teal-500">
+        <ul className="mt-5 max-w-2xl text-left lg:mx-auto lg:w-fit list-inside list-disc space-y-2 text-sm text-[var(--cr-muted)] marker:text-teal-500">
           <li>One page for proposals and invoices. Turn a proposal into an invoice in one click.</li>
           <li>Crew hours and the saved rate fill the wage total. A raise does not change old jobs.</li>
           <li>Paid invoices, expenses, and pay in one year log. Your phone and computer share the account.</li>
         </ul>
-        <div className="mt-8 grid gap-3 sm:flex sm:flex-wrap sm:items-center">
+        <div className="mt-8 grid gap-3 sm:flex sm:flex-wrap sm:items-center lg:justify-center">
           <a href="/signup" className="rounded-lg bg-teal-500 px-6 py-3 text-center text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">Start free</a>
           <a href="#pricing" className="rounded-lg border border-teal-400/40 px-6 py-3 text-center text-sm font-medium transition hover:border-teal-400">See pricing</a>
         </div>
         <p className="mt-3 text-sm text-[var(--cr-muted)]">14-day trial. No card to start.</p>
 
-<div className="mt-12 grid gap-6 lg:grid-cols-2">
+<div className="mt-12 grid gap-6 text-left lg:grid-cols-2 lg:items-stretch">
           <div className="sample-sheet rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <p className="muted text-xs uppercase tracking-wide">What the customer sees</p>
             <div className="mt-2 flex items-start justify-between">
@@ -96,18 +96,18 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-6xl gap-4 px-4 pb-16 sm:grid-cols-3 sm:pb-20">
-        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
+      <section className="mx-auto grid max-w-6xl auto-rows-fr gap-4 px-4 pb-16 sm:grid-cols-3 sm:pb-20">
+        <div className="h-full rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
           <p className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-teal-500/15 text-sm font-bold text-teal-600 dark:text-teal-300">1</p>
           <h2 className="mt-3 font-semibold">Write the proposal</h2>
           <p className="mt-2 text-sm text-[var(--cr-muted)]">Price the job. Your costs stay on your side. Turn it into an invoice when they say yes.</p>
         </div>
-        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
+        <div className="h-full rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
           <p className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-teal-500/15 text-sm font-bold text-teal-600 dark:text-teal-300">2</p>
           <h2 className="mt-3 font-semibold">Send the invoice</h2>
           <p className="mt-2 text-sm text-[var(--cr-muted)]">Add the crew. Hours and the saved rate fill the wage total.</p>
         </div>
-        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
+        <div className="h-full rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
           <p className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-teal-500/15 text-sm font-bold text-teal-600 dark:text-teal-300">3</p>
           <h2 className="mt-3 font-semibold">Mark it paid</h2>
           <p className="mt-2 text-sm text-[var(--cr-muted)]">Record the payment. The year log keeps the receipt and the pay.</p>
@@ -133,7 +133,7 @@ export default function HomePage() {
             <p className="mt-3 text-sm text-[var(--cr-muted)]">Same tools, paid ahead.</p>
           </div>
         </div>
-        <p className="mt-4 text-sm text-[var(--cr-muted)]">
+        <p className="mx-auto mt-5 max-w-2xl text-center text-sm text-[var(--cr-muted)]">
           A raise changes the next job only. The year packet is a log, not a tax return. Checkout comes later.
         </p>
       </section>
