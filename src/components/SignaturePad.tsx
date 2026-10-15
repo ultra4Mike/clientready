@@ -108,7 +108,7 @@ export default function SignaturePad({ value, onChange, defaultName = "" }: Prop
       </div>
       <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder={defaultName ? `Signer name (${defaultName})` : "Signer name"} value={signerName} onChange={(event) => setSignerName(event.target.value)} />
       {mode === "drawn" ? (
-        <div className="sig-pad-surface w-full max-w-[400px] rounded-lg border-2 border-dashed border-teal-500/50 bg-white shadow-inner">
+        <div className="sig-pad-surface w-full rounded-lg border-2 border-dashed border-teal-500/50 bg-white shadow-inner">
         <canvas
           ref={canvasRef}
           width={WIDTH}
