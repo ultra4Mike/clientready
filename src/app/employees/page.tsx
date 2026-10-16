@@ -237,7 +237,7 @@ export default function EmployeesPage() {
             <p className="text-base font-semibold">{person.name} <span className="font-medium text-teal-600 dark:text-teal-300">· ${Number(person.rate || 0).toFixed(2)}/hr</span></p>
             <p className="text-sm text-[var(--cr-muted)]">
               {person.kind} · {person.role || "No role"} · {person.active ? "Active" : "Inactive"}
-              {person.hireDate ? ` · hired ${person.hireDate}` : ""}
+              {person.hireDate ? <> · <span className="whitespace-nowrap">hired {person.hireDate}</span></> : ""}
             </p>
             <p className="mt-1 text-sm text-[var(--cr-muted)]">{person.email || "No login email"}</p>
             <p className="text-sm text-[var(--cr-muted)]">{person.phone}</p>
