@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import LegalLinks from "@/components/LegalLinks";
 import { FormEvent, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { loadAccountIntoCache } from "@/lib/account-cache";
@@ -52,6 +53,7 @@ export default function SignupPage() {
         <button type="submit" disabled={busy} className="min-h-11 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-60">
           {busy ? "Creating account" : "Sign up"}
         </button>
+        <LegalLinks prefix="By signing up you agree to the" className="text-center" />
       </form>
       {message && <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-300">{message}</p>}
       </div>

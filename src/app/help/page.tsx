@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
+import LegalLinks from "@/components/LegalLinks";
 import { HELP_ARTICLES, HELP_CATEGORIES, SUPPORT_EMAIL, type HelpArticle } from "@/lib/help/articles";
 
 const byId = new Map(HELP_ARTICLES.map((a) => [a.id, a]));
@@ -67,6 +68,7 @@ export default function HelpPage() {
       <div className="mt-8 rounded-xl border border-teal-500/20 p-4 text-sm">
         Still need help? <a className="font-semibold text-teal-600 dark:text-teal-300" href={`mailto:${SUPPORT_EMAIL}?subject=ClientReady%20help`}>Email support</a>
       </div>
+      <LegalLinks className="mt-4 text-center" />
     </AppShell>
   );
 }

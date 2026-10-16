@@ -246,6 +246,9 @@ export const HELP_ARTICLES: HelpArticle[] = [
     steps: ["Open Settings.", "Find Login password and choose a new one.", "Tap Update password."] },
   { id: "logout", category: "Account", question: "How do I log out?",
     steps: ["Desktop: tap Log out at the top right.", "Phone: tap More, then Log out under Settings."], tips: ["On a shared device, make sure the pill shows Synced before logging out."] },
+  { id: "privacy-terms", category: "Account", question: "Where can I find the Privacy Policy and Terms?",
+    steps: ["Open Settings and look at the Legal row at the bottom, or scroll to the bottom of this Help page.", "They're also linked on the login and sign-up pages and on the home page.", "Your clients see the same links at the bottom of approval links and the client portal."],
+    tips: ["The Privacy Policy is currently a draft pending owner/legal review."], keywords: ["privacy", "terms", "legal", "policy", "gdpr", "data"] },
   { id: "contact-support", category: "Account", question: "How do I contact support?",
     steps: ["Scroll to the bottom of this Help page and tap Email support.", "Include what you tapped, what you expected, and the document number if there is one."], keywords: ["help", "contact"] },
 

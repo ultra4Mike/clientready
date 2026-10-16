@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import LegalLinks from "@/components/LegalLinks";
 import { approveByToken, fetchApprovalDoc, readApproval, type Approval } from "@/lib/approval";
 import { amountOf, documentTotals, discountLabel } from "@/lib/discount";
 import { balanceDue, paidTotal, readPayments } from "@/lib/payments";
@@ -129,6 +130,7 @@ export default function ApprovePage() {
         </h1>
         {state === "missing" && <p className="mt-2 text-sm">It may have been turned off or replaced. Ask the sender for a new link.</p>}
         {state === "error" && <p className="mt-2 text-sm">Check your connection and reload the page.</p>}
+        <LegalLinks className="mt-8 text-center" />
       </main>
     );
   }
@@ -265,6 +267,7 @@ export default function ApprovePage() {
         </div>
         {!isProposal && (token || portal) && <RatingBox target={{ token, portal }} />}
       </section>
+      <LegalLinks className="mt-8 text-center" />
     </main>
   );
 }

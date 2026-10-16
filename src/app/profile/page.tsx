@@ -1,6 +1,7 @@
 "use client";
 
 import TimezoneCombobox from "@/components/TimezoneCombobox";
+import LegalLinks from "@/components/LegalLinks";
 import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import StripeSetup from "@/components/StripeSetup";
@@ -263,6 +264,10 @@ export default function ProfilePage() {
         {passwordMessage && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-[var(--cr-muted)]">{passwordMessage}</p>}
       </form>
         </div>
+      </div>
+      <div data-testid="settings-legal" className="mt-6 flex items-center gap-3 border-t border-teal-500/15 pt-4 text-sm">
+        <span className="font-medium text-[var(--cr-muted)]">Legal</span>
+        <LegalLinks className="text-sm" />
       </div>
     </AppShell>
   );

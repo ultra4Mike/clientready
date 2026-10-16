@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import LegalLinks from "@/components/LegalLinks";
 import { FormEvent, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { loadAccountIntoCache } from "@/lib/account-cache";
@@ -71,6 +72,7 @@ export default function LoginPage() {
       <p className="mt-6 text-center text-sm text-[var(--cr-muted)]">
         New here? <a href="/signup" className="font-semibold text-teal-600 hover:underline">Create an account</a>
       </p>
+      <LegalLinks className="mt-4 text-center" />
       </div>
     </main>
   );
