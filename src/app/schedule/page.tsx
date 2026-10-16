@@ -81,7 +81,7 @@ export default function SchedulePage() {
           <a href="/dashboard" className="flex items-center gap-2 text-sm font-medium transition hover:text-teal-500"><span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-teal-500 text-sm font-bold text-slate-950!">C</span>
             Back to dashboard
           </a>
-          <a href="/calendar" className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400">
+          <a href="/calendar" className="inline-flex min-h-11 items-center rounded-lg border border-teal-500/30 px-4 text-sm font-medium transition hover:border-teal-400">
             Calendar
           </a>
         </div>
