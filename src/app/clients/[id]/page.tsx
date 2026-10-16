@@ -73,18 +73,18 @@ export default function ClientRecordPage() {
         {client && view && (
           <>
             <div className="mb-5 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-6">
-              <Link href="/clients" className="mb-3 inline-flex text-xs font-medium text-[var(--cr-muted)] transition hover:text-teal-500">← All clients</Link>
+              <Link href="/clients" className="-ml-1 mb-2 inline-flex min-h-11 items-center px-1 text-xs font-medium text-[var(--cr-muted)] transition hover:text-teal-500">← All clients</Link>
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex min-w-0 items-center gap-4">
-                  <span aria-hidden="true" className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-teal-500/15 text-xl font-bold text-teal-700 dark:text-teal-300">{(client.name || "?").trim().charAt(0).toUpperCase()}</span>
+                  <span aria-hidden="true" className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-teal-400/30 to-teal-600/20 text-lg font-bold uppercase tracking-wide text-teal-700 ring-1 ring-teal-500/25 dark:text-teal-200">{(client.name || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("") || "?"}</span>
                   <div className="min-w-0 [&>[data-page-header]]:mb-1 [&>[data-page-header]]:border-0 [&>[data-page-header]]:pb-0 [&_h2]:break-words">
                     <PageHeader title={client.name} subtitle={[client.company, client.email, client.phone].filter(Boolean).join(" · ")} />
                     {client.address && <p className="text-sm text-[var(--cr-muted)]" data-testid="client-address">{client.address}</p>}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0 sm:flex-wrap sm:justify-end">
-                  {client.phone && <a href={`tel:${client.phone}`} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-teal-500/30 px-4 text-sm font-medium transition hover:border-teal-400 sm:min-h-10">Call</a>}
-                  {client.email && <a href={`mailto:${client.email}`} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-teal-500/30 px-4 text-sm font-medium transition hover:border-teal-400 sm:min-h-10">Email</a>}
+                  {client.phone && <a href={`tel:${client.phone}`} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-teal-500/30 gap-1.5 px-4 text-sm font-medium transition hover:border-teal-400 sm:min-h-10"><span aria-hidden="true">📞</span>Call</a>}
+                  {client.email && <a href={`mailto:${client.email}`} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-teal-500/30 gap-1.5 px-4 text-sm font-medium transition hover:border-teal-400 sm:min-h-10"><span aria-hidden="true">✉️</span>Email</a>}
                   <a href={`/invoice?clientId=${encodeURIComponent(client.id)}`} data-testid="client-new-invoice" className="inline-flex min-h-11 items-center justify-center rounded-lg bg-teal-500 px-4 text-sm font-semibold text-slate-950! transition hover:bg-teal-400 sm:min-h-10">New invoice</a>
                   <a href={`/invoice?clientId=${encodeURIComponent(client.id)}&type=proposal`} data-testid="client-new-proposal" className="inline-flex min-h-11 items-center justify-center rounded-lg border border-teal-500/30 px-4 text-sm font-medium transition hover:border-teal-400 sm:min-h-10">New proposal</a>
                 </div>
