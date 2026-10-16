@@ -6,6 +6,7 @@ import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { supabase } from "@/lib/supabase";
 import { buildReport, MONTHS, reportYears } from "@/lib/reports";
+import { csvText, downloadCsv } from "@/lib/csv";
 import { taxCategories } from "@/lib/tax-categories";
 import { mileage, totalMiles } from "@/lib/mileage";
 
@@ -54,6 +55,10 @@ export default function ReportsPage() {
             {years.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
         </label>
+        <div className="flex flex-wrap gap-2 text-sm">
+          <button type="button" data-testid="report-export-months" className="min-h-11 rounded-lg border border-teal-500/30 px-3" onClick={() => downloadCsv(`report-${year}-months.csv`, csvText(["Month", "Billed", "Collected", "Job costs", "Crew receipts"], [...report.months.map((row) => [MONTHS[row.month], row.billed.toFixed(2), row.collected.toFixed(2), row.jobCosts.toFixed(2), row.crewReceipts.toFixed(2)]), ["Total", report.totals.billed.toFixed(2), report.totals.collected.toFixed(2), report.totals.jobCosts.toFixed(2), report.totals.crewReceipts.toFixed(2)]]))}>Export months (CSV)</button>
+          <button type="button" data-testid="report-export-jobs" disabled={!report.jobs.length} className="min-h-11 rounded-lg border border-teal-500/30 px-3 disabled:opacity-50" onClick={() => downloadCsv(`report-${year}-jobs.csv`, csvText(["Invoice", "Client", "Date", "Total", "Job cost", "Profit"], report.jobs.map((job) => [job.number, job.client, job.date.slice(0, 10), job.total.toFixed(2), job.cost.toFixed(2), job.profit.toFixed(2)])))}>Export jobs (CSV)</button>
+        </div>
 
         <div className="overflow-x-auto">
           <table data-testid="report-months" className="w-full text-sm">
