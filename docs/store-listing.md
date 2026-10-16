@@ -63,3 +63,8 @@ The iOS app is a WebView loading the live site, which Apple often rejects under 
 - Deep links (clientready:// and Universal Links / Associated Domains, already in 36f18fc)
 - Native back/navigation handling and safe-area layout
 Also give the reviewer a demo login with sample data. Each added plugin means updating the privacy answers above.
+
+## Subscription flow decision (owner-confirmed 2026-10-16)
+- Website (clientreadyapp.com): pricing shown on home page and /plans; plan buttons go to trial sign-up now, and to Stripe subscription checkout once the owner's Stripe account is set up.
+- iOS/Android apps: login only. No prices, no subscribe/buy buttons, no links to purchase for the first submission. Users subscribe on the website, then log in to the app.
+- Revisit after approval: a "Manage plan" link that opens the website (US external-link rules changed in 2025; outside the US stay strict).
