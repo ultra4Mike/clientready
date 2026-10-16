@@ -518,7 +518,7 @@ export default function CrewPage() {
                 <div className={cardClass} data-testid="crew-route">
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="font-semibold">Today&apos;s route</h3>
-                    <a href={route.url} target="_blank" rel="noreferrer" className="rounded-xl bg-teal-500 px-3 py-2 text-sm font-semibold text-slate-950" data-testid="crew-route-open">Open route in Maps</a>
+                    <a href={route.url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-teal-500 px-4 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400" data-testid="crew-route-open">Open route in Maps</a>
                   </div>
                   <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm">
                     {route.stops.map((card) => <li key={card.id} data-testid={`crew-route-stop-${card.id}`}>{card.start_time ? `${timeLabel(card.start_time)} · ` : ""}{card.client_name} — {card.client_address}</li>)}
