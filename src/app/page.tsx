@@ -30,8 +30,8 @@ export default function HomePage() {
           </a>
           <div className="flex items-center gap-2 text-sm sm:gap-4">
             <button type="button" onClick={toggleTheme} className="hidden font-medium transition hover:text-teal-500 sm:inline">{theme === "dark" ? "Light" : "Dark"}</button>
-            <a href="/login" className="inline-flex min-h-10 items-center rounded-lg border border-teal-500/30 px-3 font-medium transition hover:border-teal-400 hover:text-teal-500 sm:min-h-0 sm:border-0 sm:px-0">Log in</a>
-            <a href="/signup" className="inline-flex min-h-10 items-center whitespace-nowrap rounded-lg bg-teal-500 px-3 py-2 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 sm:px-4">Start free</a>
+            <a href="/login" className="inline-flex min-h-11 items-center rounded-lg border border-teal-500/30 px-3 font-medium transition hover:border-teal-400 hover:text-teal-500 sm:min-h-0 sm:border-0 sm:px-0">Log in</a>
+            <a href="/signup" className="inline-flex min-h-11 items-center whitespace-nowrap rounded-lg bg-teal-500 px-3 py-2 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 sm:px-4">Start free</a>
           </div>
         </div>
       </header>
