@@ -44,6 +44,17 @@ export const HELP_ARTICLES: HelpArticle[] = [
     summary: "A quick look at what needs your attention today.",
     steps: ["Open Dashboard.", "Review items like Needs review, unpaid invoices and upcoming jobs.", "Tap any item to open it."], related: ["needs-review"] },
 
+  { id: "first-run-tour", category: "Getting started", question: "I just signed up. What's the quickest way to get going?",
+    summary: "Follow the Getting started card on the Dashboard; it ticks off each step as you finish it.",
+    steps: ["Open Dashboard and find the Getting started card.", "Add your logo: opens Settings, where you fill in Business info and Save.", "Add your first client on Clients.", "Send your first invoice: tap New invoice, add items, Save document, then Share approval link or Email.", "Set how customers pay: in Settings, turn on Payment methods (Zelle, Venmo, Cash App, PayPal.me, check or bank) and tap Save payment methods.", "Record your first payment from Collect when the money arrives."],
+    tips: ["The card turns into \"You are all set up.\" once every step is done."],
+    related: ["getting-started-checklist", "business-info", "first-invoice", "payment-methods-setup"], keywords: ["new", "tour", "onboarding", "first run", "start"] },
+  { id: "payment-methods-setup", category: "Getting started", question: "How do I tell clients how to pay me?",
+    summary: "Turn on the payment methods you accept; clients see them on invoices, approval links and the portal.",
+    steps: ["Open Settings and scroll to Payment methods.", "Tick each method you accept and fill in your handle, link or instructions.", "Tap Save payment methods.", "When a client pays, open the invoice, tap Mark paid and choose the method."],
+    tips: ["Money goes straight to you. ClientReady never holds funds and never marks an invoice paid on its own."],
+    related: ["first-run-tour", "manual-payment"], keywords: ["zelle", "venmo", "cash app", "paypal", "check", "bank", "ach", "pay"] },
+
   // ── Invoices ────────────────────────────────────────────────────
   { id: "invoice-what", category: "Invoices", question: "What is an invoice in ClientReady?",
     summary: "A bill for work, with line items, tax, discounts, payments and what's still owed.",
@@ -249,6 +260,11 @@ export const HELP_ARTICLES: HelpArticle[] = [
   { id: "privacy-terms", category: "Account", question: "Where can I find the Privacy Policy and Terms?",
     steps: ["Open Settings and look at the Legal row at the bottom, or scroll to the bottom of this Help page.", "They're also linked on the login and sign-up pages and on the home page.", "Your clients see the same links at the bottom of approval links and the client portal."],
     tips: ["The Privacy Policy is currently a draft pending owner/legal review."], keywords: ["privacy", "terms", "legal", "policy", "gdpr", "data"] },
+  { id: "delete-account", category: "Account", question: "How do I delete my account?",
+    summary: "For now, email support from your sign-in address and ask for deletion.",
+    steps: ["Download a backup from the Backup page if you want to keep a copy.", "Email support from the address you sign in with and ask to delete your account.", "We confirm the request, then delete your login and business data and turn off your shared links."],
+    tips: ["Crew you added lose access; their own logins are not deleted."],
+    related: ["privacy-terms", "contact-support"], keywords: ["delete", "close", "remove account", "cancel"] },
   { id: "contact-support", category: "Account", question: "How do I contact support?",
     steps: ["Scroll to the bottom of this Help page and tap Email support.", "Include what you tapped, what you expected, and the document number if there is one."], keywords: ["help", "contact"] },
 

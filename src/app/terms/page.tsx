@@ -46,6 +46,12 @@ const SECTIONS: { title: string; body: string[] }[] = [
   { title: "12. Ending your account and exporting data", body: [
     "You can stop using ClientReady at any time. Before you close your account, download your data from the Backup page. We may suspend or end accounts that break these Terms. After an account is closed, we may delete its data after [Data retention period].",
   ] },
+  { title: "12a. Account deletion", body: [
+    "You can ask us to delete your account and its data at any time. Until in-app deletion is available, email [Support email to confirm] from the address you sign in with and ask to delete your account; we will confirm the request and complete it within [Deletion response time]. When in-app deletion is available it will be under Settings, and a web page at [Account deletion URL] will let you request deletion without the app.",
+    "Deleting an owner account deletes your login, business profile, clients, proposals, invoices, recorded payments, schedules, crew time, expenses, job photos and payment-method settings, and turns off every approval link and client portal you shared. Crew members you added lose access to your jobs; their own logins are not deleted. Data saved only on your device stays there until you clear it or uninstall the app.",
+    "Some records may be kept for up to [Data retention period] in backups, or longer where the law requires (for example tax or fraud-prevention records). Payment providers you connected keep their own records under their own terms; deleting ClientReady does not close those accounts.",
+    "Your clients' information belongs to your business records. If one of your clients asks us to delete their information, we will refer them to you, and you can remove it from Clients and Documents.",
+  ] },
   { title: "13. Changes to these Terms", body: [
     "We may update these Terms. We'll change the date below and, for important changes, tell you in the app or by email. Using ClientReady after a change means you accept the updated Terms.",
   ] },

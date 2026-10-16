@@ -44,6 +44,33 @@ export default function PrivacyPage() {
           reference). If email sending is turned on, emails you choose to send go through our email
           provider (Resend), with replies going to your own address.
         </p>
+        <h2 className="mt-6 text-lg font-semibold text-slate-900">Account deletion</h2>
+        <p className="mt-2">
+          <strong>How to delete:</strong> until in-app deletion is available, email [Support email to confirm]
+          from the address you sign in with and ask us to delete your account. We confirm the request and
+          complete it within [Deletion response time]. When in-app deletion ships it will be in Settings,
+          and you will also be able to request deletion on the web at [Account deletion URL].
+        </p>
+        <p className="mt-2">
+          <strong>What is deleted:</strong> your login, business profile, clients, proposals, invoices,
+          recorded payments, schedules, crew time and expenses, job photos and payment-method settings.
+          Approval links and client portals you shared stop working. Copies saved only on your device stay
+          there until you clear the app&apos;s data or uninstall it, so download a backup first if you want one.
+        </p>
+        <p className="mt-2">
+          <strong>Retention:</strong> some data may remain in backups for up to [Data retention period], or
+          longer where the law requires. Emails already sent and records held by payment providers you
+          connected are kept under those providers&apos; own policies.
+        </p>
+        <p className="mt-2">
+          <strong>Crew:</strong> crew members you added lose access to your jobs, hours and expenses. Their
+          own logins are not deleted; a crew member can ask us to delete their own account the same way.
+        </p>
+        <p className="mt-2">
+          <strong>Your clients:</strong> client details are kept on behalf of the business that entered them.
+          If a client asks us to delete their information, we refer the request to that business, which can
+          remove it from Clients and Documents.
+        </p>
         <h2 className="mt-6 text-lg font-semibold text-slate-900">Your responsibilities</h2>
         <p className="mt-2">
           We do not sell your client list. You should not upload information you are not allowed to keep
