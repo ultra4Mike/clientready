@@ -15,6 +15,7 @@ function lateFeeFields(row: Record<string, unknown>) {
     lateFeeType: has ? row.late_fee_type || "off" : local.lateFeeType || "off",
     lateFeeValue: has ? row.late_fee_value ?? "" : local.lateFeeValue ?? "",
     lateFeeGraceDays: has ? row.late_fee_grace_days ?? "0" : local.lateFeeGraceDays ?? "0",
+    reviewLink: "review_link" in row ? row.review_link ?? "" : local.reviewLink ?? "",
   };
 }
 import { DOCS_KEY, mergeDocs, OWNER_KEY, parkDocsFor, parkUnsyncedDocs, syncLocalDocs, takeParkedDocs } from "@/lib/doc-sync";

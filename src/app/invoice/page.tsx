@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import PortalShare from "@/components/PortalShare";
 import Section, { SectionDefaults, useOpenedExisting } from "@/components/Section";
 import EmailComposer from "@/components/EmailComposer";
@@ -17,6 +18,7 @@ import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
 import { getTrialState } from "@/lib/trial";
 import { syncClientContact } from "@/lib/client-sync";
+import { noteReviewAsked, reviewAskedAt, reviewMailHref, reviewMessage, reviewSmsHref } from "@/lib/review-request";
 import { readLateFeeSettings, suggestedLateFee, type LateFeeSettings } from "@/lib/late-fees";
 import { saveCrewJobs } from "@/lib/crew";
 import { balanceDue, paidTotal, paymentFields, paymentMethods, readPayments, type Payment } from "@/lib/payments";
@@ -212,6 +214,9 @@ export default function NewInvoicePage() {
   const [daysLeft, setDaysLeft] = useState(14);
 
   const isProposal = docKind === "proposal";
+  const [reviewLink, setReviewLink] = useState("");
+  const [reviewAsked, setReviewAsked] = useState("");
+  const [reviewCopied, setReviewCopied] = useState(false);
   const [lateFeeSettings, setLateFeeSettings] = useState<LateFeeSettings>(() => readLateFeeSettings(null));
 
   useEffect(() => {
@@ -226,6 +231,7 @@ export default function NewInvoicePage() {
     setLogo(profile.logo || "");
     setSetAsidePercent(profile.setAsidePercent || "30");
     setLateFeeSettings(readLateFeeSettings(profile));
+    setReviewLink(profile.reviewLink || "");
   }, []);
 
   useEffect(() => {
@@ -1076,6 +1082,26 @@ export default function NewInvoicePage() {
                 <button type="button" data-testid="late-fee-add" onClick={addLateFee} className="mt-1 rounded-lg border border-amber-500/50 px-3 py-1.5 text-sm font-medium max-sm:min-h-11">Add late fee line</button>
               </div>
             )}
+            {!isProposal && docId && status === "paid" && (() => {
+              const asked = reviewAsked || reviewAskedAt(docId);
+              if (!reviewLink.trim()) return <p className="w-full text-xs text-[var(--cr-muted)]" data-testid="review-request-setup">Paid. Add a review link in <Link href="/profile" className="underline">Settings</Link> to ask {clientName.trim() || "this client"} for a review.</p>;
+              const body = reviewMessage(clientName, businessName, reviewLink);
+              const sms = reviewSmsHref(clientPhone, body);
+              const mail = reviewMailHref(clientEmail, businessName, body);
+              const opened = () => setReviewAsked(noteReviewAsked(docId));
+              return (
+                <div className="w-full rounded-lg border border-teal-500/30 px-3 py-2 text-sm" data-testid="review-request" data-asked={asked ? "1" : "0"}>
+                  <p className="font-medium">Ask {clientName.trim() || "your client"} for a review</p>
+                  <p className="mt-1 text-xs text-[var(--cr-muted)]" data-testid="review-message">{body}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {sms && <a href={sms} onClick={opened} data-testid="review-sms" className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium max-sm:min-h-11">Text</a>}
+                    {mail && <a href={mail} onClick={opened} data-testid="review-email" className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium max-sm:min-h-11">Email</a>}
+                    <button type="button" data-testid="review-copy" className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium max-sm:min-h-11" onClick={() => { void navigator.clipboard?.writeText(body).catch(() => {}); setReviewCopied(true); opened(); }}>{reviewCopied ? "Copied" : "Copy"}</button>
+                  </div>
+                  {asked && <p className="mt-1 text-xs text-[var(--cr-muted)]" data-testid="review-asked">Opened {new Date(asked).toLocaleDateString("en-US", { month: "short", day: "numeric" })}. You send it yourself.</p>}
+                </div>
+              );
+            })()}
             {!locked && !isProposal && docId && status !== "paid" && totals.balance > 0.004 && <button type="button" data-testid="mark-paid-cash" onClick={markPaidCash} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Mark paid in cash (${totals.balance.toFixed(2)})</button>}
             {!isProposal && docId && status !== "draft" && status !== "paid" && totals.balance > 0 && <button type="button" data-testid="invoice-reminder" onClick={() => setReminderOpen((open) => !open)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Reminder</button>}
           </div>
