@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
+import EmptyState from "@/components/EmptyState";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import PortalShare from "@/components/PortalShare";
@@ -218,14 +219,14 @@ export default function ClientsPage() {
                 setEditingId("");
                 setForm(emptyClient);
               }}
-              className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50"
+              className="min-h-11 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50"
             >
               {showForm ? "Hide form" : "Add new client"}
             </button>}
         />
 
         <input
-          className="mb-6 w-full rounded-xl border border-teal-500/30 bg-[var(--cr-card)] px-4 py-3 shadow-sm text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
+          className="mb-6 min-h-11 w-full rounded-xl border border-teal-500/30 bg-[var(--cr-card)] px-4 py-3 text-base shadow-sm sm:text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
           placeholder="Search name, company, email, or phone"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
@@ -263,33 +264,33 @@ export default function ClientsPage() {
 
         {message && <p className="mb-4 rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-slate-600">{message}</p>}
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] shadow-sm">
           <div className="hidden gap-4 border-b border-slate-200 bg-teal-500/5 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600 md:grid md:grid-cols-[minmax(0,1.6fr)_minmax(0,1.6fr)_9rem_minmax(0,1.2fr)_10rem]">
             <span>Client</span><span>Contact</span><span>Next visit</span><span>Notes</span><span className="text-right">Actions</span>
           </div>
-          {clients.length === 0 && <p className="p-10 text-center text-sm text-slate-600">No saved clients yet.</p>}
+          {clients.length === 0 && <EmptyState icon="👤" title="No saved clients yet." line="Add a client to reuse their details on invoices." />}
           {clients.length > 0 && visible.length === 0 && <p className="p-10 text-center text-sm text-slate-600">No clients match that search.</p>}
           {visible.map((client) => (
             <div key={client.id} className="grid gap-3 border-b border-slate-200 px-4 py-4 transition last:border-b-0 hover:bg-teal-500/5 md:items-center md:gap-4 md:px-5 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1.6fr)_9rem_minmax(0,1.2fr)_10rem]">
               <div className="flex min-w-0 items-center gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-500/15 text-sm font-bold uppercase text-teal-700 dark:text-teal-300">{client.name.slice(0, 1)}</span>
+                <span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-teal-400/30 to-teal-600/20 text-sm font-bold uppercase tracking-wide text-teal-700 ring-1 ring-teal-500/25 dark:text-teal-200">{client.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("") || "?"}</span>
                 <div className="min-w-0">
                   <p className="truncate font-semibold"><Link href={`/clients/${encodeURIComponent(client.id)}`} data-testid="client-open" className="hover:underline">{client.name}</Link></p>
                   {client.company && <p className="truncate text-sm text-slate-600">{client.company}</p>}
                 </div>
               </div>
-              <div className="min-w-0 text-sm text-slate-600">
-                <p className="truncate">{client.email}</p>
-                {client.phone && <p className="truncate">{client.phone}</p>}
+              <div className="flex min-w-0 flex-wrap gap-2 text-sm text-slate-600 md:block md:space-y-0.5">
+                {client.phone && <a href={`tel:${client.phone.replace(/[^\d+]/g, "")}`} className="inline-flex min-h-11 min-w-0 max-w-full items-center gap-1.5 rounded-lg border border-teal-500/30 px-3 font-medium transition hover:border-teal-400 md:flex md:min-h-0 md:border-0 md:px-0 md:font-normal md:hover:text-teal-600"><span aria-hidden="true">📞</span><span className="truncate">{client.phone}</span></a>}
+                {client.email && <a href={`mailto:${client.email}`} className="inline-flex min-h-11 min-w-0 max-w-full items-center gap-1.5 rounded-lg border border-teal-500/30 px-3 font-medium transition hover:border-teal-400 md:flex md:min-h-0 md:border-0 md:px-0 md:font-normal md:hover:text-teal-600"><span aria-hidden="true">✉️</span><span className="truncate">{client.email}</span></a>}
               </div>
               <div className="text-sm">
                 {client.nextVisit ? <p className="font-medium"><span className="md:hidden">Next visit: </span>{client.nextVisit}</p> : <p className="hidden text-slate-500 md:block">—</p>}
                 {client.visitTime && <p className="text-slate-600">{client.visitTime}</p>}
               </div>
               <p className="line-clamp-2 text-sm text-slate-600">{client.notes}</p>
-              <div className="flex gap-2 md:justify-end">
-                <button type="button" aria-expanded={portalFor === client.id} data-testid="client-portal-toggle" onClick={() => setPortalFor(portalFor === client.id ? "" : client.id)} className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium transition sm:min-h-0 ${portalFor === client.id ? "border-teal-400 bg-teal-500/15 text-teal-700 dark:text-teal-300" : "border-slate-300 hover:border-teal-500"}`}><span aria-hidden="true">🔗</span>Portal</button>
-                <button type="button" onClick={() => editClient(client)} className="min-h-11 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium transition hover:border-teal-500 sm:min-h-0">Edit</button>
+              <div className="grid grid-cols-3 gap-2 md:flex md:justify-end">
+                <button type="button" aria-expanded={portalFor === client.id} data-testid="client-portal-toggle" onClick={() => setPortalFor(portalFor === client.id ? "" : client.id)} className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition sm:min-h-0 ${portalFor === client.id ? "border-teal-400 bg-teal-500/15 text-teal-700 dark:text-teal-300" : "border-slate-300 hover:border-teal-500"}`}><span aria-hidden="true">🔗</span>Portal</button>
+                <button type="button" onClick={() => editClient(client)} className="min-h-11 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium transition hover:border-teal-500 sm:min-h-10">Edit</button>
                 <button type="button" onClick={() => removeClient(client.id)} className="min-h-11 rounded-lg border border-rose-500/40 px-3 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10 sm:min-h-10 dark:text-rose-300">Remove</button>
               </div>
               {portalFor === client.id && (
