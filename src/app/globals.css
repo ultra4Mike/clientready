@@ -436,7 +436,7 @@ html.dark .cr-text-warn { color: #fcd34d !important; }
 
 /* Safe areas (notch, home indicator, landscape sides) for standalone / store-app mode */
 .app-topbar { padding-top: max(0.375rem, env(safe-area-inset-top)); }
-.app-root, main { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+.app-root { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
 .mobile-savebar { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
 .quick-create-fab { right: max(1rem, env(safe-area-inset-right)); }
 @media (min-width: 900px) { .app-topbar { padding-top: max(0.75rem, env(safe-area-inset-top)); } }
