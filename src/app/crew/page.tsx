@@ -96,6 +96,12 @@ function routeStops(cards: Card[]) {
 }
 
 /** One card per job: schedule details (time, status, crew note) merged onto this worker's pay row. */
+/** "past" | "today" | "upcoming" | "undated" for a job date vs today (both YYYY-MM-DD, phone's local day). */
+function dayGroup(date: string, today: string) {
+  if (!date || !today) return "undated";
+  return date < today ? "past" : date === today ? "today" : "upcoming";
+}
+
 function buildCards(jobs: Job[]): Card[] {
   const cards: Card[] = [];
   for (const job of jobs) {
@@ -423,8 +429,10 @@ export default function CrewPage() {
     const total = mine.reduce((sum, entry) => sum + entryHours(entry, now), 0);
     const jobSpend = expenses.filter((item) => item.doc_id === card.doc_id);
     const mapUrl = card.client_address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(card.client_address)}` : "";
+    const when = dayGroup(card.job_date, today);
+    const past = when === "past";
     return (
-      <article key={`${card.id}`} className={cardClass} data-testid={`crew-card-${card.doc_id}`}>
+      <article key={`${card.id}`} className={`${cardClass}${past ? " opacity-80" : ""}`} data-testid={`crew-card-${card.doc_id}`} data-past={past ? "true" : "false"} data-today={when === "today" ? "true" : "false"} data-group={when} data-completed={status === "done" ? "true" : "false"}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-teal-600 dark:text-teal-300">
@@ -438,10 +446,10 @@ export default function CrewPage() {
 
         <div className="mt-3 grid grid-cols-2 gap-2 text-sm [&>*]:min-w-0 [&>*]:break-words">
           {card.client_phone
-            ? <a href={`tel:${card.client_phone}`} className="flex min-h-11 items-center justify-center rounded-xl border border-teal-500/30 px-3 py-2 text-center font-medium transition hover:border-teal-400 hover:bg-teal-500/10" data-testid="call">📞 Call {card.client_phone}</a>
+            ? <a href={`tel:${card.client_phone}`} className="flex min-h-11 items-center justify-center rounded-xl border border-teal-500/30 px-3 py-2 text-center font-medium transition hover:border-teal-400 hover:bg-teal-500/10" data-testid={`call-${card.doc_id}`} data-action="call">📞 Call {card.client_phone}</a>
             : <span className="flex min-h-11 items-center justify-center rounded-xl border border-dashed border-teal-500/20 px-3 py-2 text-center opacity-50">No phone</span>}
           {mapUrl
-            ? <a href={mapUrl} target="_blank" rel="noreferrer" className="flex min-h-11 items-center justify-center rounded-xl border border-teal-500/30 px-3 py-2 text-center font-medium transition hover:border-teal-400 hover:bg-teal-500/10" data-testid="map">📍 Map</a>
+            ? <a href={mapUrl} target="_blank" rel="noreferrer" className="flex min-h-11 items-center justify-center rounded-xl border border-teal-500/30 px-3 py-2 text-center font-medium transition hover:border-teal-400 hover:bg-teal-500/10" data-testid={`map-${card.doc_id}`} data-action="map">📍 Map</a>
             : <span className="flex min-h-11 items-center justify-center rounded-xl border border-dashed border-teal-500/20 px-3 py-2 text-center opacity-50">No address</span>}
         </div>
         {card.client_address && <p className="mt-2 text-sm text-[var(--cr-muted)]">{card.client_address}</p>}
@@ -516,6 +524,8 @@ export default function CrewPage() {
             </div>
             {running ? (
               <button type="button" disabled={busy !== ""} data-testid={`clock-out-${card.doc_id}`} onClick={() => act(`clock-${card.doc_id}`, () => crewClockOut(card.doc_id), "Clocked out.")} className="rounded-xl bg-amber-500 px-4 py-3 font-semibold text-slate-950!">Clock out</button>
+            ) : past ? (
+              <p data-testid={`past-state-${card.doc_id}`} data-completed={status === "done" ? "true" : "false"} className="rounded-xl border border-slate-300/60 px-3 py-2 text-sm font-semibold text-[var(--cr-muted)]">{status === "done" ? "✓ Completed" : "Past job"}</p>
             ) : (
               <button type="button" disabled={busy !== "" || Boolean(open)} data-testid={`clock-in-${card.doc_id}`} onClick={() => act(`clock-${card.doc_id}`, () => crewClockIn(card.doc_id), "Clocked in.")} className="rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! disabled:opacity-40">{open ? "On another job" : "Clock in"}</button>
             )}
@@ -616,7 +626,7 @@ export default function CrewPage() {
         </div>
         <nav className="mx-auto mt-3 grid max-w-3xl grid-cols-4 gap-1 rounded-xl border border-teal-500/20 bg-[var(--cr-card)] p-1 text-xs sm:text-sm" role="tablist">
           {tabs.map(([key, label]) => (
-            <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)} className={`rounded-lg px-1 py-2 font-medium transition ${tab === key ? "bg-teal-500 font-semibold text-slate-950! shadow-sm" : "hover:bg-teal-500/10"}`}>{label}</button>
+            <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => { setTab(key); window.scrollTo({ top: 0 }); }} className={`rounded-lg px-1 py-2 font-medium transition ${tab === key ? "bg-teal-500 font-semibold text-slate-950! shadow-sm" : "hover:bg-teal-500/10"}`}>{label}</button>
           ))}
         </nav>
       </header>
@@ -665,7 +675,7 @@ export default function CrewPage() {
               const list = weekCards.filter((card) => card.job_date === day);
               if (!list.length) return null;
               return (
-                <div key={day} className="space-y-2">
+                <div key={day} className="space-y-2" data-testid="week-day" data-day={day} data-group={dayGroup(day, today)}>
                   <h2 className={`text-sm font-semibold ${day === today ? "text-teal-600 dark:text-teal-300" : "text-[var(--cr-muted)]"}`}>{dayLabel(day)}{day === today ? " · Today" : ""}</h2>
                   {list.map(jobCard)}
                 </div>
@@ -673,7 +683,7 @@ export default function CrewPage() {
             })}
             {weekCards.length === 0 && <p className={`${cardClass} border-dashed py-10 text-center text-sm text-[var(--cr-muted)]`}>No jobs for you this week.</p>}
             {later.length > 0 && (
-              <div className="space-y-2" data-testid="coming-up">
+              <div className="space-y-2" data-testid="coming-up" data-group="upcoming">
                 <h2 className="text-sm font-semibold text-[var(--cr-muted)]">Coming up</h2>
                 {later.map(jobCard)}
               </div>
@@ -721,35 +731,35 @@ export default function CrewPage() {
             <button type="button" data-testid="report-open" onClick={() => setReportOpen(!reportOpen)} className="w-full rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">{reportOpen ? "Close" : "New job report"}</button>
             {reportOpen && (
               <form onSubmit={saveDraft} className={`${cardClass} space-y-3`}>
-                <select className={input} onChange={(event) => { const client = clients.find((item) => item.id === event.target.value); if (client) setForm({ ...form, clientName: client.name, clientPhone: client.phone || "", clientAddress: client.address || "" }); }}>
+                <select id="report-savedClient" name="savedClient" aria-label="Saved client" className={input} onChange={(event) => { const client = clients.find((item) => item.id === event.target.value); if (client) setForm({ ...form, clientName: client.name, clientPhone: client.phone || "", clientAddress: client.address || "" }); }}>
                   <option value="">Pick a client</option>
                   {clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
                 </select>
-                <input className={input} placeholder="Who it was for" value={form.clientName} onChange={(event) => setForm({ ...form, clientName: event.target.value })} />
-                <input className={input} placeholder="Phone" value={form.clientPhone} onChange={(event) => setForm({ ...form, clientPhone: event.target.value })} />
-                <input className={input} placeholder="Address" value={form.clientAddress} onChange={(event) => setForm({ ...form, clientAddress: event.target.value })} />
-                <textarea className={`${input} min-h-20`} placeholder="What was done" value={form.workDone} onChange={(event) => setForm({ ...form, workDone: event.target.value })} />
+                <input id="report-clientName" name="clientName" className={input} placeholder="Who it was for" value={form.clientName} onChange={(event) => setForm({ ...form, clientName: event.target.value })} />
+                <input id="report-clientPhone" name="clientPhone" className={input} placeholder="Phone" value={form.clientPhone} onChange={(event) => setForm({ ...form, clientPhone: event.target.value })} />
+                <input id="report-clientAddress" name="clientAddress" className={input} placeholder="Address" value={form.clientAddress} onChange={(event) => setForm({ ...form, clientAddress: event.target.value })} />
+                <textarea id="report-workDone" name="workDone" className={`${input} min-h-20`} placeholder="What was done" value={form.workDone} onChange={(event) => setForm({ ...form, workDone: event.target.value })} />
                 <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
-                  <label className="space-y-1 text-sm font-medium">Date<input type="date" className={input} value={form.workDate} onChange={(event) => setForm({ ...form, workDate: event.target.value })} /></label>
-                  <label className="space-y-1 text-sm font-medium">Hours<input className={input} value={form.hours} onChange={(event) => setForm({ ...form, hours: event.target.value })} /></label>
-                  <label className="space-y-1 text-sm font-medium">Start<input type="time" className={input} value={form.startTime} onChange={(event) => setForm({ ...form, startTime: event.target.value })} /></label>
-                  <label className="space-y-1 text-sm font-medium">End<input type="time" className={input} value={form.endTime} onChange={(event) => setForm({ ...form, endTime: event.target.value })} /></label>
+                  <label className="space-y-1 text-sm font-medium">Date<input id="report-workDate" name="workDate" type="date" className={input} value={form.workDate} onChange={(event) => setForm({ ...form, workDate: event.target.value })} /></label>
+                  <label className="space-y-1 text-sm font-medium">Hours<input id="report-hours" name="hours" className={input} value={form.hours} onChange={(event) => setForm({ ...form, hours: event.target.value })} /></label>
+                  <label className="space-y-1 text-sm font-medium">Start<input id="report-startTime" name="startTime" type="time" className={input} value={form.startTime} onChange={(event) => setForm({ ...form, startTime: event.target.value })} /></label>
+                  <label className="space-y-1 text-sm font-medium">End<input id="report-endTime" name="endTime" type="time" className={input} value={form.endTime} onChange={(event) => setForm({ ...form, endTime: event.target.value })} /></label>
                 </div>
                 <fieldset className="space-y-2 rounded-xl border border-teal-500/20 p-3" data-testid="report-costs">
                   <legend className="px-1 text-sm font-medium">Costs you paid</legend>
                   {costLines.map((line, index) => (
                     <div key={line.id} className="space-y-2 border-b border-teal-500/10 pb-2 last:border-0 last:pb-0" data-testid="report-cost-line">
                       <div className="grid grid-cols-2 gap-2">
-                        <select aria-label={`Cost ${index + 1} category`} data-testid="report-cost-kind" className={input} value={line.kind} onChange={(event) => setCostLines((current) => current.map((item) => (item.id === line.id ? { ...item, kind: event.target.value as CrewKind } : item)))}>
+                        <select aria-label={`Cost ${index + 1} category`} data-testid="report-cost-kind" id={`report-cost-${index}-kind`} name={`costs[${index}].kind`} className={input} value={line.kind} onChange={(event) => setCostLines((current) => current.map((item) => (item.id === line.id ? { ...item, kind: event.target.value as CrewKind } : item)))}>
                           {KINDS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                         </select>
-                        <input aria-label={`Cost ${index + 1} amount`} data-testid="report-cost-amount" inputMode="decimal" className={input} placeholder="Amount $" value={line.amount} onChange={(event) => setCostLines((current) => current.map((item) => (item.id === line.id ? { ...item, amount: event.target.value } : item)))} />
+                        <input aria-label={`Cost ${index + 1} amount`} data-testid="report-cost-amount" id={`report-cost-${index}-amount`} name={`costs[${index}].amount`} inputMode="decimal" className={input} placeholder="Amount $" value={line.amount} onChange={(event) => setCostLines((current) => current.map((item) => (item.id === line.id ? { ...item, amount: event.target.value } : item)))} />
                       </div>
-                      <input aria-label={`Cost ${index + 1} note`} data-testid="report-cost-note" className={input} placeholder="What it was" value={line.note} onChange={(event) => setCostLines((current) => current.map((item) => (item.id === line.id ? { ...item, note: event.target.value } : item)))} />
+                      <input aria-label={`Cost ${index + 1} note`} data-testid="report-cost-note" id={`report-cost-${index}-note`} name={`costs[${index}].note`} className={input} placeholder="What it was" value={line.note} onChange={(event) => setCostLines((current) => current.map((item) => (item.id === line.id ? { ...item, note: event.target.value } : item)))} />
                       <div className="flex flex-wrap items-center gap-2">
                         <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-teal-500/50 px-3 text-sm font-medium transition hover:bg-teal-500/10">
                           📷 {line.receipt ? "Retake receipt" : "Receipt photo (optional)"}
-                          <input aria-label={`Cost ${index + 1} receipt photo`} data-testid="report-cost-receipt" type="file" accept="image/*" capture="environment" className="sr-only" onClick={nativePhotoClick((files) => pickLineReceipt(line.id, files[0]))} onChange={(event) => { pickLineReceipt(line.id, event.target.files?.[0]); event.target.value = ""; }} />
+                          <input aria-label={`Cost ${index + 1} receipt photo`} data-testid="report-cost-receipt" id={`report-cost-${index}-receipt`} name={`costs[${index}].receipt`} type="file" accept="image/*" capture="environment" className="sr-only" onClick={nativePhotoClick((files) => pickLineReceipt(line.id, files[0]))} onChange={(event) => { pickLineReceipt(line.id, event.target.files?.[0]); event.target.value = ""; }} />
                         </label>
                         {/* eslint-disable-next-line @next/next/no-img-element -- local data URL preview */}
                         {line.receipt && <img src={line.receipt} alt={`Receipt ${index + 1}`} className="h-11 w-11 rounded-lg object-cover" data-testid="report-cost-receipt-preview" />}
@@ -759,8 +769,8 @@ export default function CrewPage() {
                   ))}
                   {costLines.length < 20 && <button type="button" data-testid="report-cost-add" className="min-h-11 w-full rounded-xl border border-teal-500/40 px-3 text-sm font-medium transition hover:border-teal-400 hover:bg-teal-500/10" onClick={() => setCostLines((current) => [...current, newCostLine()])}>＋ Add another cost</button>}
                 </fieldset>
-                <textarea className={`${input} min-h-16`} placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
-                <label className="flex items-center gap-3 rounded-xl border border-teal-500/20 px-3 py-3 text-sm font-medium"><input className="h-4 w-4 accent-teal-500" type="checkbox" checked={form.finished} onChange={(event) => setForm({ ...form, finished: event.target.checked })} /> Job is finished</label>
+                <textarea id="report-notes" name="notes" className={`${input} min-h-16`} placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+                <label className="flex items-center gap-3 rounded-xl border border-teal-500/20 px-3 py-3 text-sm font-medium"><input id="report-finished" name="finished" className="h-4 w-4 accent-teal-500" type="checkbox" checked={form.finished} onChange={(event) => setForm({ ...form, finished: event.target.checked })} /> Job is finished</label>
                 <button type="submit" data-testid="report-submit" disabled={busy !== ""} className="sticky bottom-3 w-full rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! shadow-lg transition hover:bg-teal-400">Send job report</button>
               </form>
             )}
