@@ -200,7 +200,7 @@ export default function DashboardPage() {
         <form onSubmit={handleSearch} >
           <input
             className="w-full rounded-xl border border-teal-500/20 bg-[var(--cr-card)] px-4 py-2.5 text-sm placeholder:text-[var(--cr-muted)] focus:border-teal-400/60 focus:outline-none focus:ring-2 focus:ring-teal-400/20"
-            placeholder="Search invoices, clients, documents..."
+            placeholder="Search invoices, clients, items…"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />

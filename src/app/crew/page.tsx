@@ -545,19 +545,19 @@ export default function CrewPage() {
   return (
     <main className="min-h-screen bg-[var(--cr-bg)] pb-24 text-[var(--cr-text)]">
       <header className="app-topbar sticky top-0 z-10 border-b border-teal-500/20 bg-[var(--cr-bg)] px-4 py-3 shadow-sm print:hidden">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+        <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-500 font-bold text-slate-950! shadow-sm">C</span>
-            <div>
-              <p className="text-sm font-semibold leading-tight" data-testid="crew-name">{name || "Your jobs"}</p>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold leading-tight" data-testid="crew-name">{name || "Your jobs"}</p>
               <p className="text-xs text-[var(--cr-muted)]">Crew</p>
             </div>
           </div>
-          <div className="flex items-center gap-3 text-sm">
+          <div className="flex flex-wrap items-center justify-end gap-1 text-sm sm:gap-3">
             {open && <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-200 tabular-nums" data-testid="header-timer">⏱ {fmtTimer((now) - Date.parse(open.started_at))}</span>}
-            <button type="button" onClick={switchTheme} className="tap rounded-lg px-3 py-2 font-medium transition hover:bg-teal-500/10">{theme === "dark" ? "Light" : "Dark"}</button>
-            <button type="button" className="tap whitespace-nowrap rounded-lg px-3 py-2 font-medium transition hover:bg-teal-500/10" onClick={async () => { if (!(await confirmLogoutWithQueue(userId))) return; await supabase.auth.signOut(); window.location.href = "/"; }}>Log out</button>
-            <a href="/account/delete" className="tap whitespace-nowrap rounded-lg px-3 py-2 text-sm text-rose-700 transition hover:bg-rose-500/10 dark:text-rose-300" data-testid="crew-delete-account">Delete account</a>
+            <button type="button" onClick={switchTheme} className="tap inline-flex min-h-11 items-center rounded-lg px-2.5 py-2 font-medium sm:px-3 transition hover:bg-teal-500/10">{theme === "dark" ? "Light" : "Dark"}</button>
+            <button type="button" className="tap inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-2.5 py-2 font-medium sm:px-3 transition hover:bg-teal-500/10" onClick={async () => { if (!(await confirmLogoutWithQueue(userId))) return; await supabase.auth.signOut(); window.location.href = "/"; }}>Log out</button>
+            <a href="/account/delete" className="tap inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-2.5 py-2 text-sm sm:px-3 text-rose-700 transition hover:bg-rose-500/10 dark:text-rose-300" data-testid="crew-delete-account">Delete account</a>
           </div>
         </div>
         <nav className="mx-auto mt-3 grid max-w-3xl grid-cols-4 gap-1 rounded-xl border border-teal-500/20 bg-[var(--cr-card)] p-1 text-xs sm:text-sm" role="tablist">
@@ -569,7 +569,7 @@ export default function CrewPage() {
 
       <div className="mx-auto max-w-3xl space-y-5 px-4 pt-5">
         {message && <p className="rounded-xl border border-teal-500/30 px-3 py-2 text-sm" role="status" data-testid="crew-message">{message}</p>}
-        {offline && <p className="cr-tone-warn flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-50 px-3 py-2.5 text-sm text-amber-900" role="status" data-testid="crew-offline"><span aria-hidden="true" className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-amber-500" /><span><strong className="font-semibold">Offline.</strong> Showing what was saved on this phone. Photos and expenses you add will send when you&apos;re back online.</span></p>}
+        {offline && <p className="cr-tone-warn flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-50 px-3 py-2.5 text-sm text-amber-900" role="status" data-testid="crew-offline"><span aria-hidden="true" className="mt-1.5 h-2 w-2 shrink-0 cr-dot-warn rounded-full bg-amber-500" /><span><strong className="font-semibold">Offline.</strong> Showing what was saved on this phone. Photos and expenses you add will send when you&apos;re back online.</span></p>}
         {queue.length > 0 && (
           <div className="space-y-2 rounded-xl border border-teal-500/30 bg-[var(--cr-panel)] p-3 text-sm" data-testid="crew-queue" data-count={queue.filter((item) => !item.lastError).length}>
             {queue.some((item) => !item.lastError) && <p className="flex flex-wrap items-center gap-2"><span className="cr-tone-teal inline-flex items-center gap-1.5 rounded-full border border-teal-500/40 bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800"><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-teal-500" />{queue.filter((item) => !item.lastError).length} waiting to upload</span>{offline && <span className="text-xs opacity-75">Sends when back online</span>}{!offline && <button type="button" className="ml-auto inline-flex min-h-11 min-w-11 items-center rounded-lg bg-teal-600 px-4 font-semibold text-white hover:bg-teal-500" data-testid="crew-queue-retry" onClick={() => flush()}>Send now</button>}</p>}
