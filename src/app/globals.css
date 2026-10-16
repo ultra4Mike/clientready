@@ -440,3 +440,10 @@ html.dark .cr-text-warn { color: #fcd34d !important; }
 .mobile-savebar { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
 .quick-create-fab { right: max(1rem, env(safe-area-inset-right)); }
 @media (min-width: 900px) { .app-topbar { padding-top: max(0.75rem, env(safe-area-inset-top)); } }
+
+/* Native-app feel */
+html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
+body { overscroll-behavior-y: none; }
+.app-root { overscroll-behavior: contain; }
+a, button, [role="button"], [role="tab"], select, label, summary { touch-action: manipulation; }
+nav, button, [role="tab"], .quick-create-fab, .app-topbar { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
