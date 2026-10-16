@@ -47,7 +47,7 @@ const SECTIONS: { title: string; body: string[] }[] = [
     "You can stop using ClientReady at any time. Before you close your account, download your data from the Backup page. We may suspend or end accounts that break these Terms. After an account is closed, we may delete its data after [Data retention period].",
   ] },
   { title: "12a. Account deletion", body: [
-    "You can delete your account at any time: in Settings tap Delete account (crew: Delete account on the Crew page), or visit https://clientreadyapp.com/account/delete on the web. You confirm with your password or an emailed link and by typing DELETE. If online deletion is unavailable, the page asks you to email [Support email to confirm] and we complete it within [Deletion response time].",
+    "You can delete your account at any time: in Settings tap Delete account (crew: Delete account on the Crew page), or visit https://clientreadyapp.com/account/delete on the web. You confirm with your password or an emailed link and by typing DELETE. If online deletion is unavailable, the page asks you to email support@clientreadyapp.com and we complete it within [Deletion response time].",
     "Deleting an owner account deletes your login, business profile, clients, proposals, invoices, recorded payments, schedules, crew time, expenses, job photos and payment-method settings, and turns off every approval link and client portal you shared. Crew members you added lose access to your jobs; their own logins are not deleted. Data saved only on your device stays there until you clear it or uninstall the app.",
     "Some records may be kept for up to [Data retention period] in backups, or longer where the law requires (for example tax or fraud-prevention records). Payment providers you connected keep their own records under their own terms; deleting ClientReady does not close those accounts.",
     "Your clients' information belongs to your business records. If one of your clients asks us to delete their information, we will refer them to you, and you can remove it from Clients and Documents.",
@@ -85,7 +85,7 @@ export default function TermsPage() {
         ))}
         <h2 className="mt-6 text-lg font-semibold">15. Contact</h2>
         <p className="mt-2">
-          Questions about these Terms: <a href={`mailto:${SUPPORT_EMAIL}`} className="font-semibold text-teal-600 underline-offset-2 hover:underline">{SUPPORT_EMAIL}</a> ([Support email to confirm]) or [Company mailing address].
+          Questions about these Terms: <a href={`mailto:${SUPPORT_EMAIL}`} className="font-semibold text-teal-600 underline-offset-2 hover:underline">{SUPPORT_EMAIL}</a> or [Company mailing address].
         </p>
         <p className="mt-6 text-sm text-[var(--cr-muted)]">
           See also our <Link href="/privacy" className="underline-offset-2 hover:text-teal-600 hover:underline">Privacy Policy</Link>.
