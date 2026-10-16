@@ -176,7 +176,7 @@ async function saveDocument() {
           <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Client & period</h2>
           <div>
             <input
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+              className="min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-base sm:text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
               placeholder="Search clients by name"
               value={clientSearch}
               onChange={(event) => setClientSearch(event.target.value)}
@@ -201,25 +201,25 @@ async function saveDocument() {
           </div>
 
           <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+            className="min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-base sm:text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
             placeholder="Report title"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
           />
           <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+            className="min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-base sm:text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
             placeholder="Client name"
             value={clientName}
             onChange={(event) => setClientName(event.target.value)}
           />
           <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+            className="min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-base sm:text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
             placeholder="Client company"
             value={clientCompany}
             onChange={(event) => setClientCompany(event.target.value)}
           />
           <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+            className="min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-base sm:text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
             placeholder="Date range"
             value={dateRange}
             onChange={(event) => setDateRange(event.target.value)}
@@ -257,14 +257,14 @@ async function saveDocument() {
             <button
               type="button"
               onClick={saveDocument}
-              className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50"
+              className="min-h-11 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50"
             >
               Save document
             </button>
             <button
               type="button"
               onClick={saveClientFromForm}
-              className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600"
+              className="min-h-11 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600"
             >
               Save as client
             </button>
