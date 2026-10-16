@@ -6,7 +6,7 @@ import PageHeader from "@/components/PageHeader";
 import ScheduleEditor from "@/components/ScheduleEditor";
 import { uniqueDocs } from "@/lib/change-orders";
 import { scheduledJobs } from "@/lib/scheduled-jobs";
-import { confirmRemovalFor, moveSchedule, readSchedule, readWorkers, saveSchedule, DONE_CLASS, DONE_LABEL, doneState, STATUS_CLASS, STATUS_LABEL, statusClass, statusLabel, type DoneState, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
+import { confirmRemovalFor, moveSchedule, omwTime, readSchedule, readWorkers, saveSchedule, DONE_CLASS, DONE_LABEL, doneState, STATUS_CLASS, STATUS_LABEL, statusClass, statusLabel, type DoneState, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
 
 type SavedDocument = {
   id: string;
@@ -107,11 +107,12 @@ export default function CalendarPage() {
         onDragStart={(event) => event.dataTransfer.setData("text/plain", job.doc.id)}
         onClick={(event) => { event.stopPropagation(); setEditing({ docId: job.doc.id }); }}
         className={`cursor-grab truncate rounded-md border px-2 py-1 text-left text-xs font-medium shadow-sm ${statusClass(job.schedule)}`}
-        title={`${job.doc.title} · ${job.doc.clientName} · ${statusLabel(job.schedule)}${people ? ` · ${people}` : ""}`}
+        title={`${job.doc.title} · ${job.doc.clientName} · ${statusLabel(job.schedule)}${job.schedule.onMyWayAt && job.schedule.status !== "done" ? ` · ${job.schedule.onMyWayBy || "Crew"} on the way` : ""}${people ? ` · ${people}` : ""}`}
       >
         {job.schedule.startTime && <span className="font-semibold">{timeLabel(job.schedule.startTime)} </span>}
         {job.doc.clientName || job.doc.title}
         {!compact && people && <span className="block truncate opacity-80">{people}</span>}
+        {job.schedule.onMyWayAt && job.schedule.status !== "done" && <span className="block truncate opacity-80" data-testid="omw">🚗 {compact ? "On way" : `On the way · ${omwTime(job.schedule.onMyWayAt)}`}</span>}
         {doneState(job.schedule) === "awaiting" && <span className="block truncate opacity-80" data-testid="done-awaiting">{compact ? "To confirm" : DONE_LABEL.awaiting}</span>}
         {!compact && doneState(job.schedule) === "confirmed" && <span className="block truncate opacity-80">{DONE_LABEL.confirmed}</span>}
       </div>

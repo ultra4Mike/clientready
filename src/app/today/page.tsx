@@ -5,7 +5,7 @@ import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { loadAccountIntoCache } from "@/lib/account-cache";
 import { uniqueDocs } from "@/lib/change-orders";
-import { confirmJobDone, doneState, readWorkers, saveSchedule, statusLabel, type Schedule } from "@/lib/schedule";
+import { confirmJobDone, doneState, omwTime, onMyWaySmsHref, readWorkers, saveSchedule, statusLabel, type Schedule } from "@/lib/schedule";
 import { localYmd, niceYmd, scheduledJobs, timeLabel } from "@/lib/scheduled-jobs";
 
 type Doc = { id: string; type: string; title: string; clientName: string; createdAt: string; data: Record<string, unknown> };
@@ -95,6 +95,11 @@ export default function TodayPage() {
                     <a href={`/invoice?id=${encodeURIComponent(doc.id)}`} className="underline-offset-2 hover:underline">{text(doc.data?.clientName) || doc.clientName || doc.title}</a>
                   </p>
                   <p className="text-xs text-[var(--cr-muted)]" data-testid="today-status"><span className={`mr-1 inline-block rounded-full border px-2 py-0.5 text-[11px] font-semibold ${schedule.status === "done" ? (done === "awaiting" ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300" : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300") : schedule.status === "in_progress" ? "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300" : "border-teal-500/30 bg-teal-500/10 text-teal-700 dark:text-teal-300"}`}>{statusLabel(schedule)}</span> {doc.title}{people ? ` · ${people}` : ""}</p>
+                  {schedule.onMyWayAt && schedule.status !== "done" && (
+                    <p className="text-xs font-semibold text-sky-700 dark:text-sky-300" data-testid="today-omw">🚗 {schedule.onMyWayBy || "Crew"} on the way · {omwTime(schedule.onMyWayAt)}
+                      {phone && onMyWaySmsHref(phone, text(doc.data?.clientName) || doc.clientName, schedule.onMyWayBy || "") && <> · <a href={onMyWaySmsHref(phone, text(doc.data?.clientName) || doc.clientName, schedule.onMyWayBy || "")} data-testid="today-omw-text" className="underline">Text customer</a></>}
+                    </p>
+                  )}
                   {address && <p className="break-words" data-testid="today-address">{address}</p>}
                   {phone && <p><a href={`tel:${phone.replace(/[^\d+]/g, "")}`} data-testid="today-phone" className="underline">{phone}</a></p>}
                   {schedule.crewNote && <p className="rounded-lg bg-teal-500/5 px-2 py-1 text-xs text-[var(--cr-muted)]">Crew note: {schedule.crewNote}</p>}

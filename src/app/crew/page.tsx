@@ -3,7 +3,7 @@
 import { CREW_KINDS } from "@/lib/cost-categories";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { crewMarkDone, crewSetJobStatus, STATUS_CLASS, STATUS_LABEL, type JobStatus } from "@/lib/schedule";
+import { crewMarkDone, crewOnMyWay, omwTime, crewSetJobStatus, onMyWaySmsHref, STATUS_CLASS, STATUS_LABEL, type JobStatus } from "@/lib/schedule";
 import { compressPhoto } from "@/lib/photos";
 import { compressImage, crewClockIn, crewClockOut, crewEditClock, entryHours, fmtHours, fmtTimer, type ClockEntry } from "@/lib/clock";
 
@@ -16,6 +16,7 @@ type Job = {
   client_address: string;
   client_email?: string;
   schedule_status?: string;
+  on_my_way_at?: string;
   done_confirmed?: boolean;
   job_date: string;
   start_time: string;
@@ -91,7 +92,7 @@ function buildCards(jobs: Job[]): Card[] {
     const index = cards.findIndex((card) => card.doc_id === sched.doc_id && !card.scheduled);
     const merged = {
       scheduled: true, schedule_status: sched.schedule_status, done_confirmed: Boolean(sched.done_confirmed), job_date: sched.job_date || "", start_time: sched.start_time,
-      end_time: sched.end_time, client_email: sched.client_email, crewNote: sched.note || "",
+      end_time: sched.end_time, client_email: sched.client_email, crewNote: sched.note || "", on_my_way_at: sched.on_my_way_at || "",
     };
     if (index >= 0) cards[index] = { ...cards[index], ...merged, job_date: sched.job_date || cards[index].job_date };
     else cards.push({ ...sched, ...merged });
@@ -343,6 +344,16 @@ export default function CrewPage() {
                 {STATUS_LABEL[key]}
               </button>
             ))}
+          </div>
+        )}
+        {card.scheduled && status !== "done" && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm" data-testid={`omw-${card.doc_id}`} data-state={card.on_my_way_at ? "sent" : "none"}>
+            <button type="button" disabled={busy !== ""} onClick={() => act(`omw-${card.doc_id}`, () => crewOnMyWay(card.doc_id), "Marked on my way. Your boss can see it.")} data-testid={`omw-button-${card.doc_id}`} className="min-h-11 rounded-xl border border-teal-500/30 px-3 py-2 font-semibold transition hover:border-teal-400 hover:bg-teal-500/10 disabled:opacity-60">
+              🚗 {card.on_my_way_at ? `On my way · ${omwTime(card.on_my_way_at)}` : "On my way"}
+            </button>
+            {card.on_my_way_at && card.client_phone && onMyWaySmsHref(card.client_phone, card.client_name, name) && (
+              <a href={onMyWaySmsHref(card.client_phone, card.client_name, name)} data-testid={`omw-text-${card.doc_id}`} className="tap underline">Text the customer (you send it)</a>
+            )}
           </div>
         )}
         {card.scheduled && doneFor === card.doc_id && !card.done_confirmed && (

@@ -16,6 +16,9 @@ export type Schedule = {
   doneAt?: string;
   doneBy?: string;
   confirmedAt?: string;
+  /** Set by the crew's "On my way" tap (time + crew member's name). Shown to the owner; never sent. */
+  onMyWayAt?: string;
+  onMyWayBy?: string;
 };
 export type Worker = { id: string; name: string; email?: string; phone?: string; role?: string; rate?: string; active?: boolean };
 /** The older per-job crew/pay rows (data.crew). */
@@ -88,6 +91,8 @@ export function readSchedule(data: Record<string, unknown> | undefined): Schedul
       ...(raw.doneAt ? { doneAt: String(raw.doneAt) } : {}),
       ...(raw.doneBy ? { doneBy: String(raw.doneBy) } : {}),
       ...(raw.confirmedAt ? { confirmedAt: String(raw.confirmedAt) } : {}),
+      ...(raw.onMyWayAt ? { onMyWayAt: String(raw.onMyWayAt) } : {}),
+      ...(raw.onMyWayBy ? { onMyWayBy: String(raw.onMyWayBy).slice(0, 80) } : {}),
     };
   }
   if (data?.jobTime && isDate(data?.dueDate)) {
@@ -390,17 +395,44 @@ export async function syncScheduleCrewJobs(doc: CloudDoc) {
       start_time: schedule.startTime,
       end_time: schedule.endTime || "",
       done_confirmed: schedule.status === "done" && Boolean(schedule.confirmedAt),
+      on_my_way_at: schedule.onMyWayAt || "",
     }));
-  const { error } = await supabase.from("crew_jobs").insert(rows);
+  let { error } = await supabase.from("crew_jobs").insert(rows);
+  // Before the on-my-way migration (110000) runs, crew_jobs has no on_my_way_at column: insert without it.
+  if (error && /on_my_way_at/.test(error.message || "")) {
+    ({ error } = await supabase.from("crew_jobs").insert(rows.map(({ on_my_way_at: _skip, ...row }) => { void _skip; return row; })));
+  }
   // Before the done-photos migration runs, crew_jobs has no done_confirmed column: insert without it.
   if (error && /done_confirmed/.test(error.message || "")) {
-    await supabase.from("crew_jobs").insert(rows.map(({ done_confirmed: _skip, ...row }) => { void _skip; return row; }));
+    await supabase.from("crew_jobs").insert(rows.map(({ done_confirmed: _skip, on_my_way_at: _skip2, ...row }) => { void _skip; void _skip2; return row; }));
   }
 }
 
 /** Done by the crew, not yet confirmed by the owner. */
 export function awaitingConfirmation(schedule: Schedule | null) {
   return Boolean(schedule && schedule.status === "done" && !schedule.confirmedAt);
+}
+
+/** Crew: "On my way" for an assigned job (records time + their name for the owner; sends nothing). */
+export async function crewOnMyWay(docId: string) {
+  const { data, error } = await supabase.rpc("crew_on_my_way", { p_doc_id: docId });
+  if (error) return error.message;
+  return data === false ? "Could not update this job." : "";
+}
+
+/** Ready-to-send text for the customer (opened in the phone's messages app; never sent automatically). */
+export function onMyWaySmsHref(phone: string, clientName: string, workerName: string) {
+  const digits = phone.replace(/[^\d+]/g, "");
+  if (!digits) return "";
+  const first = clientName.trim().split(/\s+/)[0] || "there";
+  const body = `Hi ${first}, this is ${workerName.trim() || "your crew"}. I'm on my way to you now.`;
+  return `sms:${digits}?&body=${encodeURIComponent(body)}`;
+}
+
+/** "9:05 AM" for an ISO time, in this device's zone. */
+export function omwTime(iso: string) {
+  const time = new Date(iso);
+  return Number.isNaN(time.getTime()) ? "" : time.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
 /** Crew: mark an assigned job done; at least one photo (compressed JPEG data URL) is required. */
