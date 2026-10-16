@@ -50,6 +50,20 @@ const newCostLine = (): CostDraft => ({ id: Math.random().toString(36).slice(2),
 // Same keys and names as the owner's job costs ("Crew spend vs your estimate" rows).
 const KINDS = CREW_KINDS.map(({ kind, label }) => [kind, label] as const);
 const input = "min-h-11 w-full rounded-xl border border-teal-700/40 bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-slate-500 dark:border-teal-500/30 dark:placeholder:text-slate-400 transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30";
+const ICON_PATHS = {
+  phone: "M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2",
+  pin: "M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5",
+  note: "M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5",
+  receipt: "M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3",
+  timer: "M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM12 9v4l2.5 2M9 2h6",
+  sun: "M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4",
+  car: "M5 16V11l2-5h10l2 5v5M3 16h18v3H3zM7 19v1.5M17 19v1.5M5 11h14",
+  camera: "M4 8h3l2-3h6l2 3h3v11H4zM12 16.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7",
+  check: "M5 12.5l4.5 4.5L19 7.5",
+};
+function Icon({ name, className = "h-4 w-4" }: { name: keyof typeof ICON_PATHS; className?: string }) {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" className={`${className} shrink-0`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={ICON_PATHS[name]} /></svg>;
+}
 const cardClass = "rounded-2xl border border-teal-700/30 bg-[var(--cr-card)] dark:border-teal-500/20 p-4 shadow-sm sm:p-5";
 
 function ymd(date: Date) {
@@ -437,7 +451,7 @@ export default function CrewPage() {
     const when = dayGroup(card.job_date, today);
     const past = when === "past";
     return (
-      <article key={`${card.id}`} className={`${cardClass}${past ? " opacity-80" : ""}`} data-testid={`crew-card-${card.doc_id}`} data-past={past ? "true" : "false"} data-today={when === "today" ? "true" : "false"} data-group={when} data-completed={status === "done" ? "true" : "false"}>
+      <article key={`${card.id}`} className={`${cardClass}${past ? " cr-card-past border-dashed opacity-70 saturate-50 transition hover:opacity-100 hover:saturate-100" : ""}${when === "today" ? " cr-card-today border-l-4 border-l-teal-500" : ""}`} data-testid={`crew-card-${card.doc_id}`} data-past={past ? "true" : "false"} data-today={when === "today" ? "true" : "false"} data-group={when} data-completed={status === "done" ? "true" : "false"}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-teal-800 dark:text-teal-300">
@@ -451,16 +465,16 @@ export default function CrewPage() {
 
         <div className="mt-3 grid grid-cols-2 gap-2 text-sm [&>*]:min-w-0 [&>*]:break-words">
           {card.client_phone
-            ? <a href={`tel:${card.client_phone}`} className="flex min-h-11 items-center justify-center rounded-xl border border-teal-500/30 px-3 py-2 text-center font-medium transition hover:border-teal-400 hover:bg-teal-500/10" data-testid={`call-${card.doc_id}`} data-action="call"><span className="flex flex-col items-center leading-tight"><span>📞 Call</span><span className="whitespace-nowrap text-xs font-normal tabular-nums opacity-80">{card.client_phone}</span></span></a>
+            ? <a href={`tel:${card.client_phone}`} className="flex min-h-11 items-center justify-center rounded-xl border border-teal-500/30 px-3 py-2 text-center font-medium transition hover:border-teal-400 hover:bg-teal-500/10" data-testid={`call-${card.doc_id}`} data-action="call"><span className="flex flex-col items-center leading-tight"><span className="inline-flex items-center gap-1.5"><Icon name="phone" />Call</span><span className="whitespace-nowrap text-xs font-normal tabular-nums opacity-80">{card.client_phone}</span></span></a>
             : <span className="flex min-h-11 items-center justify-center rounded-xl border border-dashed border-teal-500/20 px-3 py-2 text-center opacity-50">No phone</span>}
           {mapUrl
-            ? <a href={mapUrl} target="_blank" rel="noreferrer" className="flex min-h-11 items-center justify-center rounded-xl border border-teal-500/30 px-3 py-2 text-center font-medium transition hover:border-teal-400 hover:bg-teal-500/10" data-testid={`map-${card.doc_id}`} data-action="map">📍 Map</a>
+            ? <a href={mapUrl} target="_blank" rel="noreferrer" className="flex min-h-11 items-center justify-center rounded-xl border border-teal-500/30 px-3 py-2 text-center font-medium transition hover:border-teal-400 hover:bg-teal-500/10" data-testid={`map-${card.doc_id}`} data-action="map"><span className="inline-flex items-center gap-1.5"><Icon name="pin" />Map</span></a>
             : <span className="flex min-h-11 items-center justify-center rounded-xl border border-dashed border-teal-500/20 px-3 py-2 text-center opacity-50">No address</span>}
         </div>
         {card.client_address && <p className="mt-2 text-sm text-[var(--cr-muted)]">{card.client_address}</p>}
         {card.client_email && <p className="text-sm"><a className="tap underline" href={`mailto:${card.client_email}`}>{card.client_email}</a></p>}
         {(card.crewNote || card.payRow?.note) && (
-          <p className="mt-2 rounded-xl bg-teal-500/10 px-3 py-2 text-sm" data-testid="crew-note">📝 {card.crewNote || card.payRow?.note}</p>
+          <p className="mt-2 rounded-xl bg-teal-500/10 px-3 py-2 text-sm flex items-start gap-2" data-testid="crew-note"><Icon name="note" className="mt-0.5 h-4 w-4 text-teal-700 dark:text-teal-300" /><span>{card.crewNote || card.payRow?.note}</span></p>
         )}
 
         {card.scheduled && card.items.length > 0 && (
@@ -490,7 +504,7 @@ export default function CrewPage() {
         {card.scheduled && status !== "done" && (
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm" data-testid={`omw-${card.doc_id}`} data-state={card.on_my_way_at ? "sent" : "none"}>
             <button type="button" disabled={busy !== ""} onClick={() => act(`omw-${card.doc_id}`, () => crewOnMyWay(card.doc_id), "Marked on my way. Your boss can see it.")} data-testid={`omw-button-${card.doc_id}`} className="min-h-11 rounded-xl border border-teal-500/30 px-3 py-2 font-semibold transition hover:border-teal-400 hover:bg-teal-500/10 disabled:opacity-60">
-              🚗 {card.on_my_way_at ? `On my way · ${omwTime(card.on_my_way_at)}` : "On my way"}
+              <span className="inline-flex items-center gap-1.5"><Icon name="car" />{card.on_my_way_at ? `On my way · ${omwTime(card.on_my_way_at)}` : "On my way"}</span>
             </button>
             {card.on_my_way_at && card.client_phone && onMyWaySmsHref(card.client_phone, card.client_name, name) && (
               <a href={onMyWaySmsHref(card.client_phone, card.client_name, name)} data-testid={`omw-text-${card.doc_id}`} className="tap underline">Text the customer (you send it)</a>
@@ -501,7 +515,7 @@ export default function CrewPage() {
           <div className="mt-3 space-y-2 rounded-xl border border-teal-500/30 p-3 text-sm" data-testid={`done-panel-${card.doc_id}`}>
             <p className="font-semibold">Photo of the finished job (required)</p>
             <label className="flex min-h-11 cursor-pointer items-center justify-center rounded-xl border border-dashed border-teal-500/40 px-3 py-2 font-medium">
-              📷 {donePhotos.length ? "Add another photo" : "Take or choose photo"}
+              <Icon name="camera" />{donePhotos.length ? "Add another photo" : "Take or choose photo"}
               <input type="file" accept="image/*" capture="environment" multiple className="sr-only" data-testid={`done-photo-input-${card.doc_id}`} onClick={nativePhotoClick((files) => pickDonePhotos(files))} onChange={(event) => { pickDonePhotos(event.target.files); event.target.value = ""; }} />
             </label>
             {donePhotos.length > 0 && (
@@ -518,21 +532,21 @@ export default function CrewPage() {
           </div>
         )}
 
-        <div className="mt-4 rounded-xl border border-teal-500/20 bg-teal-500/5 p-3 sm:p-4">
+        <div className="mt-3 rounded-xl border border-teal-500/20 bg-teal-500/5 px-3 py-2">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Your time on this job</p>
-              <p className="text-2xl font-bold tabular-nums" data-testid={`timer-${card.doc_id}`}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Your time on this job</p>
+              <p className="text-lg font-bold leading-tight tabular-nums" data-testid={`timer-${card.doc_id}`}>
                 {running ? fmtTimer((now) - Date.parse(running.started_at)) : fmtHours(total)}
               </p>
               {running && <p className="text-xs text-[var(--cr-muted)]">Clocked in at {clockTime(running.started_at)} · {fmtHours(total)} total</p>}
             </div>
             {running ? (
-              <button type="button" disabled={busy !== ""} data-testid={`clock-out-${card.doc_id}`} onClick={() => act(`clock-${card.doc_id}`, () => crewClockOut(card.doc_id), "Clocked out.")} className="rounded-xl bg-amber-500 px-4 py-3 font-semibold text-slate-950!">Clock out</button>
+              <button type="button" disabled={busy !== ""} data-testid={`clock-out-${card.doc_id}`} onClick={() => act(`clock-${card.doc_id}`, () => crewClockOut(card.doc_id), "Clocked out.")} className="min-h-11 shrink-0 rounded-xl bg-amber-500 px-4 py-2 font-semibold text-slate-950!">Clock out</button>
             ) : past ? (
-              <p data-testid={`past-state-${card.doc_id}`} data-completed={status === "done" ? "true" : "false"} className="rounded-xl border border-slate-300/60 px-3 py-2 text-sm font-semibold text-[var(--cr-muted)]">{status === "done" ? "✓ Completed" : "Past job"}</p>
+              <p data-testid={`past-state-${card.doc_id}`} data-completed={status === "done" ? "true" : "false"} className="shrink-0 rounded-full border border-slate-400/40 px-3 py-1.5 text-xs font-semibold text-[var(--cr-muted)]"><span className="inline-flex items-center gap-1">{status === "done" ? <><Icon name="check" className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />Completed</> : "Past job"}</span></p>
             ) : (
-              <button type="button" disabled={busy !== "" || Boolean(open)} data-testid={`clock-in-${card.doc_id}`} onClick={() => act(`clock-${card.doc_id}`, () => crewClockIn(card.doc_id), "Clocked in.")} className="rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! disabled:opacity-40">{open ? "On another job" : "Clock in"}</button>
+              <button type="button" disabled={busy !== "" || Boolean(open)} data-testid={`clock-in-${card.doc_id}`} onClick={() => act(`clock-${card.doc_id}`, () => crewClockIn(card.doc_id), "Clocked in.")} className="min-h-11 shrink-0 rounded-xl bg-teal-500 px-4 py-2 font-semibold text-slate-950! disabled:opacity-40">{open ? "On another job" : "Clock in"}</button>
             )}
           </div>
           {mine.length > 0 && (
@@ -564,7 +578,7 @@ export default function CrewPage() {
           )}
         </div>
 
-        <div className="mt-3">
+        <div className="mt-2">
           {spendOpen === card.doc_id ? (
             <div className="space-y-3 border-t border-teal-500/20 pt-3" data-testid={`expense-form-${card.doc_id}`}>
               <div className="grid grid-cols-2 gap-2">
@@ -575,7 +589,7 @@ export default function CrewPage() {
               </div>
               <input aria-label="What it was" className={input} placeholder="What it was" value={spend.note} onChange={(event) => setSpend({ ...spend, note: event.target.value })} />
               <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-teal-500/50 px-3 py-3 text-sm font-medium transition hover:bg-teal-500/10">
-                📷 {spend.receipt ? "Retake receipt photo" : "Snap receipt"}
+                <Icon name="camera" />{spend.receipt ? "Retake receipt photo" : "Snap receipt"}
                 <input aria-label="Receipt photo" type="file" accept="image/*" capture="environment" className="sr-only" onClick={nativePhotoClick((files) => pickReceipt(files[0]))} onChange={(event) => pickReceipt(event.target.files?.[0])} />
               </label>
               {/* eslint-disable-next-line @next/next/no-img-element -- local data URL preview */}
@@ -586,14 +600,14 @@ export default function CrewPage() {
               </div>
             </div>
           ) : (
-            <button type="button" data-testid={`add-expense-${card.doc_id}`} onClick={() => { setSpend({ kind: "parts", amount: "", note: "", receipt: "" }); setSpendOpen(card.doc_id); }} className="min-h-11 w-full rounded-xl border border-teal-700/40 px-3 py-2.5 text-sm font-medium transition hover:border-teal-400 hover:bg-teal-500/10 dark:border-teal-500/40">
-              🧾 Add expense / receipt
+            <button type="button" data-testid={`add-expense-${card.doc_id}`} onClick={() => { setSpend({ kind: "parts", amount: "", note: "", receipt: "" }); setSpendOpen(card.doc_id); }} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-teal-800 transition hover:bg-teal-500/10 dark:text-teal-300">
+              <Icon name="receipt" />Add expense / receipt
             </button>
           )}
           {jobSpend.length > 0 && (
             <ul className="mt-2 space-y-1 text-sm text-[var(--cr-muted)]">
               {jobSpend.map((item) => (
-                <li key={item.id} data-testid="expense-item">{KINDS.find(([value]) => value === item.kind)?.[1] || item.kind} · ${item.amount}{item.note ? ` · ${item.note}` : ""}{item.receipt ? " · 🧾 receipt" : ""}</li>
+                <li key={item.id} data-testid="expense-item">{KINDS.find(([value]) => value === item.kind)?.[1] || item.kind} · ${item.amount}{item.note ? ` · ${item.note}` : ""}{item.receipt ? " · receipt attached" : ""}</li>
               ))}
             </ul>
           )}
@@ -612,7 +626,7 @@ export default function CrewPage() {
   const tabs: [Tab, string][] = [["today", "Today"], ["week", "This week"], ["hours", "My hours"], ["reports", "Reports"]];
 
   return (
-    <main className="crew-page min-h-screen bg-[var(--cr-bg)] pb-24 text-[var(--cr-text)]">
+    <main className="crew-page min-h-dvh bg-[var(--cr-bg)] pb-24 text-[var(--cr-text)]">
       <header className="app-topbar sticky top-0 z-10 border-b border-teal-500/20 bg-[var(--cr-bg)] px-4 py-3 shadow-sm print:hidden">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -623,7 +637,7 @@ export default function CrewPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-1 text-sm sm:gap-3">
-            {open && <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-200 tabular-nums" data-testid="header-timer">⏱ {fmtTimer((now) - Date.parse(open.started_at))}</span>}
+            {open && <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-200 tabular-nums" data-testid="header-timer"><Icon name="timer" className="h-3.5 w-3.5" />{fmtTimer((now) - Date.parse(open.started_at))}</span>}
             <button type="button" onClick={switchTheme} className="tap inline-flex min-h-11 w-16 items-center justify-center rounded-lg px-2.5 py-2 font-medium sm:px-3 transition hover:bg-teal-500/10">{theme === "dark" ? "Light" : "Dark"}</button>
             <button type="button" className="tap inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-2.5 py-2 font-medium sm:px-3 transition hover:bg-teal-500/10" onClick={async () => { if (!(await confirmLogoutWithQueue(userId))) return; await supabase.auth.signOut(); window.location.href = "/"; }}>Log out</button>
           </div>
@@ -653,7 +667,7 @@ export default function CrewPage() {
         {tab === "today" && (
           <section className="space-y-3">
             <h2 className="text-xl font-bold tracking-tight">{today ? dayLabel(today) : "Today"}</h2>
-            {todayCards.length === 0 && <EmptyState icon="☀" title="Nothing scheduled for you today." className={`${cardClass} border-dashed`} />}
+            {todayCards.length === 0 && <EmptyState icon={<Icon name="sun" className="h-6 w-6" />} title="Nothing scheduled for you today." className={`${cardClass} border-dashed`} />}
             {(() => {
               const route = routeStops(todayCards);
               if (route.stops.length < 2) return null;
@@ -680,7 +694,7 @@ export default function CrewPage() {
               if (!list.length) return null;
               return (
                 <div key={day} className="space-y-2" data-testid="week-day" data-day={day} data-group={dayGroup(day, today)}>
-                  <h2 className={`text-sm font-semibold ${day === today ? "text-teal-600 dark:text-teal-300" : "text-[var(--cr-muted)]"}`}>{dayLabel(day)}{day === today ? " · Today" : ""}</h2>
+                  <h2 className={`flex items-center gap-2 text-xs font-semibold uppercase tracking-wide ${day === today ? "text-teal-700 dark:text-teal-300" : "text-[var(--cr-muted)]"}`}>{day === today && <span aria-hidden="true" className="h-2 w-2 rounded-full bg-teal-500" />}{dayLabel(day)}{day === today && <span className="cr-tone-teal rounded-full border border-teal-500/40 bg-teal-50 px-2 py-0.5 text-[10px] text-teal-800">Today</span>}{dayGroup(day, today) === "past" && <span className="font-normal normal-case tracking-normal opacity-75">· Past</span>}<span aria-hidden="true" className="h-px flex-1 bg-teal-500/15" /></h2>
                   {list.map(jobCard)}
                 </div>
               );
@@ -688,13 +702,13 @@ export default function CrewPage() {
             {weekCards.length === 0 && <p className={`${cardClass} border-dashed py-10 text-center text-sm text-[var(--cr-muted)]`}>No jobs for you this week.</p>}
             {later.length > 0 && (
               <div className="space-y-2" data-testid="coming-up" data-group="upcoming">
-                <h2 className="text-sm font-semibold text-[var(--cr-muted)]">Coming up</h2>
+                <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Coming up<span aria-hidden="true" className="h-px flex-1 bg-teal-500/15" /></h2>
                 {later.map(jobCard)}
               </div>
             )}
             {undated.length > 0 && (
               <div className="space-y-2">
-                <h2 className="text-sm font-semibold text-[var(--cr-muted)]">Not scheduled yet</h2>
+                <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Not scheduled yet<span aria-hidden="true" className="h-px flex-1 bg-teal-500/15" /></h2>
                 {undated.map(jobCard)}
               </div>
             )}
@@ -705,19 +719,19 @@ export default function CrewPage() {
           <section className={cardClass} data-testid="my-hours">
             <h2 className="text-lg font-bold tracking-tight">My hours this week</h2>
             <p className="text-xs text-[var(--cr-muted)]">Clocked is from your clock in/out. Pay sheet is what your boss logged for pay.</p>
-            <table className="mt-4 w-full text-sm">
-              <thead><tr className="text-left text-xs uppercase tracking-wide text-[var(--cr-muted)]"><th className="py-2 font-semibold">Day</th><th className="py-2 text-right font-semibold">Clocked</th><th className="py-2 text-right font-semibold">Pay sheet</th></tr></thead>
+            <table className="mt-4 w-full table-fixed text-sm"><colgroup><col /><col className="w-24" /><col className="w-24" /></colgroup>
+              <thead><tr className="text-left text-xs uppercase tracking-wide text-[var(--cr-muted)]"><th className="px-2 py-2 font-semibold">Day</th><th className="px-2 py-2 text-right font-semibold">Clocked</th><th className="px-2 py-2 text-right font-semibold">Pay sheet</th></tr></thead>
               <tbody>
                 {hoursByDay.map((item) => (
-                  <tr key={item.day} className={`border-t border-teal-500/10 ${item.day === today ? "font-semibold" : ""}`} data-testid={`hours-${item.day}`}>
-                    <td className="py-2">{dayLabel(item.day)}</td>
-                    <td className="py-1.5 text-right tabular-nums">{item.clocked ? fmtHours(item.clocked) : "–"}</td>
-                    <td className="py-1.5 text-right tabular-nums">{item.logged ? `${item.logged.toFixed(2)} h` : "–"}</td>
+                  <tr key={item.day} className={`border-t border-teal-500/10 ${item.day === today ? "cr-hours-today bg-teal-500/10 font-semibold" : ""}`} data-testid={`hours-${item.day}`}>
+                    <td className="px-2 py-2">{dayLabel(item.day)}{item.day === today && <span className="ml-1.5 text-xs font-medium text-teal-700 dark:text-teal-300">Today</span>}</td>
+                    <td className="px-2 py-2 text-right tabular-nums">{item.clocked ? fmtHours(item.clocked) : "–"}</td>
+                    <td className="px-2 py-2 text-right tabular-nums">{item.logged ? `${item.logged.toFixed(2)} h` : "–"}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t border-teal-500/30 font-semibold" data-testid="hours-total"><td className="py-2">Total</td><td className="py-2 text-right tabular-nums">{fmtHours(weekClocked)}</td><td className="py-2 text-right tabular-nums">{weekLogged.toFixed(2)} h</td></tr>
+                <tr className="border-t border-teal-500/30 font-semibold" data-testid="hours-total"><td className="px-2 py-2">Total</td><td className="px-2 py-2 text-right tabular-nums">{fmtHours(weekClocked)}</td><td className="px-2 py-2 text-right tabular-nums">{weekLogged.toFixed(2)} h</td></tr>
               </tfoot>
             </table>
             <div className="mt-5 rounded-xl bg-teal-500/10 p-4 text-sm">
