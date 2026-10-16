@@ -1,7 +1,7 @@
 /**
  * DRAFT help articles for upcoming / partly shipped features. NOT rendered (not imported by the Help Center).
  * When a feature ships, verify labels in the UI, then move the article into HELP_ARTICLES in ./articles.ts.
- * Status notes: manual payment methods shipped in 81a2084 (see payment-methods-setup in articles.ts);
+ * Status notes: manual payment methods shipped in 81a2084; their articles moved to articles.ts 2026-10-16;
  * per-owner card payments (Stripe Connect), automatic reminders and in-app SMS are not built yet.
  */
 import type { HelpArticle } from "./articles";
@@ -9,21 +9,6 @@ import type { HelpArticle } from "./articles";
 export type UpcomingArticle = HelpArticle & { feature: string; status: "draft" | "shipped-verify-labels" };
 
 export const UPCOMING_HELP_ARTICLES: UpcomingArticle[] = [
-  { feature: "manual-payment-methods", status: "shipped-verify-labels",
-    id: "pay-zelle-venmo-cashapp", category: "Payments", question: "How do clients pay me with Zelle, Venmo or Cash App?",
-    summary: "Clients see your handle with a copy button; they pay you in their own app.",
-    steps: ["In Settings, under Payment methods, turn on Zelle, Venmo or Cash App and enter your handle.", "Tap Save payment methods.", "Your client sees the handle on the invoice, approval link and portal, with Copy and (where supported) an Open app button.", "When the money arrives, open the invoice, tap Mark paid and pick the method."],
-    tips: ["ClientReady can't see these transfers, so it never marks them paid for you."],
-    related: ["manual-payment"], keywords: ["zelle", "venmo", "cash app", "p2p"] },
-  { feature: "manual-payment-methods", status: "shipped-verify-labels",
-    id: "pay-paypal-me", category: "Payments", question: "How do I accept PayPal.me payments?",
-    steps: ["In Settings, under Payment methods, turn on PayPal.me and enter your PayPal.me link or username.", "Save payment methods.", "Clients tap the link to pay in PayPal; record it with Mark paid."],
-    related: ["pay-zelle-venmo-cashapp"], keywords: ["paypal"] },
-  { feature: "manual-payment-methods", status: "shipped-verify-labels",
-    id: "pay-check-ach", category: "Payments", question: "How do clients pay by check or bank transfer (ACH)?",
-    steps: ["In Settings, under Payment methods, turn on Check and enter who to pay and the mailing address.", "Turn on Bank transfer and enter the instructions you want clients to see.", "Save payment methods.", "When the check clears or the transfer lands, tap Mark paid and choose the method."],
-    tips: ["Only share bank details you are comfortable showing to anyone who has the invoice link."],
-    related: ["pay-zelle-venmo-cashapp"], keywords: ["check", "cheque", "ach", "bank", "wire"] },
   { feature: "card-payments-connect", status: "draft",
     id: "card-connect-own-account", category: "Payments", question: "How do I take card payments into my own account?",
     summary: "Connect your own card processor account; card payments go straight to you.",

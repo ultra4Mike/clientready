@@ -44,6 +44,8 @@ export function isNetworkError(message: string) {
 export async function enqueue(item: Omit<QueueItem, "id" | "createdAt" | "attempts">) {
   const full: QueueItem = { ...item, id: `q${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`, createdAt: new Date().toISOString(), attempts: 0 };
   await run("readwrite", (store) => store.put(full));
+  // Ask the browser not to evict queued photos under storage pressure (best effort; ignored if unsupported).
+  try { void navigator.storage?.persist?.().catch(() => undefined); } catch { /* ignore */ }
   return full;
 }
 
@@ -65,7 +67,17 @@ async function save(item: QueueItem) {
  * Stops at the first network failure (still offline); a server refusal is kept with lastError for the
  * person to see and discard. Returns how many were sent.
  */
-export async function flushQueue(user: string, send: (item: QueueItem) => Promise<string>) {
+let flushing: Promise<number> | null = null;
+
+export function flushQueue(user: string, send: (item: QueueItem) => Promise<string>): Promise<number> {
+  // One flush at a time in this tab: the online event, page load and Send now can fire together,
+  // and two overlapping flushes would send the same item twice.
+  if (flushing) return flushing;
+  flushing = flushOnce(user, send).finally(() => { flushing = null; });
+  return flushing;
+}
+
+async function flushOnce(user: string, send: (item: QueueItem) => Promise<string>) {
   let sent = 0;
   for (const item of await queued(user)) {
     if (item.lastError) continue;

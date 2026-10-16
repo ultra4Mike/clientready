@@ -266,7 +266,11 @@ export default function CrewPage() {
   async function sendOrQueue(kind: QueueKind, docId: string, payload: Record<string, unknown>, send: () => Promise<string>) {
     const error = navigator.onLine ? await send().catch((reason: unknown) => String((reason as Error)?.message || reason)) : "offline";
     if (!error || !isNetworkError(error === "offline" ? "failed to fetch" : error)) return { error, queued: false };
-    await enqueue({ user: userId, kind, docId, payload });
+    try {
+      await enqueue({ user: userId, kind, docId, payload });
+    } catch {
+      return { error: "No signal, and this phone has no room to save it. Free up space or try again when online.", queued: false };
+    }
     refreshQueue();
     return { error: "", queued: true };
   }
