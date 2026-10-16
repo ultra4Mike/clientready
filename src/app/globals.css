@@ -406,7 +406,8 @@ html.dark .owner-costs [data-testid="section-toggle"] span {
 }
 
 /* Hide the floating quick-create + on pages with a sticky mobile save bar */
-body:has(.mobile-savebar) .quick-create-fab {
+body:has(.mobile-savebar) .quick-create-fab,
+body:has(.hide-fab) .quick-create-fab {
   display: none !important;
 }
 
