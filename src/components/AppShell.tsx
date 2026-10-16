@@ -1,5 +1,6 @@
 "use client";
 
+import GlobalSearch from "@/components/GlobalSearch";
 import TrialBanner from "@/components/TrialBanner";
 import { ReactNode, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -96,6 +97,7 @@ useEffect(() => {
   const actions = (
     <div className="tap-row flex items-center gap-1 text-sm font-medium min-[900px]:flex-wrap min-[900px]:gap-4">
       <SyncPill />
+      <GlobalSearch />
       <button
         type="button"
         aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
