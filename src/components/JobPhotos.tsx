@@ -1,5 +1,6 @@
 "use client";
 
+import { nativePhotoClick } from "@/lib/native-camera";
 import { useState } from "react";
 import { compressPhoto, dataUrlBytes, MAX_PHOTOS, orderByTag, PHOTO_TAG_LABEL, type JobPhoto, type PhotoTag } from "@/lib/photos";
 
@@ -9,7 +10,7 @@ export function JobPhotosEditor({ photos, onChange, showOnCopy = false, onShowOn
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
-  async function addFiles(list: FileList | null) {
+  async function addFiles(list: FileList | File[] | null) {
     if (!list || !list.length) return;
     const room = MAX_PHOTOS - photos.length;
     const files = Array.from(list).slice(0, Math.max(room, 0));
@@ -42,11 +43,11 @@ export function JobPhotosEditor({ photos, onChange, showOnCopy = false, onShowOn
           <div className="flex gap-2">
             <label className={pick}>
               Take photo
-              <input type="file" accept="image/*" capture="environment" className="hidden" disabled={busy} onChange={(event) => { addFiles(event.target.files); event.target.value = ""; }} />
+              <input type="file" accept="image/*" capture="environment" className="hidden" disabled={busy} onClick={nativePhotoClick((files) => addFiles(files), "CAMERA")} onChange={(event) => { addFiles(event.target.files); event.target.value = ""; }} />
             </label>
             <label className={pick}>
               Choose photos
-              <input type="file" accept="image/*" multiple className="hidden" data-testid="photos-input" disabled={busy} onChange={(event) => { addFiles(event.target.files); event.target.value = ""; }} />
+              <input type="file" accept="image/*" multiple className="hidden" data-testid="photos-input" disabled={busy} onClick={nativePhotoClick((files) => addFiles(files), "PHOTOS")} onChange={(event) => { addFiles(event.target.files); event.target.value = ""; }} />
             </label>
           </div>
         )}

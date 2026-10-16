@@ -1,5 +1,6 @@
 "use client";
 
+import { nativePhotoClick } from "@/lib/native-camera";
 import { enqueue, flushQueue, isNetworkError, queued, removeQueued, type QueueItem, type QueueKind } from "@/lib/photo-queue";
 import EmptyState from "@/components/EmptyState";
 import CrewDaysOff from "@/components/CrewDaysOff";
@@ -310,7 +311,7 @@ export default function CrewPage() {
     }, navigator.onLine ? "Expense added to this job." : "Saved on this phone. It will send when you're back online.");
   }
 
-  async function pickDonePhotos(files: FileList | null) {
+  async function pickDonePhotos(files: FileList | File[] | null) {
     if (!files?.length) return;
     try {
       const added: string[] = [];
@@ -426,7 +427,7 @@ export default function CrewPage() {
             <p className="font-semibold">Photo of the finished job (required)</p>
             <label className="flex min-h-11 cursor-pointer items-center justify-center rounded-xl border border-dashed border-teal-500/40 px-3 py-2 font-medium">
               📷 {donePhotos.length ? "Add another photo" : "Take or choose photo"}
-              <input type="file" accept="image/*" capture="environment" multiple className="sr-only" data-testid={`done-photo-input-${card.doc_id}`} onChange={(event) => { pickDonePhotos(event.target.files); event.target.value = ""; }} />
+              <input type="file" accept="image/*" capture="environment" multiple className="sr-only" data-testid={`done-photo-input-${card.doc_id}`} onClick={nativePhotoClick((files) => pickDonePhotos(files))} onChange={(event) => { pickDonePhotos(event.target.files); event.target.value = ""; }} />
             </label>
             {donePhotos.length > 0 && (
               <div className="flex flex-wrap gap-2" data-testid="done-photo-previews">
@@ -497,7 +498,7 @@ export default function CrewPage() {
               <input aria-label="What it was" className={input} placeholder="What it was" value={spend.note} onChange={(event) => setSpend({ ...spend, note: event.target.value })} />
               <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-teal-500/50 px-3 py-3 text-sm font-medium transition hover:bg-teal-500/10">
                 📷 {spend.receipt ? "Retake receipt photo" : "Snap receipt"}
-                <input aria-label="Receipt photo" type="file" accept="image/*" capture="environment" className="sr-only" onChange={(event) => pickReceipt(event.target.files?.[0])} />
+                <input aria-label="Receipt photo" type="file" accept="image/*" capture="environment" className="sr-only" onClick={nativePhotoClick((files) => pickReceipt(files[0]))} onChange={(event) => pickReceipt(event.target.files?.[0])} />
               </label>
               {/* eslint-disable-next-line @next/next/no-img-element -- local data URL preview */}
               {spend.receipt && <img src={spend.receipt} alt="Receipt preview" className="max-h-40 rounded-lg" data-testid="receipt-preview" />}

@@ -17,7 +17,11 @@ routes (`/api/*`), so a static export isn't possible; `cap-shell/` is only the b
 | @capacitor/ios | 8.5.3 | dependency | iOS platform (Swift Package Manager, no CocoaPods) |
 | @capacitor/android | 8.5.3 | dependency | Android platform (Gradle) |
 | @capacitor/app | 8.1.2 | dependency | deep links (`appUrlOpen`) + Android back button |
+| @capacitor/camera | 8.2.5 | dependency | native camera / photo-library sheet for job photos, crew done photos and receipts (web file input unchanged) |
 | @capacitor/cli | 8.5.3 | devDependency | `cap sync` / `cap open` |
+
+`@capacitor/assets` 3.0.5 was run once (in a temp copy, not a dependency) to generate the native icons and splash
+screens from `assets/`. Re-run: `npx -p node@22 npx @capacitor/assets generate --ios --android`.
 
 Native SDKs the generated projects pull in:
 - Android (Gradle, `android/variables.gradle`): androidx.appcompat 1.7.1, androidx.coordinatorlayout 1.3.0,
@@ -25,10 +29,16 @@ Native SDKs the generated projects pull in:
   androidx.webkit 1.14.0, Capacitor's `capacitor-android` and `capacitor-cordova-android-plugins` (Cordova 14.0.1
   compatibility layer, empty); test-only: junit 4.13.2, androidx.test.ext:junit 1.3.0, espresso-core 3.7.0.
   minSdk 24, compile/target SDK 36.
+- Camera plugin: Android io.ionic.libs:ioncamera-android 1.0.2, androidx.exifinterface 1.4.1,
+  com.google.android.material 1.13.0, androidx.core:core-ktx 1.17.0, com.google.code.gson 2.10.1;
+  iOS ion-ios-camera 2.0.x (IONCameraLib). iOS Info.plist has camera + photo library usage strings.
 - iOS (Swift Package Manager, `ios/App/CapApp-SPM/Package.swift`): capacitor-swift-pm 8.5.3 (Capacitor + Cordova
   products) and the local CapacitorApp plugin.
 
 No analytics, ads, push, or crash-reporting SDKs.
+
+Dependabot (moderate) on the default branch is dev-only: fast-glob and uuid@7 via @capacitor/cli. Not
+force-fixed; it clears when @capacitor/cli updates its dependencies.
 
 ## Deep links
 - Custom scheme `clientready://<path>` (both platforms): works without any account setup.
