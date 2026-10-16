@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { loadAccountIntoCache } from "@/lib/account-cache";
@@ -50,7 +51,7 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[var(--cr-bg)] px-4 py-10">
       <div className="w-full max-w-md">
-      <a href="/" className="mb-6 inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[var(--cr-muted)] transition hover:text-teal-600"><span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-teal-500 text-xs font-bold text-slate-950!">C</span>Back to ClientReady</a>
+      <Link href="/" className="mb-6 inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[var(--cr-muted)] transition hover:text-teal-600"><span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-teal-500 text-xs font-bold text-slate-950!">C</span>Back to ClientReady</Link>
       <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-6 shadow-xl shadow-teal-950/10 sm:p-8">
       <h1 className="text-2xl font-bold tracking-tight">{resetMode ? "Reset password" : "Log in"}</h1>
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">

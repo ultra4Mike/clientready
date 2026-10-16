@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 export default function HomePage() {
@@ -7,7 +8,8 @@ export default function HomePage() {
 
   useEffect(() => {
     const saved = window.localStorage.getItem("clientready-theme") || "dark";
-    setTheme(saved);
+    // Set after mount (not during the effect body) so the static render and first client render match.
+    Promise.resolve().then(() => setTheme(saved));
     document.documentElement.classList.toggle("dark", saved === "dark");
     document.documentElement.classList.toggle("light", saved === "light");
   }, []);
@@ -24,10 +26,10 @@ export default function HomePage() {
     <main className="min-h-screen bg-[var(--cr-bg)] text-[var(--cr-text)]">
       <header className="sticky top-0 z-20 border-b border-teal-500/20 bg-[var(--cr-panel)] print:hidden">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3 sm:py-4">
-          <a href="/" className="flex items-center gap-2 font-semibold">
+          <Link href="/" className="flex items-center gap-2 font-semibold">
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-teal-500 text-sm font-bold text-slate-950!">C</span>
             ClientReady
-          </a>
+          </Link>
           <div className="flex items-center gap-2 text-sm sm:gap-4">
             <button type="button" onClick={toggleTheme} className="hidden font-medium transition hover:text-teal-500 sm:inline">{theme === "dark" ? "Light" : "Dark"}</button>
             <a href="/login" className="inline-flex min-h-11 items-center rounded-lg border border-teal-500/30 px-3 font-medium transition hover:border-teal-400 hover:text-teal-500 sm:min-h-0 sm:border-0 sm:px-0">Log in</a>

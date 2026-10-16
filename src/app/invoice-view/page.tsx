@@ -68,77 +68,81 @@ export default function InvoiceViewPage() {
   const [viewState, setViewState] = useState<"loading" | "ready" | "empty">("loading");
 
   useEffect(() => {
-    const profileRaw = window.localStorage.getItem("clientready-profile");
-    if (profileRaw) {
-      const profile = JSON.parse(profileRaw);
-      setBusinessName(profile.businessName || "");
-      setLogo(profile.logo || "");
-      setPaymentLink(profile.paymentLink || "");
-    }
+    // Read storage after mount (outside the effect body) so the static render and first client render match.
+    function load() {
+      const profileRaw = window.localStorage.getItem("clientready-profile");
+      if (profileRaw) {
+        const profile = JSON.parse(profileRaw);
+        setBusinessName(profile.businessName || "");
+        setLogo(profile.logo || "");
+        setPaymentLink(profile.paymentLink || "");
+      }
 
-    const openId = new URLSearchParams(window.location.search).get("id") || window.localStorage.getItem("clientready-open-document");
-    const docsRaw = window.localStorage.getItem("clientready-documents");
-    const docs = openId && docsRaw ? (JSON.parse(docsRaw) as SavedDocument[]) : [];
-    const doc = docs.find((item) => item.id === openId && item.type === "invoice");
-    setViewState(doc ? "ready" : "empty");
-    if (!doc) return;
-    const data = (doc.data || {}) as {
-      invoiceNumber?: string;
-      clientName?: string;
-      clientCompany?: string;
-      clientEmail?: string;
-      clientPhone?: string;
-      clientAddress?: string;
-      invoiceDate?: string;
-      dueDate?: string;
-      notes?: string;
-      taxPercent?: string;
-      discountType?: string;
-      discountValue?: string;
-      payments?: unknown;
-      signature?: unknown;
-      payLink?: string;
-      photos?: unknown;
-      showPhotos?: unknown;
-      changeOrderOf?: unknown;
-      changeOrderNotes?: unknown;
-      proposalSignature?: unknown;
-      paymentAmount?: string;
-      paymentMethod?: string;
-      paymentDate?: string;
-      paymentRef?: string;
-      items?: LineItem[];
-      status?: string;
-      jobTime?: string;
-    };
-    setDocId(doc.id);
-    setInvoiceNumber(data.invoiceNumber || doc.title);
-    setClientName(data.clientName || doc.clientName);
-    setClientCompany(data.clientCompany || "");
-    setClientEmail(data.clientEmail || "");
-    setClientPhone(data.clientPhone || "");
-    setClientAddress(data.clientAddress || "");
-    setInvoiceDate(data.invoiceDate || "");
-    setDueDate(data.dueDate || "");
-    setNotes(data.notes || "");
-    setTaxPercent(data.taxPercent || "0");
-    setDiscountType(data.discountType || "percent");
-    setDiscountValue(data.discountValue || "");
-    setPayments(readPayments(data));
-    setSignature(readSignature(data.signature));
-    setDocPayLink(data.payLink || "");
-    setPhotos(data.showPhotos === true ? readPhotos(data.photos) : []);
-    setChangeOrderOf(readChangeOrderOf(data.changeOrderOf));
-    // Stored notes, plus any change orders found by search (e.g. made before notes existed).
-    const found = changeOrdersFor(docs, doc.id).map((order) => ({ id: order.id, number: order.number, createdAt: "" }));
-    setChangeOrderNotes(mergeChangeOrderNotes(readChangeOrderNotes(data.changeOrderNotes), found));
-    setProposalSignature(readSignature(data.proposalSignature));
-    setItems(data.items || []);
-    setStages(doc.type === "invoice" ? readStages((doc.data as Record<string, unknown> | undefined)?.stages) : []);
-    setStatus(data.status || "draft");
-    setJobTime(data.jobTime || "");
-    setApproval(readApproval(doc.data?.approval));
-    refreshApproval(doc.id).then((latest) => { if (latest !== undefined) setApproval(latest); });
+      const openId = new URLSearchParams(window.location.search).get("id") || window.localStorage.getItem("clientready-open-document");
+      const docsRaw = window.localStorage.getItem("clientready-documents");
+      const docs = openId && docsRaw ? (JSON.parse(docsRaw) as SavedDocument[]) : [];
+      const doc = docs.find((item) => item.id === openId && item.type === "invoice");
+      setViewState(doc ? "ready" : "empty");
+      if (!doc) return;
+      const data = (doc.data || {}) as {
+        invoiceNumber?: string;
+        clientName?: string;
+        clientCompany?: string;
+        clientEmail?: string;
+        clientPhone?: string;
+        clientAddress?: string;
+        invoiceDate?: string;
+        dueDate?: string;
+        notes?: string;
+        taxPercent?: string;
+        discountType?: string;
+        discountValue?: string;
+        payments?: unknown;
+        signature?: unknown;
+        payLink?: string;
+        photos?: unknown;
+        showPhotos?: unknown;
+        changeOrderOf?: unknown;
+        changeOrderNotes?: unknown;
+        proposalSignature?: unknown;
+        paymentAmount?: string;
+        paymentMethod?: string;
+        paymentDate?: string;
+        paymentRef?: string;
+        items?: LineItem[];
+        status?: string;
+        jobTime?: string;
+      };
+      setDocId(doc.id);
+      setInvoiceNumber(data.invoiceNumber || doc.title);
+      setClientName(data.clientName || doc.clientName);
+      setClientCompany(data.clientCompany || "");
+      setClientEmail(data.clientEmail || "");
+      setClientPhone(data.clientPhone || "");
+      setClientAddress(data.clientAddress || "");
+      setInvoiceDate(data.invoiceDate || "");
+      setDueDate(data.dueDate || "");
+      setNotes(data.notes || "");
+      setTaxPercent(data.taxPercent || "0");
+      setDiscountType(data.discountType || "percent");
+      setDiscountValue(data.discountValue || "");
+      setPayments(readPayments(data));
+      setSignature(readSignature(data.signature));
+      setDocPayLink(data.payLink || "");
+      setPhotos(data.showPhotos === true ? readPhotos(data.photos) : []);
+      setChangeOrderOf(readChangeOrderOf(data.changeOrderOf));
+      // Stored notes, plus any change orders found by search (e.g. made before notes existed).
+      const found = changeOrdersFor(docs, doc.id).map((order) => ({ id: order.id, number: order.number, createdAt: "" }));
+      setChangeOrderNotes(mergeChangeOrderNotes(readChangeOrderNotes(data.changeOrderNotes), found));
+      setProposalSignature(readSignature(data.proposalSignature));
+      setItems(data.items || []);
+      setStages(doc.type === "invoice" ? readStages((doc.data as Record<string, unknown> | undefined)?.stages) : []);
+      setStatus(data.status || "draft");
+      setJobTime(data.jobTime || "");
+      setApproval(readApproval(doc.data?.approval));
+      refreshApproval(doc.id).then((latest) => { if (latest !== undefined) setApproval(latest); });
+    }
+    Promise.resolve().then(load);
   }, []);
 
   const totals = useMemo(() => {

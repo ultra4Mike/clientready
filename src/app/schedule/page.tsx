@@ -38,15 +38,17 @@ export default function SchedulePage() {
   useEffect(() => {
     const clientsRaw = window.localStorage.getItem("clientready-clients");
     const apptRaw = window.localStorage.getItem("clientready-appointments");
-    if (clientsRaw) setClients(JSON.parse(clientsRaw));
-    if (apptRaw) setAppointments(JSON.parse(apptRaw));
+    Promise.resolve().then(() => {
+      if (clientsRaw) setClients(JSON.parse(clientsRaw));
+      if (apptRaw) setAppointments(JSON.parse(apptRaw));
+    });
     // Jobs scheduled on invoices/proposals: the same source as the calendar, from today on.
     const readJobs = () => {
       const raw = window.localStorage.getItem("clientready-documents");
       const today = localYmd();
       setJobs(scheduledJobs(raw ? uniqueDocs(JSON.parse(raw) as ScheduledJob["doc"][]) : []).filter(({ schedule }) => schedule.date >= today));
     };
-    readJobs();
+    Promise.resolve().then(readJobs);
     loadAccountIntoCache().catch(() => false).then(() => { readJobs(); setLoaded(true); });
   }, []);
 
