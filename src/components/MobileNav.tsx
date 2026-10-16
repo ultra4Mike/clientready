@@ -29,7 +29,7 @@ export const NAV_GROUPS = [
   { label: "Money", links: ["/documents", "/collect", "/reports", "/year"].map(byHref) },
   { label: "Team", links: ["/employees"].map(byHref) },
 ];
-export const BOTTOM_LINKS = [{ href: "/profile", label: "Settings" }, byHref("/backup")];
+export const BOTTOM_LINKS = [{ href: "/profile", label: "Settings" }, byHref("/backup"), { href: "/help", label: "Help" }];
 
 const QUICK_CREATE = [
   { href: "/invoice", label: "New invoice" },
