@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 import { allTombstones, flushDeletes, recordDelete } from "./doc-tombstones";
 import { markSynced, markUnsynced } from "./sync-status";
 import { keepStripePayments } from "./payments";
+import { mergeScheduleBlocks } from "./schedule-merge";
 
 export type CloudDoc = {
   id: string;
@@ -88,9 +89,10 @@ export async function saveCloudDocument(doc: CloudDoc) {
       if (cloudApproval) doc.data.approval = cloudApproval;
       else delete doc.data.approval;
       // A crew member may have updated the job status in the cloud since this copy was loaded.
-      const cloudSchedule = (current.data as Record<string, unknown> | null)?.schedule as { updatedAt?: string } | undefined;
-      const mine = doc.data.schedule as { updatedAt?: string } | undefined;
-      if (cloudSchedule && (!mine || Date.parse(cloudSchedule.updatedAt || "") > Date.parse(mine.updatedAt || ""))) doc.data.schedule = cloudSchedule;
+      // Field-wise: their status/done/on-my-way is kept, but this save's date/time/crew are never replaced by an older plan.
+      const cloudSchedule = (current.data as Record<string, unknown> | null)?.schedule as Record<string, unknown> | undefined;
+      const mine = doc.data.schedule as Record<string, unknown> | undefined;
+      if (cloudSchedule) doc.data.schedule = mergeScheduleBlocks(mine, cloudSchedule, "local");
       // Card payments recorded by Stripe on the server are never dropped by a save from an older copy.
       const withStripe = keepStripePayments(doc.data, current.data as Record<string, unknown> | null);
       if (withStripe !== doc.data) Object.assign(doc.data, withStripe);
