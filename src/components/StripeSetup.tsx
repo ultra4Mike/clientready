@@ -89,7 +89,7 @@ export default function StripeSetup() {
         </ol>
       )}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <input aria-label="Stripe webhook URL" readOnly value={webhookUrl} onFocus={(event) => event.target.select()} className="w-full min-w-0 rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 font-mono text-xs sm:flex-1" />
+        <input name="stripeWebhookUrl" aria-label="Stripe webhook URL" readOnly value={webhookUrl} onFocus={(event) => event.target.select()} className="w-full min-w-0 rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 font-mono text-xs sm:flex-1" />
         <button type="button" onClick={() => copy(webhookUrl, "Webhook URL")} className="min-h-11 rounded-lg border border-teal-500/30 px-3 py-2 text-sm font-medium transition hover:border-teal-500 sm:min-h-0 sm:shrink-0 sm:text-xs">Copy webhook URL</button>
       </div>
         </div>

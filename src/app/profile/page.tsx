@@ -180,59 +180,59 @@ export default function ProfilePage() {
           <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600 sm:col-span-2">Business info</h2>
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
           Business name
-          <input className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Business name" value={profile.businessName} onChange={(event) => update("businessName", event.target.value)} />
+          <input name="businessName" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Business name" value={profile.businessName} onChange={(event) => update("businessName", event.target.value)} />
         </label>
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
           Your name
-          <input className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Your name" value={profile.ownerName} onChange={(event) => update("ownerName", event.target.value)} />
+          <input name="ownerName" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Your name" value={profile.ownerName} onChange={(event) => update("ownerName", event.target.value)} />
         </label>
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
           Business email
-          <input className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Business email" value={profile.email} onChange={(event) => update("email", event.target.value)} />
+          <input name="email" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Business email" value={profile.email} onChange={(event) => update("email", event.target.value)} />
         </label>
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
           Phone
-          <input className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Phone" value={profile.phone} onChange={(event) => update("phone", event.target.value)} />
+          <input name="phone" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Phone" value={profile.phone} onChange={(event) => update("phone", event.target.value)} />
         </label>
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
           Address
-          <input className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Address" value={profile.address} onChange={(event) => update("address", event.target.value)} />
+          <input name="address" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Address" value={profile.address} onChange={(event) => update("address", event.target.value)} />
         </label>
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
           Website
-          <input className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Website" value={profile.website} onChange={(event) => update("website", event.target.value)} />
+          <input name="website" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Website" value={profile.website} onChange={(event) => update("website", event.target.value)} />
         </label>
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
           Tax ID / EIN
-          <input className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Tax ID / EIN" value={profile.taxId} onChange={(event) => update("taxId", event.target.value)} />
+          <input name="taxId" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Tax ID / EIN" value={profile.taxId} onChange={(event) => update("taxId", event.target.value)} />
         </label>
         <TimezoneCombobox value={timezone} onChange={setTimezone} address={profile.address} />
         <label className="block text-sm font-medium text-[var(--cr-muted)] sm:col-span-2">
           Default payment terms
-          <textarea className="mt-1.5 min-h-24 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Default payment terms" value={profile.paymentTerms} onChange={(event) => update("paymentTerms", event.target.value)} />
+          <textarea name="paymentTerms" className="mt-1.5 min-h-24 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Default payment terms" value={profile.paymentTerms} onChange={(event) => update("paymentTerms", event.target.value)} />
         </label>
         </div>
         <div id="payments" className="scroll-mt-24 space-y-3 rounded-xl border border-teal-500/20 p-4 sm:p-5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Payments, savings & logo</h2>
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
           How customers pay you
-          <input className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Venmo, Cash App, Zelle, or a payment URL" value={profile.paymentLink} onChange={(event) => update("paymentLink", event.target.value)} />
+          <input name="paymentLink" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Venmo, Cash App, Zelle, or a payment URL" value={profile.paymentLink} onChange={(event) => update("paymentLink", event.target.value)} />
         </label>
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
           Set aside % of profit
-          <input className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="30" value={profile.setAsidePercent} onChange={(event) => update("setAsidePercent", event.target.value)} />
+          <input name="setAsidePercent" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="30" value={profile.setAsidePercent} onChange={(event) => update("setAsidePercent", event.target.value)} />
         </label>
         <p className="-mt-1 text-xs text-[var(--cr-muted)]">Default is 30%. This is a cushion for taxes. It is not a tax return.</p>
         <fieldset className="space-y-2" data-testid="late-fee-settings">
           <legend className="text-sm font-medium text-[var(--cr-muted)]">Late fee (suggested only, you add it yourself)</legend>
           <div className="grid grid-cols-3 gap-2">
-            <select aria-label="Late fee type" data-testid="late-fee-type" className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm" value={profile.lateFeeType} onChange={(event) => update("lateFeeType", event.target.value)}>
+            <select name="lateFeeType" aria-label="Late fee type" data-testid="late-fee-type" className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm" value={profile.lateFeeType} onChange={(event) => update("lateFeeType", event.target.value)}>
               <option value="off">Off</option>
               <option value="flat">Flat $</option>
               <option value="percent">% of unpaid</option>
             </select>
-            <input aria-label="Late fee amount" data-testid="late-fee-value" inputMode="decimal" placeholder={profile.lateFeeType === "percent" ? "5" : "25"} className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm" value={profile.lateFeeValue} onChange={(event) => update("lateFeeValue", event.target.value)} disabled={profile.lateFeeType === "off"} />
-            <input aria-label="Grace days after due date" data-testid="late-fee-grace" inputMode="numeric" placeholder="Grace days" className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm" value={profile.lateFeeGraceDays} onChange={(event) => update("lateFeeGraceDays", event.target.value)} disabled={profile.lateFeeType === "off"} />
+            <input name="lateFeeValue" aria-label="Late fee amount" data-testid="late-fee-value" inputMode="decimal" placeholder={profile.lateFeeType === "percent" ? "5" : "25"} className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm" value={profile.lateFeeValue} onChange={(event) => update("lateFeeValue", event.target.value)} disabled={profile.lateFeeType === "off"} />
+            <input name="lateFeeGraceDays" aria-label="Grace days after due date" data-testid="late-fee-grace" inputMode="numeric" placeholder="Grace days" className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm" value={profile.lateFeeGraceDays} onChange={(event) => update("lateFeeGraceDays", event.target.value)} disabled={profile.lateFeeType === "off"} />
           </div>
           <p className="text-xs text-[var(--cr-muted)]">After the due date plus grace days, an unpaid invoice shows a suggested late fee. Nothing is added or sent unless you tap it.</p>
         </fieldset>
@@ -257,8 +257,8 @@ export default function ProfilePage() {
       <form id="password" onSubmit={changePassword} className="scroll-mt-24 mt-6 space-y-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none sm:p-6">
         <h2 className="text-lg font-bold tracking-tight">Login password</h2>
         <p className="text-sm text-[var(--cr-muted)]">Login email: {loginEmail || "Not signed in"}</p>
-        <input type="password" className="w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Current password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
-        <input type="password" className="w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="New password" value={nextPassword} onChange={(event) => setNextPassword(event.target.value)} />
+        <input type="password" name="currentPassword" aria-label="Current password" autoComplete="current-password" className="w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Current password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
+        <input type="password" name="newPassword" aria-label="New password" autoComplete="new-password" className="w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="New password" value={nextPassword} onChange={(event) => setNextPassword(event.target.value)} />
         <button type="submit" className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50 w-full sm:w-auto">Update password</button>
         {passwordMessage && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-[var(--cr-muted)]">{passwordMessage}</p>}
       </form>
