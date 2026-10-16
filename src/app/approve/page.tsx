@@ -16,6 +16,9 @@ import SignaturePad from "@/components/SignaturePad";
 import { fetchPortalDoc, portalApprove } from "@/lib/portal";
 import { StageSchedule } from "@/components/StageSchedule";
 import RatingBox from "@/components/Rating";
+import PayOptions from "@/components/PayOptions";
+import { fetchPublicPaymentMethods } from "@/lib/payments/public";
+import type { PaymentMethodsConfig } from "@/lib/payments/providers";
 import { payNowAmount, readStages, todayYmd } from "@/lib/stages";
 import type { Signature } from "@/lib/signature";
 
@@ -42,11 +45,13 @@ export default function ApprovePage() {
   const [portal, setPortal] = useState<{ p: string; d: string } | null>(null);
   const [mySignature, setMySignature] = useState<Signature | null>(null);
   const [approvalSignature, setApprovalSignature] = useState<Signature | null>(null);
+  const [payMethods, setPayMethods] = useState<PaymentMethodsConfig>({});
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
     const t = query.get("t") || "";
     const viaPortal = query.get("p") && query.get("d") ? { p: query.get("p") || "", d: query.get("d") || "" } : null;
+    if (viaPortal || t) fetchPublicPaymentMethods(viaPortal ? { portal: viaPortal.p } : { token: t }).then(setPayMethods).catch(() => {});
     // Keep the token out of logs/analytics referrers on outbound links.
     const meta = document.createElement("meta");
     meta.name = "referrer";
@@ -250,6 +255,7 @@ export default function ApprovePage() {
               {cardEnabled && totals.balance >= 0.5 && <p className="mt-2 text-xs text-slate-500">Secure checkout by Stripe. {payNow < totals.balance ? "You pay the amount due now; the rest follows the payment schedule." : "You pay what is still owed."}</p>}
             </div>
           )}
+          {!isProposal && text(data.status) !== "paid" && totals.balance > 0.004 && <PayOptions config={payMethods} amount={totals.balance} reference={number} publicCopy />}
           {!isProposal && <StageSchedule stages={stages} total={totals.total} balance={totals.balance} />}
           {text(data.notes) && <p className="mt-3 text-sm text-slate-600">{text(data.notes)}</p>}
           {data.showPhotos === true && <JobPhotoStrip photos={readPhotos(data.photos)} />}

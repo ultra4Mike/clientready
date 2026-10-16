@@ -1,5 +1,7 @@
 "use client";
 
+import PayOptions from "@/components/PayOptions";
+import { readLocalPaymentMethods, type PaymentMethodsConfig } from "@/lib/payments/providers";
 import { StageSchedule } from "@/components/StageSchedule";
 import { readStages, type Stage } from "@/lib/stages";
 import { useEffect, useMemo, useState } from "react";
@@ -58,6 +60,8 @@ export default function InvoiceViewPage() {
   const [proposalSignature, setProposalSignature] = useState<Signature | null>(null);
   const [items, setItems] = useState<LineItem[]>([]);
   const [status, setStatus] = useState("");
+  const [payMethods, setPayMethods] = useState<PaymentMethodsConfig>({});
+  useEffect(() => { Promise.resolve().then(() => setPayMethods(readLocalPaymentMethods())); }, []);
   const [businessName, setBusinessName] = useState("");
   const [logo, setLogo] = useState("");
   const [jobTime, setJobTime] = useState("");
@@ -335,6 +339,7 @@ export default function InvoiceViewPage() {
             </div>
           </div>
 
+          {status !== "paid" && totals.balance > 0.004 && <PayOptions config={payMethods} amount={totals.balance} reference={invoiceNumber} />}
           <StageSchedule stages={stages} total={totals.total} balance={totals.balance} />
           {notes && <p className="mt-6 whitespace-pre-line text-sm text-slate-600">{notes}</p>}
           <JobPhotoStrip photos={photos} />

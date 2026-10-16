@@ -26,6 +26,8 @@ import { JobPhotosEditor, JobPhotoStrip } from "@/components/JobPhotos";
 import { currentDocId } from "@/lib/doc-sync";
 import { isQuotaError, readPhotos, type JobPhoto } from "@/lib/photos";
 import LineSplit from "@/components/LineSplit";
+import PayOptions from "@/components/PayOptions";
+import { markPaidChoices, readLocalPaymentMethods, type PaymentMethodsConfig } from "@/lib/payments/providers";
 import { completeMessage, mailHref, scheduledMessage } from "@/lib/job-messages";
 import { clientFromRow, readCachedClients } from "@/lib/client-rows";
 import { ownerRating, starsText, type Rating } from "@/lib/ratings";
@@ -198,6 +200,9 @@ export default function NewInvoicePage() {
   const [rating, setRating] = useState<Rating | null>(null);
   const [jobMsg, setJobMsg] = useState<{ kind: string; text: string } | null>(null);
   const [jobMsgCopied, setJobMsgCopied] = useState(false);
+  const [payMethods, setPayMethods] = useState<PaymentMethodsConfig>({});
+  const [markMethod, setMarkMethod] = useState("Cash");
+  useEffect(() => { Promise.resolve().then(() => setPayMethods(readLocalPaymentMethods())); }, []);
   useEffect(() => {
     let live = true;
     Promise.resolve().then(() => { if (live) setRating(null); });
@@ -448,8 +453,9 @@ export default function NewInvoicePage() {
   async function markPaidCash() {
     const amount = totals.balance;
     if (locked || isProposal || !(amount > 0.004)) return;
-    if (!window.confirm(`Record a cash payment of $${amount.toFixed(2)} today and mark this invoice paid?`)) return;
-    const nextPayments = [...payments.filter((payment) => Number(payment.amount) > 0), { id: Date.now().toString(), amount: amount.toFixed(2), method: "Cash", date: ymd(new Date()), ref: "" }];
+    const method = markMethod || "Cash";
+    if (!window.confirm(`Record a ${method === "Cash" ? "cash" : method} payment of $${amount.toFixed(2)} today and mark this invoice paid?`)) return;
+    const nextPayments = [...payments.filter((payment) => Number(payment.amount) > 0), { id: Date.now().toString(), amount: amount.toFixed(2), method, date: ymd(new Date()), ref: "" }];
     setPayments(nextPayments);
     setStatus("paid");
     await saveDocument({ payments: nextPayments, status: "paid" });
@@ -1148,7 +1154,14 @@ export default function NewInvoicePage() {
                 </div>
               );
             })()}
-            {!locked && !isProposal && docId && status !== "paid" && totals.balance > 0.004 && <button type="button" data-testid="mark-paid-cash" onClick={markPaidCash} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Mark paid in cash (${totals.balance.toFixed(2)})</button>}
+            {!locked && !isProposal && docId && status !== "paid" && totals.balance > 0.004 && (
+              <span className="inline-flex flex-wrap items-center gap-2">
+                <select aria-label="Paid with" name="markPaidMethod" data-testid="mark-paid-method" value={markMethod} onChange={(event) => setMarkMethod(event.target.value)} className="min-h-11 rounded-lg border border-slate-300 bg-transparent px-3 text-sm">
+                  {markPaidChoices(payMethods, paymentMethods).map((method) => <option key={method} value={method}>{method}</option>)}
+                </select>
+                <button type="button" data-testid="mark-paid-cash" onClick={markPaidCash} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">{markMethod === "Cash" ? "Mark paid in cash" : `Mark paid by ${markMethod}`} (${totals.balance.toFixed(2)})</button>
+              </span>
+            )}
             {!isProposal && docId && status !== "draft" && status !== "paid" && totals.balance > 0 && <button type="button" data-testid="invoice-reminder" onClick={() => setReminderOpen((open) => !open)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Reminder</button>}
           </div>
           {docId && <div className="print-hide mb-4 -mt-2"><button type="button" data-testid="invoice-email" onClick={() => setEmailOpen((open) => !open)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">{emailOpen ? "Close email" : `Email ${isProposal ? "proposal" : "invoice"}…`}</button></div>}
@@ -1241,6 +1254,7 @@ export default function NewInvoicePage() {
                 {(!isProposal || totals.paid > 0) && <div className="mt-1 flex justify-between border-t border-slate-500 pt-1 text-lg font-bold"><span>{isProposal ? "Balance after deposit" : "Still owed"}</span><span data-testid="preview-still-owed">${totals.balance.toFixed(2)}</span></div>}
               </div>
             </div>
+            {!isProposal && status !== "paid" && totals.balance > 0.004 && <PayOptions config={payMethods} amount={totals.balance} reference={invoiceNumber} />}
             {!isProposal && <StageSchedule stages={stages} total={totals.total} balance={totals.balance} muted={mutedClass} />}
             {notes && <p className={`mt-3 text-sm ${mutedClass}`}>{notes}</p>}
             {showPhotos && <JobPhotoStrip photos={photos} muted={mutedClass} />}

@@ -36,6 +36,7 @@ const keys = [
   "clientready-packages",
   "clientready-mileage",
   "clientready-inventory",
+  "clientready-payment-methods",
 ];
 
 
@@ -96,6 +97,8 @@ export async function loadAccountIntoCache(): Promise<boolean> {
         ...lateFeeFields(profile),
       })
     );
+    // Payment methods shown to customers (migration 20261016070000).
+    if ("payment_methods" in profile) window.localStorage.setItem("clientready-payment-methods", JSON.stringify(profile.payment_methods || {}));
     // Job packages (migration 20261016020000): merge with this device's list; the invoice editor pushes local changes.
     if ("packages" in profile) {
       const { mergePackages, PACKAGES_KEY } = await import("@/lib/packages");

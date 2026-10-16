@@ -1,5 +1,6 @@
 "use client";
 
+import PaymentMethodsSettings from "@/components/PaymentMethodsSettings";
 import TimezoneCombobox from "@/components/TimezoneCombobox";
 import LegalLinks from "@/components/LegalLinks";
 import { FormEvent, useEffect, useState } from "react";
@@ -254,6 +255,8 @@ export default function ProfilePage() {
         </button>
         {message && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-[var(--cr-muted)]">{message}</p>}
       </form>
+
+      <PaymentMethodsSettings />
 
       <form id="password" onSubmit={changePassword} className="scroll-mt-24 mt-6 space-y-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none sm:p-6">
         <h2 className="text-lg font-bold tracking-tight">Login password</h2>

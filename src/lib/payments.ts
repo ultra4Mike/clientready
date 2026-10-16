@@ -1,7 +1,7 @@
 /** tip: extra the client gave on top of the bill; never counts toward the balance. */
 export type Payment = { id: string; amount: string; method: string; date: string; ref: string; tip?: string };
 
-export const paymentMethods = ["Cash", "Check", "Venmo", "Cash App", "Zelle", "Bank", "Card", "Other"];
+export const paymentMethods = ["Cash", "Check", "Venmo", "Cash App", "Zelle", "PayPal", "Bank", "Card", "Other"];
 
 type PaymentData = {
   payments?: unknown;

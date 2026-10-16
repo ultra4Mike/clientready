@@ -1,5 +1,8 @@
 "use client";
 
+import PayOptions from "@/components/PayOptions";
+import { fetchPublicPaymentMethods } from "@/lib/payments/public";
+import type { PaymentMethodsConfig } from "@/lib/payments/providers";
 import { useEffect, useState } from "react";
 import LegalLinks from "@/components/LegalLinks";
 import { fetchPortal, portalDocUrl, type PortalBusiness, type PortalDoc } from "@/lib/portal";
@@ -23,8 +26,10 @@ export default function PortalPage() {
   const [state, setState] = useState<"loading" | "ready" | "missing" | "error">("loading");
   const [portal, setPortal] = useState<{ clientName: string; business: PortalBusiness; documents: PortalDoc[] } | null>(null);
 
+  const [payMethods, setPayMethods] = useState<PaymentMethodsConfig>({});
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("t") || "";
+    if (t) fetchPublicPaymentMethods({ portal: t }).then(setPayMethods).catch(() => {});
     const meta = document.createElement("meta");
     meta.name = "referrer";
     meta.content = "no-referrer";
@@ -68,6 +73,7 @@ export default function PortalPage() {
           <h1 className="text-2xl font-bold tracking-tight">Documents for {portal.clientName}</h1>
           <p className="mt-1 text-sm text-slate-600">{[portal.business.email, portal.business.phone].filter(Boolean).join(" · ")}</p>
           <p className={`mt-4 inline-flex flex-wrap items-baseline gap-x-2 rounded-xl px-4 py-3 text-lg font-semibold ${owed > 0 ? "cr-tone-warn bg-amber-50 text-amber-900 ring-1 ring-amber-200" : "cr-tone-good bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200"}`} data-testid="portal-owed">Total still owed: <span className="text-2xl font-bold tabular-nums">${owed.toFixed(2)}</span></p>
+          {owed > 0 && <PayOptions config={payMethods} amount={owed} reference="" publicCopy />}
           </div>
         </div>
         <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white shadow-sm" data-testid="portal-list">
