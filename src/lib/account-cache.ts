@@ -111,6 +111,7 @@ export async function loadAccountIntoCache(): Promise<boolean> {
         nextVisit: row.next_visit || "",
         visitTime: row.visit_time || "",
         notes: row.notes || "",
+        ...(typeof row.updated_at === "string" && row.updated_at ? { updated_at: row.updated_at } : {}),
       }))
     )
   );

@@ -19,6 +19,7 @@ type Client = {
   nextVisit: string;
   visitTime: string;
   notes: string;
+  updated_at?: string; // cloud baseline for the contact retry queue (absent before migration 20261016000000)
 };
 
 const emptyClient = {
@@ -43,6 +44,7 @@ function fromRow(row: Record<string, string>) {
     nextVisit: row.next_visit || "",
     visitTime: row.visit_time || "",
     notes: row.notes || "",
+    ...(typeof row.updated_at === "string" && row.updated_at ? { updated_at: row.updated_at } : {}),
   };
 }
 

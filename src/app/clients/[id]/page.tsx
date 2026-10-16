@@ -38,7 +38,7 @@ export default function ClientRecordPage() {
       if (data.user) {
         const { data: rows } = await supabase.from("clients").select("*").eq("user_id", data.user.id);
         if (Array.isArray(rows) && rows.length) {
-          const next = rows.map((row) => ({ id: row.id, name: row.name || "", company: row.company || "", email: row.email || "", phone: row.phone || "", address: row.address || "", notes: row.notes || "" }));
+          const next = rows.map((row) => ({ id: row.id, name: row.name || "", company: row.company || "", email: row.email || "", phone: row.phone || "", address: row.address || "", notes: row.notes || "", ...(typeof row.updated_at === "string" && row.updated_at ? { updated_at: row.updated_at } : {}) }));
           window.localStorage.setItem("clientready-clients", JSON.stringify(next));
         }
       }
