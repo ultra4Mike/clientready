@@ -65,7 +65,7 @@ export default function HistoryPage() {
         <PageHeader title="Client history" subtitle="Pick a client to see every document attached to them." />
 
         <select
-          className="mt-6 w-full max-w-md rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+          className="min-h-11 mt-6 w-full max-w-md rounded-lg border border-slate-300 px-3 py-2.5 text-base sm:text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
           value={selectedName}
           onChange={(event) => setSelectedName(event.target.value)}
         >
