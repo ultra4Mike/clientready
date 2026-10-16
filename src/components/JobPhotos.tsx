@@ -59,7 +59,7 @@ export function JobPhotosEditor({ photos, onChange, showOnCopy = false, onShowOn
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={photo.dataUrl} alt={photo.caption || "Job photo"} className="aspect-square w-full rounded-lg object-cover" />
               <input className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" maxLength={60} placeholder="Caption (optional)" value={photo.caption} onChange={(event) => onChange(photos.map((item) => item.id === photo.id ? { ...item, caption: event.target.value } : item))} />
-              <select aria-label="Before or after" name="photoTag" data-testid="photo-tag" className="w-full rounded-md border border-slate-300 bg-transparent px-2 py-1.5 text-sm" value={photo.tag || ""} onChange={(event) => { const tag = event.target.value as PhotoTag; onChange(photos.map((item) => { if (item.id !== photo.id) return item; const { tag: _old, ...rest } = item; void _old; return tag ? { ...rest, tag } : rest; })); }}>
+              <select aria-label="Before or after" name="photoTag" data-testid="photo-tag" className="min-h-11 w-full rounded-lg border border-slate-300 bg-transparent px-2 text-base sm:min-h-9 sm:text-sm" value={photo.tag || ""} onChange={(event) => { const tag = event.target.value as PhotoTag; onChange(photos.map((item) => { if (item.id !== photo.id) return item; const { tag: _old, ...rest } = item; void _old; return tag ? { ...rest, tag } : rest; })); }}>
                 <option value="">No tag</option>
                 <option value="before">Before</option>
                 <option value="after">After</option>
@@ -93,9 +93,9 @@ export function JobPhotoStrip({ photos, muted = "text-slate-600" }: { photos: Jo
           <figure key={photo.id} className="min-w-0" data-tag={photo.tag || undefined}>
             <button type="button" className="photo-thumb block w-full" onClick={() => setOpen(photo)} aria-label="Enlarge photo">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={photo.dataUrl} alt={photo.caption || "Job photo"} className="aspect-square w-full rounded object-cover" />
+              <img src={photo.dataUrl} alt={photo.caption || "Job photo"} className={`aspect-square w-full rounded-lg object-cover ${photo.tag === "after" ? "ring-2 ring-emerald-500/60" : photo.tag ? "ring-2 ring-amber-500/60" : ""}`} />
             </button>
-            {(photo.tag || photo.caption) && <figcaption className={`photo-caption truncate text-xs ${muted}`}>{photo.tag && <span className="font-semibold" data-testid="photo-tag-label">{PHOTO_TAG_LABEL[photo.tag]}{photo.caption ? ": " : ""}</span>}{photo.caption}</figcaption>}
+            {(photo.tag || photo.caption) && <figcaption className={`photo-caption truncate text-xs ${muted}`}>{photo.tag && <span className={`mr-1 inline-block rounded-full px-1.5 py-px text-[10px] font-bold uppercase tracking-wide ${photo.tag === "after" ? "cr-tone-good bg-emerald-100 text-emerald-800" : "cr-tone-warn bg-amber-100 text-amber-800"}`} data-testid="photo-tag-label">{PHOTO_TAG_LABEL[photo.tag]}{photo.caption ? ": " : ""}</span>}{photo.caption}</figcaption>}
           </figure>
         ))}
       </div>
