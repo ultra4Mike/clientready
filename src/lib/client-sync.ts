@@ -33,42 +33,67 @@ export async function syncClientContact(clientId: string, contact: Contact): Pro
   if (!Object.keys(patch).length) return null;
   const next = clients.map((client) => (client.id === target.id ? { ...client, ...patch } : client));
   window.localStorage.setItem(CLIENTS_KEY, JSON.stringify(next));
-  queueContactPatch(target.id, patch);
-  await flushClientContactQueue();
+  const userId = await getUserId().catch(() => "");
+  if (userId) {
+    queueContactPatch(userId, target.id, patch);
+    await flushClientContactQueue();
+  }
   return next;
 }
 
-const QUEUE_KEY = "clientready-client-sync-queue";
-type Queue = Record<string, Partial<Contact>>;
+const QUEUE_PREFIX = "clientready-client-sync-queue:";
+type Queued = { patch: Partial<Contact>; queuedAt: string };
+type Queue = Record<string, Queued>;
+const queueKey = (userId: string) => `${QUEUE_PREFIX}${userId}`;
 
-function readQueue(): Queue {
+function readQueue(userId: string): Queue {
   try {
-    return JSON.parse(window.localStorage.getItem(QUEUE_KEY) || "{}") || {};
+    return JSON.parse(window.localStorage.getItem(queueKey(userId)) || "{}") || {};
   } catch {
     return {};
   }
 }
 
-function queueContactPatch(id: string, patch: Partial<Contact>) {
-  const queue = readQueue();
-  queue[id] = { ...(queue[id] || {}), ...patch };
-  window.localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+function writeQueue(userId: string, queue: Queue) {
+  if (Object.keys(queue).length) window.localStorage.setItem(queueKey(userId), JSON.stringify(queue));
+  else window.localStorage.removeItem(queueKey(userId));
+}
+
+function queueContactPatch(userId: string, id: string, patch: Partial<Contact>) {
+  const queue = readQueue(userId);
+  queue[id] = { patch: { ...(queue[id]?.patch || {}), ...patch }, queuedAt: new Date().toISOString() };
+  writeQueue(userId, queue);
 }
 
 /**
- * Sends queued client contact updates to the cloud. A failed update (offline, signed out, error)
- * stays queued and is retried on the next call. Returns how many are still waiting.
+ * Sends the signed-in user's queued client contact updates to the cloud. The queue is kept per user
+ * id, so switching accounts never sends (or drops) another account's updates. A failed update stays
+ * queued for the next call; an update is skipped when the cloud row was changed after it was queued
+ * (when the clients table has updated_at). Returns how many are still waiting.
  */
 export async function flushClientContactQueue(): Promise<number> {
-  const queue = readQueue();
-  const ids = Object.keys(queue);
-  if (!ids.length) return 0;
-  const userId = await getUserId().catch(() => null);
-  if (!userId) return ids.length;
-  for (const id of ids) {
-    const { error } = await supabase.from("clients").update(queue[id]).eq("id", id).eq("user_id", userId);
+  const userId = await getUserId().catch(() => "");
+  if (!userId) return 0;
+  const queue = readQueue(userId);
+  for (const id of Object.keys(queue)) {
+    const { patch, queuedAt } = queue[id];
+    const { data: row, error: readError } = await supabase.from("clients").select("*").eq("id", id).eq("user_id", userId).maybeSingle();
+    if (readError) continue; // offline or error: keep for next time
+    if (!row) {
+      delete queue[id]; // client gone from this account
+      continue;
+    }
+    const cloudUpdated = typeof (row as Record<string, unknown>).updated_at === "string" ? String((row as Record<string, unknown>).updated_at) : "";
+    if (cloudUpdated && new Date(cloudUpdated).getTime() > new Date(queuedAt).getTime()) {
+      delete queue[id]; // a newer edit is already in the cloud: don't overwrite it
+      continue;
+    }
+    const update = cloudUpdated ? { ...patch, updated_at: new Date().toISOString() } : patch;
+    const { error } = await supabase.from("clients").update(update).eq("id", id).eq("user_id", userId);
     if (!error) delete queue[id];
   }
-  window.localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+  writeQueue(userId, queue);
+  // The old shared queue (before per-user keys) can't be attributed to an account safely: drop it.
+  window.localStorage.removeItem("clientready-client-sync-queue");
   return Object.keys(queue).length;
 }

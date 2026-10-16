@@ -25,11 +25,13 @@ Shared by the three ClientReady bots. Update the **Status** column when you pick
 | R3 | Stuck-payment orphan: a pending payment whose invoice was deleted and whose checkout predates migration 140000 has no owner → shows in nobody's notice; needs a DB query. | Dev | Open | 2026-10-15 |
 | R4 | Stuck-payment notice on Get paid loads once per page view; new stuck payments need a reload. Not shown on Dashboard. | Dev | Open | 2026-10-15 |
 | R5 | Document sync is "newest updatedAt wins" using device clocks; a wrong device clock can overwrite real edits (only approvals and Stripe payments are protected). | Help | Open | 2026-10-15 |
-| R6 | Client contact retry queue is per device (localStorage), not per user; a queued update can overwrite a newer edit from another device. | Help | Open | 2026-10-15 |
+| R6 | Client contact retry queue is per device (localStorage), not per user; a queued update can overwrite a newer edit from another device. | Help | Done 2026-10-16 — see R12 | 2026-10-15 |
 | R7 | README said "No service-role key is used anywhere" — now corrected (this commit). | Help | Done | 2026-10-15 |
 | R8 | Privacy page (`src/app/privacy/page.tsx`) still says data stays in the browser / cloud storage not live — outdated; needs real copy (owner/legal wording). | Owner + Visual | In progress 2026-10-16 — draft text in place, marked for owner/legal review | 2026-10-15 |
 | R9 | Checkout claim row can be left without a session if the server crashes mid-request (ignored after 2 min; Stripe session still payable and recorded via webhook). | Dev | Open | 2026-10-15 |
 | R10 | New migrations 150000 (review link) and 160000 (crew unavailable) added by other bots — confirm they degrade quietly until run. | Dev | Open | 2026-10-15 |
+| R11 | Pending-payments list (\`/api/pay/pending\`) reads at most 200 unresolved rows across **all** owners before filtering to the signed-in owner, so with many unresolved rows an owner's stuck payment may not show. Fix belongs in payment code — coordinate with Dev before changing. | Help (with Dev) | Open | 2026-10-16 |
+| R12 | Client contact retry queue was not account-scoped (could be dropped after an account switch; a retry could overwrite a newer cloud edit). Fixed in \`src/lib/client-sync.ts\`: queue keyed per user id; update skipped when the cloud row's \`updated_at\` is newer than the queued change (only if the clients table has \`updated_at\`); old shared queue dropped. | Help | Done 2026-10-16 | 2026-10-16 |
 
 ## 3. Help content to verify
 | # | Item | Owner | Status | Added |
@@ -42,7 +44,7 @@ Shared by the three ClientReady bots. Update the **Status** column when you pick
 ## 4. Pending handoffs
 | # | Item | Owner | Status | Added |
 |---|---|---|---|---|
-| P1 | Dev to review payment commits `7b27e47` (webhook pending/idempotency, checkout reuse, client-sync queue) and `a12ed9b` (pending route, StuckPayments, checkout claim guard), and add tests (no test runner exists yet). Note: a12ed9b also fixed a query-builder reuse bug from 7b27e47. | Dev | Open | 2026-10-15 |
+| P1 | Dev to review payment commits `7b27e47` (webhook pending/idempotency, checkout reuse, client-sync queue) and `a12ed9b` (pending route, StuckPayments, checkout claim guard), and add tests (no test runner exists yet). Note: a12ed9b also fixed a query-builder reuse bug from 7b27e47. | Dev | Done 2026-10-16 — Dev reviewed 7b27e47/a12ed9b: no blockers, suites pass | 2026-10-15 |
 
 ## 5. Lint debt
 | # | Item | Owner | Status | Added |
