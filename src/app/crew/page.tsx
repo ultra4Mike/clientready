@@ -78,6 +78,17 @@ function clockTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
+/** Today's stops in time order, plus one Google Maps directions link through every address (from current location). */
+function routeStops(cards: Card[]) {
+  const stops = cards.filter((card) => card.client_address?.trim() && card.schedule_status !== "done");
+  const addresses = stops.map((card) => card.client_address.trim());
+  if (!addresses.length) return { stops, url: "" };
+  const destination = addresses[addresses.length - 1];
+  const waypoints = addresses.slice(0, -1).join("|");
+  const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}${waypoints ? `&waypoints=${encodeURIComponent(waypoints)}` : ""}`;
+  return { stops, url };
+}
+
 /** One card per job: schedule details (time, status, crew note) merged onto this worker's pay row. */
 function buildCards(jobs: Job[]): Card[] {
   const cards: Card[] = [];
@@ -500,6 +511,21 @@ export default function CrewPage() {
           <section className="space-y-3">
             <h2 className="text-xl font-bold tracking-tight">{today ? dayLabel(today) : "Today"}</h2>
             {todayCards.length === 0 && <EmptyState icon="☀" title="Nothing scheduled for you today." className={`${cardClass} border-dashed`} />}
+            {(() => {
+              const route = routeStops(todayCards);
+              if (route.stops.length < 2) return null;
+              return (
+                <div className={cardClass} data-testid="crew-route">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-semibold">Today&apos;s route</h3>
+                    <a href={route.url} target="_blank" rel="noreferrer" className="rounded-xl bg-teal-500 px-3 py-2 text-sm font-semibold text-slate-950" data-testid="crew-route-open">Open route in Maps</a>
+                  </div>
+                  <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm">
+                    {route.stops.map((card) => <li key={card.id} data-testid={`crew-route-stop-${card.id}`}>{card.start_time ? `${timeLabel(card.start_time)} · ` : ""}{card.client_name} — {card.client_address}</li>)}
+                  </ol>
+                </div>
+              );
+            })()}
             {todayCards.map(jobCard)}
           </section>
         )}
