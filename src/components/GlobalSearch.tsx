@@ -43,7 +43,7 @@ export default function GlobalSearch() {
         <div className="fixed inset-0 z-[60] flex items-stretch justify-center bg-slate-950/60 backdrop-blur-sm sm:items-start sm:p-3 sm:pt-[12vh]" onClick={() => setOpen(false)}>
           <div role="dialog" aria-label="Search" data-testid="search-dialog" className="flex w-full flex-col overflow-hidden bg-[var(--cr-panel)] pt-[env(safe-area-inset-top)] text-[var(--cr-text)] shadow-2xl sm:max-w-xl sm:rounded-2xl sm:border sm:border-teal-500/30 sm:pt-0" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center gap-1 border-b border-teal-500/20 pr-2">
-            <input ref={inputRef} type="search" name="q" aria-label="Search invoices, clients and parts" data-testid="search-input" placeholder="Invoice #, client, phone, address, item…" value={query}
+            <input ref={inputRef} type="search" name="q" aria-label="Search invoices, clients and parts" data-testid="search-input" placeholder="Search invoices, clients, items…" value={query}
               onChange={(event) => { setQuery(event.target.value); setActive(0); }}
               onKeyDown={(event) => {
                 if (event.key === "ArrowDown") { event.preventDefault(); setActive((i) => Math.min(i + 1, hits.length - 1)); }

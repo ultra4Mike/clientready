@@ -430,7 +430,8 @@ html.dark .cr-tone-good, html.dark .cr-tone-good * { background-color: rgba(6, 7
 html.dark .cr-tone-warn, html.dark .cr-tone-warn * { background-color: rgba(120, 53, 15, 0.45) !important; color: #fde68a !important; border-color: rgba(180, 83, 9, 0.7) !important; --tw-ring-color: rgba(180, 83, 9, 0.7) !important; }
 html.dark .cr-tone-teal { background-color: rgba(19, 78, 74, 0.5) !important; color: #99f6e4 !important; border-color: rgba(15, 118, 110, 0.7) !important; }
 html.dark .cr-tone-teal p, html.dark .cr-tone-teal span, html.dark .cr-tone-teal div { color: #ccfbf1 !important; }
-html.dark .cr-tone-good * , html.dark .cr-tone-warn * { background-color: transparent !important; }
+html.dark .cr-tone-bad, html.dark .cr-tone-bad * { background-color: rgba(127, 29, 29, 0.45) !important; color: #fecdd3 !important; border-color: rgba(190, 18, 60, 0.7) !important; }
+html.dark .cr-tone-good * , html.dark .cr-tone-warn *, html.dark .cr-tone-bad * { background-color: transparent !important; }
 html.dark .cr-text-good { color: #6ee7b7 !important; }
 html.dark .cr-text-warn { color: #fcd34d !important; }
 
