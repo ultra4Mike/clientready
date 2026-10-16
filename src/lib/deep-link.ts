@@ -1,5 +1,7 @@
+import { SITE_HOSTS } from "./site";
+
 /** Hosts whose https links open inside the app (App Links / Universal Links). */
-export const APP_LINK_HOSTS = ["clientready-six.vercel.app"];
+export const APP_LINK_HOSTS = SITE_HOSTS;
 
 /**
  * Turns a link the OS handed to the native app into an in-app path, or "" to ignore it.

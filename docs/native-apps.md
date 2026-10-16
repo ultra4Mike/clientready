@@ -1,7 +1,7 @@
 # Native apps (Capacitor 8)
 
 `ios/` and `android/` are Capacitor shells around the **live** web app (`server.url` in
-`capacitor.config.ts`, default `https://clientready-six.vercel.app/dashboard`). ClientReady needs its server
+`capacitor.config.ts`, default `https://clientreadyapp.com/dashboard`). ClientReady needs its server
 routes (`/api/*`), so a static export isn't possible; `cap-shell/` is only the bundled fallback
 (`index.html`, and `offline.html` when the server can't be reached).
 
@@ -42,12 +42,14 @@ force-fixed; it clears when @capacitor/cli updates its dependencies.
 
 ## Deep links
 - Custom scheme `clientready://<path>` (both platforms): works without any account setup.
-- https links to `clientready-six.vercel.app` open the app once the site proves ownership:
+- https links to `clientreadyapp.com`, `www.clientreadyapp.com` (and the old `clientready-six.vercel.app`) open the app once the site proves ownership:
   - Android App Links: serve `/.well-known/assetlinks.json` with the **release signing SHA-256** (template below).
-  - iOS Universal Links: `ios/App/App/App.entitlements` has `applinks:clientready-six.vercel.app`; serve
+  - iOS Universal Links: `ios/App/App/App.entitlements` has `applinks:` for all three hosts; serve
     `/.well-known/apple-app-site-association` with the **Apple Team ID** (template below). Associated Domains
     needs a paid Apple Developer team; remove the entitlement to build with a free/personal team.
   These files are not in `public/` yet on purpose: placeholder values would publish a broken verification file.
+  Put them in `public/.well-known/` when the values exist; they serve on every host (next.config.ts serves the
+  AASA file as JSON). www must serve them directly (not redirect) for verification.
 
 ```json
 // public/.well-known/assetlinks.json

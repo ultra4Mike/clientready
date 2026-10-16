@@ -1,3 +1,4 @@
+import { linkOrigin } from "@/lib/site";
 import { supabase } from "@/lib/supabase";
 import { getUserId } from "@/lib/cloud-docs";
 import { newApprovalToken } from "@/lib/approval";
@@ -11,7 +12,7 @@ import type { Signature } from "@/lib/signature";
 export const clientKey = (name: string) => name.trim().toLowerCase();
 
 export function portalUrl(token: string) {
-  return `${window.location.origin}/portal?t=${encodeURIComponent(token)}`;
+  return `${linkOrigin()}/portal?t=${encodeURIComponent(token)}`;
 }
 
 export function portalDocUrl(token: string, docId: string) {

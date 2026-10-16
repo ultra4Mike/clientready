@@ -1,3 +1,4 @@
+import { linkOrigin } from "@/lib/site";
 import { supabase } from "@/lib/supabase";
 import { getUserId, isUuid, type CloudDoc } from "@/lib/cloud-docs";
 
@@ -34,7 +35,7 @@ export function newApprovalToken() {
 }
 
 export function approvalUrl(token: string) {
-  return `${window.location.origin}/approve?t=${encodeURIComponent(token)}`;
+  return `${linkOrigin()}/approve?t=${encodeURIComponent(token)}`;
 }
 
 export function approvalLabel(approval: Approval | null) {

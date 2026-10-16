@@ -5,6 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "ClientReady",
     short_name: "ClientReady",
     description: "Proposals, invoices, crew and job costs in one place.",
+    id: "/dashboard",
     start_url: "/dashboard",
     scope: "/",
     display: "standalone",

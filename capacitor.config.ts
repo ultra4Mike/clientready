@@ -6,7 +6,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
  * `npx cap sync`. If the server can't be reached, cap-shell/offline.html is shown.
  * appId is a placeholder until the owner registers the bundle id with Apple/Google.
  */
-const serverUrl = process.env.CAP_SERVER_URL || "https://clientready-six.vercel.app";
+const serverUrl = process.env.CAP_SERVER_URL || "https://clientreadyapp.com";
 
 const config: CapacitorConfig = {
   appId: "app.clientready.mobile",

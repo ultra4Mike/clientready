@@ -1,9 +1,11 @@
+import { SITE_URL } from "@/lib/site";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ServiceWorker from "@/components/ServiceWorker";
 import NativeBridge from "@/components/NativeBridge";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "ClientReady",
   description:
     "Create professional proposals, invoices, client emails, and reports in minutes.",

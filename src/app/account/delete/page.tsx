@@ -1,5 +1,6 @@
 "use client";
 
+import { linkOrigin } from "@/lib/site";
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -39,7 +40,7 @@ export default function DeleteAccountPage() {
     setMessage("");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setMessage("Enter the email you sign in with.");
     setBusy(true);
-    const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: false, emailRedirectTo: `${window.location.origin}/account/delete` } });
+    const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: false, emailRedirectTo: `${linkOrigin()}/account/delete` } });
     setBusy(false);
     // Same answer whether or not the address has an account.
     if (error && !/not found|signups not allowed/i.test(error.message)) return setMessage("Could not send the link. Try again in a minute.");

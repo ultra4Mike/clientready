@@ -1,5 +1,6 @@
 "use client";
 
+import { linkOrigin } from "@/lib/site";
 import Link from "next/link";
 import LegalLinks from "@/components/LegalLinks";
 import { FormEvent, useState } from "react";
@@ -20,7 +21,7 @@ export default function LoginPage() {
     const cleanEmail = email.trim().toLowerCase();
     if (resetMode) {
       const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-        redirectTo: "https://clientready-six.vercel.app/reset-password",
+        redirectTo: `${linkOrigin()}/reset-password`,
       });
       setBusy(false);
       setMessage(error ? error.message : "Reset link sent. Check inbox and spam.");

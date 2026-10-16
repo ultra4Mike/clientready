@@ -4,6 +4,8 @@
 <dict>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
+		<string>applinks:clientreadyapp.com</string>
+		<string>applinks:www.clientreadyapp.com</string>
 		<string>applinks:clientready-six.vercel.app</string>
 	</array>
 </dict>
