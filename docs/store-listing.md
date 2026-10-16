@@ -51,4 +51,14 @@ Paid plans are sold on the web only. The iOS app shows no prices, purchase butto
 ## Still open
 - Placeholders: [Support email], [Support URL], [Privacy URL] ([Domain]/privacy), [Marketing URL], [Data retention period] (suggest 30 days after account closure), [Domain] for /account/delete.
 - Account deletion shipped (9f81fdd); verify it works on the live host once the service-role key is set.
-- **Recheck all answers after the native wrapper's SDKs land** (push, crash reporting, analytics would change them).
+- ~~Recheck after native wrapper SDKs land~~ **Done 2026-10-16** (Dev 36f18fc, see docs/native-apps.md): @capacitor/core, ios, android 8.5.3, @capacitor/app 8.1.2, androidx libraries, capacitor-swift-pm. No analytics, ads, push or crash SDKs, so no new data types; Tracking = No. Recheck again whenever a native plugin/SDK is added (e.g. native push, camera).
+- **App ID:** `app.clientready.mobile` is a placeholder (bundle ID / package name). It is permanent once published on either store, so the owner must confirm it before the first upload.
+
+## Review risk: Apple Guideline 4.2 (minimum functionality)
+The iOS app is a WebView loading the live site, which Apple often rejects under 4.2 as "a repackaged website". To reduce risk, ship native touches before submitting and mention them in the review notes:
+- Camera / photo picker for job photos (native picker or Capacitor Camera plugin)
+- Push notifications (native APNs via a Capacitor push plugin, not just web push)
+- Offline use (bundled offline page; saves on device and syncs later)
+- Deep links (clientready:// and Universal Links / Associated Domains, already in 36f18fc)
+- Native back/navigation handling and safe-area layout
+Also give the reviewer a demo login with sample data. Each added plugin means updating the privacy answers above.
