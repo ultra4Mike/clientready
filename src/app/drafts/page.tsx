@@ -20,6 +20,7 @@ type Draft = {
   parts_cost: string;
   parts_note: string;
   costs?: unknown;
+  opened_doc_id?: string;
   drive_hours: string;
   drive_minutes: string;
   notes: string;
@@ -41,6 +42,15 @@ export default function DraftsPage() {
     }
     load();
   }, []);
+
+  /** R18: the invoice this report already became (cloud link, or a saved invoice on this device that carries it). */
+  function existingInvoice(draft: Draft) {
+    let docs: { id: string; title?: string; data?: { invoiceNumber?: string; crewReport?: { draftId?: string } } }[] = [];
+    try { docs = JSON.parse(window.localStorage.getItem("clientready-documents") || "[]"); } catch { docs = []; }
+    const doc = docs.find((item) => (draft.opened_doc_id && item.id === draft.opened_doc_id) || item.data?.crewReport?.draftId === draft.id);
+    if (doc) return { id: doc.id, label: doc.data?.invoiceNumber || doc.title || "the invoice" };
+    return draft.opened_doc_id ? { id: "", label: "" } : null;
+  }
 
   function openAsInvoice(draft: Draft) {
     // Receipts stay on the report (too big to hand over); the invoice only notes that one exists.
@@ -76,7 +86,20 @@ export default function DraftsPage() {
                 ))}
               </ul>
             )}
-            <button type="button" onClick={() => openAsInvoice(draft)} className="mt-4 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 sm:w-auto">Open as invoice</button>
+            {(() => {
+              const existing = typeof window === "undefined" ? null : existingInvoice(draft);
+              if (!existing) return null;
+              return (
+                <div className="mt-3 rounded-xl border border-amber-400/50 bg-amber-400/10 p-3 text-sm" data-testid="draft-opened" data-doc-id={existing.id}>
+                  <p>{existing.id ? <>Already opened as {existing.label}. Opening it again would count these costs twice.</> : <>Already turned into an invoice (not on this device yet). Creating another would count these costs twice.</>}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {existing.id && <a href={`/invoice?id=${encodeURIComponent(existing.id)}`} data-testid="draft-open-existing" className="inline-flex min-h-11 items-center rounded-lg bg-teal-500 px-4 font-semibold text-slate-950!">Open {existing.label}</a>}
+                    <button type="button" data-testid="draft-create-another" className="min-h-11 rounded-lg border border-amber-500/60 px-4 font-medium" onClick={() => openAsInvoice(draft)}>Create another anyway</button>
+                  </div>
+                </div>
+              );
+            })()}
+            {!(typeof window !== "undefined" && existingInvoice(draft)) && <button type="button" data-testid="draft-open" onClick={() => openAsInvoice(draft)} className="mt-4 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 sm:w-auto">Open as invoice</button>}
           </div>
         ))}
       </div>

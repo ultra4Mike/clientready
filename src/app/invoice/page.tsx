@@ -660,6 +660,8 @@ export default function NewInvoicePage() {
       endTime: jobEnd,
     }, crew);
     await syncScheduleCrewJobs(nextDoc);
+    // R18: remember which invoice this crew report became, so opening the report again goes here.
+    if (crewReport?.draftId && /^[0-9a-f-]{36}$/i.test(cloudId)) await supabase.from("job_drafts").update({ opened_doc_id: cloudId }).eq("id", crewReport.draftId).then(() => undefined, () => undefined);
     setWorkers(readWorkers());
     // Contact changes also go to the linked saved client (Clients page / portal).
     const clientsAfter = await syncClientContact(docClientId, { name: clientName, company: clientCompany, email: clientEmail, phone: clientPhone, address: clientAddress }).catch(() => null);
