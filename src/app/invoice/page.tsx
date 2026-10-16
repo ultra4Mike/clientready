@@ -26,6 +26,7 @@ import { JobPhotosEditor, JobPhotoStrip } from "@/components/JobPhotos";
 import { currentDocId } from "@/lib/doc-sync";
 import { isQuotaError, readPhotos, type JobPhoto } from "@/lib/photos";
 import LineSplit from "@/components/LineSplit";
+import { applyPackage, deletePackage, readPackages, savePackage, type JobPackage } from "@/lib/packages";
 import ReminderPanel from "@/components/ReminderPanel";
 import { normalizeCategory, type LineCategory } from "@/lib/line-split";
 import { appendChangeOrderNote, changeOrderData, changeOrdersFor, mergeChangeOrderNotes, readChangeOrderNotes, readChangeOrderOf, type ChangeOrderNote, type ChangeOrderOf } from "@/lib/change-orders";
@@ -189,6 +190,9 @@ export default function NewInvoicePage() {
   const [clockEntries, setClockEntries] = useState<ClockEntry[]>([]);
   const [clockFix, setClockFix] = useState<{ id: string; start: string; end: string } | null>(null);
   const [items, setItems] = useState<LineItem[]>([{ ...emptyItem }]);
+  const [packages, setPackages] = useState<JobPackage[]>([]);
+  const [packageName, setPackageName] = useState("");
+  useEffect(() => { setPackages(readPackages()); }, []);
   const [businessName, setBusinessName] = useState("Your business");
   const [ownerName, setOwnerName] = useState("");
   const [reminderOpen, setReminderOpen] = useState(false);
@@ -855,6 +859,18 @@ export default function NewInvoicePage() {
               <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Line items & pricing</h2>
             <div className="space-y-3">
               <div className="flex items-center justify-between"><h2 className="font-medium">Line items</h2><button type="button" className="tap rounded-lg border border-teal-500/40 max-sm:min-h-11 px-3 py-1.5 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300" onClick={() => setItems((current) => [...current, { ...emptyItem }])}>Add item</button></div>
+              <div className="flex flex-wrap items-center gap-2 text-sm" data-testid="packages">
+                <select aria-label="Add a package" data-testid="package-add" className="min-h-11 rounded-lg border border-slate-300 px-3 py-2 text-sm" value="" onChange={(event) => { const pkg = packages.find((p) => p.id === event.target.value); if (pkg) setItems((current) => applyPackage(current, pkg)); }}>
+                  <option value="">{packages.length ? "Add package…" : "No packages yet"}</option>
+                  {packages.map((pkg) => <option key={pkg.id} value={pkg.id}>{pkg.name} ({pkg.items.length} items)</option>)}
+                </select>
+                <input aria-label="Package name" name="packageName" data-testid="package-name" placeholder="Package name" className="min-h-11 w-40 rounded-lg border border-slate-300 px-3 py-2 text-sm" value={packageName} onChange={(event) => setPackageName(event.target.value)} />
+                <button type="button" data-testid="package-save" disabled={!packageName.trim()} className="tap min-h-11 rounded-lg border border-teal-500/40 px-3 py-1.5 font-medium disabled:opacity-50" onClick={() => { setPackages(savePackage(packageName, items)); setPackageName(""); }}>Save items as package</button>
+                {packages.length > 0 && <select aria-label="Delete a package" data-testid="package-delete" className="min-h-11 rounded-lg border border-slate-300 px-3 py-2 text-sm" value="" onChange={(event) => { if (event.target.value && window.confirm("Delete this package? Invoices that used it keep their items.")) setPackages(deletePackage(event.target.value)); }}>
+                  <option value="">Delete package…</option>
+                  {packages.map((pkg) => <option key={pkg.id} value={pkg.id}>{pkg.name}</option>)}
+                </select>}
+              </div>
               <div className="hidden gap-2 border-b border-slate-200 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:grid sm:grid-cols-[minmax(0,1fr)_4.5rem_6rem_8.5rem]"><span>Description</span><span>Qty</span><span>Rate</span><span>Type</span></div>
               {items.map((item, index) => (
                 <div key={index} className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-2 sm:grid-cols-[minmax(0,1fr)_4.5rem_6rem_8.5rem] sm:border-0 sm:p-0">
