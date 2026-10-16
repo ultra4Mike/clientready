@@ -269,8 +269,24 @@ export default function NewInvoicePage() {
       const raw = window.localStorage.getItem("clientready-documents");
       const wanted = window.localStorage.getItem("clientready-new-type");
       if (!openId) {
-        const kind: DocKind = wanted === "proposal" ? "proposal" : "invoice";
+        const params = new URLSearchParams(window.location.search);
+        const kind: DocKind = wanted === "proposal" || params.get("type") === "proposal" ? "proposal" : "invoice";
         window.localStorage.removeItem("clientready-new-type");
+        // New document for a saved client (/invoice?clientId=...): copy that client's details in.
+        // Only for new documents; an opened document always keeps its own stored client details.
+        const forClient = params.get("clientId");
+        if (forClient) {
+          const clients = JSON.parse(window.localStorage.getItem("clientready-clients") || "[]") as SavedClient[];
+          const client = clients.find((item) => item.id === forClient);
+          if (client) {
+            setClientName(client.name || "");
+            setClientId(client.id);
+            setClientCompany(client.company || "");
+            setClientEmail(client.email || "");
+            setClientPhone(client.phone || "");
+            setClientAddress(client.address || "");
+          }
+        }
         setDocKind(kind);
         setInvoiceNumber(nextNumber(kind));
         setInvoiceDate(ymd(new Date()));
