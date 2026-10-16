@@ -31,12 +31,15 @@ export default function ProfilePage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [nextPassword, setNextPassword] = useState("");
   const [passwordMessage, setPasswordMessage] = useState("");
+  const [timezone, setTimezone] = useState("America/Chicago");
+  const timezones = typeof Intl !== "undefined" && "supportedValuesOf" in Intl ? Intl.supportedValuesOf("timeZone") : [timezone];
 
   useEffect(() => {
     async function load() {
       const raw = window.localStorage.getItem("clientready-profile");
       const local = raw ? { ...emptyProfile, ...JSON.parse(raw) } : emptyProfile;
       setProfile(local);
+      setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Chicago");
 
       const { data } = await supabase.auth.getUser();
       const user = data.user;
@@ -50,6 +53,7 @@ export default function ProfilePage() {
         .maybeSingle();
 
       if (!row) return;
+      if (typeof row.timezone === "string" && row.timezone) setTimezone(row.timezone);
       setProfile({
         businessName: row.business_name || "",
         ownerName: row.owner_name || "",
@@ -112,6 +116,8 @@ export default function ProfilePage() {
         setSaved(true);
         return;
       }
+      // Business timezone (card payment dates). Ignored quietly before migration 20261015130000 adds the column.
+      await supabase.from("profiles").update({ timezone }).eq("id", user.id);
       setMessage("Saved on this computer and in your account.");
     } else {
       setMessage("Saved on this computer. Log in to save to your account.");
@@ -195,6 +201,13 @@ export default function ProfilePage() {
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
           Tax ID / EIN
           <input className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Tax ID / EIN" value={profile.taxId} onChange={(event) => update("taxId", event.target.value)} />
+        </label>
+        <label className="block text-sm font-medium text-[var(--cr-muted)]">
+          Business timezone
+          <select data-testid="business-timezone" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={timezone} onChange={(event) => setTimezone(event.target.value)}>
+            {(timezones.includes(timezone) ? timezones : [timezone, ...timezones]).map((zone) => <option key={zone} value={zone}>{zone.replace(/_/g, " ")}</option>)}
+          </select>
+          <span className="mt-1 block text-xs">Used for the date on card payments.</span>
         </label>
         <label className="block text-sm font-medium text-[var(--cr-muted)] sm:col-span-2">
           Default payment terms

@@ -4,6 +4,7 @@ import EmptyState from "@/components/EmptyState";
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
+import StuckPayments from "@/components/StuckPayments";
 import { saveCloudDocument } from "@/lib/cloud-docs";
 import { amountOf, documentTotals } from "@/lib/discount";
 import { balanceDue, isOpenBalance, paidTotal, paymentFields, paymentMethods, readPayments } from "@/lib/payments";
@@ -194,6 +195,7 @@ export default function CollectPage() {
   return (
     <AppShell title="Get paid">
       <PageHeader title="Get paid" subtitle="Unpaid invoices and overdue amounts, with the next step on each one." actions={<a href="/invoice" className="rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">New invoice +</a>} />
+      <StuckPayments />
 
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <div className="min-w-0 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 shadow-sm sm:p-6">
