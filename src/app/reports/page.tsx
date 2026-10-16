@@ -6,6 +6,8 @@ import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { supabase } from "@/lib/supabase";
 import { buildReport, MONTHS, reportYears } from "@/lib/reports";
+import { taxCategories } from "@/lib/tax-categories";
+import { mileage, totalMiles } from "@/lib/mileage";
 
 type Doc = { id: string; type: string; title?: string; clientName?: string; createdAt?: string; data?: Record<string, unknown> };
 type CrewExpense = { amount?: unknown; created_at?: string };
@@ -37,6 +39,9 @@ export default function ReportsPage() {
 
   const years = useMemo(() => reportYears(documents), [documents]);
   const report = useMemo(() => buildReport(documents, crewExpenses, year), [documents, crewExpenses, year]);
+  const tax = useMemo(() => taxCategories(documents, year), [documents, year]);
+  const [miles, setMiles] = useState(0);
+  useEffect(() => { Promise.resolve().then(() => setMiles(totalMiles(mileage.read(), year))); }, [year, documents]);
   const cell = "px-2 py-1.5 text-right tabular-nums";
 
   return (
@@ -120,6 +125,34 @@ export default function ReportsPage() {
               </table>
             </div>
           )}
+        </div>
+
+        <div data-testid="tax-categories" data-total={tax.total.toFixed(2)}>
+          <h2 className="text-sm font-semibold">Tax categories (Schedule C)</h2>
+          <p className="mt-1 text-xs text-slate-500">Your job costs for {year} sorted by Schedule C line. A starting point for you or your tax preparer, not tax advice.</p>
+          <div className="overflow-x-auto">
+            <table className="mt-2 w-full text-sm">
+              <tbody>
+                {tax.lines.map((line) => (
+                  <tr key={line.key} data-testid="tax-line" data-key={line.key} data-amount={line.amount.toFixed(2)} className="border-t border-slate-200/60">
+                    <td className="whitespace-nowrap px-2 py-1.5 font-medium">{line.line}</td>
+                    <td className="px-2 py-1.5">{line.label}{line.note && <span className="block text-xs text-slate-500">{line.note}</span>}</td>
+                    <td className={cell}>{usd(line.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-slate-300 font-semibold">
+                  <td className="px-2 py-1.5" colSpan={2}>Total (same as job costs above)</td>
+                  <td className={cell}>{usd(tax.total)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <ul className="mt-2 space-y-0.5 text-xs text-slate-500">
+            {miles > 0 && <li data-testid="tax-miles">Mileage log: {miles} business miles in {year} (Line 9 if you use the standard mileage rate).</li>}
+            {tax.tips > 0 && <li data-testid="tax-tips">Tips received: {usd(tax.tips)} (part of gross receipts, Line 1; not in the totals above).</li>}
+          </ul>
         </div>
       </div>
     </AppShell>
