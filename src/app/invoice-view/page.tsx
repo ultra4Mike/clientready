@@ -5,7 +5,7 @@ import { readStages, type Stage } from "@/lib/stages";
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
-import { balanceDue, paidTotal, readPayments, type Payment } from "@/lib/payments";
+import { balanceDue, paidTotal, readPayments, tipTotal, type Payment } from "@/lib/payments";
 import { JobPhotoStrip } from "@/components/JobPhotos";
 import { readPhotos, type JobPhoto } from "@/lib/photos";
 import LineSplit from "@/components/LineSplit";
@@ -320,6 +320,12 @@ export default function InvoiceViewPage() {
                 <div className="flex justify-between">
                   <span>Paid</span>
                   <span>-${totals.paid.toFixed(2)}</span>
+                </div>
+              )}
+              {tipTotal(payments) > 0 && (
+                <div className="flex justify-between" data-testid="tip-line">
+                  <span>Tip received, thank you</span>
+                  <span>${tipTotal(payments).toFixed(2)}</span>
                 </div>
               )}
               <div className="mt-2 flex justify-between border-t border-slate-200 pt-2 text-lg font-bold">

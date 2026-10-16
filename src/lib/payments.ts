@@ -1,4 +1,5 @@
-export type Payment = { id: string; amount: string; method: string; date: string; ref: string };
+/** tip: extra the client gave on top of the bill; never counts toward the balance. */
+export type Payment = { id: string; amount: string; method: string; date: string; ref: string; tip?: string };
 
 export const paymentMethods = ["Cash", "Check", "Venmo", "Cash App", "Zelle", "Bank", "Card", "Other"];
 
@@ -31,6 +32,7 @@ export function readPayments(data?: PaymentData | null): Payment[] {
         method: String(item.method || ""),
         date: String(item.date || ""),
         ref: String(item.ref || ""),
+        ...(num(item.tip) > 0 ? { tip: String(item.tip) } : {}),
       };
     });
   }
@@ -38,6 +40,11 @@ export function readPayments(data?: PaymentData | null): Payment[] {
     return [{ id: "legacy", amount: String(data.paymentAmount), method: String(data.paymentMethod || ""), date: String(data.paymentDate || ""), ref: String(data.paymentRef || "") }];
   }
   return [];
+}
+
+/** Tips recorded with payments (separate from the invoice total and balance). */
+export function tipTotal(payments: Payment[]) {
+  return round(payments.reduce((sum, payment) => sum + Math.max(num(payment.tip), 0), 0));
 }
 
 export function paidTotal(payments: Payment[]) {
@@ -56,7 +63,7 @@ export function balanceDue(total: number, amountPaid: number, status?: unknown) 
 
 /** Fields to save in document data. Keeps the older single-payment fields filled for pages that read them. */
 export function paymentFields(payments: Payment[]) {
-  const clean = payments.filter((payment) => num(payment.amount) > 0);
+  const clean = payments.filter((payment) => num(payment.amount) > 0).map(({ tip, ...payment }) => (num(tip) > 0 ? { ...payment, tip } : payment));
   const latest = clean[clean.length - 1];
   return {
     payments: clean,
