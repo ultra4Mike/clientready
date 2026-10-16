@@ -1,5 +1,6 @@
 "use client";
 
+import { enqueue, flushQueue, isNetworkError, queued, removeQueued, type QueueItem, type QueueKind } from "@/lib/photo-queue";
 import EmptyState from "@/components/EmptyState";
 import CrewDaysOff from "@/components/CrewDaysOff";
 import { CREW_KINDS } from "@/lib/cost-categories";
@@ -116,6 +117,8 @@ function buildCards(jobs: Job[]): Card[] {
 export default function CrewPage() {
   const [userId, setUserId] = useState("");
   const [email, setEmail] = useState("");
+  const [offline, setOffline] = useState(false);
+  const [queue, setQueue] = useState<QueueItem[]>([]);
   const [name, setName] = useState("");
   const [ownerId, setOwnerId] = useState("");
   const [employeeId, setEmployeeId] = useState("");
@@ -139,8 +142,10 @@ export default function CrewPage() {
   const [fixing, setFixing] = useState<{ id: string; start: string; end: string; reason: string } | null>(null);
 
   async function load() {
-    const { data } = await supabase.auth.getUser();
-    const user = data.user;
+    const { data, error: userError } = await supabase.auth.getUser();
+    let user = data.user;
+    // Offline: use the saved session so the cached jobs still show (and queued photos can wait).
+    if (!user && userError && isNetworkError(userError.message)) user = (await supabase.auth.getSession()).data.session?.user ?? null;
     const me = (user?.email || "").toLowerCase();
     const ownRow = (row: object) => {
       const worker = String((row as { worker_email?: unknown }).worker_email || "").toLowerCase();
@@ -153,6 +158,7 @@ export default function CrewPage() {
     // Only people on a crew list use this page. An owner who isn't on any employee list (their own
     // included) goes to the dashboard before anything is loaded or shown.
     const { data: person, error: personError } = await supabase.rpc("is_crew_email");
+    const offline = Boolean(personError && isNetworkError(personError.message));
     const row = Array.isArray(person) ? person[0] : person;
     const cacheKey = `clientready-crew-cache-${user.id}`;
     if (!personError && !row) {
@@ -171,6 +177,12 @@ export default function CrewPage() {
     } catch {
       window.localStorage.removeItem(cacheKey);
     }
+    if (offline) {
+      setOffline(true);
+      refreshQueue(user.id);
+      return;
+    }
+    setOffline(false);
     if (row) {
       setEmployeeId(row.id || "");
       setOwnerId(row.user_id || "");
@@ -193,6 +205,8 @@ export default function CrewPage() {
       expenses: ((spendRows.data || []) as Expense[]).filter(ownRow),
       drafts: ((draftRows.data || []) as Draft[]).filter(ownRow),
     };
+    refreshQueue(user.id);
+    if (navigator.onLine) void flushQueue(user.id, sendQueued).then((sent) => { refreshQueue(user.id); if (sent) setMessage(`Sent ${sent} saved upload${sent === 1 ? "" : "s"}.`); }).catch(() => undefined);
     setName(next.name); setJobs(next.jobs); setClock(next.clock); setExpenses(next.expenses); setDrafts(next.drafts);
     setClients((clientRows.data || []) as Client[]);
     try {
@@ -211,7 +225,11 @@ export default function CrewPage() {
     const first = window.setTimeout(tick, 0);
     const timer = window.setInterval(tick, 1000);
     const start = window.setTimeout(() => { setTheme(saved); load(); }, 0);
-    return () => { window.clearInterval(timer); window.clearTimeout(first); window.clearTimeout(start); };
+    const back = () => { setOffline(false); void load(); };
+    const gone = () => setOffline(true);
+    window.addEventListener("online", back);
+    window.addEventListener("offline", gone);
+    return () => { window.clearInterval(timer); window.clearTimeout(first); window.clearTimeout(start); window.removeEventListener("online", back); window.removeEventListener("offline", gone); };
   }, []);
 
   function switchTheme() {
@@ -220,6 +238,36 @@ export default function CrewPage() {
     window.localStorage.setItem("clientready-theme", next);
     document.documentElement.classList.toggle("dark", next === "dark");
     document.documentElement.classList.toggle("light", next === "light");
+  }
+
+  function refreshQueue(user = userId) {
+    if (!user) return;
+    queued(user).then(setQueue).catch(() => setQueue([]));
+  }
+
+  async function sendQueued(item: QueueItem) {
+    if (item.kind === "done") return crewMarkDone(item.docId, (item.payload.photos as string[]) || []);
+    const { error } = await supabase.rpc("crew_add_expense", { p_doc_id: item.docId, ...item.payload });
+    return error ? error.message : "";
+  }
+
+  async function flush(user = userId) {
+    if (!user || !navigator.onLine) return;
+    const sent = await flushQueue(user, sendQueued).catch(() => 0);
+    refreshQueue(user);
+    if (sent) {
+      setMessage(`Sent ${sent} saved upload${sent === 1 ? "" : "s"}.`);
+      await load();
+    }
+  }
+
+  /** Runs an upload; if the phone is offline it is saved on the device and sent later. */
+  async function sendOrQueue(kind: QueueKind, docId: string, payload: Record<string, unknown>, send: () => Promise<string>) {
+    const error = navigator.onLine ? await send().catch((reason: unknown) => String((reason as Error)?.message || reason)) : "offline";
+    if (!error || !isNetworkError(error === "offline" ? "failed to fetch" : error)) return { error, queued: false };
+    await enqueue({ user: userId, kind, docId, payload });
+    refreshQueue();
+    return { error: "", queued: true };
   }
 
   async function act(key: string, work: () => Promise<string>, done: string) {
@@ -252,10 +300,14 @@ export default function CrewPage() {
   async function saveExpense(card: Card) {
     if (!spend.amount.trim()) return setMessage("Add the amount you spent.");
     await act(`spend-${card.doc_id}`, async () => {
-      const { error } = await supabase.rpc("crew_add_expense", { p_doc_id: card.doc_id, p_kind: spend.kind, p_amount: spend.amount, p_note: spend.note, p_receipt: spend.receipt });
-      if (!error) { setSpend({ kind: "parts", amount: "", note: "", receipt: "" }); setSpendOpen(""); }
-      return error ? error.message : "";
-    }, "Expense added to this job.");
+      const payload = { p_kind: spend.kind, p_amount: spend.amount, p_note: spend.note, p_receipt: spend.receipt };
+      const result = await sendOrQueue("expense", card.doc_id, payload, async () => {
+        const { error } = await supabase.rpc("crew_add_expense", { p_doc_id: card.doc_id, ...payload });
+        return error ? error.message : "";
+      });
+      if (!result.error) { setSpend({ kind: "parts", amount: "", note: "", receipt: "" }); setSpendOpen(""); }
+      return result.queued ? "" : result.error;
+    }, navigator.onLine ? "Expense added to this job." : "Saved on this phone. It will send when you're back online.");
   }
 
   async function pickDonePhotos(files: FileList | null) {
@@ -271,10 +323,10 @@ export default function CrewPage() {
 
   async function markDone(card: Card) {
     await act(`status-${card.doc_id}`, async () => {
-      const error = await crewMarkDone(card.doc_id, donePhotos);
-      if (!error) { setDonePhotos([]); setDoneFor(""); }
-      return error;
-    }, "Marked done. Your boss will confirm it.");
+      const result = await sendOrQueue("done", card.doc_id, { photos: donePhotos }, () => crewMarkDone(card.doc_id, donePhotos));
+      if (!result.error) { setDonePhotos([]); setDoneFor(""); }
+      return result.error;
+    }, navigator.onLine ? "Marked done. Your boss will confirm it." : "Saved on this phone with the photos. It will send when you're back online.");
   }
 
   async function pickReceipt(file: File | undefined) {
@@ -507,6 +559,18 @@ export default function CrewPage() {
 
       <div className="mx-auto max-w-3xl space-y-5 px-4 pt-5">
         {message && <p className="rounded-xl border border-teal-500/30 px-3 py-2 text-sm" role="status" data-testid="crew-message">{message}</p>}
+        {offline && <p className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" data-testid="crew-offline">Offline: showing what was saved on this phone. Photos and expenses you add will send when you&apos;re back online.</p>}
+        {queue.length > 0 && (
+          <div className="rounded-xl border border-teal-500/30 px-3 py-2 text-sm" data-testid="crew-queue" data-count={queue.filter((item) => !item.lastError).length}>
+            {queue.some((item) => !item.lastError) && <p>{queue.filter((item) => !item.lastError).length} waiting to upload{offline ? " (offline)" : ""}.{!offline && <button type="button" className="ml-2 min-h-11 font-medium text-teal-600" data-testid="crew-queue-retry" onClick={() => flush()}>Send now</button>}</p>}
+            {queue.filter((item) => item.lastError).map((item) => (
+              <p key={item.id} className="mt-1 text-rose-600 dark:text-rose-300" data-testid="crew-queue-failed" data-doc-id={item.docId}>
+                {item.kind === "done" ? "Done photos" : "Expense"} for {cards.find((card) => card.doc_id === item.docId)?.client_name || "a job"} couldn&apos;t be sent: {item.lastError}
+                <button type="button" className="ml-2 min-h-11 font-medium underline" data-testid="crew-queue-discard" onClick={() => removeQueued(item.id).then(() => refreshQueue())}>Discard</button>
+              </p>
+            ))}
+          </div>
+        )}
 
         {tab === "today" && (
           <section className="space-y-3">

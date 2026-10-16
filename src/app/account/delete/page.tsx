@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { clearOfflineCaches, wipeThisDevice } from "@/lib/wipe-device";
+import { clearQueueDb } from "@/lib/photo-queue";
 
 const box = "rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-6";
 const input = "mt-1.5 w-full min-h-11 rounded-lg border border-slate-300 bg-transparent px-3 text-base outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-500/30 sm:text-sm";
@@ -70,6 +71,7 @@ export default function DeleteAccountPage() {
     await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
     wipeThisDevice();
     await clearOfflineCaches();
+    clearQueueDb();
     window.location.href = "/?deleted=1";
   }
 
