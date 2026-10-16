@@ -36,7 +36,7 @@ export default function RatingBox({ target }: { target: RatingTarget }) {
       <p className="font-semibold">How did we do?</p>
       <div className="mt-2 flex gap-1" role="radiogroup" aria-label="Rating">
         {[1, 2, 3, 4, 5].map((n) => (
-          <button key={n} type="button" role="radio" aria-checked={stars === n} aria-label={`${n} star${n > 1 ? "s" : ""}`} data-testid={`rating-star-${n}`} onClick={() => { setStars(n); setSaved(false); }} className={`min-h-11 min-w-11 text-2xl leading-none ${n <= stars ? "text-amber-500" : "text-slate-300"}`}>★</button>
+          <button key={n} type="button" role="radio" aria-checked={stars === n} aria-label={`${n} star${n > 1 ? "s" : ""}`} data-testid={`rating-star-${n}`} onClick={() => { setStars(n); setSaved(false); }} className={`min-h-11 min-w-11 text-2xl leading-none ${n <= stars ? "text-amber-500" : "text-slate-400 dark:text-slate-500"}`}>★</button>
         ))}
       </div>
       <label className="mt-2 block">Anything to add? (optional)
