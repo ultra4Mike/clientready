@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
+import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
 
 type Receipt = {
@@ -39,7 +40,7 @@ export default function ReceiptPage() {
         <p className="text-xs font-semibold uppercase tracking-wide text-teal-600">Cash receipt</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">{businessName}</h1>
         {!receipt ? (
-          <p className="mt-6 rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">No cash receipt yet.</p>
+          <EmptyState icon="🧾" title="No cash receipt yet." className="mt-6 rounded-xl border border-dashed border-slate-300" />
         ) : (
           <div className="mt-6 divide-y divide-slate-200 border-y border-slate-200 text-sm">
             <div className="flex justify-between gap-4 py-2.5"><span className="text-slate-500">Received from</span><span className="font-medium">{receipt.clientName || "Client"}</span></div>
