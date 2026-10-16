@@ -417,6 +417,16 @@ export default function NewInvoicePage() {
   function addPayment() {
     setPayments((current) => [...current, { id: Date.now().toString(), amount: current.length ? "" : (totals.balance || totals.total).toFixed(2), method: "Cash", date: ymd(new Date()), ref: "" }]);
   }
+  /** Owner tap: record the remaining balance as a cash payment dated today, mark the invoice paid, and save. */
+  async function markPaidCash() {
+    const amount = totals.balance;
+    if (locked || isProposal || !(amount > 0.004)) return;
+    if (!window.confirm(`Record a cash payment of $${amount.toFixed(2)} today and mark this invoice paid?`)) return;
+    const nextPayments = [...payments.filter((payment) => Number(payment.amount) > 0), { id: Date.now().toString(), amount: amount.toFixed(2), method: "Cash", date: ymd(new Date()), ref: "" }];
+    setPayments(nextPayments);
+    setStatus("paid");
+    await saveDocument({ payments: nextPayments, status: "paid" });
+  }
   function updatePayment(id: string, patch: Partial<Payment>) {
     setPayments((current) => current.map((payment) => payment.id === id ? { ...payment, ...patch } : payment));
   }
@@ -538,7 +548,11 @@ export default function NewInvoicePage() {
     setStyle("clean"); setJobTime(""); setCosts(emptyCosts); setCrew([]); setOtherFees([]);
   }
 
-  async function saveDocument() {
+  /** `cash` (from "Mark paid in cash") saves with that payment list and status instead of the form's. */
+  async function saveDocument(cash?: unknown) {
+    const over = cash && typeof cash === "object" && Array.isArray((cash as { payments?: unknown }).payments) ? (cash as { payments: Payment[]; status: string }) : null;
+    const savePayments = over ? over.payments : payments;
+    const saveStatus = over ? over.status : status;
     if (locked) {
       setSaveMessage("Trial ended. Subscribe to save. $7.99/mo or $19.99 for 3 months.");
       return;
@@ -557,7 +571,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(stored?.data?.schedule ? { schedule: stored.data.schedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
+      data: { clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(stored?.data?.schedule ? { schedule: stored.data.schedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -577,7 +591,7 @@ export default function NewInvoicePage() {
       clientName,
       clientPhone,
       clientAddress,
-      status,
+      status: saveStatus,
       startTime: jobStart,
       endTime: jobEnd,
     }, crew);
@@ -1044,6 +1058,7 @@ export default function NewInvoicePage() {
           <div className="print-hide mb-4 flex flex-wrap gap-2 sm:gap-3">
             <button type="button" onClick={() => window.print()} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Print / Save PDF</button>
             {!locked && !isProposal && status !== "paid" && <button type="button" onClick={copyPayLink} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">{paymentLink.trim() ? "Pay / Copy pay link" : "Add how to pay"}</button>}
+            {!locked && !isProposal && docId && status !== "paid" && totals.balance > 0.004 && <button type="button" data-testid="mark-paid-cash" onClick={markPaidCash} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Mark paid in cash (${totals.balance.toFixed(2)})</button>}
             {!isProposal && docId && status !== "draft" && status !== "paid" && totals.balance > 0 && <button type="button" data-testid="invoice-reminder" onClick={() => setReminderOpen((open) => !open)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Reminder</button>}
           </div>
           {docId && <div className="print-hide mb-4 -mt-2"><button type="button" data-testid="invoice-email" onClick={() => setEmailOpen((open) => !open)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">{emailOpen ? "Close email" : `Email ${isProposal ? "proposal" : "invoice"}…`}</button></div>}
