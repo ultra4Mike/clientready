@@ -37,6 +37,7 @@ const keys = [
   "clientready-mileage",
   "clientready-inventory",
   "clientready-payment-methods",
+  "clientready-followups-opened",
 ];
 
 

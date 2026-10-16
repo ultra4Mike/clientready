@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
+import FollowUps from "@/components/FollowUps";
 import { loadAccountIntoCache } from "@/lib/account-cache";
 import { uniqueDocs } from "@/lib/change-orders";
 import { confirmJobDone, doneState, omwTime, onMyWaySmsHref, readWorkers, saveSchedule, statusLabel, type Schedule } from "@/lib/schedule";
@@ -115,6 +116,7 @@ export default function TodayPage() {
             );
           })}
         </ol>
+        <FollowUps docs={docs} today={today} />
       </section>
     </AppShell>
   );
