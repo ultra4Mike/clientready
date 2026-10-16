@@ -55,3 +55,9 @@ Shared by the three ClientReady bots. Update the **Status** column when you pick
 |---|---|---|---|---|
 | L1 | `src/components/AppShell.tsx`: react-hooks/set-state-in-effect (theme read in effect) — pre-existing. | Visual | Done 2026-10-16 (Help: setState deferred one microtask, same pattern as fae8b09) | 2026-10-15 |
 | L2 | `src/app/collect/page.tsx`: 2 pre-existing lint errors (set-state-in-effect; "value cannot be modified"). | Dev | Open | 2026-10-15 |
+
+## 6. Product / support follow-ups
+| # | Item | Owner | Status | Added |
+|---|---|---|---|---|
+| S1 | Paid plans / billing after the 14-day trial. Needs Stripe Billing, so it goes last under the user's "no outside accounts first" rule. | Dev | Not started | 2026-10-16 |
+| S2 | User could not edit the address on a paid invoice; suspected trial read-only lock, unconfirmed. | Dev | Waiting on user | 2026-10-16 |
