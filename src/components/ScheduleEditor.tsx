@@ -95,12 +95,12 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
           ))}
         </div>
         {workerIds.some((id) => off.has(id)) && (
-          <p role="alert" data-testid="unavail-warning" className="mt-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-xs">
+          <p role="alert" data-testid="unavail-warning" className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-900 dark:text-amber-200">
             Marked unavailable on this day: {workerIds.filter((id) => off.has(id)).map((id) => `${names.get(id) || "Worker"}${off.get(id) ? ` (${off.get(id)})` : ""}`).join(", ")}
           </p>
         )}
         {travel.length > 0 && (
-          <p role="alert" data-testid="travel-warning" className="mt-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-xs">
+          <p role="alert" data-testid="travel-warning" className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-900 dark:text-amber-200">
             Less than {TRAVEL_BUFFER_MINUTES} min travel time: {travel.map((w) => `${names.get(w.workerId) || "Worker"} ${w.gap < 0 ? "overlaps" : `has ${w.gap} min before/after`} ${w.otherTitle}`).join("; ")}. You can still save.
           </p>
         )}
