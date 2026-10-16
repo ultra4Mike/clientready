@@ -1,5 +1,6 @@
 "use client";
 
+import EmptyState from "@/components/EmptyState";
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
@@ -217,9 +218,7 @@ export default function CollectPage() {
           </p>
         )}
         {unpaid.length === 0 && (
-          <p className="rounded-2xl border border-dashed border-teal-500/30 bg-[var(--cr-card)] p-8 text-center text-sm text-[var(--cr-muted)]">
-            Nothing to collect. Unpaid invoices will show here.
-          </p>
+          <EmptyState icon="✓" title="Nothing to collect" line="Unpaid invoices will show here." className="rounded-2xl border border-dashed border-teal-500/30 bg-[var(--cr-card)]" />
         )}
 
         {unpaid.length > 0 && (
