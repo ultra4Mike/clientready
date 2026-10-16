@@ -409,3 +409,11 @@ html.dark .owner-costs [data-testid="section-toggle"] span {
 body:has(.mobile-savebar) .quick-create-fab {
   display: none !important;
 }
+
+/* Native UI and page scrollbar follow the theme */
+html { color-scheme: light; scrollbar-width: thin; scrollbar-color: rgba(13, 148, 136, 0.35) transparent; }
+html.dark { color-scheme: dark; scrollbar-color: rgba(45, 212, 191, 0.35) transparent; }
+html::-webkit-scrollbar { width: 10px; height: 10px; }
+html::-webkit-scrollbar-track { background: transparent; }
+html::-webkit-scrollbar-thumb { background: rgba(13, 148, 136, 0.35); border-radius: 9999px; border: 2px solid transparent; background-clip: padding-box; }
+html.dark::-webkit-scrollbar-thumb { background-color: rgba(45, 212, 191, 0.35); }
