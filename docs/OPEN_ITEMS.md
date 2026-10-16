@@ -34,10 +34,10 @@ Shared by the three ClientReady bots. Update the **Status** column when you pick
 ## 3. Help content to verify
 | # | Item | Owner | Status | Added |
 |---|---|---|---|---|
-| H1 | Recurring invoice walkthrough ("set it to repeat" → Generate next invoice now) — click through in the app and fix wording. | Help | Open | 2026-10-15 |
-| H2 | Crew assignment walkthrough (add crew to job / Remove from job) — verify the real flow. | Help | Open | 2026-10-15 |
-| H3 | Spot-check button/screen names in all 90 articles against the current UI (UI changed since: timezone combobox, review request, crew unavailable, timesheet CSV, Mark paid in cash). | Help | Open | 2026-10-15 |
-| H4 | Add articles for features shipped after the help pass: review request after payment, crew "mark unavailable", timesheet CSV export, late-fee settings, timezone combobox search. | Help | Open | 2026-10-15 |
+| H1 | Recurring invoice walkthrough ("set it to repeat" → Generate next invoice now) — click through in the app and fix wording. | Help | Done 2026-10-15 — traced in code; recurring (Recurring section → Repeat → Needs review drafts) and crew assignment (Schedule section / Calendar → + Add crew → Save schedule) rewritten | 2026-10-15 |
+| H2 | Crew assignment walkthrough (add crew to job / Remove from job) — verify the real flow. | Help | Done 2026-10-15 — crew assignment flow traced and fixed (see H1) | 2026-10-15 |
+| H3 | Spot-check button/screen names in all 90 articles against the current UI (UI changed since: timezone combobox, review request, crew unavailable, timesheet CSV, Mark paid in cash). | Help | Done 2026-10-15 — labels re-verified; fixed receipt, manual payment, deposit, crew done/report/drafts, on my way, client remove/contact, schedule/repeat, portal/link revoke, clock fix | 2026-10-15 |
+| H4 | Add articles for features shipped after the help pass: review request after payment, crew "mark unavailable", timesheet CSV export, late-fee settings, timezone combobox search. | Help | Done 2026-10-15 — added review-request, crew-unavailable, timesheet-csv, late-fee-settings; timezone article rewritten for search box | 2026-10-15 |
 
 ## 4. Pending handoffs
 | # | Item | Owner | Status | Added |
