@@ -78,7 +78,7 @@ export default function SchedulePage() {
 
   return (
     <main className="min-h-screen bg-[var(--cr-bg)] pb-[calc(10rem+env(safe-area-inset-bottom))] text-[var(--cr-text)] min-[900px]:pb-0 print:pb-0">
-      <header className="sticky top-0 z-20 border-b border-teal-500/20 bg-[var(--cr-panel)] print:hidden">
+      <header className="app-topbar sticky top-0 z-20 border-b border-teal-500/20 bg-[var(--cr-panel)] print:hidden">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
           <a href="/dashboard" className="flex items-center gap-2 text-sm font-medium transition hover:text-teal-500"><span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-teal-500 text-sm font-bold text-slate-950!">C</span>
             Back to dashboard

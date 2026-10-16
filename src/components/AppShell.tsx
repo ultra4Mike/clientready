@@ -122,7 +122,7 @@ useEffect(() => {
           <div className="mt-6 flex min-h-[calc(100%-4rem)] flex-col">{nav}</div>
         </aside>
         <div className="min-w-0 flex-1">
-          <header className="border-b border-teal-500/20 bg-[var(--cr-panel)] px-4 py-1.5 min-[900px]:sticky min-[900px]:top-0 min-[900px]:z-20 min-[900px]:bg-[var(--cr-bg)] min-[900px]:px-6 min-[900px]:py-3">
+          <header className="app-topbar border-b border-teal-500/20 bg-[var(--cr-panel)] px-4 py-1.5 min-[900px]:sticky min-[900px]:top-0 min-[900px]:z-20 min-[900px]:bg-[var(--cr-bg)] min-[900px]:px-6 min-[900px]:py-3">
             <div className="flex items-center justify-between gap-3">
               <div className="min-[900px]:hidden"><Logo /></div>
               {showTitle ? <h1 className="hidden text-lg font-semibold min-[900px]:block">{title}</h1> : <span className="sr-only">{title}</span>}

@@ -482,7 +482,7 @@ export default function CrewPage() {
 
   return (
     <main className="min-h-screen bg-[var(--cr-bg)] pb-24 text-[var(--cr-text)]">
-      <header className="sticky top-0 z-10 border-b border-teal-500/20 bg-[var(--cr-bg)] px-4 py-3 shadow-sm print:hidden">
+      <header className="app-topbar sticky top-0 z-10 border-b border-teal-500/20 bg-[var(--cr-bg)] px-4 py-3 shadow-sm print:hidden">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-500 font-bold text-slate-950! shadow-sm">C</span>
