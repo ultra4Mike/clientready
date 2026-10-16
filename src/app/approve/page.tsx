@@ -14,6 +14,7 @@ import PayQr from "@/components/PayQr";
 import SignaturePad from "@/components/SignaturePad";
 import { fetchPortalDoc, portalApprove } from "@/lib/portal";
 import { StageSchedule } from "@/components/StageSchedule";
+import RatingBox from "@/components/Rating";
 import { payNowAmount, readStages, todayYmd } from "@/lib/stages";
 import type { Signature } from "@/lib/signature";
 
@@ -261,6 +262,7 @@ export default function ApprovePage() {
           {approved && <p className="mt-3 text-sm font-semibold text-emerald-700">Approved{approval?.approverName ? ` by ${approval.approverName}` : ""}</p>}
           {approved && approvalSignature && <div className="mt-2" data-testid="approval-signature"><SignatureBlock signature={approvalSignature} label="Approved and signed" /></div>}
         </div>
+        {!isProposal && (token || portal) && <RatingBox target={{ token, portal }} />}
       </section>
     </main>
   );

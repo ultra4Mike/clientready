@@ -26,6 +26,7 @@ import { JobPhotosEditor, JobPhotoStrip } from "@/components/JobPhotos";
 import { currentDocId } from "@/lib/doc-sync";
 import { isQuotaError, readPhotos, type JobPhoto } from "@/lib/photos";
 import LineSplit from "@/components/LineSplit";
+import { ownerRating, starsText, type Rating } from "@/lib/ratings";
 import { applyPackage, deletePackage, readPackages, savePackage, syncPackages, type JobPackage } from "@/lib/packages";
 import ReminderPanel from "@/components/ReminderPanel";
 import { normalizeCategory, type LineCategory } from "@/lib/line-split";
@@ -192,7 +193,14 @@ export default function NewInvoicePage() {
   const [items, setItems] = useState<LineItem[]>([{ ...emptyItem }]);
   const [packages, setPackages] = useState<JobPackage[]>([]);
   const [packageName, setPackageName] = useState("");
-  useEffect(() => { setPackages(readPackages()); void syncPackages().then(setPackages); }, []);
+  const [rating, setRating] = useState<Rating | null>(null);
+  useEffect(() => {
+    let live = true;
+    Promise.resolve().then(() => { if (live) setRating(null); });
+    if (docId && /^[0-9a-f-]{36}$/i.test(docId)) ownerRating(docId).then((row) => { if (live) setRating(row); }).catch(() => {});
+    return () => { live = false; };
+  }, [docId]);
+  useEffect(() => { Promise.resolve().then(() => setPackages(readPackages())); void syncPackages().then(setPackages); }, []);
   const [businessName, setBusinessName] = useState("Your business");
   const [ownerName, setOwnerName] = useState("");
   const [reminderOpen, setReminderOpen] = useState(false);
@@ -1098,6 +1106,11 @@ export default function NewInvoicePage() {
                 <p>Suggested late fee: <b>${lateFee.amount.toFixed(2)}</b> ({lateFee.daysLate} days past due, {lateFee.how}).{Number(taxPercent) > 0 ? " Tax % applies to it as a line item." : ""}</p>
                 <button type="button" data-testid="late-fee-add" onClick={addLateFee} className="mt-1 rounded-lg border border-amber-500/50 px-3 py-1.5 text-sm font-medium max-sm:min-h-11">Add late fee line</button>
               </div>
+            )}
+            {!isProposal && rating && (
+              <p className="w-full rounded-lg border border-amber-500/30 px-3 py-2 text-sm" data-testid="owner-rating" data-stars={rating.stars}>
+                Customer rating: <span className="text-amber-500" aria-label={`${rating.stars} of 5 stars`}>{starsText(rating.stars)}</span>{rating.comment ? <> · “{rating.comment}”</> : null}
+              </p>
             )}
             {!isProposal && docId && status === "paid" && (() => {
               const asked = reviewAsked || reviewAskedAt(docId);
