@@ -1,5 +1,6 @@
 "use client";
 
+import { PLANS, PRICES_ARE_PLACEHOLDERS } from "@/lib/plans";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -118,25 +119,17 @@ export default function HomePage() {
 
       <section id="pricing" className="mx-auto max-w-6xl px-4 pb-16">
         <h2 className="text-3xl font-bold tracking-tight">Simple pricing</h2>
-        <div className="mt-6 grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-6 shadow-sm">
-            <p className="text-sm text-[var(--cr-muted)]">Trial</p>
-            <p className="mt-2 text-3xl font-bold tracking-tight">14 days</p>
-            <p className="mt-3 text-sm text-[var(--cr-muted)]">Full tools. No card. Then old work stays viewable.</p>
-          </div>
-          <div className="rounded-2xl border-2 border-teal-400 bg-[var(--cr-card)] p-6 shadow-md">
-            <p className="text-sm font-semibold text-teal-600 dark:text-teal-300">Monthly</p>
-            <p className="mt-2 text-3xl font-bold tracking-tight">$7.99</p>
-            <p className="mt-3 text-sm text-[var(--cr-muted)]">After the trial. Keep saving new jobs.</p>
-          </div>
-          <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-6 shadow-sm">
-            <p className="text-sm text-[var(--cr-muted)]">3 months</p>
-            <p className="mt-2 text-3xl font-bold tracking-tight">$19.99</p>
-            <p className="mt-3 text-sm text-[var(--cr-muted)]">Same tools, paid ahead.</p>
-          </div>
+        <div className="mt-6 grid gap-4 md:grid-cols-3" data-testid="home-pricing">
+          {PLANS.map((plan) => (
+            <div key={plan.id} className={`rounded-2xl bg-[var(--cr-card)] p-6 ${plan.highlight ? "border-2 border-teal-400 shadow-md" : "border border-teal-500/20 shadow-sm"}`}>
+              <p className={`text-sm ${plan.highlight ? "font-semibold text-teal-600 dark:text-teal-300" : "text-[var(--cr-muted)]"}`}>{plan.name}</p>
+              <p className="mt-2 text-3xl font-bold tracking-tight">{plan.price}</p>
+              <p className="mt-3 text-sm text-[var(--cr-muted)]">{plan.blurb}</p>
+            </div>
+          ))}
         </div>
         <p className="mx-auto mt-5 max-w-2xl text-center text-sm text-[var(--cr-muted)]">
-          A raise changes the next job only. The year packet is a log, not a tax return. Checkout comes later.
+          A raise changes the next job only. The year packet is a log, not a tax return. Checkout comes later. <Link href="/plans" className="underline">See plans</Link>{PRICES_ARE_PLACEHOLDERS ? " (placeholder prices)" : ""}.
         </p>
       </section>
 

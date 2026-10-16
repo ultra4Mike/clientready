@@ -1,5 +1,6 @@
 "use client";
 
+import TrialBanner from "@/components/TrialBanner";
 import { ReactNode, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -129,7 +130,7 @@ useEffect(() => {
             </div>
           </header>
           <div className="app-main p-4 pb-[calc(10rem+env(safe-area-inset-bottom))] min-[900px]:p-6 print:pb-4">
-            <div className="mx-auto w-full max-w-6xl">{children}</div>
+            <div className="mx-auto w-full max-w-6xl"><TrialBanner />{children}</div>
           </div>
         </div>
       </div>
