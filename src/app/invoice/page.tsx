@@ -825,11 +825,11 @@ export default function NewInvoicePage() {
               <div className="flex items-center justify-between"><h2 className="font-medium">Line items</h2><button type="button" className="tap rounded-lg border border-teal-500/40 max-sm:min-h-11 px-3 py-1.5 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300" onClick={() => setItems((current) => [...current, { ...emptyItem }])}>Add item</button></div>
               <div className="hidden gap-2 border-b border-slate-200 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:grid sm:grid-cols-[minmax(0,1fr)_4.5rem_6rem_8.5rem]"><span>Description</span><span>Qty</span><span>Rate</span><span>Type</span></div>
               {items.map((item, index) => (
-                <div key={index} className="grid grid-cols-3 gap-2 rounded-lg border border-slate-200 p-2 sm:grid-cols-[minmax(0,1fr)_4.5rem_6rem_8.5rem] sm:border-0 sm:p-0">
-                  <input className="col-span-3 sm:col-span-1 rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Description" value={item.description} onChange={(event) => updateItem(index, "description", event.target.value)} />
+                <div key={index} className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-2 sm:grid-cols-[minmax(0,1fr)_4.5rem_6rem_8.5rem] sm:border-0 sm:p-0">
+                  <input className="col-span-2 sm:col-span-1 rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Description" value={item.description} onChange={(event) => updateItem(index, "description", event.target.value)} />
                   <input className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Qty" value={item.qty} onChange={(event) => updateItem(index, "qty", event.target.value)} />
                   <input className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Rate" value={item.rate} onChange={(event) => updateItem(index, "rate", event.target.value)} />
-                  <select aria-label="Item type" data-testid="item-category" className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={item.category || ""} onChange={(event) => setItems((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, category: normalizeCategory(event.target.value) } : row))}>
+                  <select aria-label="Item type" data-testid="item-category" className="col-span-2 w-full min-w-0 sm:col-span-1 rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={item.category || ""} onChange={(event) => setItems((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, category: normalizeCategory(event.target.value) } : row))}>
                     <option value="">Unmarked</option>
                     <option value="labor">Labor</option>
                     <option value="materials">Materials</option>
@@ -855,9 +855,9 @@ export default function NewInvoicePage() {
               <div className="flex justify-between border-t border-teal-500/30 pt-2 text-base font-bold"><span>Total</span><span className="tabular-nums">${totals.total.toFixed(2)}</span></div>
             </div>
             <Section id="payments" label="Payments" className="space-y-2 rounded-xl border border-slate-200 p-4">
-              <div className="flex items-center justify-between">
-                <h2 className="font-medium">{isProposal ? "Deposit received" : "Payments received"}</h2>
-                <button type="button" className="min-h-11 rounded-lg border border-teal-500/40 px-3 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 sm:min-h-9 dark:text-teal-300" onClick={addPayment}>{payments.length ? "Add another payment" : isProposal ? "Add deposit" : "Add payment"}</button>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="min-w-0 font-medium">{isProposal ? "Deposit received" : "Payments received"}</h2>
+                <button type="button" className="min-h-11 shrink-0 whitespace-nowrap rounded-lg border border-teal-500/40 px-3 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 sm:min-h-9 dark:text-teal-300" onClick={addPayment}>{payments.length ? "Add another payment" : isProposal ? "Add deposit" : "Add payment"}</button>
               </div>
               {payments.map((payment) => (
                 <div key={payment.id} className="grid gap-2 border-t border-slate-100 pt-2 sm:grid-cols-2">
@@ -1027,7 +1027,7 @@ export default function NewInvoicePage() {
                 {fromProposal ? <>Made from proposal <a className="font-medium text-teal-600 underline" href={`/invoice?id=${encodeURIComponent(fromProposal.id)}`}>{fromProposal.number}</a></> : <>Invoice made from this proposal: {madeInvoices.map((item, index) => <span key={item.id}>{index ? ", " : ""}<a className="font-medium text-teal-600 underline" href={`/invoice?id=${encodeURIComponent(item.id)}`}>{item.number}</a></span>)}</>}
               </p>
             )}
-            <div className="print-hide sticky bottom-0 lg:hidden z-10 -mx-4 grid grid-cols-2 gap-2 border-t border-slate-200 bg-[var(--cr-card)] px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:-mx-6 sm:flex sm:flex-wrap sm:gap-3 sm:px-6">
+            <div className="mobile-savebar print-hide sticky bottom-0 lg:hidden z-10 -mx-4 grid grid-cols-2 gap-2 border-t border-slate-200 bg-[var(--cr-card)] px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:-mx-6 sm:flex sm:flex-wrap sm:gap-3 sm:px-6">
               {!locked && <button type="button" onClick={saveDocument} className="col-span-2 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Save document</button>}
               {isProposal && !locked && (
                 <button type="button" onClick={createInvoiceFromProposal} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Create invoice</button>

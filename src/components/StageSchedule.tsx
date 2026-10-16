@@ -47,9 +47,9 @@ export function StageEditor({ stages, onChange, total, balance }: { stages: Stag
   }
   return (
     <div className="space-y-2 rounded-xl border border-slate-200 p-4" data-testid="stage-editor">
-      <div className="flex items-center justify-between">
-        <h2 className="font-medium">Payment stages (optional)</h2>
-        <button type="button" className="tap min-h-11 rounded-lg border border-teal-500/40 px-3 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 sm:min-h-10 dark:text-teal-300" onClick={add} data-testid="stage-add">Add stage</button>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="min-w-0 font-medium">Payment stages (optional)</h2>
+        <button type="button" className="tap min-h-11 shrink-0 whitespace-nowrap rounded-lg border border-teal-500/40 px-3 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 sm:min-h-10 dark:text-teal-300" onClick={add} data-testid="stage-add">Add stage</button>
       </div>
       {stages.length === 0 && <p className="text-xs text-slate-500">Split this invoice into deposit / progress / final payments with due dates. The invoice total does not change.</p>}
       {plan.rows.map((row) => (
