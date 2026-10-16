@@ -470,3 +470,5 @@ html.dark .cr-panel .border-slate-200, html.dark .cr-panel .border-slate-300 { b
 html.dark .cr-panel input, html.dark .cr-panel select { background-color: #10262c !important; color: #e2f6f4 !important; border-color: rgba(45, 212, 191, 0.35) !important; }
 html.dark .cr-panel .text-rose-700 { color: #fda4af !important; }
 html.dark .cr-panel .text-emerald-700 { color: #6ee7b7 !important; }
+/* Native app (Capacitor): no prices, plans or purchase links (see src/lib/native.ts). */
+.native-app [data-purchase] { display: none !important; }

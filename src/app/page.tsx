@@ -2,6 +2,7 @@
 
 import { PLANS, PRICES_ARE_PLACEHOLDERS } from "@/lib/plans";
 import Link from "next/link";
+import NativeLoginOnly from "@/components/NativeLoginOnly";
 import { useEffect, useState } from "react";
 
 export default function HomePage() {
@@ -31,6 +32,7 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-[var(--cr-bg)] text-[var(--cr-text)]">
+      <NativeLoginOnly />
       {deleted && <p role="status" data-testid="account-deleted" className="flex items-center justify-center gap-2 bg-emerald-600 px-4 py-3 text-center text-sm font-medium text-white!"><span aria-hidden="true">✓</span>Your account was deleted.</p>}
       <header className="sticky top-0 z-20 border-b border-teal-500/20 bg-[var(--cr-panel)] pt-[env(safe-area-inset-top)] print:hidden">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3 sm:py-4">
@@ -59,7 +61,7 @@ export default function HomePage() {
         </ul>
         <div className="mt-8 grid gap-3 sm:flex sm:flex-wrap sm:items-center lg:justify-center">
           <a href="/signup" className="rounded-lg bg-teal-500 px-6 py-3 text-center text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">Start free</a>
-          <a href="#pricing" className="rounded-lg border border-teal-400/40 px-6 py-3 text-center text-sm font-medium transition hover:border-teal-400">See pricing</a>
+          <a href="#pricing" data-purchase className="rounded-lg border border-teal-400/40 px-6 py-3 text-center text-sm font-medium transition hover:border-teal-400">See pricing</a>
         </div>
         <p className="mt-3 text-sm text-[var(--cr-muted)]">14-day trial. No card to start.</p>
 
@@ -124,7 +126,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="pricing" className="mx-auto max-w-6xl px-4 pb-16">
+      <section id="pricing" data-purchase className="mx-auto max-w-6xl px-4 pb-16">
         <h2 className="text-center text-3xl font-bold tracking-tight">Simple pricing</h2>
         <div className="mt-6 grid gap-4 md:grid-cols-3" data-testid="home-pricing">
           {PLANS.map((plan) => (

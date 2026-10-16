@@ -1,3 +1,4 @@
+import { NATIVE_CLASS_SCRIPT } from "@/lib/native";
 import { SITE_URL } from "@/lib/site";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
@@ -34,7 +35,7 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem('clientready-theme')||'dark';var r=document.documentElement;r.classList.toggle('dark',t==='dark');r.classList.toggle('light',t==='light');}catch(e){}`,
+            __html: NATIVE_CLASS_SCRIPT + `try{var t=localStorage.getItem('clientready-theme')||'dark';var r=document.documentElement;r.classList.toggle('dark',t==='dark');r.classList.toggle('light',t==='light');}catch(e){}`,
           }}
         />
       </head>

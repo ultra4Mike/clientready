@@ -878,8 +878,8 @@ export default function NewInvoicePage() {
 {locked && (
             <div className="rounded-xl border p-4 text-sm shadow-sm" style={{ background: "#fef3c7", color: "#0f172a", borderColor: "#f59e0b" }} data-testid="trial-upgrade">
               <p className="font-semibold">Your free trial has ended.</p>
-              <p>You can view and print old documents. New saves are locked. Plans: {priceSummary()}{PRICES_ARE_PLACEHOLDERS ? " (placeholder prices)" : ""}.</p>
-              <Link href="/plans" data-testid="trial-upgrade-plans" className="mt-2 inline-flex min-h-11 items-center rounded-lg bg-teal-500 px-4 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">See plans</Link>
+              <p>You can view and print old documents. New saves are locked.<span data-purchase> Plans: {priceSummary()}{PRICES_ARE_PLACEHOLDERS ? " (placeholder prices)" : ""}.</span></p>
+              <Link href="/plans" data-purchase data-testid="trial-upgrade-plans" className="mt-2 inline-flex min-h-11 items-center rounded-lg bg-teal-500 px-4 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">See plans</Link>
             </div>
           )}
           {!locked && daysLeft <= 5 && (
