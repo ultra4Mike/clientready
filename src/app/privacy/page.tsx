@@ -41,7 +41,8 @@ export default function PrivacyPage() {
           bank account numbers: those are entered with the payment provider, whose own terms and
           privacy policy apply. ClientReady keeps the payment details shown on an invoice (such as a
           payment handle or instructions) and the payments recorded on it (amount, date, method and
-          reference). If email sending is turned on, emails you choose to send go through our email
+          reference), including deposits, partial and stage payments, and the discounts, taxes and
+          totals on each document. Payments go to the business, not to ClientReady. If email sending is turned on, emails you choose to send go through our email
           provider (Resend), with replies going to your own address.
         </p>
         <h2 className="mt-6 text-lg font-semibold text-slate-900">Account deletion</h2>
