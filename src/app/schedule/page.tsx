@@ -97,7 +97,7 @@ export default function SchedulePage() {
         >
           <h1 className="text-xl font-bold tracking-tight">Schedule a job</h1>
           <select
-            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+            className="w-full min-h-11 rounded-lg border border-slate-300 bg-transparent px-3 py-2.5 text-base shadow-sm sm:text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
             value={form.clientName}
             onChange={(event) =>
               setForm({ ...form, clientName: event.target.value })
@@ -111,34 +111,34 @@ export default function SchedulePage() {
             ))}
           </select>
           <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block text-sm font-medium text-slate-600">
+          <label className="block text-sm font-medium text-[var(--cr-muted)]">
             Date
             <input
               type="date"
-              className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+              className="mt-1.5 w-full min-h-11 rounded-lg border border-slate-300 bg-transparent px-3 py-2.5 text-base shadow-sm sm:text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
               value={form.date}
               onChange={(event) => setForm({ ...form, date: event.target.value })}
             />
           </label>
-          <label className="block text-sm font-medium text-slate-600">
+          <label className="block text-sm font-medium text-[var(--cr-muted)]">
             Start time
             <input
               type="time"
-              className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+              className="mt-1.5 w-full min-h-11 rounded-lg border border-slate-300 bg-transparent px-3 py-2.5 text-base shadow-sm sm:text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
               value={form.time}
               onChange={(event) => setForm({ ...form, time: event.target.value })}
             />
           </label>
           </div>
           <textarea
-            className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+            className="min-h-24 w-full min-h-11 rounded-lg border border-slate-300 bg-transparent px-3 py-2.5 text-base shadow-sm sm:text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
             placeholder="Job details"
             value={form.notes}
             onChange={(event) => setForm({ ...form, notes: event.target.value })}
           />
           <button
             type="submit"
-            className="w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50 sm:w-auto"
+            className="min-h-11 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50 sm:w-auto"
           >
             Save appointment
           </button>
@@ -147,15 +147,15 @@ export default function SchedulePage() {
         <div className="space-y-3">
           {jobs.length > 0 && <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Scheduled jobs</h2>}
           {jobs.map(({ doc, schedule }) => (
-            <a key={`job-${doc.id}`} href={`/invoice?id=${encodeURIComponent(doc.id)}`} data-testid="schedule-job" className="block rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm transition hover:border-teal-400">
+            <a key={`job-${doc.id}`} href={`/invoice?id=${encodeURIComponent(doc.id)}`} data-testid="schedule-job" className="block rounded-2xl border border-l-4 border-teal-500/20 border-l-teal-500 bg-[var(--cr-card)] p-5 shadow-sm transition hover:border-teal-400">
               <p className="text-base font-semibold">{doc.clientName || doc.title}</p>
-              <p className="mt-0.5 text-sm font-medium text-teal-600">{niceYmd(schedule.date)}{schedule.startTime ? ` at ${timeLabel(schedule.startTime)}` : ""}</p>
-              <p className="mt-1 text-sm text-slate-600">{doc.title} · <span data-done={doneState(schedule) || undefined}>{statusLabel(schedule)}</span></p>
+              <p className="mt-0.5 text-sm font-semibold text-teal-600 dark:text-teal-300">{niceYmd(schedule.date)}{schedule.startTime ? ` at ${timeLabel(schedule.startTime)}` : ""}</p>
+              <p className="mt-1 text-sm text-[var(--cr-muted)]">{doc.title} · <span data-done={doneState(schedule) || undefined}>{statusLabel(schedule)}</span></p>
             </a>
           ))}
           {jobs.length > 0 && appointments.length > 0 && <h2 className="pt-2 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Other appointments</h2>}
           {loaded && jobs.length === 0 && appointments.length === 0 && (
-            <p className="rounded-2xl border border-dashed border-teal-500/30 bg-[var(--cr-card)] p-8 text-center text-sm text-slate-600">No appointments yet.</p>
+            <p className="rounded-2xl border border-dashed border-teal-500/30 bg-[var(--cr-card)] p-8 text-center text-sm text-[var(--cr-muted)]">No appointments yet.</p>
           )}
           {appointments
             .slice()
@@ -163,19 +163,19 @@ export default function SchedulePage() {
             .map((item) => (
               <div
                 key={item.id}
-                className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm"
+                className="rounded-2xl border border-l-4 border-teal-500/20 border-l-sky-400 bg-[var(--cr-card)] p-5 shadow-sm"
               >
                 <p className="text-base font-semibold">{item.clientName}</p>
-                <p className="mt-0.5 text-sm font-medium text-teal-600">
+                <p className="mt-0.5 text-sm font-semibold text-teal-600 dark:text-teal-300">
                   {item.date} at {item.time}
                 </p>
                 {item.notes && (
-                  <p className="mt-1 text-sm text-slate-600">{item.notes}</p>
+                  <p className="mt-1 text-sm text-[var(--cr-muted)]">{item.notes}</p>
                 )}
                 <button
                   type="button"
                   onClick={() => removeAppointment(item.id)}
-                  className="mt-3 rounded-lg px-3 py-1.5 text-sm text-slate-500 transition hover:bg-red-500/10 hover:text-red-600"
+                  className="mt-3 inline-flex min-h-11 items-center rounded-lg px-3 text-sm text-[var(--cr-muted)] transition hover:bg-red-500/10 hover:text-red-600"
                 >
                   Remove
                 </button>
