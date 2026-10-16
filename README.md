@@ -135,7 +135,7 @@ checkout. The invoice status is not changed automatically.
    - `SUPABASE_SERVICE_ROLE_KEY`: Supabase → Project Settings → API → `service_role` key. Server only; never expose it in the browser.
    - Optional: `STRIPE_CURRENCY` (default `usd`).
 3. Stripe Dashboard → Developers → Webhooks → Add endpoint:
-   - URL: `https://YOUR-DOMAIN/api/stripe/webhook`
+   - URL: `https://clientreadyapp.com/api/stripe/webhook`
    - Events: `checkout.session.completed` and `checkout.session.async_payment_succeeded`
    - Copy the endpoint's signing secret into `STRIPE_WEBHOOK_SECRET`.
 

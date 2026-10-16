@@ -7,7 +7,7 @@ Derived from the code on 2026-10-16. ⚠️ = uncertain, owner/Dev must confirm.
 - **Subtitle (iOS, ≤30):** Invoices, jobs & crew in one app (30)
 - **Short description (Google, ≤80):** Send proposals and invoices, schedule jobs, run your crew and get paid directly.
 - **Category:** Business (secondary: Productivity)
-- **Support URL:** [Support URL] · **Marketing URL:** [Marketing URL] · **Privacy URL:** [Domain]/privacy · **Terms:** [Domain]/terms · **Account deletion URL (Google):** [Domain]/account/delete (in-app: Settings → Delete account; crew: Crew page → Delete account).
+- **Support URL:** https://clientreadyapp.com/help · **Marketing URL:** https://clientreadyapp.com · **Privacy URL:** https://clientreadyapp.com/privacy · **Terms:** https://clientreadyapp.com/terms · **Account deletion URL (Google):** https://clientreadyapp.com/account/delete (in-app: Settings → Delete account; crew: Crew page → Delete account).
 - **iOS keywords (≤100 chars):** `invoice,estimate,proposal,contractor,crew,scheduling,jobs,quote,billing,timesheet,field service` (93)
 
 ## Full description
@@ -40,7 +40,7 @@ Data linked to the user, used for **App Functionality** only:
 
 ## Google Play Data Safety (owner-approved 2026-10-16)
 - Data encrypted in transit: **Yes**. Requires deploying on an HTTPS host (e.g. Vercel, Netlify, Cloudflare); Supabase is HTTPS.
-- Users can request deletion: **Yes**: in-app (Settings → Delete account) and on the web at [Domain]/account/delete. Requires SUPABASE_SERVICE_ROLE_KEY on the host; otherwise the page falls back to emailing support.
+- Users can request deletion: **Yes**: in-app (Settings → Delete account) and on the web at https://clientreadyapp.com/account/delete. Requires SUPABASE_SERVICE_ROLE_KEY on the host; otherwise the page falls back to emailing support.
 - Data shared with third parties: **No.** Supabase (hosting/database), Resend (emails the owner sends) and payment providers the owner connects are service providers processing data on the business's behalf, not sharing.
 - Collected (app functionality / account management): Personal info (name, email, phone, address), Financial info: other (payment records, payment handles / bank instructions), Photos (optional), Files & docs (documents, signatures), App info & performance (server logs/IP; not linked to identity, not used for tracking or ads). Device or other IDs (push subscription endpoint + user agent; optional, only when notifications are turned on; app functionality). Not collected: Location, App activity, Purchase history.
 - Required: email. Optional: photos.
@@ -49,14 +49,15 @@ Data linked to the user, used for **App Functionality** only:
 Paid plans are sold on the web only. The iOS app shows no prices, purchase buttons or links to buy (reader-style); Purchases are not collected in-app. Revisit if in-app purchase is ever added.
 
 ## Still open
-- Placeholders: [Support email], [Support URL], [Privacy URL] ([Domain]/privacy), [Marketing URL], [Data retention period] (suggest 30 days after account closure), [Domain] for /account/delete.
+- Placeholders: [Support email], [Data retention period] (suggest 30 days after account closure). URLs filled 2026-10-16: production domain https://clientreadyapp.com is live (www also works; old Vercel URL still works).
 - Account deletion shipped (9f81fdd); verify it works on the live host once the service-role key is set.
-- ~~Recheck after native wrapper SDKs land~~ **Done 2026-10-16** (Dev 36f18fc, see docs/native-apps.md): @capacitor/core, ios, android 8.5.3, @capacitor/app 8.1.2, androidx libraries, capacitor-swift-pm. No analytics, ads, push or crash SDKs, so no new data types; Tracking = No. Recheck again whenever a native plugin/SDK is added (e.g. native push, camera).
+- ~~Recheck after native wrapper SDKs land~~ **Done 2026-10-16** (Dev 36f18fc, see docs/native-apps.md): @capacitor/core, ios, android 8.5.3, @capacitor/app 8.1.2, androidx libraries, capacitor-swift-pm. No analytics, ads, push or crash SDKs, so no new data types; Tracking = No. Recheck again whenever a native plugin/SDK is added (e.g. native push).
+- **@capacitor/camera 8.2.5 added 2026-10-16** (Dev 5fbf887): native camera and photo-library picker for job photos, crew done photos and receipts. iOS `NSCameraUsageDescription` and photo-library usage strings added. Photos upload to the owner's own storage exactly as before, so **no new data types** (Photos already declared, optional); Tracking still No. Offline photo queue (fa211eb): crew done photos and expense receipts taken offline stay on the device (per user) until sent on reconnect, and are wiped on account deletion; nothing leaves the device except to the owner's storage.
 - **App ID:** `app.clientready.mobile` is a placeholder (bundle ID / package name). It is permanent once published on either store, so the owner must confirm it before the first upload.
 
 ## Review risk: Apple Guideline 4.2 (minimum functionality)
 The iOS app is a WebView loading the live site, which Apple often rejects under 4.2 as "a repackaged website". To reduce risk, ship native touches before submitting and mention them in the review notes:
-- Camera / photo picker for job photos (native picker or Capacitor Camera plugin)
+- Camera / photo picker for job photos: **Done** (@capacitor/camera 8.2.5, 5fbf887) plus offline photo queue (fa211eb). Mention both in review notes as native functionality.
 - Push notifications (native APNs via a Capacitor push plugin, not just web push)
 - Offline use (bundled offline page; saves on device and syncs later)
 - Deep links (clientready:// and Universal Links / Associated Domains, already in 36f18fc)

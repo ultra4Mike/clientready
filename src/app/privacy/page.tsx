@@ -47,7 +47,7 @@ export default function PrivacyPage() {
         <h2 className="mt-6 text-lg font-semibold text-slate-900">Account deletion</h2>
         <p className="mt-2">
           <strong>How to delete:</strong> open Settings and tap Delete account (crew: Delete account on
-          the Crew page), or go to /account/delete on the web without the app. Confirm with your password or
+          the Crew page), or go to https://clientreadyapp.com/account/delete on the web without the app. Confirm with your password or
           a link we email you, type DELETE and tap Delete my account. If online deletion is unavailable, the
           page tells you to email [Support email to confirm] instead, and we complete it within [Deletion response time].
         </p>
