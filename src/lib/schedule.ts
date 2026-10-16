@@ -436,9 +436,13 @@ export function omwTime(iso: string) {
 }
 
 /** Crew: mark an assigned job done; at least one photo (compressed JPEG data URL) is required. */
-export async function crewMarkDone(docId: string, photos: string[]) {
+export async function crewMarkDone(docId: string, photos: string[], clientKey = "") {
   if (!photos.length) return "Add at least one photo of the finished job.";
-  const { data, error } = await supabase.rpc("crew_mark_done", { p_doc_id: docId, p_photos: photos });
+  // With a client key the server skips an upload it already has (retry after a lost reply).
+  let { data, error } = await supabase.rpc("crew_mark_done", clientKey ? { p_doc_id: docId, p_photos: photos, p_client_key: clientKey } : { p_doc_id: docId, p_photos: photos });
+  if (error && clientKey && /could not find the function|PGRST202/i.test(`${error.message} ${(error as { code?: string }).code || ""}`)) {
+    ({ data, error } = await supabase.rpc("crew_mark_done", { p_doc_id: docId, p_photos: photos })); // migration 20261016100000 not run yet
+  }
   if (error) return error.message;
   return data === false ? "Could not mark this job done." : "";
 }

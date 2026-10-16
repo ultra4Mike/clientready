@@ -1,7 +1,7 @@
 "use client";
 
 import { nativePhotoClick } from "@/lib/native-camera";
-import { enqueue, flushQueue, isNetworkError, queued, removeQueued, type QueueItem, type QueueKind } from "@/lib/photo-queue";
+import { confirmLogoutWithQueue, enqueue, flushQueue, isNetworkError, newUploadKey, queued, removeQueued, type QueueItem, type QueueKind } from "@/lib/photo-queue";
 import EmptyState from "@/components/EmptyState";
 import CrewDaysOff from "@/components/CrewDaysOff";
 import { CREW_KINDS } from "@/lib/cost-categories";
@@ -247,9 +247,8 @@ export default function CrewPage() {
   }
 
   async function sendQueued(item: QueueItem) {
-    if (item.kind === "done") return crewMarkDone(item.docId, (item.payload.photos as string[]) || []);
-    const { error } = await supabase.rpc("crew_add_expense", { p_doc_id: item.docId, ...item.payload });
-    return error ? error.message : "";
+    if (item.kind === "done") return crewMarkDone(item.docId, (item.payload.photos as string[]) || [], item.id);
+    return addExpense(item.docId, item.payload, item.id);
   }
 
   async function flush(user = userId) {
@@ -263,11 +262,20 @@ export default function CrewPage() {
   }
 
   /** Runs an upload; if the phone is offline it is saved on the device and sent later. */
-  async function sendOrQueue(kind: QueueKind, docId: string, payload: Record<string, unknown>, send: () => Promise<string>) {
-    const error = navigator.onLine ? await send().catch((reason: unknown) => String((reason as Error)?.message || reason)) : "offline";
+  /** crew_add_expense with an idempotency key (falls back to the keyless call before migration 20261016100000). */
+  async function addExpense(docId: string, payload: Record<string, unknown>, key: string) {
+    let { error } = await supabase.rpc("crew_add_expense", { p_doc_id: docId, p_receipt: "", ...payload, p_client_key: key });
+    if (error && /could not find the function|PGRST202/i.test(`${error.message} ${error.code || ""}`)) ({ error } = await supabase.rpc("crew_add_expense", { p_doc_id: docId, ...payload }));
+    return error ? error.message : "";
+  }
+
+  /** One key per upload, used for the first try and every retry, so the server never adds it twice. */
+  async function sendOrQueue(kind: QueueKind, docId: string, payload: Record<string, unknown>, send: (key: string) => Promise<string>) {
+    const key = newUploadKey();
+    const error = navigator.onLine ? await send(key).catch((reason: unknown) => String((reason as Error)?.message || reason)) : "offline";
     if (!error || !isNetworkError(error === "offline" ? "failed to fetch" : error)) return { error, queued: false };
     try {
-      await enqueue({ user: userId, kind, docId, payload });
+      await enqueue({ id: key, user: userId, kind, docId, payload });
     } catch {
       return { error: "No signal, and this phone has no room to save it. Free up space or try again when online.", queued: false };
     }
@@ -306,10 +314,7 @@ export default function CrewPage() {
     if (!spend.amount.trim()) return setMessage("Add the amount you spent.");
     await act(`spend-${card.doc_id}`, async () => {
       const payload = { p_kind: spend.kind, p_amount: spend.amount, p_note: spend.note, p_receipt: spend.receipt };
-      const result = await sendOrQueue("expense", card.doc_id, payload, async () => {
-        const { error } = await supabase.rpc("crew_add_expense", { p_doc_id: card.doc_id, ...payload });
-        return error ? error.message : "";
-      });
+      const result = await sendOrQueue("expense", card.doc_id, payload, (key) => addExpense(card.doc_id, payload, key));
       if (!result.error) { setSpend({ kind: "parts", amount: "", note: "", receipt: "" }); setSpendOpen(""); }
       return result.queued ? "" : result.error;
     }, navigator.onLine ? "Expense added to this job." : "Saved on this phone. It will send when you're back online.");
@@ -328,7 +333,7 @@ export default function CrewPage() {
 
   async function markDone(card: Card) {
     await act(`status-${card.doc_id}`, async () => {
-      const result = await sendOrQueue("done", card.doc_id, { photos: donePhotos }, () => crewMarkDone(card.doc_id, donePhotos));
+      const result = await sendOrQueue("done", card.doc_id, { photos: donePhotos }, (key) => crewMarkDone(card.doc_id, donePhotos, key));
       if (!result.error) { setDonePhotos([]); setDoneFor(""); }
       return result.error;
     }, navigator.onLine ? "Marked done. Your boss will confirm it." : "Saved on this phone with the photos. It will send when you're back online.");
@@ -551,7 +556,7 @@ export default function CrewPage() {
           <div className="flex items-center gap-3 text-sm">
             {open && <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-200 tabular-nums" data-testid="header-timer">⏱ {fmtTimer((now) - Date.parse(open.started_at))}</span>}
             <button type="button" onClick={switchTheme} className="tap rounded-lg px-3 py-2 font-medium transition hover:bg-teal-500/10">{theme === "dark" ? "Light" : "Dark"}</button>
-            <button type="button" className="tap whitespace-nowrap rounded-lg px-3 py-2 font-medium transition hover:bg-teal-500/10" onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}>Log out</button>
+            <button type="button" className="tap whitespace-nowrap rounded-lg px-3 py-2 font-medium transition hover:bg-teal-500/10" onClick={async () => { if (!(await confirmLogoutWithQueue(userId))) return; await supabase.auth.signOut(); window.location.href = "/"; }}>Log out</button>
             <a href="/account/delete" className="tap whitespace-nowrap rounded-lg px-3 py-2 text-sm text-rose-700 transition hover:bg-rose-500/10 dark:text-rose-300" data-testid="crew-delete-account">Delete account</a>
           </div>
         </div>

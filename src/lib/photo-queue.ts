@@ -41,8 +41,13 @@ export function isNetworkError(message: string) {
   return (typeof navigator !== "undefined" && navigator.onLine === false) || /failed to fetch|networkerror|load failed|network request failed|fetch failed/i.test(message);
 }
 
-export async function enqueue(item: Omit<QueueItem, "id" | "createdAt" | "attempts">) {
-  const full: QueueItem = { ...item, id: `q${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`, createdAt: new Date().toISOString(), attempts: 0 };
+/** A stable key for one upload; sent to the server so a retry after a lost reply adds nothing (R14). */
+export function newUploadKey() {
+  return `q${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export async function enqueue(item: Omit<QueueItem, "id" | "createdAt" | "attempts"> & { id?: string }) {
+  const full: QueueItem = { ...item, id: item.id || newUploadKey(), createdAt: new Date().toISOString(), attempts: 0 };
   await run("readwrite", (store) => store.put(full));
   // Ask the browser not to evict queued photos under storage pressure (best effort; ignored if unsupported).
   try { void navigator.storage?.persist?.().catch(() => undefined); } catch { /* ignore */ }
@@ -92,6 +97,24 @@ async function flushOnce(user: string, send: (item: QueueItem) => Promise<string
     }
   }
   return sent;
+}
+
+/** Removes one user's unsent items (log out on a shared phone); other users' items stay. */
+export async function clearUserQueue(user: string) {
+  for (const item of await queued(user)) await removeQueued(item.id);
+}
+
+/**
+ * Before logging out: if this user has unsent uploads, ask; on OK they are removed from this phone.
+ * Returns false when the person chose to stay signed in.
+ */
+export async function confirmLogoutWithQueue(user: string) {
+  if (!user || typeof indexedDB === "undefined") return true;
+  const pending = await queued(user).catch(() => [] as QueueItem[]);
+  if (!pending.length) return true;
+  const ok = window.confirm(`${pending.length} upload${pending.length === 1 ? " hasn't" : "s haven't"} been sent yet (job photos or receipts). If you log out now, ${pending.length === 1 ? "it" : "they"} will be deleted from this phone. Log out anyway?`);
+  if (ok) await clearUserQueue(user).catch(() => undefined);
+  return ok;
 }
 
 /** Wipe on sign-out/account deletion. */
