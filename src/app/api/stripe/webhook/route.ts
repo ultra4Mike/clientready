@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   if (!verifyStripeSignature(payload, request.headers.get("stripe-signature") || "", config.webhookSecret)) {
     return Response.json({ error: "Bad signature." }, { status: 400 });
   }
-  let event: { type?: string; data?: { object?: Session } };
+  let event: { id?: string; type?: string; data?: { object?: Session } };
   try {
     event = JSON.parse(payload);
   } catch {
@@ -36,17 +36,36 @@ export async function POST(request: Request) {
   }
   const session = event.data?.object || {};
   const docId = session.metadata?.doc_id || session.client_reference_id || "";
-  if (session.payment_status !== "paid" || !session.id || !docId || !session.amount_total) {
+  if (session.payment_status !== "paid" || !session.id || !session.amount_total) {
     return Response.json({ received: true, recorded: false });
   }
-  const { data, error } = await serviceClient().rpc("record_stripe_payment", {
+  const paidAt = new Date((session.created || Math.floor(Date.now() / 1000)) * 1000).toISOString();
+  const ref = String(session.payment_intent || session.id);
+  const client = serviceClient();
+  const v2 = await client.rpc("record_stripe_payment_v2", {
     p_doc_id: docId,
     p_session_id: session.id,
     p_amount: session.amount_total / 100,
-    p_paid_at: new Date((session.created || Math.floor(Date.now() / 1000)) * 1000).toISOString(),
-    p_ref: String(session.payment_intent || session.id),
+    p_paid_at: paidAt,
+    p_ref: ref,
+    p_event_id: String(event.id || ""),
+    p_default_tz: process.env.BUSINESS_TIMEZONE || "America/Chicago",
   });
-  // A failure returns 500 so Stripe retries; recording is idempotent per session.
-  if (error) return Response.json({ error: "Could not record payment." }, { status: 500 });
-  return Response.json({ received: true, recorded: Boolean(data) });
+  if (!v2.error) {
+    // 'pending': invoice missing or not synced yet. It is saved in stripe_pending_payments; a non-2xx
+    // makes Stripe retry (for up to ~3 days), and a later retry records it once (idempotent).
+    if (v2.data === "pending") return Response.json({ error: "Invoice not found yet; payment kept as pending." }, { status: 409 });
+    return Response.json({ received: true, recorded: v2.data === "recorded" || v2.data === "duplicate" });
+  }
+  // Before migration 20261015130000 runs, fall back to the original function (UTC date).
+  const { data, error } = await client.rpc("record_stripe_payment", {
+    p_doc_id: docId,
+    p_session_id: session.id,
+    p_amount: session.amount_total / 100,
+    p_paid_at: paidAt,
+    p_ref: ref,
+  });
+  // A failure or a missing invoice returns non-2xx so Stripe retries; recording is idempotent per session.
+  if (error || !data) return Response.json({ error: "Could not record payment." }, { status: error ? 500 : 409 });
+  return Response.json({ received: true, recorded: true });
 }

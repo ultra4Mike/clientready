@@ -35,9 +35,32 @@ export async function POST(request: Request) {
   if (doc.type !== "invoice") return Response.json({ error: "Only invoices can be paid online." }, { status: 400 });
   const data = (doc.data || {}) as Record<string, unknown>;
   // Progress billing: the current stage's amount unless the customer chose to pay the full balance.
-  const { charge, staged } = amountToCharge(data, full);
-  const cents = Math.round(charge * 100);
+  const { charge, owed, staged } = amountToCharge(data, full);
+  // Never charge more than the saved remaining balance.
+  const cents = Math.round(Math.min(charge, owed) * 100);
   if (cents < 50) return Response.json({ error: "Nothing is owed on this invoice." }, { status: 400 });
+
+  // Reuse an open Checkout for the same invoice and amount; expire stale ones so a client can't pay
+  // twice from two tabs. Skipped quietly until migration 20261015130000 creates the table.
+  const sessions = serviceClient().from("stripe_checkout_sessions");
+  const auth = { Authorization: `Bearer ${config.secretKey}` };
+  const { data: openRows, error: openError } = await sessions.select("session_id, cents, url, expires_at").eq("doc_id", String(doc.id)).eq("status", "open");
+  if (!openError && Array.isArray(openRows)) {
+    for (const row of openRows as { session_id: string; cents: number; url: string; expires_at: string }[]) {
+      const live = await fetch(`${config.apiBase}/v1/checkout/sessions/${encodeURIComponent(row.session_id)}`, { headers: auth })
+        .then((r) => (r.ok ? r.json() : null)).catch(() => null) as { status?: string; payment_status?: string } | null;
+      if (live?.status === "complete" || live?.payment_status === "paid") {
+        // Paid but not recorded yet (webhook pending): don't start another payment.
+        await sessions.update({ status: "complete" }).eq("session_id", row.session_id);
+        return Response.json({ error: "A payment for this invoice is already being processed. Refresh in a minute." }, { status: 409 });
+      }
+      if (live?.status === "open" && row.cents === cents && new Date(row.expires_at).getTime() > Date.now() + 60_000) {
+        return Response.json({ url: row.url });
+      }
+      if (live?.status === "open") await fetch(`${config.apiBase}/v1/checkout/sessions/${encodeURIComponent(row.session_id)}/expire`, { method: "POST", headers: auth }).catch(() => null);
+      await sessions.update({ status: "expired" }).eq("session_id", row.session_id);
+    }
+  }
 
   const origin = request.headers.get("origin") || new URL(request.url).origin;
   const back = viaPortal
@@ -56,6 +79,7 @@ export async function POST(request: Request) {
     "metadata[owed_cents]": String(cents),
     "payment_intent_data[metadata][doc_id]": String(doc.id),
     client_reference_id: String(doc.id),
+    expires_at: String(Math.floor(Date.now() / 1000) + 31 * 60),
   });
   if (typeof data.clientEmail === "string" && /.+@.+\..+/.test(data.clientEmail)) form.set("customer_email", data.clientEmail);
 
@@ -64,7 +88,10 @@ export async function POST(request: Request) {
     headers: { Authorization: `Bearer ${config.secretKey}`, "Content-Type": "application/x-www-form-urlencoded" },
     body: form.toString(),
   });
-  const session = (await response.json().catch(() => ({}))) as { url?: string; error?: { message?: string } };
+  const session = (await response.json().catch(() => ({}))) as { id?: string; url?: string; expires_at?: number; error?: { message?: string } };
   if (!response.ok || !session.url) return Response.json({ error: "Could not start card payment. Try again later." }, { status: 502 });
+  if (!openError && session.id) {
+    await sessions.insert({ session_id: session.id, doc_id: String(doc.id), cents, url: session.url, expires_at: new Date((session.expires_at || Math.floor(Date.now() / 1000) + 1800) * 1000).toISOString() });
+  }
   return Response.json({ url: session.url });
 }

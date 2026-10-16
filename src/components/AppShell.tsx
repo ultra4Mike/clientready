@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { clearLocalBusiness } from "@/lib/account-cache";
 import { isCrewUser } from "@/lib/crew";
 import SyncPill from "@/components/SyncPill";
+import { flushClientContactQueue } from "@/lib/client-sync";
 import MobileNav, { BOTTOM_LINKS, NAV_GROUPS } from "@/components/MobileNav";
 
 function Logo() {
@@ -39,6 +40,11 @@ useEffect(() => {
     isCrewUser().then((crew) => {
       if (crew) window.location.href = "/crew";
     });
+    // Retry client contact updates that failed to reach the cloud (offline or error).
+    const retry = () => void flushClientContactQueue().catch(() => undefined);
+    retry();
+    window.addEventListener("online", retry);
+    return () => window.removeEventListener("online", retry);
   }, []);
 
   function saveTheme(next: string) {

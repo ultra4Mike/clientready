@@ -33,7 +33,42 @@ export async function syncClientContact(clientId: string, contact: Contact): Pro
   if (!Object.keys(patch).length) return null;
   const next = clients.map((client) => (client.id === target.id ? { ...client, ...patch } : client));
   window.localStorage.setItem(CLIENTS_KEY, JSON.stringify(next));
-  const userId = await getUserId();
-  if (userId) await supabase.from("clients").update(patch).eq("id", target.id).eq("user_id", userId);
+  queueContactPatch(target.id, patch);
+  await flushClientContactQueue();
   return next;
+}
+
+const QUEUE_KEY = "clientready-client-sync-queue";
+type Queue = Record<string, Partial<Contact>>;
+
+function readQueue(): Queue {
+  try {
+    return JSON.parse(window.localStorage.getItem(QUEUE_KEY) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+
+function queueContactPatch(id: string, patch: Partial<Contact>) {
+  const queue = readQueue();
+  queue[id] = { ...(queue[id] || {}), ...patch };
+  window.localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+}
+
+/**
+ * Sends queued client contact updates to the cloud. A failed update (offline, signed out, error)
+ * stays queued and is retried on the next call. Returns how many are still waiting.
+ */
+export async function flushClientContactQueue(): Promise<number> {
+  const queue = readQueue();
+  const ids = Object.keys(queue);
+  if (!ids.length) return 0;
+  const userId = await getUserId().catch(() => null);
+  if (!userId) return ids.length;
+  for (const id of ids) {
+    const { error } = await supabase.from("clients").update(queue[id]).eq("id", id).eq("user_id", userId);
+    if (!error) delete queue[id];
+  }
+  window.localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+  return Object.keys(queue).length;
 }
