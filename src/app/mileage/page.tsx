@@ -7,7 +7,7 @@ import EmptyState from "@/components/EmptyState";
 import { newId } from "@/lib/synced-list";
 import { mileage, mileageCsv, milesOf, totalMiles, type Trip } from "@/lib/mileage";
 
-const input = "w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30";
+const input = "w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2.5 text-base outline-none sm:text-sm min-h-11 mt-1 transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30";
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
 /** Owner-only (AppShell sends crew accounts to /crew). */
@@ -46,13 +46,13 @@ export default function MileagePage() {
           <button type="button" data-testid="mileage-csv" disabled={!shown.length} onClick={download} className="min-h-11 whitespace-nowrap rounded-lg border border-teal-500/40 px-3 text-sm font-medium disabled:opacity-50">Download CSV</button>
         </div>} />
       <div className="space-y-5">
-        <div className="grid gap-2 rounded-xl border border-slate-200 p-4 sm:grid-cols-6" data-testid="mileage-form">
+        <div className="grid gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:grid-cols-6 sm:p-5" data-testid="mileage-form">
           <label className="text-sm">Date<input type="date" name="date" className={input} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label>
           <label className="text-sm">Miles<input name="miles" inputMode="decimal" className={input} value={form.miles} onChange={(e) => setForm({ ...form, miles: e.target.value })} /></label>
           <label className="text-sm">From<input name="from" className={input} value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value })} /></label>
           <label className="text-sm">To<input name="to" className={input} value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} /></label>
           <label className="text-sm">Purpose<input name="purpose" placeholder="Job, supply run…" className={input} value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} /></label>
-          <button type="button" data-testid="mileage-add" onClick={add} className="min-h-11 self-end rounded-lg bg-teal-500 px-3 font-semibold text-slate-950">Add trip</button>
+          <button type="button" data-testid="mileage-add" onClick={add} className="min-h-11 self-end rounded-lg bg-teal-500 px-4 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">Add trip</button>
           {error && <p role="alert" className="text-sm text-red-600 sm:col-span-6">{error}</p>}
         </div>
         <p className="text-lg font-semibold" data-testid="mileage-total">{year}: {totalMiles(trips, year)} miles</p>
