@@ -60,7 +60,7 @@ export default function StuckPayments() {
         {items.map((item) => (
           <li key={item.sessionId} className="flex flex-wrap items-center justify-between gap-2">
             <span>${item.amount.toFixed(2)} · {new Date(item.paidAt).toLocaleDateString()} · <span className="text-[var(--cr-muted)]">{item.ref}</span></span>
-            <button type="button" disabled={busy === item.sessionId} onClick={() => retry(item.sessionId)} className="rounded-lg bg-teal-500 px-3 py-1.5 text-xs font-semibold text-slate-950! transition hover:bg-teal-400 disabled:opacity-60">
+            <button type="button" disabled={busy === item.sessionId} onClick={() => retry(item.sessionId)} className="inline-flex min-h-11 items-center rounded-lg bg-teal-500 px-4 text-sm font-semibold text-slate-950! transition hover:bg-teal-400 disabled:opacity-60">
               {busy === item.sessionId ? "Retrying…" : "Retry recording"}
             </button>
           </li>
