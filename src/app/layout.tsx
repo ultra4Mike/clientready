@@ -1,10 +1,23 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "ClientReady",
   description:
     "Create professional proposals, invoices, client emails, and reports in minutes.",
+  applicationName: "ClientReady",
+  appleWebApp: { capable: true, title: "ClientReady", statusBarStyle: "black-translucent" },
+  formatDetection: { telephone: false },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#061418" },
+    { media: "(prefers-color-scheme: light)", color: "#f4fbfb" },
+  ],
 };
 
 export default function RootLayout({
