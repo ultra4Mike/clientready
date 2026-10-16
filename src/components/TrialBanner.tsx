@@ -12,7 +12,7 @@ export default function TrialBanner() {
     getTrialState().then((trial) => { if (live) setState(trial); }).catch(() => {});
     return () => { live = false; };
   }, []);
-  if (!state || (!state.expired && state.daysLeft > 3)) return null;
+  if (!state || (!state.expired && !(Number.isFinite(state.daysLeft) && state.daysLeft <= 3))) return null;
   return (
     <div role="status" data-testid="trial-banner" data-expired={state.expired ? "1" : "0"} className="print-hide mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm">
       <span>{state.expired ? "Your free trial has ended. Old documents stay viewable; new saves are locked." : `${state.daysLeft} day${state.daysLeft === 1 ? "" : "s"} left in your free trial.`}</span>
