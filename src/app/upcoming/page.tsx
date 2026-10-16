@@ -87,7 +87,7 @@ export default function UpcomingPage() {
             <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-teal-500/30 bg-[var(--cr-card)] px-6 py-12 text-center"><span className="flex h-12 w-12 items-center justify-center rounded-full bg-teal-500/15 text-xl">📅</span><p className="text-base font-semibold">Nothing scheduled this week.</p><p className="max-w-sm text-sm text-[var(--cr-muted)]">Invoices due and jobs in the next 7 days will appear here.</p><a href="/calendar" className="mt-2 rounded-lg border border-teal-500/30 px-4 py-2 text-sm font-medium">Open calendar</a></div>
           )}
 
-          {!loaded && jobs.length === 0 && upcoming.length === 0 && <p className="text-sm text-[var(--cr-muted)]" data-loading="true">Loading…</p>}
+          {!loaded && jobs.length === 0 && upcoming.length === 0 && <div className="space-y-3" data-loading="true" aria-busy="true"><span className="sr-only">Loading…</span>{[0, 1, 2].map((n) => <div key={n} className="h-20 animate-pulse rounded-2xl bg-teal-500/10 motion-reduce:animate-none" />)}</div>}
 
           {jobs.map(({ doc, schedule }) => (
             <a
