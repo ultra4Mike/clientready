@@ -54,9 +54,9 @@ export default function HomePage() {
         <p className="mt-3 text-sm text-[var(--cr-muted)]">14-day trial. No card to start.</p>
 
 <div className="mt-12 grid gap-6 text-left lg:grid-cols-2 lg:items-stretch">
-          <div className="sample-sheet rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="sample-sheet flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <p className="muted text-xs uppercase tracking-wide">What the customer sees</p>
-            <div className="mt-2 flex items-start justify-between">
+            <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-2xl font-semibold">INV-1042</h2>
                 <p className="muted mt-2 text-sm">North Yard Co.</p>
@@ -71,7 +71,7 @@ export default function HomePage() {
             <div className="mt-6 flex justify-between border-t border-slate-200 pt-3 text-sm"><span>Fall cleanup</span><span>$520.00</span></div>
             <div className="mt-2 flex justify-between text-sm"><span>Haul away</span><span>$265.00</span></div>
             <div className="mt-4 flex justify-between border-t border-slate-200 pt-3 font-semibold"><span>Total</span><span>$785.00</span></div>
-            <p className="muted mt-4 text-sm">Pay here: Venmo @northyard</p>
+            <div className="mt-auto pt-6"><p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">Pay here: Venmo @northyard</p><p className="muted mt-3 text-xs">Thank you for your business.</p></div>
           </div>
 
           <div className="sample-owner rounded-2xl border border-amber-300 bg-amber-50 p-6 shadow-sm">
