@@ -5,3 +5,13 @@ export function wipeThisDevice() {
   }
 }
 
+
+/** Drops the service worker's page/asset caches (no business data is in them, but nothing should outlive a deleted account). */
+export async function clearOfflineCaches() {
+  try {
+    navigator.serviceWorker?.controller?.postMessage("clear-caches");
+    if ("caches" in window) await Promise.all((await caches.keys()).map((key) => caches.delete(key)));
+  } catch {
+    // best effort
+  }
+}

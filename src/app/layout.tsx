@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import ServiceWorker from "@/components/ServiceWorker";
 
 export const metadata: Metadata = {
   title: "ClientReady",
@@ -36,6 +37,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-[var(--cr-bg)] text-[var(--cr-text)] antialiased">
         {children}
+        <ServiceWorker />
       </body>
     </html>
   );
