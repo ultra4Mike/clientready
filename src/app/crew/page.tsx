@@ -1,5 +1,6 @@
 "use client";
 
+import EmptyState from "@/components/EmptyState";
 import { CREW_KINDS } from "@/lib/cost-categories";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -497,7 +498,7 @@ export default function CrewPage() {
         {tab === "today" && (
           <section className="space-y-3">
             <h2 className="text-xl font-bold tracking-tight">{today ? dayLabel(today) : "Today"}</h2>
-            {todayCards.length === 0 && <p className={`${cardClass} border-dashed py-10 text-center text-sm text-[var(--cr-muted)]`}>Nothing scheduled for you today.</p>}
+            {todayCards.length === 0 && <EmptyState icon="☀" title="Nothing scheduled for you today." className={`${cardClass} border-dashed`} />}
             {todayCards.map(jobCard)}
           </section>
         )}
