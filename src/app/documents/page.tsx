@@ -279,18 +279,18 @@ export default function DocumentsPage() {
         <span data-testid="doc-count">{visibleDocs.length} of {documents.length} documents</span>
         <span className="flex items-center gap-3">
           {visibleDocs.length > 0 && <button type="button" data-testid="docs-export" className="font-medium text-teal-600 dark:text-teal-300" onClick={() => exportCsv(selecting && selected.size ? visibleDocs.filter((doc) => selected.has(doc.id)) : visibleDocs)}>{selecting && selected.size ? `Export ${selected.size} (CSV)` : "Export CSV"}</button>}
-          {documents.length > 0 && <button type="button" data-testid="docs-select" aria-pressed={selecting} className="font-medium text-teal-600 dark:text-teal-300" onClick={() => { setSelecting(!selecting); setSelected(new Set()); setBulkMessage(""); }}>{selecting ? "Done" : "Select"}</button>}
+          {documents.length > 0 && <button type="button" data-testid="docs-select" aria-pressed={selecting} className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-4 text-sm font-medium transition ${selecting ? "border-teal-400 bg-teal-500 text-slate-950!" : "border-teal-500/40 text-teal-700 hover:border-teal-400 dark:text-teal-300"}`} onClick={() => { setSelecting(!selecting); setSelected(new Set()); setBulkMessage(""); }}>{selecting ? "Done" : "Select"}</button>}
         </span>
         {filtersOn && <button type="button" className="font-medium text-teal-600 dark:text-teal-300" onClick={() => { setSearch(""); setTypeFilter("all"); setStatusFilter("all"); setFromDate(""); setToDate(""); }}>Clear filters</button>}
       </div>
 
       {selecting && (
-        <div className="sticky top-2 z-10 mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-teal-500/30 bg-[var(--cr-panel)] px-3 py-2 text-sm shadow" data-testid="bulk-bar">
-          <span data-testid="bulk-count">{selected.size} selected</span>
-          <button type="button" data-testid="bulk-all" className="min-h-11 rounded-lg border border-slate-300 px-3" onClick={() => setSelected(new Set(visibleDocs.map((doc) => doc.id)))}>Select all shown</button>
-          <button type="button" data-testid="bulk-none" disabled={!selected.size} className="min-h-11 rounded-lg border border-slate-300 px-3 disabled:opacity-50" onClick={() => setSelected(new Set())}>Clear</button>
-          <button type="button" data-testid="bulk-remove" disabled={!selected.size} className="min-h-11 rounded-lg border border-rose-500/40 px-3 text-rose-600 disabled:opacity-50 dark:text-rose-300" onClick={removeSelected}>Delete selected</button>
-          {bulkMessage && <span role="status" data-testid="bulk-message">{bulkMessage}</span>}
+        <div className="hide-fab fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-40 grid grid-cols-3 items-center gap-2 rounded-2xl border border-teal-500/30 bg-[var(--cr-panel)]/95 p-3 text-sm shadow-2xl backdrop-blur min-[900px]:sticky min-[900px]:inset-auto min-[900px]:top-2 min-[900px]:z-10 min-[900px]:mt-3 min-[900px]:flex min-[900px]:flex-wrap min-[900px]:rounded-xl min-[900px]:px-3 min-[900px]:py-2 min-[900px]:shadow-lg print:hidden" data-testid="bulk-bar">
+          <span className="col-span-3 font-semibold min-[900px]:mr-2" data-testid="bulk-count">{selected.size} selected</span>
+          <button type="button" data-testid="bulk-all" className="min-h-11 rounded-lg border border-slate-300 px-3 font-medium transition hover:border-teal-500" onClick={() => setSelected(new Set(visibleDocs.map((doc) => doc.id)))}>Select all shown</button>
+          <button type="button" data-testid="bulk-none" disabled={!selected.size} className="min-h-11 rounded-lg border border-slate-300 px-3 font-medium transition hover:border-teal-500 disabled:opacity-50" onClick={() => setSelected(new Set())}>Clear</button>
+          <button type="button" data-testid="bulk-remove" disabled={!selected.size} className="min-h-11 rounded-lg bg-rose-600 px-3 font-semibold text-white! shadow-sm transition hover:bg-rose-500 disabled:opacity-50" onClick={removeSelected}>Delete selected</button>
+          {bulkMessage && <span role="status" className="col-span-3 text-xs text-[var(--cr-muted)]" data-testid="bulk-message">{bulkMessage}</span>}
         </div>
       )}
       {!selecting && bulkMessage && <p role="status" className="mt-2 text-xs" data-testid="bulk-message">{bulkMessage}</p>}
@@ -317,9 +317,9 @@ export default function DocumentsPage() {
             title={`${STAGE_LABEL[stageOf(doc).stage]}${NEXT_LABEL[stageOf(doc).next] ? ` · Next: ${NEXT_LABEL[stageOf(doc).next]}` : ""}`}
             className="grid grid-cols-2 gap-x-4 gap-y-2 border-b border-teal-500/10 px-4 py-4 transition last:border-b-0 hover:bg-teal-500/5 md:items-center md:px-5 md:py-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_6.5rem_minmax(6.5rem,auto)_auto] md:gap-x-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_6.5rem_6.5rem_minmax(6.5rem,auto)_auto]"
           >
-            {selecting && <label className="col-span-2 flex min-h-11 items-center gap-2 text-sm md:hidden"><input type="checkbox" data-testid="doc-select" checked={selected.has(doc.id)} onChange={() => toggleSelected(doc.id)} aria-label={`Select ${doc.title || "document"}`} /> Select</label>}
+            {selecting && <label className="col-span-2 flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium md:hidden"><input type="checkbox" className="h-6 w-6 accent-teal-500" data-testid="doc-select" checked={selected.has(doc.id)} onChange={() => toggleSelected(doc.id)} aria-label={`Select ${doc.title || "document"}`} /> Select</label>}
             <span className="col-span-2 flex min-w-0 items-center gap-3 md:col-span-1">
-            {selecting && <input type="checkbox" className="hidden h-5 w-5 shrink-0 md:block" data-testid="doc-select-wide" checked={selected.has(doc.id)} onChange={() => toggleSelected(doc.id)} aria-label={`Select ${doc.title || "document"}`} />}
+            {selecting && <input type="checkbox" className="hidden h-5 w-5 shrink-0 cursor-pointer accent-teal-500 md:block" data-testid="doc-select-wide" checked={selected.has(doc.id)} onChange={() => toggleSelected(doc.id)} aria-label={`Select ${doc.title || "document"}`} />}
             <button type="button" onClick={() => openDocument(doc)} className="min-w-0 flex-1 text-left">
               <p className="truncate text-base font-semibold md:text-sm">{doc.title || "Untitled"}</p>
               <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-[var(--cr-muted)]">
