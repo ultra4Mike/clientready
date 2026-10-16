@@ -1,4 +1,13 @@
-export type JobPhoto = { id: string; dataUrl: string; caption: string; addedAt: string };
+/** tag: "before" / "after" the work (optional). */
+export type PhotoTag = "" | "before" | "after";
+export type JobPhoto = { id: string; dataUrl: string; caption: string; addedAt: string; tag?: PhotoTag };
+export const PHOTO_TAG_LABEL: Record<Exclude<PhotoTag, "">, string> = { before: "Before", after: "After" };
+const tagOf = (value: unknown): PhotoTag => (value === "before" || value === "after" ? value : "");
+/** Before photos first, then untagged, then after; stable within each group. */
+export function orderByTag(photos: JobPhoto[]) {
+  const rank = (photo: JobPhoto) => (photo.tag === "before" ? 0 : photo.tag === "after" ? 2 : 1);
+  return photos.map((photo, index) => ({ photo, index })).sort((a, b) => rank(a.photo) - rank(b.photo) || a.index - b.index).map(({ photo }) => photo);
+}
 
 export const MAX_PHOTOS = 6;
 const MAX_EDGE = 1024;
@@ -15,7 +24,8 @@ export function readPhotos(value: unknown): JobPhoto[] {
   return value
     .map((raw, index) => {
       const item = (raw || {}) as Partial<JobPhoto>;
-      return { id: String(item.id || `ph${index}`), dataUrl: String(item.dataUrl || ""), caption: String(item.caption || ""), addedAt: String(item.addedAt || "") };
+      const tag = tagOf(item.tag);
+      return { id: String(item.id || `ph${index}`), dataUrl: String(item.dataUrl || ""), caption: String(item.caption || ""), addedAt: String(item.addedAt || ""), ...(tag ? { tag } : {}) };
     })
     .filter((photo) => /^data:image\/(jpeg|png|webp);base64,/.test(photo.dataUrl))
     .slice(0, MAX_PHOTOS);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { compressPhoto, dataUrlBytes, MAX_PHOTOS, type JobPhoto } from "@/lib/photos";
+import { compressPhoto, dataUrlBytes, MAX_PHOTOS, orderByTag, PHOTO_TAG_LABEL, type JobPhoto, type PhotoTag } from "@/lib/photos";
 
 type EditorProps = { photos: JobPhoto[]; onChange: (photos: JobPhoto[]) => void; showOnCopy?: boolean; onShowOnCopyChange?: (value: boolean) => void };
 
@@ -59,6 +59,11 @@ export function JobPhotosEditor({ photos, onChange, showOnCopy = false, onShowOn
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={photo.dataUrl} alt={photo.caption || "Job photo"} className="aspect-square w-full rounded-lg object-cover" />
               <input className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" maxLength={60} placeholder="Caption (optional)" value={photo.caption} onChange={(event) => onChange(photos.map((item) => item.id === photo.id ? { ...item, caption: event.target.value } : item))} />
+              <select aria-label="Before or after" name="photoTag" data-testid="photo-tag" className="w-full rounded-md border border-slate-300 bg-transparent px-2 py-1.5 text-sm" value={photo.tag || ""} onChange={(event) => { const tag = event.target.value as PhotoTag; onChange(photos.map((item) => { if (item.id !== photo.id) return item; const { tag: _old, ...rest } = item; void _old; return tag ? { ...rest, tag } : rest; })); }}>
+                <option value="">No tag</option>
+                <option value="before">Before</option>
+                <option value="after">After</option>
+              </select>
               <button type="button" className="min-h-11 rounded-lg border border-rose-500/40 px-3 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10 sm:min-h-10 dark:text-rose-300" onClick={() => onChange(photos.filter((item) => item.id !== photo.id))}>Remove</button>
             </div>
           ))}
@@ -84,13 +89,13 @@ export function JobPhotoStrip({ photos, muted = "text-slate-600" }: { photos: Jo
     <div className="print-keep mt-3" data-testid="photo-strip">
       <p className={`text-xs ${muted}`}>Job photos</p>
       <div className="mt-1 grid grid-cols-6 gap-2">
-        {photos.map((photo) => (
-          <figure key={photo.id} className="min-w-0">
+        {orderByTag(photos).map((photo) => (
+          <figure key={photo.id} className="min-w-0" data-tag={photo.tag || undefined}>
             <button type="button" className="photo-thumb block w-full" onClick={() => setOpen(photo)} aria-label="Enlarge photo">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={photo.dataUrl} alt={photo.caption || "Job photo"} className="aspect-square w-full rounded object-cover" />
             </button>
-            {photo.caption && <figcaption className={`photo-caption truncate text-xs ${muted}`}>{photo.caption}</figcaption>}
+            {(photo.tag || photo.caption) && <figcaption className={`photo-caption truncate text-xs ${muted}`}>{photo.tag && <span className="font-semibold" data-testid="photo-tag-label">{PHOTO_TAG_LABEL[photo.tag]}{photo.caption ? ": " : ""}</span>}{photo.caption}</figcaption>}
           </figure>
         ))}
       </div>
@@ -98,7 +103,7 @@ export function JobPhotoStrip({ photos, muted = "text-slate-600" }: { photos: Jo
         <div className="print-hide fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setOpen(null)} role="dialog" aria-label="Photo">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={open.dataUrl} alt={open.caption || "Job photo"} className="max-h-[85vh] max-w-full rounded-lg" />
-          {open.caption && <p className="absolute bottom-6 left-0 right-0 text-center text-white">{open.caption}</p>}
+          {(open.tag || open.caption) && <p className="absolute bottom-6 left-0 right-0 text-center text-white">{[open.tag ? PHOTO_TAG_LABEL[open.tag] : "", open.caption].filter(Boolean).join(": ")}</p>}
         </div>
       )}
     </div>
