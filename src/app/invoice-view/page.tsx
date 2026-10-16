@@ -307,7 +307,7 @@ export default function InvoiceViewPage() {
                 <span>${totals.subtotal.toFixed(2)}</span>
               </div>
               {totals.discount > 0 && (
-                <div className="flex justify-between">
+                <div data-testid="view-discount" className="flex justify-between">
                   <span>{discountLabel(discountType, discountValue)}</span>
                   <span>-${totals.discount.toFixed(2)}</span>
                 </div>

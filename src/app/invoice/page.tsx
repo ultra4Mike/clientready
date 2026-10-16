@@ -963,10 +963,10 @@ export default function NewInvoicePage() {
               <p className="text-sm font-medium text-slate-600">Discount <span className="font-normal text-slate-500">(taken off before tax)</span></p>
               <div className="flex items-stretch gap-2">
                 <div role="group" aria-label="Discount type" className="flex shrink-0 rounded-lg border border-slate-300 p-0.5">
-                  <button type="button" aria-pressed={discountType === "percent"} onClick={() => setDiscountType("percent")} className={`min-h-11 min-w-11 rounded-md px-4 text-sm font-semibold transition ${discountType === "percent" ? "bg-teal-500 text-slate-950!" : "text-slate-600 hover:bg-teal-500/10"}`}>%</button>
-                  <button type="button" aria-pressed={discountType === "amount"} onClick={() => setDiscountType("amount")} className={`min-h-11 min-w-11 rounded-md px-4 text-sm font-semibold transition ${discountType === "amount" ? "bg-teal-500 text-slate-950!" : "text-slate-600 hover:bg-teal-500/10"}`}>$</button>
+                  <button type="button" data-testid="discount-type-percent" aria-pressed={discountType === "percent"} onClick={() => setDiscountType("percent")} className={`min-h-11 min-w-11 rounded-md px-4 text-sm font-semibold transition ${discountType === "percent" ? "bg-teal-500 text-slate-950!" : "text-slate-600 hover:bg-teal-500/10"}`}>%</button>
+                  <button type="button" data-testid="discount-type-amount" aria-pressed={discountType === "amount"} onClick={() => setDiscountType("amount")} className={`min-h-11 min-w-11 rounded-md px-4 text-sm font-semibold transition ${discountType === "amount" ? "bg-teal-500 text-slate-950!" : "text-slate-600 hover:bg-teal-500/10"}`}>$</button>
                 </div>
-                <input aria-label="Discount value" className="min-h-11 w-full min-w-0 rounded-lg border border-slate-300 px-3 text-right text-sm tabular-nums shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" inputMode="decimal" placeholder={discountType === "percent" ? "e.g. 10" : "e.g. 50.00"} value={discountValue} onChange={(event) => setDiscountValue(event.target.value)} />
+                <input aria-label="Discount value" data-testid="discount-value" className="min-h-11 w-full min-w-0 rounded-lg border border-slate-300 px-3 text-right text-sm tabular-nums shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" inputMode="decimal" placeholder={discountType === "percent" ? "e.g. 10" : "e.g. 50.00"} value={discountValue} onChange={(event) => setDiscountValue(event.target.value)} />
               </div>
             </div>
             <label className="block text-sm font-medium text-slate-600">Tax %
@@ -1311,7 +1311,7 @@ export default function NewInvoicePage() {
               </div>
               <div className="space-y-0.5">
                 <div className="flex justify-between"><span>Subtotal</span><span>${totals.subtotal.toFixed(2)}</span></div>
-                {totals.discount > 0 && <div className="flex justify-between"><span>{discountLabel(discountType, discountValue)}</span><span>-${totals.discount.toFixed(2)}</span></div>}
+                {totals.discount > 0 && <div className="flex justify-between" data-testid="preview-discount" data-amount={totals.discount.toFixed(2)}><span>{discountLabel(discountType, discountValue)}</span><span>-${totals.discount.toFixed(2)}</span></div>}
                 <div className="flex justify-between"><span>Tax</span><span>${totals.tax.toFixed(2)}</span></div>
                 <div className="flex justify-between font-semibold"><span>Total</span><span>${totals.total.toFixed(2)}</span></div>
                 {totals.paid > 0 && <div className="flex justify-between text-emerald-700"><span>{isProposal ? "Deposit paid ✓" : "Paid"}</span><span>-${totals.paid.toFixed(2)}</span></div>}
