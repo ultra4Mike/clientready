@@ -127,31 +127,31 @@ export default function ReportsPage() {
           )}
         </div>
 
-        <div data-testid="tax-categories" data-total={tax.total.toFixed(2)}>
-          <h2 className="text-sm font-semibold">Tax categories (Schedule C)</h2>
+        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5" data-testid="tax-categories" data-total={tax.total.toFixed(2)}>
+          <h2 className="text-base font-semibold">Tax categories (Schedule C)</h2>
           <p className="mt-1 text-xs text-slate-500">Your job costs for {year} sorted by Schedule C line. A starting point for you or your tax preparer, not tax advice.</p>
           <div className="overflow-x-auto">
-            <table className="mt-2 w-full text-sm">
+            <table className="mt-3 w-full text-sm">
               <tbody>
                 {tax.lines.map((line) => (
-                  <tr key={line.key} data-testid="tax-line" data-key={line.key} data-amount={line.amount.toFixed(2)} className="border-t border-slate-200/60">
-                    <td className="whitespace-nowrap px-2 py-1.5 font-medium">{line.line}</td>
-                    <td className="px-2 py-1.5">{line.label}{line.note && <span className="block text-xs text-slate-500">{line.note}</span>}</td>
+                  <tr key={line.key} data-testid="tax-line" data-key={line.key} data-amount={line.amount.toFixed(2)} className="border-t border-slate-200/60 align-top transition hover:bg-teal-500/5">
+                    <td className="whitespace-nowrap px-2 py-2.5"><span className="inline-block rounded-md bg-teal-500/10 px-2 py-0.5 text-xs font-semibold text-teal-700 dark:text-teal-300">{line.line}</span></td>
+                    <td className="px-2 py-2.5">{line.label}{line.note && <span className="block text-xs text-slate-500">{line.note}</span>}</td>
                     <td className={cell}>{usd(line.amount)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t border-slate-300 font-semibold">
-                  <td className="px-2 py-1.5" colSpan={2}>Total (same as job costs above)</td>
+                <tr className="border-t-2 border-slate-300 text-base font-bold">
+                  <td className="px-2 py-3" colSpan={2}>Total (same as job costs above)</td>
                   <td className={cell}>{usd(tax.total)}</td>
                 </tr>
               </tfoot>
             </table>
           </div>
-          <ul className="mt-2 space-y-0.5 text-xs text-slate-500">
-            {miles > 0 && <li data-testid="tax-miles">Mileage log: {miles} business miles in {year} (Line 9 if you use the standard mileage rate).</li>}
-            {tax.tips > 0 && <li data-testid="tax-tips">Tips received: {usd(tax.tips)} (part of gross receipts, Line 1; not in the totals above).</li>}
+          <ul className="mt-3 space-y-1.5 text-xs text-slate-600">
+            {miles > 0 && <li className="rounded-lg bg-slate-500/5 px-3 py-2" data-testid="tax-miles">🚗 Mileage log: {miles} business miles in {year} (Line 9 if you use the standard mileage rate).</li>}
+            {tax.tips > 0 && <li className="rounded-lg bg-slate-500/5 px-3 py-2" data-testid="tax-tips">💵 Tips received: {usd(tax.tips)} (part of gross receipts, Line 1; not in the totals above).</li>}
           </ul>
         </div>
       </div>
