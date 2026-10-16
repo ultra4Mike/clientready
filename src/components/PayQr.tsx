@@ -24,7 +24,8 @@ export default function PayQr({ url, size = 104 }: { url: string; size?: number 
   }
   const box = count + QUIET * 2;
   return (
-    <div className="flex items-center gap-4" data-testid="pay-qr">
+    <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:text-left" data-testid="pay-qr">
+      <div className="rounded-xl p-2 shadow-sm ring-1 ring-black/10" style={{ background: "#ffffff", flex: "none" }}>
       <svg
         role="img"
         aria-label={`QR code for ${safe}`}
@@ -37,8 +38,10 @@ export default function PayQr({ url, size = 104 }: { url: string; size?: number 
         <rect width={box} height={box} fill="#ffffff" />
         <path d={path} fill="#000000" />
       </svg>
+      </div>
       <div className="min-w-0">
         <p className="font-semibold">Scan to pay</p>
+        <p className="text-xs opacity-80">Point your phone camera at the code</p>
         <p className="qr-url break-all text-xs opacity-80">{safe}</p>
       </div>
     </div>

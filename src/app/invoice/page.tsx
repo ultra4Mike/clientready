@@ -928,16 +928,18 @@ export default function NewInvoicePage() {
                 </div>
               ))}
             </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-slate-600">Discount (taken off before tax)</p>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setDiscountType("percent")} className={`rounded-lg px-4 py-2 text-sm font-medium transition ${discountType === "percent" ? "bg-teal-500 font-semibold text-slate-950!" : "border border-slate-300 hover:border-teal-500"}`}>%</button>
-                <button type="button" onClick={() => setDiscountType("amount")} className={`rounded-lg px-4 py-2 text-sm font-medium transition ${discountType === "amount" ? "bg-teal-500 font-semibold text-slate-950!" : "border border-slate-300 hover:border-teal-500"}`}>$</button>
-                <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" inputMode="decimal" placeholder={discountType === "percent" ? "Discount percent, e.g. 10" : "Discount amount, e.g. 50"} value={discountValue} onChange={(event) => setDiscountValue(event.target.value)} />
+            <div className="space-y-1.5 rounded-xl border border-slate-200 p-4">
+              <p className="text-sm font-medium text-slate-600">Discount <span className="font-normal text-slate-500">(taken off before tax)</span></p>
+              <div className="flex items-stretch gap-2">
+                <div role="group" aria-label="Discount type" className="flex shrink-0 rounded-lg border border-slate-300 p-0.5">
+                  <button type="button" aria-pressed={discountType === "percent"} onClick={() => setDiscountType("percent")} className={`min-h-11 min-w-11 rounded-md px-4 text-sm font-semibold transition ${discountType === "percent" ? "bg-teal-500 text-slate-950!" : "text-slate-600 hover:bg-teal-500/10"}`}>%</button>
+                  <button type="button" aria-pressed={discountType === "amount"} onClick={() => setDiscountType("amount")} className={`min-h-11 min-w-11 rounded-md px-4 text-sm font-semibold transition ${discountType === "amount" ? "bg-teal-500 text-slate-950!" : "text-slate-600 hover:bg-teal-500/10"}`}>$</button>
+                </div>
+                <input aria-label="Discount value" className="min-h-11 w-full min-w-0 rounded-lg border border-slate-300 px-3 text-right text-sm tabular-nums shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" inputMode="decimal" placeholder={discountType === "percent" ? "e.g. 10" : "e.g. 50.00"} value={discountValue} onChange={(event) => setDiscountValue(event.target.value)} />
               </div>
             </div>
             <label className="block text-sm font-medium text-slate-600">Tax %
-            <input className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Tax percent" value={taxPercent} onChange={(event) => setTaxPercent(event.target.value)} />
+            <input inputMode="decimal" className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-right text-sm tabular-nums shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Tax percent" value={taxPercent} onChange={(event) => setTaxPercent(event.target.value)} />
             </label>
             <div className="ml-auto w-full max-w-xs space-y-1 rounded-xl border border-teal-500/30 bg-teal-500/5 p-4 text-sm">
               <div className="flex justify-between"><span className="text-slate-600">Subtotal</span><span className="tabular-nums">${totals.subtotal.toFixed(2)}</span></div>
