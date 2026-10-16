@@ -33,6 +33,7 @@ $$;
 revoke all on function public.portal_documents(text) from public, anon, authenticated;
 
 -- Same customer-safe copy as before, minus the internal client id.
+-- Kept identical to 20261015080000 (also drops emailLog) so re-running this file never undoes it.
 create or replace function public.public_document_data(p_data jsonb)
 returns jsonb
 language sql
@@ -40,7 +41,7 @@ immutable
 as $$
   select (p_data - 'jobCosts' - 'crew' - 'recurring' - 'recurringReview' - 'recurringFrom'
                  - 'changeOrderNotes' - 'updatedAt' - 'approval' - 'schedule' - 'jobTime'
-                 - 'reviews' - 'fromProposal' - 'changeOrderOf' - 'photos' - 'clientId')
+                 - 'reviews' - 'fromProposal' - 'changeOrderOf' - 'photos' - 'clientId' - 'emailLog')
          || jsonb_build_object(
               'approval', case when p_data ? 'approval' then (p_data -> 'approval') - 'token' else null end,
               'changeOrderOf', case when p_data ? 'changeOrderOf'
