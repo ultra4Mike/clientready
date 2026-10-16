@@ -1,5 +1,6 @@
 "use client";
 
+import TimesheetExport from "@/components/TimesheetExport";
 import EmptyState from "@/components/EmptyState";
 import { FormEvent, useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
@@ -260,6 +261,7 @@ export default function EmployeesPage() {
           </div>
         ))}
       </div>
+      <TimesheetExport names={Object.fromEntries(employees.map((person) => [person.id, person.name]))} />
       </div>
       </div>
     </AppShell>
