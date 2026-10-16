@@ -46,10 +46,10 @@ export default function PrivacyPage() {
         </p>
         <h2 className="mt-6 text-lg font-semibold text-slate-900">Account deletion</h2>
         <p className="mt-2">
-          <strong>How to delete:</strong> until in-app deletion is available, email [Support email to confirm]
-          from the address you sign in with and ask us to delete your account. We confirm the request and
-          complete it within [Deletion response time]. When in-app deletion ships it will be in Settings,
-          and you will also be able to request deletion on the web at [Account deletion URL].
+          <strong>How to delete:</strong> open Settings and tap Delete account (crew: Delete account on
+          the Crew page), or go to /account/delete on the web without the app. Confirm with your password or
+          a link we email you, type DELETE and tap Delete my account. If online deletion is unavailable, the
+          page tells you to email [Support email to confirm] instead, and we complete it within [Deletion response time].
         </p>
         <p className="mt-2">
           <strong>What is deleted:</strong> your login, business profile, clients, proposals, invoices,
@@ -70,6 +70,18 @@ export default function PrivacyPage() {
           <strong>Your clients:</strong> client details are kept on behalf of the business that entered them.
           If a client asks us to delete their information, we refer the request to that business, which can
           remove it from Clients and Documents.
+        </p>
+        <h2 className="mt-6 text-lg font-semibold text-slate-900">Notifications and this device</h2>
+        <p className="mt-2">
+          Phone notifications are off unless you turn them on in Settings under Notifications. If you do,
+          we store that device&apos;s push subscription (an address from your browser&apos;s push service, its keys
+          and the browser type) with your account so we can send it alerts about approvals, payments and crew
+          updates. Turn them off on this device, log out, or delete your account and it is removed.
+        </p>
+        <p className="mt-2">
+          To work offline, the app keeps copies of pages you have opened on this device. Approval links,
+          client portals, shared invoice views, account deletion and server requests are never cached.
+          These copies are cleared when your account is deleted, or when you clear the app&apos;s data.
         </p>
         <h2 className="mt-6 text-lg font-semibold text-slate-900">Your responsibilities</h2>
         <p className="mt-2">

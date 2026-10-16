@@ -19,6 +19,7 @@ Shared by the three ClientReady bots. Update the **Status** column when you pick
 | M9 | Run migration `20261016000000_clients_updated_at.sql` on the live Supabase project (adds `clients.updated_at` + server touch trigger). Until it runs, the contact retry queue uses its fallback (no conditional update). | Owner | Done 2026-10-16 (run and verified on live) | 2026-10-16 |
 | M10 | Run migration `20261016010000_rls_hardening.sql` on live (policies → TO authenticated, WITH CHECK on UPDATE, revoke anon table grants and authenticated TRUNCATE/TRIGGER/REFERENCES, revoke anon EXECUTE on is_crew_email/list_crew_clients). Then re-run rls-audit.md steps 1–6. | Owner | Done 2026-10-16 (run and verified on live) | 2026-10-16 |
 | M11 | Supabase Auth "Confirm email" enabled, so nobody can sign up with a crew member's email (without access to that inbox) and pass as crew. | Owner | Done 2026-10-16 | 2026-10-16 |
+| M12 | In hosting env set `SUPABASE_SERVICE_ROLE_KEY` (server only; without it /account/delete only says email support) and `NEXT_PUBLIC_VAPID_PUBLIC_KEY` (without it Notifications says not available yet). Also run migrations `20261016080000_account_deletion.sql` and `20261016090000_push_subscriptions.sql`. | Owner | Open | 2026-10-16 |
 
 ## 2. Open risks
 | # | Risk | Owner | Status | Added |
@@ -60,7 +61,7 @@ Shared by the three ClientReady bots. Update the **Status** column when you pick
 | # | Item | Owner | Status | Added |
 |---|---|---|---|---|
 | S1 | Paid plans / billing after the 14-day trial. Needs Stripe Billing, so it goes last under the user's "no outside accounts first" rule. | Dev | Not started | 2026-10-16 |
-| S3 | **Store blocker:** no in-app account deletion (Apple requires in-app; Google requires in-app + web URL). Spec: `clientready-help/account-deletion-spec.md`. Privacy/Terms/help describe interim email route. | Dev | Open | 2026-10-16 |
+| S3 | Account deletion: Dev shipped /account/delete (in-app + public web URL) in 9f81fdd; Privacy/Terms/help/store listing updated. Works only once M12 is done. | Dev | Done 2026-10-16 (Dev part) | 2026-10-16 |
 | S4 | Store listing `docs/store-listing.md`: privacy/data-safety answers approved by owner 2026-10-16 (diagnostics not linked, Financial info: other, service providers not sharing, HTTPS host, web-only billing). Remaining: fill support email/URLs, retention (suggest 30 days), deletion URL; recheck after native wrapper SDKs land. | Owner + Help | In progress 2026-10-16 | 2026-10-16 |
 | S5 | Onboarding tour `docs/onboarding-tour.md` (coach marks not built); upcoming-feature help drafts in `src/lib/help/upcoming.ts` (not rendered) — move into articles.ts as features ship. | Visual + Help | Open | 2026-10-16 |
 | S2 | User could not edit the address on a paid invoice; suspected trial read-only lock, unconfirmed. | Dev | Waiting on user | 2026-10-16 |
