@@ -33,6 +33,7 @@ const keys = [
   "clientready-deleted-docs",
   "clientready-pending-deletes",
   "clientready-packages",
+  "clientready-mileage",
 ];
 
 /** Wipes the business cache (sign-out). Never-uploaded documents are parked for the same account first. */

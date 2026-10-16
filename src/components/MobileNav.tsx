@@ -18,6 +18,7 @@ const moreLinks = [
   { href: "/drafts", label: "Crew drafts" },
   { href: "/year", label: "Year packet" },
   { href: "/reports", label: "Reports" },
+  { href: "/mileage", label: "Mileage" },
   { href: "/backup", label: "Backup" },
 ];
 
@@ -26,7 +27,7 @@ const byHref = (href: string) => ALL_LINKS.find((link) => link.href === href)!;
 export const NAV_GROUPS = [
   { label: "Work", links: ["/dashboard", "/today", "/calendar", "/upcoming", "/drafts"].map(byHref) },
   { label: "Clients", links: ["/clients", "/history"].map(byHref) },
-  { label: "Money", links: ["/documents", "/collect", "/reports", "/year"].map(byHref) },
+  { label: "Money", links: ["/documents", "/collect", "/reports", "/mileage", "/year"].map(byHref) },
   { label: "Team", links: ["/employees"].map(byHref) },
 ];
 export const BOTTOM_LINKS = [{ href: "/profile", label: "Settings" }, byHref("/backup"), { href: "/help", label: "Help" }];
