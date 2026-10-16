@@ -22,32 +22,32 @@ ClientReady is the all-in-one app for service businesses and contractors. Write 
 - Works offline and syncs when you're back online; download a backup anytime
 Start with a 14-day free trial.
 
-## Apple privacy "nutrition label"
-Tracking: **No** (no ad/analytics/tracking SDKs found in package.json or src).
+## Apple privacy "nutrition label" (owner-approved 2026-10-16)
+Tracking: **No** (no ad/analytics/tracking SDKs in package.json or src).
 Data linked to the user, used for **App Functionality** only:
 | Type | Collected? | Source in code |
 |---|---|---|
-| Contact info – Email | Yes | Supabase auth sign-in; business email in profile |
-| Contact info – Name, Phone, Physical address | Yes | Business profile; **clients' names/phones/addresses (other people's data)** |
-| User content – Photos | Yes | JobPhotos (camera/library, stored as data URLs in synced documents) |
-| User content – Other (documents, signatures, job messages) | Yes | documents, signatures, change orders |
-| Financial info – Other | Yes | recorded payments, payment handles/bank instructions shown on invoices. No card numbers (entered on Stripe) |
-| Identifiers – User ID | Yes | Supabase user id |
-| Location | **No** — no geolocation API used. ⚠️ Clients' street addresses are contact info, not location |
-| Usage data / Diagnostics | No ⚠️ — confirm hosting (Vercel?) and Supabase logs don't count; no crash SDK found |
-| Purchases | No ⚠️ — becomes Yes if paid plans (S1) use in-app purchase |
+| Contact info: Email | Yes | Supabase auth sign-in; business email in profile |
+| Contact info: Name, Phone, Physical address | Yes | Business profile; clients' names/phones/addresses entered by the business |
+| User content: Photos | Yes | JobPhotos (camera/library, stored in synced documents) |
+| User content: Other (documents, signatures, job messages) | Yes | documents, signatures, change orders |
+| Financial info: Other | Yes | Recorded payments and payment handles / bank instructions shown on invoices. No card numbers (entered with the payment provider) |
+| Identifiers: User ID | Yes | Supabase user id |
+| Diagnostics | Yes, **not linked** to identity, not tracking | Server/host logs (IP addresses, request logs) |
+| Location | No | No geolocation API; client street addresses are contact info |
+| Purchases | No | Billing is web-only; nothing is sold in the app |
 
-## Google Play Data Safety
-- Data encrypted in transit: Yes (HTTPS/Supabase). ⚠️ confirm.
-- Users can request deletion: **Must be Yes for launch — currently only by email**; in-app + web URL needed.
-- Shared with third parties: No sharing for ads. Service providers (Supabase hosting, Resend for emails the owner sends, Stripe/payment providers the owner connects) count as "processing on your behalf", not sharing ⚠️ confirm with Play's definitions.
-- Collected (required, app functionality, account management): Personal info (name, email, phone, address), Financial info (payment records; "other financial info"), Photos, Files & docs (documents/signatures), App activity: No ⚠️, App info & performance: No ⚠️, Location: No, Device IDs: No.
-- Optional vs required: photos optional; email required.
+## Google Play Data Safety (owner-approved 2026-10-16)
+- Data encrypted in transit: **Yes**. Requires deploying on an HTTPS host (e.g. Vercel, Netlify, Cloudflare); Supabase is HTTPS.
+- Users can request deletion: **Yes, but must be in-app + web URL before launch**; today only by email (see OPEN_ITEMS S3, [Account deletion URL]).
+- Data shared with third parties: **No.** Supabase (hosting/database), Resend (emails the owner sends) and payment providers the owner connects are service providers processing data on the business's behalf, not sharing.
+- Collected (app functionality / account management): Personal info (name, email, phone, address), Financial info: other (payment records, payment handles / bank instructions), Photos (optional), Files & docs (documents, signatures), App info & performance (server logs/IP; not linked to identity, not used for tracking or ads). Not collected: Location, Device IDs, App activity, Purchase history.
+- Required: email. Optional: photos.
 
-## Uncertain answers to resolve
-1. Hosting/server logs (IP addresses) — may need "Diagnostics" or Play "App info & performance".
-2. Whether the native wrapper (Dev) adds any SDK (push, crash reporting) — re-audit after wrapper lands.
-3. Payment handles/bank instructions: "Financial info" category confirmation.
-4. Paid plans billing method (Apple IAP rules may apply to subscriptions sold in-app).
-5. Account deletion missing — blocks both stores.
-6. Data retention period and support email still placeholders.
+## Billing (iOS)
+Paid plans are sold on the web only. The iOS app shows no prices, purchase buttons or links to buy (reader-style); Purchases are not collected in-app. Revisit if in-app purchase is ever added.
+
+## Still open
+- Placeholders: [Support email], [Support URL], [Privacy URL] ([Domain]/privacy), [Marketing URL], [Data retention period] (suggest 30 days after account closure), [Account deletion URL].
+- Account deletion missing: blocks both stores (S3).
+- **Recheck all answers after the native wrapper's SDKs land** (push, crash reporting, analytics would change them).

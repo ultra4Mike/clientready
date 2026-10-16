@@ -61,6 +61,6 @@ Shared by the three ClientReady bots. Update the **Status** column when you pick
 |---|---|---|---|---|
 | S1 | Paid plans / billing after the 14-day trial. Needs Stripe Billing, so it goes last under the user's "no outside accounts first" rule. | Dev | Not started | 2026-10-16 |
 | S3 | **Store blocker:** no in-app account deletion (Apple requires in-app; Google requires in-app + web URL). Spec: `clientready-help/account-deletion-spec.md`. Privacy/Terms/help describe interim email route. | Dev | Open | 2026-10-16 |
-| S4 | Store listing draft `docs/store-listing.md` — owner to fill URLs/placeholders; confirm ⚠️ privacy answers after native wrapper lands. | Owner + Help | Open | 2026-10-16 |
+| S4 | Store listing `docs/store-listing.md`: privacy/data-safety answers approved by owner 2026-10-16 (diagnostics not linked, Financial info: other, service providers not sharing, HTTPS host, web-only billing). Remaining: fill support email/URLs, retention (suggest 30 days), deletion URL; recheck after native wrapper SDKs land. | Owner + Help | In progress 2026-10-16 | 2026-10-16 |
 | S5 | Onboarding tour `docs/onboarding-tour.md` (coach marks not built); upcoming-feature help drafts in `src/lib/help/upcoming.ts` (not rendered) — move into articles.ts as features ship. | Visual + Help | Open | 2026-10-16 |
 | S2 | User could not edit the address on a paid invoice; suspected trial read-only lock, unconfirmed. | Dev | Waiting on user | 2026-10-16 |
