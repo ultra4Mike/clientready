@@ -13,18 +13,37 @@ async function ownerFrom(request: Request) {
   return data.user?.id || null;
 }
 
-/** Unresolved card payments for this owner: matched by owner_id, or by an invoice they own. Empty if the table is missing. */
+const UUID = /^[0-9a-f-]{36}$/i;
+
+/** Of these invoice ids, which exist and who owns them (id → user_id). */
+async function docOwners(ids: string[]) {
+  const out = new Map<string, string>();
+  const valid = [...new Set(ids.filter((id) => UUID.test(id)))];
+  if (!valid.length) return out;
+  const { data } = await serviceClient().from("documents").select("id, user_id").in("id", valid);
+  for (const doc of (data || []) as { id: string; user_id: string }[]) out.set(doc.id, doc.user_id);
+  return out;
+}
+
+/**
+ * Unresolved card payments for this owner, filtered in the query: rows stamped with their owner_id,
+ * plus older unstamped rows (before migration 20261015140000) whose invoice they own. A stamped row
+ * whose invoice now belongs to someone else is never shown. Empty if the table is missing.
+ */
 async function pendingFor(ownerId: string): Promise<Pending[]> {
-  const { data, error } = await serviceClient().from("stripe_pending_payments").select("*").is("resolved_at", null).order("created_at", { ascending: true }).limit(200);
-  if (error || !Array.isArray(data)) return [];
-  const rows = data as Pending[];
-  const docIds = rows.map((row) => row.doc_id || "").filter((id) => /^[0-9a-f-]{36}$/i.test(id));
-  const owned = new Set<string>();
-  if (docIds.length) {
-    const { data: docs } = await serviceClient().from("documents").select("id").eq("user_id", ownerId).in("id", docIds);
-    for (const doc of (docs || []) as { id: string }[]) owned.add(doc.id);
-  }
-  return rows.filter((row) => row.owner_id === ownerId || owned.has(row.doc_id || ""));
+  const table = () => serviceClient().from("stripe_pending_payments");
+  const mine = await table().select("*").eq("owner_id", ownerId).is("resolved_at", null).order("created_at", { ascending: true }).limit(200);
+  const hasOwnerColumn = !mine.error || !/owner_id/.test(mine.error.message || "");
+  if (mine.error && hasOwnerColumn) return [];
+  let rows = (mine.data || []) as Pending[];
+  // Unstamped rows: only those pointing at an invoice id; ownership checked below.
+  const loose = hasOwnerColumn
+    ? await table().select("*").is("owner_id", null).is("resolved_at", null).not("doc_id", "is", null).order("created_at", { ascending: true }).limit(200)
+    : await table().select("*").is("resolved_at", null).not("doc_id", "is", null).order("created_at", { ascending: true }).limit(200);
+  const owners = await docOwners([...rows, ...((loose.data || []) as Pending[])].map((row) => row.doc_id || ""));
+  rows = rows.filter((row) => !owners.has(row.doc_id || "") || owners.get(row.doc_id || "") === ownerId);
+  const extra = ((loose.data || []) as Pending[]).filter((row) => owners.get(row.doc_id || "") === ownerId);
+  return [...rows, ...extra].sort((x, y) => x.created_at.localeCompare(y.created_at));
 }
 
 const view = (row: Pending) => ({ sessionId: row.session_id, docId: row.doc_id, amount: Number(row.amount), paidAt: row.paid_at, ref: row.ref, attempts: row.attempts });
