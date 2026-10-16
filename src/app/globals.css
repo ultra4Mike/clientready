@@ -463,3 +463,10 @@ html.dark #crew-spend a { color: #5eead4 !important; }
 /* Crew page: slightly brighter meta text in dark mode. */
 html.dark .crew-page { --cr-muted: #cde6e2; }
 html.dark .crew-page .owner-costs [data-testid="report-cost-line"] { background-color: #10262c !important; border-color: rgba(45, 212, 191, 0.25) !important; }
+
+/* Visual: payment + discount panels (dark) */
+html.dark .cr-panel { background-color: #0b1f24 !important; border-color: rgba(45, 212, 191, 0.35) !important; }
+html.dark .cr-panel .border-slate-200, html.dark .cr-panel .border-slate-300 { border-color: rgba(45, 212, 191, 0.3) !important; }
+html.dark .cr-panel input, html.dark .cr-panel select { background-color: #10262c !important; color: #e2f6f4 !important; border-color: rgba(45, 212, 191, 0.35) !important; }
+html.dark .cr-panel .text-rose-700 { color: #fda4af !important; }
+html.dark .cr-panel .text-emerald-700 { color: #6ee7b7 !important; }

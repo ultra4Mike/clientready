@@ -253,7 +253,7 @@ export default function InvoiceViewPage() {
             <div className="shrink-0 text-right">
               {approval && <div className="mb-1"><ApprovalBadge approval={approval} /></div>}
               {changeOrderOf && <p className="change-order-badge mb-1 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide" data-testid="change-order-badge">Change order</p>}
-              <p className="text-xs uppercase tracking-wide text-slate-500">Invoice · <span className={`rounded-full px-2 py-0.5 font-semibold ${status === "paid" ? "cr-tone-good bg-emerald-100 text-emerald-800" : "cr-tone-warn bg-amber-100 text-amber-800"}`}>{status}</span></p>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Invoice · <span data-testid="invoice-status-pill" className={`inline-flex items-center rounded-full border px-2.5 py-0.5 font-semibold ${status === "paid" ? "cr-tone-good border-emerald-200 bg-emerald-100 text-emerald-800" : "cr-tone-warn border-amber-200 bg-amber-100 text-amber-800"}`}>{status === "paid" ? "✓ paid" : status}</span></p>
               <h1 className="mt-0.5 text-2xl font-bold leading-tight tracking-tight">{invoiceNumber || "Invoice"}</h1>
               <p className="text-sm text-slate-600">Date: {invoiceDate || "-"} · Due: {dueDate || "-"}</p>
               {changeOrderOf && (
@@ -289,7 +289,7 @@ export default function InvoiceViewPage() {
             })}
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-6 border-t border-slate-200 pt-4 text-sm sm:grid-cols-2">
+          <div className="mt-4 grid grid-cols-1 gap-6 border-t border-slate-200 pt-4 text-sm tabular-nums sm:grid-cols-2">
             <div className="space-y-0.5 text-slate-600">
               <LineSplit items={items} />
               {payments.some((payment) => amountOf(payment.amount) > 0) && <p className="text-xs text-slate-500">Payments</p>}
@@ -321,7 +321,7 @@ export default function InvoiceViewPage() {
                 <span>${totals.total.toFixed(2)}</span>
               </div>
               {totals.paid > 0 && (
-                <div className="flex justify-between">
+                <div className="flex justify-between font-medium text-emerald-700 dark:text-emerald-300">
                   <span>Paid</span>
                   <span>-${totals.paid.toFixed(2)}</span>
                 </div>
@@ -332,10 +332,17 @@ export default function InvoiceViewPage() {
                   <span>${tipTotal(payments).toFixed(2)}</span>
                 </div>
               )}
+              {status === "paid" || (totals.paid > 0 && totals.balance <= 0.004) ? (
+                <div data-testid="paid-in-full" className="mt-2 flex items-baseline justify-between cr-tone-good rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-lg font-bold text-emerald-800 print:bg-transparent print:px-0">
+                  <span>✓ Paid in full</span>
+                  <span>${totals.balance.toFixed(2)}</span>
+                </div>
+              ) : (
               <div className="mt-2 flex items-baseline justify-between cr-tone-teal rounded-lg bg-teal-50 px-3 py-2 text-lg font-bold text-teal-900 print:bg-transparent print:px-0">
                 <span>Still owed</span>
                 <span>${totals.balance.toFixed(2)}</span>
               </div>
+              )}
             </div>
           </div>
 

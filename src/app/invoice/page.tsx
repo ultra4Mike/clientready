@@ -928,7 +928,7 @@ export default function NewInvoicePage() {
                 </div>
               ))}
             </div>
-            <div className="space-y-1.5 rounded-xl border border-slate-200 p-4">
+            <div className="cr-panel space-y-1.5 rounded-xl border border-slate-200 p-4">
               <p className="text-sm font-medium text-slate-600">Discount <span className="font-normal text-slate-500">(taken off before tax)</span></p>
               <div className="flex items-stretch gap-2">
                 <div role="group" aria-label="Discount type" className="flex shrink-0 rounded-lg border border-slate-300 p-0.5">
@@ -947,24 +947,24 @@ export default function NewInvoicePage() {
               <div className="flex justify-between"><span className="text-slate-600">Tax</span><span className="tabular-nums">${totals.tax.toFixed(2)}</span></div>
               <div className="flex justify-between border-t border-teal-500/30 pt-2 text-base font-bold"><span>Total</span><span className="tabular-nums">${totals.total.toFixed(2)}</span></div>
             </div>
-            <Section id="payments" label="Payments" className="space-y-2 rounded-xl border border-slate-200 p-4">
+            <Section id="payments" label="Payments" className="cr-panel space-y-3 rounded-xl border border-slate-200 p-4">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="min-w-0 font-medium">{isProposal ? "Deposit received" : "Payments received"}</h2>
+                <h2 className="min-w-0 text-xs font-semibold uppercase tracking-wide text-teal-600 dark:text-teal-300">{isProposal ? "Deposit received" : "Payments received"}</h2>
                 <button type="button" className="min-h-11 shrink-0 whitespace-nowrap rounded-lg border border-teal-500/40 px-3 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 sm:min-h-9 dark:text-teal-300" onClick={addPayment}>{payments.length ? "Add another payment" : isProposal ? "Add deposit" : "Add payment"}</button>
               </div>
               {payments.map((payment) => (
-                <div key={payment.id} className="grid gap-2 border-t border-slate-100 pt-2 sm:grid-cols-2">
-                  <label className="text-sm text-slate-600">Amount paid<input className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" inputMode="decimal" placeholder="300" value={payment.amount} onChange={(event) => updatePayment(payment.id, { amount: event.target.value })} /></label>
-                  <label className="text-sm text-slate-600">Method<select className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={payment.method} onChange={(event) => updatePayment(payment.id, { method: event.target.value })}>{paymentMethods.map((method) => <option key={method} value={method}>{method}</option>)}</select></label>
-                  <label className="text-sm text-slate-600">Date paid<input type="date" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={payment.date} onChange={(event) => updatePayment(payment.id, { date: event.target.value })} /></label>
-                  <label className="text-sm text-slate-600">Reference / note<input className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Check number, confirmation, last 4" value={payment.ref} onChange={(event) => updatePayment(payment.id, { ref: event.target.value })} /></label>
-                  <label className="text-sm text-slate-600">Tip (optional, not part of the bill)<input name="paymentTip" data-testid="payment-tip" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" inputMode="decimal" placeholder="0.00" value={payment.tip || ""} onChange={(event) => updatePayment(payment.id, { tip: event.target.value })} /></label>
-                  <button type="button" className="tap text-left text-sm text-slate-600" onClick={() => setPayments((current) => current.filter((item) => item.id !== payment.id))}>Remove payment</button>
+                <div key={payment.id} className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-2">
+                  <label className="text-sm font-medium text-slate-600">Amount paid<input className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 text-right tabular-nums" inputMode="decimal" placeholder="300" value={payment.amount} onChange={(event) => updatePayment(payment.id, { amount: event.target.value })} /></label>
+                  <label className="text-sm font-medium text-slate-600">Method<select className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={payment.method} onChange={(event) => updatePayment(payment.id, { method: event.target.value })}>{paymentMethods.map((method) => <option key={method} value={method}>{method}</option>)}</select></label>
+                  <label className="text-sm font-medium text-slate-600">Date paid<input type="date" className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={payment.date} onChange={(event) => updatePayment(payment.id, { date: event.target.value })} /></label>
+                  <label className="text-sm font-medium text-slate-600">Reference / note<input className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Check number, confirmation, last 4" value={payment.ref} onChange={(event) => updatePayment(payment.id, { ref: event.target.value })} /></label>
+                  <label className="text-sm font-medium text-slate-600">Tip (optional, not part of the bill)<input name="paymentTip" data-testid="payment-tip" className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 text-right tabular-nums" inputMode="decimal" placeholder="0.00" value={payment.tip || ""} onChange={(event) => updatePayment(payment.id, { tip: event.target.value })} /></label>
+                  <button type="button" className="min-h-11 justify-self-start rounded-lg px-3 text-sm font-medium text-rose-700 transition hover:bg-rose-500/10 dark:text-rose-300 sm:col-span-2" onClick={() => setPayments((current) => current.filter((item) => item.id !== payment.id))}>Remove payment</button>
                 </div>
               ))}
               <div className="flex items-end justify-between border-t border-slate-200 pt-3">
-                <p className="text-sm text-slate-600">Total ${totals.total.toFixed(2)} · Paid ${totals.paid.toFixed(2)}</p>
-                <p className="text-right"><span className="block text-sm font-medium text-slate-600">Still owed</span><span data-testid="still-owed" className="text-2xl font-bold">${totals.balance.toFixed(2)}</span></p>
+                <p className="text-sm tabular-nums text-slate-600">Total ${totals.total.toFixed(2)} · {isProposal ? "Deposit" : "Paid"} ${totals.paid.toFixed(2)}</p>
+                <p className="text-right"><span className="block text-sm font-medium text-slate-600">{isProposal && totals.paid > 0 ? "Balance after deposit" : "Still owed"}</span><span data-testid="still-owed" className={`text-2xl font-bold tabular-nums ${totals.balance <= 0.004 && totals.paid > 0 ? "text-emerald-700 dark:text-emerald-300" : ""}`}>${totals.balance.toFixed(2)}</span></p>
               </div>
             </Section>
             {!isProposal && <StageEditor stages={stages} onChange={setStages} total={totals.total} balance={totals.balance} />}
@@ -1268,7 +1268,7 @@ export default function NewInvoicePage() {
                 return <div key={index} className="flex justify-between gap-4 py-1 text-sm"><span>{item.description || "Item"}</span><span>${amount.toFixed(2)}</span></div>;
               })}
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-6 border-t border-slate-500 pt-2 text-sm">
+            <div className="mt-2 grid grid-cols-2 gap-6 border-t border-slate-500 pt-2 text-sm tabular-nums">
               <div className={`space-y-0.5 ${mutedClass}`}>
                 <LineSplit items={items} labelClass={labelClass} />
                 {payments.filter((payment) => amountOf(payment.amount) > 0).length > 0 && <p className={`text-xs ${labelClass}`}>{isProposal ? "Deposit" : "Payments"}</p>}
@@ -1282,7 +1282,7 @@ export default function NewInvoicePage() {
                 {totals.discount > 0 && <div className="flex justify-between"><span>{discountLabel(discountType, discountValue)}</span><span>-${totals.discount.toFixed(2)}</span></div>}
                 <div className="flex justify-between"><span>Tax</span><span>${totals.tax.toFixed(2)}</span></div>
                 <div className="flex justify-between font-semibold"><span>Total</span><span>${totals.total.toFixed(2)}</span></div>
-                {totals.paid > 0 && <div className="flex justify-between"><span>{isProposal ? "Deposit paid" : "Paid"}</span><span>-${totals.paid.toFixed(2)}</span></div>}
+                {totals.paid > 0 && <div className="flex justify-between text-emerald-700"><span>{isProposal ? "Deposit paid ✓" : "Paid"}</span><span>-${totals.paid.toFixed(2)}</span></div>}
                 {tipTotal(payments) > 0 && <div className="flex justify-between" data-testid="tip-line"><span>Tip received, thank you</span><span>${tipTotal(payments).toFixed(2)}</span></div>}
                 {(!isProposal || totals.paid > 0) && <div className="mt-1 flex justify-between border-t border-slate-500 pt-1 text-lg font-bold"><span>{isProposal ? "Balance after deposit" : "Still owed"}</span><span data-testid="preview-still-owed">${totals.balance.toFixed(2)}</span></div>}
               </div>
