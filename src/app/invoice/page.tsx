@@ -812,10 +812,10 @@ export default function NewInvoicePage() {
       <section className="print-reset mx-auto grid max-w-6xl gap-6 py-2 sm:py-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-8">
         <form className="space-y-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none sm:p-6">
 {locked && (
-            <div className="rounded-lg border p-3 text-sm" style={{ background: "#fef3c7", color: "#0f172a", borderColor: "#f59e0b" }} data-testid="trial-upgrade">
+            <div className="rounded-xl border p-4 text-sm shadow-sm" style={{ background: "#fef3c7", color: "#0f172a", borderColor: "#f59e0b" }} data-testid="trial-upgrade">
               <p className="font-semibold">Your free trial has ended.</p>
               <p>You can view and print old documents. New saves are locked. Plans: {priceSummary()}{PRICES_ARE_PLACEHOLDERS ? " (placeholder prices)" : ""}.</p>
-              <Link href="/plans" data-testid="trial-upgrade-plans" className="mt-2 inline-flex min-h-11 items-center rounded-lg bg-teal-500 px-3 font-semibold text-slate-950">See plans</Link>
+              <Link href="/plans" data-testid="trial-upgrade-plans" className="mt-2 inline-flex min-h-11 items-center rounded-lg bg-teal-500 px-4 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">See plans</Link>
             </div>
           )}
           {!locked && daysLeft <= 5 && (

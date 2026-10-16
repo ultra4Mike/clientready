@@ -14,9 +14,9 @@ export default function TrialBanner() {
   }, []);
   if (!state || (!state.expired && !(Number.isFinite(state.daysLeft) && state.daysLeft <= 3))) return null;
   return (
-    <div role="status" data-testid="trial-banner" data-expired={state.expired ? "1" : "0"} className="print-hide mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm">
+    <div role="status" data-testid="trial-banner" data-expired={state.expired ? "1" : "0"} className="print-hide mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
       <span>{state.expired ? "Your free trial has ended. Old documents stay viewable; new saves are locked." : `${state.daysLeft} day${state.daysLeft === 1 ? "" : "s"} left in your free trial.`}</span>
-      <Link href="/plans" data-testid="trial-banner-plans" className="inline-flex min-h-11 items-center rounded-lg bg-teal-500 px-3 font-semibold text-slate-950">See plans</Link>
+      <Link href="/plans" data-testid="trial-banner-plans" className="inline-flex min-h-11 items-center rounded-lg bg-teal-500 px-4 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">See plans</Link>
     </div>
   );
 }

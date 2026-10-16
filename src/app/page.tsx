@@ -118,12 +118,12 @@ export default function HomePage() {
       </section>
 
       <section id="pricing" className="mx-auto max-w-6xl px-4 pb-16">
-        <h2 className="text-3xl font-bold tracking-tight">Simple pricing</h2>
+        <h2 className="text-center text-3xl font-bold tracking-tight">Simple pricing</h2>
         <div className="mt-6 grid gap-4 md:grid-cols-3" data-testid="home-pricing">
           {PLANS.map((plan) => (
             <div key={plan.id} className={`rounded-2xl bg-[var(--cr-card)] p-6 ${plan.highlight ? "border-2 border-teal-400 shadow-md" : "border border-teal-500/20 shadow-sm"}`}>
               <p className={`text-sm ${plan.highlight ? "font-semibold text-teal-600 dark:text-teal-300" : "text-[var(--cr-muted)]"}`}>{plan.name}</p>
-              <p className="mt-2 text-3xl font-bold tracking-tight">{plan.price}</p>
+              <p className="mt-2 text-4xl font-bold tracking-tight tabular-nums">{plan.price}</p>
               <p className="mt-3 text-sm text-[var(--cr-muted)]">{plan.blurb}</p>
             </div>
           ))}
@@ -134,10 +134,10 @@ export default function HomePage() {
       </section>
 
       <footer className="border-t border-teal-500/20 px-4 py-6 text-center text-sm text-[var(--cr-muted)]">
-        <a href="/login" className="px-3 hover:text-teal-500 sm:hidden">Log in</a>
-        <a href="/privacy" className="px-3 hover:text-teal-500">Privacy</a>
+        <a href="/login" className="inline-flex min-h-11 items-center px-3 hover:text-teal-500 sm:hidden">Log in</a>
+        <a href="/privacy" className="inline-flex min-h-11 items-center px-3 hover:text-teal-500">Privacy</a>
         <span>·</span>
-        <a href="/terms" className="px-3 hover:text-teal-500">Terms</a>
+        <a href="/terms" className="inline-flex min-h-11 items-center px-3 hover:text-teal-500">Terms</a>
       </footer>
     </main>
   );
