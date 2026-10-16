@@ -14,7 +14,8 @@ import LineSplit from "@/components/LineSplit";
 import ChangeOrderNotes from "@/components/ChangeOrderNotes";
 import { changeOrdersFor, mergeChangeOrderNotes, readChangeOrderNotes, readChangeOrderOf, type ChangeOrderNote, type ChangeOrderOf } from "@/lib/change-orders";
 import PayQr from "@/components/PayQr";
-import { payUrlFor } from "@/lib/pay-link";
+import { invoiceQrUrl } from "@/lib/pay-link";
+import { printOrigin } from "@/lib/site";
 import { SignatureBlock } from "@/components/SignaturePad";
 import { readSignature, type Signature } from "@/lib/signature";
 import { ApprovalBadge } from "@/components/Approval";
@@ -350,14 +351,14 @@ export default function InvoiceViewPage() {
           <StageSchedule stages={stages} total={totals.total} balance={totals.balance} />
           {notes && <p className="mt-6 whitespace-pre-line text-sm text-slate-600">{notes}</p>}
           <JobPhotoStrip photos={photos} />
-          {(payUrlFor(docPayLink, paymentLink) || signature || proposalSignature) && (
+          {(invoiceQrUrl(approval?.token, printOrigin(), docPayLink, paymentLink) || signature || proposalSignature) && (
             <div className="print-keep mt-3 grid grid-cols-1 items-end gap-6 sm:grid-cols-2 print:grid-cols-2 border-t border-slate-200 pt-3">
               <div className="space-y-3">
                 <SignatureBlock signature={proposalSignature} label="Proposal accepted" />
                 <SignatureBlock signature={signature} />
               </div>
               <div className="flex justify-start sm:justify-end print:justify-end">
-                <PayQr url={payUrlFor(docPayLink, paymentLink)} />
+                <PayQr url={invoiceQrUrl(approval?.token, printOrigin(), docPayLink, paymentLink)} />
               </div>
             </div>
           )}

@@ -47,7 +47,8 @@ import { confirmRemoval, crewForWorkers, crewIds, workLogged, clockHoursFor, ded
 import { readApproval, refreshApproval, type Approval } from "@/lib/approval";
 import { generateNextNow, readRecurring, readRecurringFrom, scheduleFromForm, type Frequency, type RecurringFrom } from "@/lib/recurring";
 import PayQr from "@/components/PayQr";
-import { payUrlFor } from "@/lib/pay-link";
+import { invoiceQrUrl, payUrlFor } from "@/lib/pay-link";
+import { printOrigin } from "@/lib/site";
 import SignaturePad, { SignatureBlock } from "@/components/SignaturePad";
 import { readSignature, type Signature } from "@/lib/signature";
 import { amountOf, documentTotals, discountLabel, normalizeDiscountType, type DiscountType } from "@/lib/discount";
@@ -824,6 +825,7 @@ export default function NewInvoicePage() {
   }, [costs, otherFees, totals.total, setAsidePercent]);
 
   const payUrl = payUrlFor(docPayLink, paymentLink);
+  const qrUrl = invoiceQrUrl(approval?.token, printOrigin(), docPayLink, paymentLink);
 
   // Collapsible sections: a new document opens with everything open; an existing one opens with the
   // client details folded to a one-line summary. The user's own open/closed choices are kept per device.
@@ -1323,15 +1325,16 @@ export default function NewInvoicePage() {
             {!isProposal && <StageSchedule stages={stages} total={totals.total} balance={totals.balance} muted={mutedClass} />}
             {notes && <p className={`mt-3 text-sm ${mutedClass}`}>{notes}</p>}
             {showPhotos && <JobPhotoStrip photos={photos} muted={mutedClass} />}
-            {(payUrl && !isProposal) || signature || (proposalSignature && !isProposal) ? (
+            {(qrUrl && !isProposal) || signature || (proposalSignature && !isProposal) ? (
               <div className="print-keep mt-3 grid grid-cols-2 items-end gap-6 border-t border-slate-500 pt-3">
                 <div className="space-y-3">
                   {!isProposal && <SignatureBlock signature={proposalSignature} label="Proposal accepted" muted={mutedClass} onDark={style === "bold"} />}
                   <SignatureBlock signature={signature} label={isProposal ? "Customer acceptance" : "Customer signature"} muted={mutedClass} onDark={style === "bold"} />
                 </div>
-                <div className="flex justify-end">{!isProposal && <PayQr url={payUrl} />}</div>
+                <div className="flex justify-end">{!isProposal && <PayQr url={qrUrl} />}</div>
               </div>
             ) : null}
+            {!isProposal && !qrUrl && <p className="print-hide mt-4 rounded-lg border border-dashed border-slate-400/60 px-3 py-2 text-xs text-slate-500" data-testid="qr-hint">No QR code yet. Make a customer link under Approval (or add a pay link) and a Scan to pay QR appears here and on the PDF.</p>}
           </div>
         </div>
       </section>

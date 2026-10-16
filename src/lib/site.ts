@@ -13,3 +13,15 @@ export function linkOrigin() {
   if (configured) return configured;
   return typeof window === "undefined" ? SITE_URL : window.location.origin;
 }
+
+/**
+ * Origin printed on paper (invoice QR codes): always the main site (https://clientreadyapp.com unless
+ * NEXT_PUBLIC_SITE_URL says otherwise), even when the owner opened the app on another host. Local
+ * development keeps its own origin so the code can be scanned in tests.
+ */
+export function printOrigin() {
+  const configured = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
+  if (configured) return configured;
+  if (typeof window !== "undefined" && /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)) return window.location.origin;
+  return SITE_URL;
+}
