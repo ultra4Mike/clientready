@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { searchAll, type SearchHit } from "@/lib/search";
 
 const KIND: Record<SearchHit["kind"], string> = { document: "Doc", client: "Client", part: "Part" };
+const KIND_ICON: Record<SearchHit["kind"], string> = { document: "📄", client: "👤", part: "🔧" };
 
 /** Search button in the top bar + Ctrl/Cmd+K or "/" to open. Searches this device's cache; nothing is changed. */
 export default function GlobalSearch() {
@@ -29,13 +30,14 @@ export default function GlobalSearch() {
 
   return (
     <>
-      <button type="button" aria-label="Search" data-testid="search-open" onClick={() => setOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-full transition hover:bg-teal-500/10 min-[900px]:w-auto min-[900px]:gap-2 min-[900px]:rounded-lg min-[900px]:px-3">
+      <button type="button" aria-label="Search" data-testid="search-open" onClick={() => setOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-full transition hover:bg-teal-500/10 min-[900px]:w-auto min-[900px]:gap-2 min-[900px]:h-10 min-[900px]:min-w-52 min-[900px]:justify-start min-[900px]:rounded-lg min-[900px]:border min-[900px]:border-teal-500/25 min-[900px]:bg-[var(--cr-card)] min-[900px]:px-3 min-[900px]:text-[var(--cr-muted)] min-[900px]:hover:border-teal-400">
         <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
         <span className="hidden min-[900px]:inline">Search</span>
+        <kbd aria-hidden="true" className="ml-auto hidden rounded border border-slate-500/30 px-1.5 py-0.5 font-sans text-[11px] font-medium min-[900px]:inline">⌘K</kbd>
       </button>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-3 pt-[10vh]" onClick={() => setOpen(false)}>
-          <div role="dialog" aria-label="Search" data-testid="search-dialog" className="w-full max-w-xl overflow-hidden rounded-2xl border border-teal-500/30 bg-[var(--cr-panel)] text-[var(--cr-text)] shadow-xl" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-[60] flex items-stretch justify-center bg-slate-950/60 backdrop-blur-sm sm:items-start sm:p-3 sm:pt-[12vh]" onClick={() => setOpen(false)}>
+          <div role="dialog" aria-label="Search" data-testid="search-dialog" className="flex w-full flex-col overflow-hidden bg-[var(--cr-panel)] pt-[env(safe-area-inset-top)] text-[var(--cr-text)] shadow-2xl sm:max-w-xl sm:rounded-2xl sm:border sm:border-teal-500/30 sm:pt-0" onClick={(event) => event.stopPropagation()}>
             <input ref={inputRef} type="search" name="q" aria-label="Search invoices, clients and parts" data-testid="search-input" placeholder="Invoice #, client, phone, address, item…" value={query}
               onChange={(event) => { setQuery(event.target.value); setActive(0); }}
               onKeyDown={(event) => {
@@ -43,13 +45,14 @@ export default function GlobalSearch() {
                 if (event.key === "ArrowUp") { event.preventDefault(); setActive((i) => Math.max(i - 1, 0)); }
                 if (event.key === "Enter") go(hits[active]);
               }}
-              className="w-full border-b border-teal-500/20 bg-transparent px-4 py-3 text-base outline-none" />
-            <ul className="max-h-[60vh] overflow-y-auto" data-testid="search-results">
-              {query.trim().length >= 2 && hits.length === 0 && <li className="px-4 py-6 text-center text-sm text-[var(--cr-muted)]" data-testid="search-empty">No matches on this device.</li>}
+              className="min-h-14 w-full border-b border-teal-500/20 bg-transparent px-5 py-4 text-base outline-none placeholder:text-[var(--cr-muted)] sm:text-lg" />
+            <ul className="flex-1 overflow-y-auto overscroll-contain p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:max-h-[60vh] sm:flex-none" data-testid="search-results">
+              {query.trim().length >= 2 && hits.length === 0 && <li className="px-4 py-10 text-center text-sm text-[var(--cr-muted)]" data-testid="search-empty"><span aria-hidden="true" className="mb-2 block text-2xl">🔍</span>No matches on this device.</li>}
               {hits.map((hit, index) => (
                 <li key={`${hit.kind}-${hit.id}`}>
-                  <a href={hit.href} data-testid="search-hit" data-kind={hit.kind} aria-selected={index === active} className={`flex min-h-11 items-center gap-3 px-4 py-2 text-sm ${index === active ? "bg-teal-500/15" : "hover:bg-teal-500/10"}`}>
-                    <span className="w-12 shrink-0 text-xs font-semibold uppercase text-teal-600 dark:text-teal-300">{KIND[hit.kind]}</span>
+                  <a href={hit.href} data-testid="search-hit" data-kind={hit.kind} aria-selected={index === active} className={`flex min-h-12 items-center gap-3 rounded-xl px-3 py-2 text-sm outline-none transition focus-visible:bg-teal-500/15 focus-visible:ring-2 focus-visible:ring-teal-400/50 ${index === active ? "bg-teal-500/15 ring-1 ring-teal-500/30" : "hover:bg-teal-500/10"}`}>
+                    <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal-500/10 text-base">{KIND_ICON[hit.kind]}</span>
+                    <span className="order-last ml-auto shrink-0 rounded-full bg-teal-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-300">{KIND[hit.kind]}</span>
                     <span className="min-w-0"><span className="block truncate font-medium">{hit.title}</span>{hit.detail && <span className="block truncate text-xs text-[var(--cr-muted)]">{hit.detail}</span>}</span>
                   </a>
                 </li>
