@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ServiceWorker from "@/components/ServiceWorker";
+import NativeBridge from "@/components/NativeBridge";
 
 export const metadata: Metadata = {
   title: "ClientReady",
@@ -38,6 +39,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-[var(--cr-bg)] text-[var(--cr-text)] antialiased">
         {children}
         <ServiceWorker />
+        <NativeBridge />
       </body>
     </html>
   );
