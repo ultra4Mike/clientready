@@ -285,7 +285,7 @@ export default function DocumentsPage() {
       </div>
 
       {selecting && (
-        <div className="hide-fab fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-40 grid grid-cols-3 items-center gap-2 rounded-2xl border border-teal-500/30 bg-[var(--cr-panel)]/95 p-3 text-sm shadow-2xl backdrop-blur min-[900px]:sticky min-[900px]:inset-auto min-[900px]:top-2 min-[900px]:z-10 min-[900px]:mt-3 min-[900px]:flex min-[900px]:flex-wrap min-[900px]:rounded-xl min-[900px]:px-3 min-[900px]:py-2 min-[900px]:shadow-lg print:hidden" data-testid="bulk-bar">
+        <div className="hide-fab fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-40 grid grid-cols-3 items-center gap-2 rounded-2xl border border-teal-500/30 bg-[var(--cr-panel)]/95 p-3 text-sm shadow-2xl backdrop-blur min-[900px]:sticky min-[900px]:inset-auto min-[900px]:top-[calc(0.5rem+env(safe-area-inset-top))] min-[900px]:z-10 min-[900px]:mt-3 min-[900px]:flex min-[900px]:flex-wrap min-[900px]:rounded-xl min-[900px]:px-3 min-[900px]:py-2 min-[900px]:shadow-lg print:hidden" data-testid="bulk-bar">
           <span className="col-span-3 font-semibold min-[900px]:mr-2" data-testid="bulk-count">{selected.size} selected</span>
           <button type="button" data-testid="bulk-all" className="min-h-11 rounded-lg border border-slate-300 px-3 font-medium transition hover:border-teal-500" onClick={() => setSelected(new Set(visibleDocs.map((doc) => doc.id)))}>Select all shown</button>
           <button type="button" data-testid="bulk-none" disabled={!selected.size} className="min-h-11 rounded-lg border border-slate-300 px-3 font-medium transition hover:border-teal-500 disabled:opacity-50" onClick={() => setSelected(new Set())}>Clear</button>

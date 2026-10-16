@@ -267,7 +267,7 @@ export default function CalendarPage() {
                     const due = view === "month" ? docs.filter((doc) => doc.type === "invoice" && doc.data?.dueDate === day && text(doc.data?.status) !== "paid") : [];
                     return (
                       <section key={day} data-testid={`agenda-day-${day}`}>
-                        <h2 className={`sticky top-0 z-10 -mx-2 mb-1.5 flex items-center gap-2 px-3 py-2 text-sm font-semibold backdrop-blur sm:-mx-3 ${day === today ? "bg-teal-500/15 text-teal-700 dark:text-teal-300" : "bg-[var(--cr-card)]/95"}`}>
+                        <h2 className={`sticky top-[env(safe-area-inset-top)] z-10 -mx-2 mb-1.5 flex items-center gap-2 px-3 py-2 text-sm font-semibold backdrop-blur sm:-mx-3 ${day === today ? "bg-teal-500/15 text-teal-700 dark:text-teal-300" : "bg-[var(--cr-card)]/95"}`}>
                           <span className={`inline-flex h-7 min-w-7 items-center justify-center rounded-full px-1.5 text-xs tabular-nums ${day === today ? "bg-teal-500 text-slate-950!" : "bg-slate-500/10"}`}>{parse(day).getDate()}</span>
                           {parse(day).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
                           {day === today && <span className="ml-auto text-xs font-semibold uppercase tracking-wide">Today</span>}
