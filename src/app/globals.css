@@ -449,3 +449,13 @@ body { overscroll-behavior-y: none; }
 .app-root { overscroll-behavior: contain; }
 a, button, [role="button"], [role="tab"], select, label, summary { touch-action: manipulation; }
 nav, button, [role="tab"], .quick-create-fab, .app-topbar { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+
+/* Crew vs estimate (owner invoice): keep tone pills readable inside the dark owner-costs panel. */
+html.dark #crew-spend { background-color: #0b1f24 !important; border-color: rgba(45, 212, 191, 0.35) !important; color: #e2f6f4 !important; }
+html.dark #crew-spend tr, html.dark #crew-spend [data-testid="cve-line"] { border-color: rgba(45, 212, 191, 0.25) !important; }
+html.dark #crew-spend .cve-btn { background-color: #10262c !important; color: #e2f6f4 !important; border-color: rgba(45, 212, 191, 0.4) !important; }
+html.dark #crew-spend .cr-tone-bad, html.dark #crew-spend .cr-tone-bad * { background-color: rgba(127, 29, 29, 0.45) !important; color: #fecdd3 !important; border-color: rgba(190, 18, 60, 0.7) !important; }
+html.dark #crew-spend .cr-tone-warn, html.dark #crew-spend .cr-tone-warn * { background-color: rgba(120, 53, 15, 0.45) !important; color: #fde68a !important; border-color: rgba(180, 83, 9, 0.7) !important; }
+html.dark #crew-spend .cr-tone-good, html.dark #crew-spend .cr-tone-good * { background-color: rgba(6, 78, 59, 0.45) !important; color: #a7f3d0 !important; border-color: rgba(4, 120, 87, 0.7) !important; }
+html.dark #crew-spend .cr-tone-bad *, html.dark #crew-spend .cr-tone-warn *, html.dark #crew-spend .cr-tone-good * { background-color: transparent !important; }
+html.dark #crew-spend a { color: #5eead4 !important; }

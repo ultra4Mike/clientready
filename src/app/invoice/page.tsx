@@ -1334,36 +1334,36 @@ function CrewSpend({ docId, estimate, report, locked, onUse }: { docId: string; 
   const diffClass = (diff: number) => (diff > 0.005 ? "font-semibold text-red-600" : diff < -0.005 ? "text-teal-700" : "");
   const diffText = (diff: number) => (Math.abs(diff) < 0.005 ? "on estimate" : diff > 0 ? `+$${diff.toFixed(2)} over` : `$${(-diff).toFixed(2)} under`);
   return (
-    <div className="print-hide mt-4 rounded-xl border border-amber-300/40 p-3 text-sm" id="crew-spend" data-testid="crew-vs-estimate">
+    <div className="print-hide mt-4 rounded-xl border border-amber-200 bg-white p-3 text-sm text-slate-900 shadow-sm sm:p-4" id="crew-spend" data-testid="crew-vs-estimate">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-medium">Crew spend vs your estimate</p>
         {differing.length > 1 && !locked && (
-          <button type="button" data-testid="cve-use-all" className="min-h-11 rounded-lg border border-teal-500/40 px-3 text-sm font-semibold transition hover:border-teal-400 hover:bg-teal-500/10" onClick={() => onUse(differing.map((group) => [group.kind, group.actual]))}>Add all crew amounts ({differing.length})</button>
+          <button type="button" data-testid="cve-use-all" className="min-h-11 rounded-lg bg-teal-500 px-3 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400" onClick={() => onUse(differing.map((group) => [group.kind, group.actual]))}>Add all crew amounts ({differing.length})</button>
         )}
       </div>
-      <table className="mt-2 w-full text-left text-sm">
-        <thead><tr className="text-xs text-[var(--cr-muted)]"><th className="font-normal">Cost</th><th className="text-right font-normal">Estimate</th><th className="text-right font-normal">Crew spent</th><th className="text-right font-normal">Difference</th><th /></tr></thead>
+      <div className="-mx-3 mt-2 overflow-x-auto px-3 sm:mx-0 sm:px-0"><table className="w-full min-w-[30rem] text-left text-sm">
+        <thead><tr className="text-[11px] uppercase tracking-wide text-[var(--cr-muted)]"><th className="pb-1 font-normal">Cost</th><th className="pb-1 text-right font-normal">Estimate</th><th className="pb-1 text-right font-normal">Crew spent</th><th className="pb-1 text-right font-normal">Difference</th><th /></tr></thead>
         <tbody>
           {shown.map(({ kind, label, est, actual, source }) => {
             const differs = actual > 0 && Math.abs(actual - est) >= 0.005;
             return (
-              <tr key={kind} data-testid="cve-row" data-kind={kind} data-estimate={est.toFixed(2)} data-crew={actual.toFixed(2)} data-differs={differs ? "1" : "0"}>
-                <td>{label}<span className="block text-xs text-[var(--cr-muted)]">Estimate from: {source}</span></td>
-                <td className="text-right tabular-nums">${est.toFixed(2)}</td>
-                <td className="text-right tabular-nums">${actual.toFixed(2)}</td>
-                <td className={`text-right tabular-nums ${diffClass(actual - est)}`}>{differs ? <span data-testid="cve-diff">{diffText(actual - est)}</span> : actual > 0 ? "on estimate" : "—"}</td>
-                <td className="pl-2 text-right">{differs && !locked && <button type="button" data-testid={`cve-use-${kind}`} className="min-h-11 rounded-lg border border-teal-500/40 px-2 text-xs font-semibold transition hover:border-teal-400 hover:bg-teal-500/10" onClick={() => onUse([[kind, actual]])}>{est > 0 ? "Use crew amount" : "Add to job costs"}</button>}</td>
+              <tr key={kind} className="border-t border-amber-200/70 align-middle" data-testid="cve-row" data-kind={kind} data-estimate={est.toFixed(2)} data-crew={actual.toFixed(2)} data-differs={differs ? "1" : "0"}>
+                <td className="py-2 pr-2"><span className="font-medium">{label}</span><span className="block text-xs text-[var(--cr-muted)]">Estimate from: {source}</span></td>
+                <td className="py-2 text-right tabular-nums">${est.toFixed(2)}</td>
+                <td className="py-2 text-right font-medium tabular-nums">${actual.toFixed(2)}</td>
+                <td className="py-2 text-right tabular-nums">{differs ? <span data-testid="cve-diff" className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold ${actual - est > 0 ? "cr-tone-bad border-rose-300 bg-rose-50 text-rose-800" : "cr-tone-warn border-amber-300 bg-amber-50 text-amber-900"}`}><span aria-hidden="true">{actual - est > 0 ? "▲" : "▼"}</span>{diffText(actual - est)}</span> : actual > 0 ? <span className="cr-tone-good inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800"><span aria-hidden="true">✓</span>on estimate</span> : <span className="text-[var(--cr-muted)]">—</span>}</td>
+                <td className="py-2 pl-2 text-right">{differs && !locked && <button type="button" data-testid={`cve-use-${kind}`} className="cve-btn min-h-11 whitespace-nowrap rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-900 font-semibold transition hover:border-teal-400 hover:bg-teal-500/10" onClick={() => onUse([[kind, actual]])}>{est > 0 ? "Use crew amount" : "Add to job costs"}</button>}</td>
               </tr>
             );
           })}
-          <tr className="border-t border-slate-200 font-semibold" data-testid="cve-total"><td>Total</td><td className="text-right tabular-nums">${totalEstimate.toFixed(2)}</td><td className="text-right tabular-nums">${totalActual.toFixed(2)}</td><td className={`text-right tabular-nums ${diffClass(totalActual - totalEstimate)}`}>{diffText(totalActual - totalEstimate)}</td><td /></tr>
+          <tr className="border-t-2 border-amber-300 font-semibold" data-testid="cve-total"><td className="py-2">Total</td><td className="py-2 text-right tabular-nums">${totalEstimate.toFixed(2)}</td><td className="py-2 text-right tabular-nums">${totalActual.toFixed(2)}</td><td className={`py-2 text-right tabular-nums ${diffClass(totalActual - totalEstimate)}`}>{diffText(totalActual - totalEstimate)}</td><td /></tr>
         </tbody>
-      </table>
+      </table></div>
       <p className="mt-2 text-xs text-[var(--cr-muted)]">From your crew&apos;s receipts and job report. Nothing changes until you tap a button, and then only your job costs (never the invoice).</p>
       {all.map((row) => (
-        <div key={row.id} className="mt-2" data-testid="cve-line" data-kind={row.kind} data-source={row.fromReport ? "report" : "expense"}>
-          <p>{row.worker_name} · {crewKindLabel(row.kind)} · ${num(row.amount).toFixed(2)} · {row.note}{row.fromReport ? " · job report" : ""}</p>
-          {row.receipt ? <a href={row.receipt} download={`receipt-${row.id}.jpg`} className="text-xs underline">Save receipt</a> : row.hasReceipt ? <a href="/drafts" className="text-xs underline">Receipt on Crew drafts</a> : null}
+        <div key={row.id} className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border border-slate-200 px-3 py-2" data-testid="cve-line" data-kind={row.kind} data-source={row.fromReport ? "report" : "expense"}>
+          <p className="min-w-0 flex-1">{row.worker_name} · <span className="font-medium">{crewKindLabel(row.kind)}</span> · <span className="tabular-nums">${num(row.amount).toFixed(2)}</span> · {row.note}{row.fromReport ? " · job report" : ""}</p>
+          {row.receipt ? <a href={row.receipt} download={`receipt-${row.id}.jpg`} className="inline-flex min-h-11 items-center text-xs font-medium text-teal-700 underline">Save receipt</a> : row.hasReceipt ? <a href="/drafts" className="inline-flex min-h-11 items-center text-xs font-medium text-teal-700 underline">Receipt on Crew drafts</a> : null}
         </div>
       ))}
     </div>
