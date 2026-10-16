@@ -16,6 +16,7 @@ Shared by the three ClientReady bots. Update the **Status** column when you pick
 | M6 | Migrations now run — next step: after M1–M2, make a real test card payment (Stripe test mode) through an approval link and the portal; confirm it appears once on the invoice with the correct local date; try two tabs at once to confirm the double-checkout guard. | Owner + Dev | Open | 2026-10-15 |
 | M7 | Set Supabase env vars for builds/deploys (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`; server: `SUPABASE_SERVICE_ROLE_KEY`, Stripe keys, optional `BUSINESS_TIMEZONE`). Without the public ones `npm run build` fails prerendering /approve. | Owner | Open | 2026-10-15 |
 | M8 | Set Business timezone in Settings once migration M1 is run. | Owner | Open | 2026-10-15 |
+| M9 | Run migration `20261016000000_clients_updated_at.sql` on the live Supabase project (adds `clients.updated_at` + server touch trigger). Until it runs, the contact retry queue uses its fallback (no conditional update). | Owner | Open | 2026-10-16 |
 
 ## 2. Open risks
 | # | Risk | Owner | Status | Added |
@@ -31,7 +32,7 @@ Shared by the three ClientReady bots. Update the **Status** column when you pick
 | R9 | Checkout claim row can be left without a session if the server crashes mid-request (ignored after 2 min; Stripe session still payable and recorded via webhook). | Dev | Open | 2026-10-15 |
 | R10 | New migrations 150000 (review link) and 160000 (crew unavailable) added by other bots — confirm they degrade quietly until run. | Dev | Open | 2026-10-15 |
 | R11 | Pending-payments list (`/api/pay/pending`) reads at most 200 unresolved rows across **all** owners before filtering to the signed-in owner, so with many unresolved rows an owner's stuck payment may not show. Fix belongs in payment code — coordinate with Dev before changing. | Help (with Dev) | Open | 2026-10-16 |
-| R12 | Client contact retry queue was not account-scoped (could be dropped after an account switch; a retry could overwrite a newer cloud edit). Fixed in `src/lib/client-sync.ts`: queue keyed per user id; update skipped when the cloud row's `updated_at` is newer than the queued change (only if the clients table has `updated_at`); old shared queue dropped. | Help | Done 2026-10-16 | 2026-10-16 |
+| R12 | Client contact retry queue was not account-scoped (could be dropped after an account switch; a retry could overwrite a newer cloud edit). Fixed in `src/lib/client-sync.ts`: queue keyed per user id; update skipped when the cloud row's `updated_at` is newer than the queued change (only if the clients table has `updated_at`); old shared queue dropped. Follow-up 2026-10-16: conditional update on the stored `updated_at` baseline (no device clocks), superseded changes dropped, queue merged on write-back so edits made during a flush are kept. Needs M9. | Help | Done 2026-10-16 | 2026-10-16 |
 
 ## 3. Help content to verify
 | # | Item | Owner | Status | Added |

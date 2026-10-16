@@ -35,14 +35,17 @@ export async function syncClientContact(clientId: string, contact: Contact): Pro
   window.localStorage.setItem(CLIENTS_KEY, JSON.stringify(next));
   const userId = await getUserId().catch(() => "");
   if (userId) {
-    queueContactPatch(userId, target.id, patch);
+    // Baseline = the cloud row's updated_at as last loaded (present once migration 20261016000000 runs).
+    const baseline = typeof target.updated_at === "string" && target.updated_at ? target.updated_at : null;
+    queueContactPatch(userId, target.id, patch, baseline);
     await flushClientContactQueue();
   }
   return next;
 }
 
 const QUEUE_PREFIX = "clientready-client-sync-queue:";
-type Queued = { patch: Partial<Contact>; queuedAt: string };
+/** baseline: cloud updated_at the change was based on (null = unknown); version: changes on every edit. */
+type Queued = { patch: Partial<Contact>; queuedAt: string; baseline?: string | null; version?: string };
 type Queue = Record<string, Queued>;
 const queueKey = (userId: string) => `${QUEUE_PREFIX}${userId}`;
 
@@ -59,41 +62,86 @@ function writeQueue(userId: string, queue: Queue) {
   else window.localStorage.removeItem(queueKey(userId));
 }
 
-function queueContactPatch(userId: string, id: string, patch: Partial<Contact>) {
+const newVersion = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
+
+function queueContactPatch(userId: string, id: string, patch: Partial<Contact>, baseline: string | null) {
   const queue = readQueue(userId);
-  queue[id] = { patch: { ...(queue[id]?.patch || {}), ...patch }, queuedAt: new Date().toISOString() };
+  const prior = queue[id];
+  queue[id] = {
+    patch: { ...(prior?.patch || {}), ...patch },
+    queuedAt: new Date().toISOString(),
+    // Keep the original baseline while an earlier change is still unsent (the cloud hasn't moved for us).
+    baseline: prior ? (prior.baseline ?? null) : baseline,
+    version: newVersion(),
+  };
   writeQueue(userId, queue);
+}
+
+/** Store the cloud's new updated_at on the cached client so the next queued change has the right baseline. */
+function rememberUpdatedAt(id: string, updatedAt: string) {
+  try {
+    const clients = JSON.parse(window.localStorage.getItem(CLIENTS_KEY) || "[]") as SavedClient[];
+    window.localStorage.setItem(CLIENTS_KEY, JSON.stringify(clients.map((client) => (client.id === id ? { ...client, updated_at: updatedAt } : client))));
+  } catch {
+    // cache unreadable: next change simply has no baseline (falls back to the time check)
+  }
+}
+
+type Outcome = { result: "sent" | "superseded" | "keep"; updatedAt?: string };
+
+async function sendOne(userId: string, id: string, item: Queued): Promise<Outcome> {
+  if (item.baseline) {
+    // Conditional update: only applies if the cloud row is still exactly the version we edited.
+    const { data, error } = await supabase.from("clients").update(item.patch).eq("id", id).eq("user_id", userId).eq("updated_at", item.baseline).select("id, updated_at");
+    if (error) return { result: "keep" };
+    const rows = Array.isArray(data) ? (data as { updated_at?: string }[]) : [];
+    if (!rows.length) {
+      console.info(`[client-sync] queued contact change for client ${id} dropped: superseded by a newer cloud edit (or client removed).`);
+      return { result: "superseded" };
+    }
+    if (rows[0].updated_at) rememberUpdatedAt(id, rows[0].updated_at);
+    return { result: "sent", updatedAt: rows[0].updated_at };
+  }
+  // Baseline unknown (column missing or not loaded yet): earlier behavior, time comparison on updated_at if present.
+  const { data: row, error: readError } = await supabase.from("clients").select("*").eq("id", id).eq("user_id", userId).maybeSingle();
+  if (readError) return { result: "keep" };
+  if (!row) return { result: "superseded" };
+  const cloudUpdated = typeof (row as Record<string, unknown>).updated_at === "string" ? String((row as Record<string, unknown>).updated_at) : "";
+  if (cloudUpdated && new Date(cloudUpdated).getTime() > new Date(item.queuedAt).getTime()) {
+    console.info(`[client-sync] queued contact change for client ${id} dropped: cloud row is newer.`);
+    return { result: "superseded" };
+  }
+  const { error } = await supabase.from("clients").update(item.patch).eq("id", id).eq("user_id", userId);
+  return { result: error ? "keep" : "sent" };
 }
 
 /**
  * Sends the signed-in user's queued client contact updates to the cloud. The queue is kept per user
- * id, so switching accounts never sends (or drops) another account's updates. A failed update stays
- * queued for the next call; an update is skipped when the cloud row was changed after it was queued
- * (when the clients table has updated_at). Returns how many are still waiting.
+ * id. With a baseline, each update is conditional on the cloud row's updated_at (no device clocks);
+ * 0 rows updated means a newer edit won, so the change is dropped. Failed sends stay queued. The queue
+ * is re-read before writing back and only entries whose version was sent are removed, so changes
+ * queued during the flush are kept. Returns how many are still waiting.
  */
 export async function flushClientContactQueue(): Promise<number> {
   const userId = await getUserId().catch(() => "");
   if (!userId) return 0;
-  const queue = readQueue(userId);
-  for (const id of Object.keys(queue)) {
-    const { patch, queuedAt } = queue[id];
-    const { data: row, error: readError } = await supabase.from("clients").select("*").eq("id", id).eq("user_id", userId).maybeSingle();
-    if (readError) continue; // offline or error: keep for next time
-    if (!row) {
-      delete queue[id]; // client gone from this account
-      continue;
-    }
-    const cloudUpdated = typeof (row as Record<string, unknown>).updated_at === "string" ? String((row as Record<string, unknown>).updated_at) : "";
-    if (cloudUpdated && new Date(cloudUpdated).getTime() > new Date(queuedAt).getTime()) {
-      delete queue[id]; // a newer edit is already in the cloud: don't overwrite it
-      continue;
-    }
-    const update = cloudUpdated ? { ...patch, updated_at: new Date().toISOString() } : patch;
-    const { error } = await supabase.from("clients").update(update).eq("id", id).eq("user_id", userId);
-    if (!error) delete queue[id];
+  const snapshot = readQueue(userId);
+  const done: Record<string, { version: string; updatedAt?: string }> = {};
+  for (const id of Object.keys(snapshot)) {
+    const outcome = await sendOne(userId, id, snapshot[id]);
+    if (outcome.result !== "keep") done[id] = { version: snapshot[id].version ?? snapshot[id].queuedAt, updatedAt: outcome.updatedAt };
   }
-  writeQueue(userId, queue);
+  // Merge: remove only what was flushed, and only if it wasn't edited again meanwhile.
+  const latest = readQueue(userId);
+  for (const [id, { version, updatedAt }] of Object.entries(done)) {
+    const current = latest[id];
+    if (!current) continue;
+    if ((current.version ?? current.queuedAt) === version) delete latest[id];
+    // Edited again during the flush: its base is now the row we just wrote.
+    else if (updatedAt) current.baseline = updatedAt;
+  }
+  writeQueue(userId, latest);
   // The old shared queue (before per-user keys) can't be attributed to an account safely: drop it.
   window.localStorage.removeItem("clientready-client-sync-queue");
-  return Object.keys(queue).length;
+  return Object.keys(latest).length;
 }
