@@ -95,7 +95,7 @@ useEffect(() => {
 
   // One header action set for every size (SyncPill mounts once); size-specific bits use CSS breakpoints only.
   const actions = (
-    <div className="tap-row flex items-center gap-1 text-sm font-medium min-[900px]:flex-wrap min-[900px]:gap-4">
+    <div className="tap-row flex items-center gap-2 text-sm font-medium min-[900px]:flex-wrap min-[900px]:gap-4">
       <SyncPill />
       <GlobalSearch />
       <button
