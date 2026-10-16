@@ -227,7 +227,7 @@ export default function ApprovePage() {
               <div className="flex justify-between font-semibold"><span>Total</span><span>${totals.total.toFixed(2)}</span></div>
               {totals.paid > 0 && <div className="flex justify-between"><span>Paid</span><span>-${totals.paid.toFixed(2)}</span></div>}
               {!isProposal && (
-                <div className="mt-2 flex items-baseline justify-between rounded-lg bg-teal-50 px-3 py-2 text-lg font-bold text-teal-900 print:bg-transparent print:px-0" data-testid="approve-owed">
+                <div className="mt-2 flex items-baseline justify-between cr-tone-teal rounded-lg bg-teal-50 px-3 py-2 text-lg font-bold text-teal-900 print:bg-transparent print:px-0" data-testid="approve-owed">
                   <span>Still owed</span><span>${totals.balance.toFixed(2)}</span>
                 </div>
               )}
@@ -235,7 +235,7 @@ export default function ApprovePage() {
           </div>
 
           {!isProposal && (cardEnabled || payMessage) && (
-            <div className="print-hide mt-4 rounded-xl border border-teal-500/30 bg-teal-50 p-4 text-sm text-slate-800" data-testid="card-pay">
+            <div className="print-hide mt-4 cr-tone-teal rounded-xl border border-teal-500/30 bg-teal-50 p-4 text-sm text-slate-800" data-testid="card-pay">
               {cardEnabled && totals.balance >= 0.5 && (
                 <button type="button" data-testid="pay-card" disabled={paying} onClick={() => payByCard(false)} className="min-h-12 w-full rounded-lg bg-teal-600 px-6 py-3 text-base font-semibold text-white shadow-md transition hover:bg-teal-500 disabled:opacity-60 sm:w-auto">
                   {paying ? "Opening secure checkout…" : `Pay $${payNow.toFixed(2)} by card${payNow < totals.balance ? " (due now)" : ""}`}
