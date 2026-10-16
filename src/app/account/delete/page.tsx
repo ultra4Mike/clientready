@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { clearOfflineCaches, wipeThisDevice } from "@/lib/wipe-device";
 
 const box = "rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-6";
-const input = "mt-1 w-full min-h-11 rounded-lg border border-slate-300 bg-transparent px-3 text-base";
+const input = "mt-1.5 w-full min-h-11 rounded-lg border border-slate-300 bg-transparent px-3 text-base outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-500/30 sm:text-sm";
 
 /**
  * Account deletion, in the app and as the public web deletion URL (Google Play).
@@ -77,17 +77,17 @@ export default function DeleteAccountPage() {
     <main className="min-h-screen bg-[var(--cr-bg)] text-[var(--cr-text)]">
       <div className="mx-auto max-w-xl space-y-4 px-4 py-8 sm:px-6" data-testid="delete-account" data-state={signedIn === null ? "loading" : signedIn ? "signed-in" : "signed-out"}>
         <Link href={signedIn ? "/profile" : "/"} className="-ml-2 inline-flex min-h-11 items-center px-2 text-sm text-[var(--cr-muted)]">← Back</Link>
-        <h1 className="text-2xl font-bold">Delete your ClientReady account</h1>
+        <div className="flex items-start gap-3"><span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-rose-500/10 text-xl ring-1 ring-rose-500/30">⚠️</span><h1 className="text-2xl font-bold tracking-tight">Delete your ClientReady account</h1></div>
         <div className={box}>
           <p className="text-sm font-semibold">This permanently deletes:</p>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm" data-testid="delete-what">
+          <ul className="mt-3 space-y-2 text-sm [&>li]:flex [&>li]:gap-2 [&>li]:before:font-bold [&>li]:before:text-rose-500 [&>li]:before:content-['×']" data-testid="delete-what">
             <li>Your login and business profile, payment methods and settings</li>
             <li>All invoices, quotes, receipts, clients, photos and notes</li>
             <li>Crew list, schedules, time and expense records, ratings</li>
             <li>Approval links and client portals you shared (they stop working)</li>
           </ul>
-          <p className="mt-3 text-sm">It can&apos;t be undone. Crew members&apos; own logins are not deleted.</p>
-          {signedIn && <Link href="/backup" className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-teal-500/30 px-4 text-sm font-medium" data-testid="delete-backup">Download a backup first</Link>}
+          <p className="mt-4 rounded-lg bg-rose-500/10 px-3 py-2 text-sm font-medium text-rose-800 dark:text-rose-200">It can&apos;t be undone. Crew members&apos; own logins are not deleted.</p>
+          {signedIn && <Link href="/backup" className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-teal-500/40 bg-teal-500/10 px-4 text-sm font-semibold text-teal-800 transition hover:border-teal-400 dark:text-teal-200 sm:w-auto" data-testid="delete-backup">Download a backup first</Link>}
         </div>
 
         {signedIn === false && (
@@ -98,15 +98,15 @@ export default function DeleteAccountPage() {
               <>
                 <label className="block text-sm font-medium">Email you sign in with<input type="email" className={input} data-testid="delete-email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" /></label>
                 <p className="mt-2 text-xs text-[var(--cr-muted)]">We&apos;ll email you a link to confirm it&apos;s you. Or <Link href="/login" className="text-teal-600 underline">sign in</Link> and come back here.</p>
-                <button type="submit" disabled={busy} className="mt-3 min-h-11 rounded-lg bg-teal-500 px-4 font-semibold text-slate-950 disabled:opacity-50" data-testid="delete-send-link">Email me a confirmation link</button>
+                <button type="submit" disabled={busy} className="mt-4 min-h-11 w-full rounded-lg bg-teal-500 px-4 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50 sm:w-auto" data-testid="delete-send-link">Email me a confirmation link</button>
               </>
             )}
-            {message && <p role="alert" className="mt-2 text-sm text-rose-600" data-testid="delete-message">{message}</p>}
+            {message && <p role="alert" className="mt-2 rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-700 dark:text-rose-200" data-testid="delete-message">{message}</p>}
           </form>
         )}
 
         {signedIn && (
-          <form onSubmit={remove} className={`${box} border-rose-500/40`} data-testid="delete-confirm">
+          <form onSubmit={remove} className={`${box} border-rose-500/50! ring-1 ring-rose-500/20`} data-testid="delete-confirm">
             <p className="text-sm">Signed in as <strong data-testid="delete-signed-in-as">{email}</strong></p>
             {!freshLink && (
               <label className="mt-3 block text-sm font-medium">Password<input type="password" className={input} data-testid="delete-password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" /></label>
@@ -114,8 +114,8 @@ export default function DeleteAccountPage() {
             {!freshLink && !linkSent && <button type="button" className="mt-1 min-h-11 text-sm text-teal-600 underline" data-testid="delete-use-link" onClick={() => sendLink()}>Email me a link instead</button>}
             {linkSent && <p role="status" className="mt-2 text-sm" data-testid="delete-link-sent">Link sent to {email}. Open it to finish.</p>}
             <label className="mt-3 block text-sm font-medium">Type DELETE to confirm<input className={input} data-testid="delete-type" value={typed} onChange={(event) => setTyped(event.target.value)} autoCapitalize="characters" autoComplete="off" /></label>
-            {message && <p role="alert" className="mt-2 text-sm text-rose-600" data-testid="delete-message">{message}</p>}
-            <button type="submit" disabled={busy || typed.trim() !== "DELETE"} className="mt-4 min-h-11 w-full rounded-lg bg-rose-600 px-4 font-semibold text-white disabled:opacity-50" data-testid="delete-submit">{busy ? "Deleting…" : "Delete my account"}</button>
+            {message && <p role="alert" className="mt-2 rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-700 dark:text-rose-200" data-testid="delete-message">{message}</p>}
+            <button type="submit" disabled={busy || typed.trim() !== "DELETE"} className="mt-5 min-h-12 w-full rounded-lg bg-rose-600 px-4 text-base font-semibold text-white! shadow-sm transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50" data-testid="delete-submit">{busy ? "Deleting…" : "Delete my account"}</button>
           </form>
         )}
       </div>

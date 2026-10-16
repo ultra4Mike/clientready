@@ -270,10 +270,10 @@ export default function ProfilePage() {
 
       <PushSettings />
 
-      <section id="delete-account" className="scroll-mt-24 mt-6 rounded-2xl border border-rose-500/30 bg-[var(--cr-card)] p-4 shadow-sm sm:p-6" data-testid="settings-delete">
-        <h2 className="text-lg font-bold tracking-tight">Delete account</h2>
+      <section id="delete-account" className="scroll-mt-24 mt-6 rounded-2xl border border-rose-500/40 bg-rose-500/5 p-4 shadow-sm sm:p-6" data-testid="settings-delete">
+        <h2 className="flex items-center gap-2 text-lg font-bold tracking-tight text-rose-700 dark:text-rose-300"><span aria-hidden="true">⚠️</span>Delete account</h2>
         <p className="mt-1 text-sm text-[var(--cr-muted)]">Permanently delete your login and all your business data.</p>
-        <a href="/account/delete" className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-rose-600 px-4 text-sm font-semibold text-white" data-testid="settings-delete-open">Delete account</a>
+        <a href="/account/delete" className="mt-4 inline-flex min-h-11 items-center rounded-lg border border-rose-500/60 px-4 text-sm font-semibold text-rose-700 transition hover:bg-rose-600 hover:text-white dark:text-rose-300" data-testid="settings-delete-open">Delete account</a>
       </section>
         </div>
       </div>
