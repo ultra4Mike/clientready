@@ -1,5 +1,6 @@
 "use client";
 
+import { writeBases } from "@/lib/three-way";
 import { csvText, downloadCsv } from "@/lib/csv";
 import EmptyState from "@/components/EmptyState";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
@@ -96,7 +97,10 @@ export default function DocumentsPage() {
       if (owner && owner !== (await getUserId())) return;
 
       // Same merge as the dashboard: keep local-only docs, newer copy wins for docs in both.
-      const { merged } = mergeDocs<SavedDocument>(local, cloud as SavedDocument[]);
+      const { merged, pushUp } = mergeDocs<SavedDocument>(local, cloud as SavedDocument[]);
+      // Cloud copies are the merge base for documents this device isn't about to upload (see three-way.ts).
+      const pending = new Set(pushUp.map((doc) => doc.id));
+      writeBases((cloud as SavedDocument[]).filter((doc) => !pending.has(doc.id)).map((doc) => ({ id: doc.id, data: doc.data as Record<string, unknown> })));
       setDocuments(merged);
       window.localStorage.setItem("clientready-documents", JSON.stringify(merged));
     }

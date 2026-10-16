@@ -1,3 +1,4 @@
+import { DOC_BASE_KEY, writeBases } from "@/lib/three-way";
 import { clientFromRow, readCachedClients } from "@/lib/client-rows";
 import { supabase } from "@/lib/supabase";
 import { fetchCloudDocuments, type CloudDoc } from "@/lib/cloud-docs";
@@ -38,6 +39,7 @@ const keys = [
   "clientready-inventory",
   "clientready-payment-methods",
   "clientready-followups-opened",
+  DOC_BASE_KEY,
 ];
 
 
@@ -157,6 +159,10 @@ export async function loadAccountIntoCache(): Promise<boolean> {
   }
   local = [...local, ...takeParkedDocs(user.id)];
   const { merged, pushUp } = mergeDocs(local, cloud);
+  // The cloud copies just read become each document's merge base, except ones this device is about to
+  // push (their base is updated after the upload succeeds).
+  const pushing = new Set(pushUp.map((doc) => doc.id));
+  writeBases(cloud.filter((doc) => !pushing.has(doc.id)).map((doc) => ({ id: doc.id, data: doc.data })));
   window.localStorage.setItem(DOCS_KEY, JSON.stringify(merged));
   window.localStorage.setItem(OWNER_KEY, user.id);
   const synced = await syncLocalDocs(merged, pushUp);

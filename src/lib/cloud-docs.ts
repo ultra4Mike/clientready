@@ -12,6 +12,8 @@ export type CloudDoc = {
   data: Record<string, unknown>;
 };
 
+import { mergeData, readBase, writeBases } from "@/lib/three-way";
+
 export function isUuid(id: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
     id
@@ -84,6 +86,14 @@ export async function saveCloudDocument(doc: CloudDoc) {
       .eq("user_id", userId)
       .maybeSingle();
     if (!readError && current) {
+      // Changes saved from another device since this one last synced are kept (field/entry-level merge).
+      const base = readBase(doc.id);
+      if (base && current.data) {
+        const stamp = doc.data.updatedAt;
+        const { data: mergedData } = mergeData(base, doc.data, current.data as Record<string, unknown>);
+        for (const key of Object.keys(doc.data)) delete doc.data[key];
+        Object.assign(doc.data, mergedData, { updatedAt: stamp });
+      }
       const cloudApproval = (current.data as Record<string, unknown> | null)?.approval;
       if (cloudApproval) doc.data.approval = cloudApproval;
       else delete doc.data.approval;
@@ -114,7 +124,10 @@ export async function saveCloudDocument(doc: CloudDoc) {
       .eq("id", doc.id)
       .eq("user_id", userId);
     if (writeError) markUnsynced(doc.id);
-    else markSynced(doc.id);
+    else {
+      markSynced(doc.id);
+      writeBases([{ id: doc.id, data: doc.data }]);
+    }
     return doc.id;
   }
 
@@ -135,5 +148,6 @@ export async function saveCloudDocument(doc: CloudDoc) {
     return doc.id;
   }
   markSynced(doc.id, data.id);
+  writeBases([{ id: data.id, data: doc.data }]);
   return data.id;
 }

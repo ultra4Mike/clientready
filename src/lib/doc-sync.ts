@@ -1,6 +1,7 @@
 import { isUuid, saveCloudDocument, type CloudDoc } from "@/lib/cloud-docs";
 import { keepStripePayments } from "@/lib/payments";
 import { localTombstones } from "@/lib/doc-tombstones";
+import { mergeData, readBase, sameData } from "@/lib/three-way";
 
 export const OWNER_KEY = "clientready-cache-owner";
 export const DOCS_KEY = "clientready-documents";
@@ -66,6 +67,16 @@ export function mergeDocs<T extends AnyDoc>(allLocal: T[], allCloud: T[]) {
       merged.push(kept);
       pushUp.push(kept);
     } else {
+      // Cloud is newer. If this device also changed the document since it last synced (offline edit),
+      // both sets of changes are kept (three-way merge against the last synced copy) and pushed up.
+      const base = typeof window === "undefined" ? null : readBase(doc.id);
+      if (base && !sameData(mine.data || {}, base)) {
+        const combined = withNewerSchedule(withCloudApproval({ ...doc, data: mergeData(base, mine.data || {}, doc.data || {}).data }, doc), mine, doc);
+        const kept = { ...combined, data: keepStripePayments(combined.data || {}, doc.data) };
+        merged.push(kept);
+        pushUp.push(kept);
+        continue;
+      }
       merged.push(withNewerSchedule(withCloudApproval({ ...doc, data: { ...(mine.data || {}), ...(doc.data || {}) } }, doc), mine, doc));
     }
   }
