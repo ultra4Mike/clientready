@@ -26,7 +26,7 @@ import { JobPhotosEditor, JobPhotoStrip } from "@/components/JobPhotos";
 import { currentDocId } from "@/lib/doc-sync";
 import { isQuotaError, readPhotos, type JobPhoto } from "@/lib/photos";
 import LineSplit from "@/components/LineSplit";
-import { applyPackage, deletePackage, readPackages, savePackage, type JobPackage } from "@/lib/packages";
+import { applyPackage, deletePackage, readPackages, savePackage, syncPackages, type JobPackage } from "@/lib/packages";
 import ReminderPanel from "@/components/ReminderPanel";
 import { normalizeCategory, type LineCategory } from "@/lib/line-split";
 import { appendChangeOrderNote, changeOrderData, changeOrdersFor, mergeChangeOrderNotes, readChangeOrderNotes, readChangeOrderOf, type ChangeOrderNote, type ChangeOrderOf } from "@/lib/change-orders";
@@ -192,7 +192,7 @@ export default function NewInvoicePage() {
   const [items, setItems] = useState<LineItem[]>([{ ...emptyItem }]);
   const [packages, setPackages] = useState<JobPackage[]>([]);
   const [packageName, setPackageName] = useState("");
-  useEffect(() => { setPackages(readPackages()); }, []);
+  useEffect(() => { setPackages(readPackages()); void syncPackages().then(setPackages); }, []);
   const [businessName, setBusinessName] = useState("Your business");
   const [ownerName, setOwnerName] = useState("");
   const [reminderOpen, setReminderOpen] = useState(false);

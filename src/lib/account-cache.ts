@@ -92,6 +92,13 @@ export async function loadAccountIntoCache(): Promise<boolean> {
         ...lateFeeFields(profile),
       })
     );
+    // Job packages (migration 20261016020000): merge with this device's list; the invoice editor pushes local changes.
+    if ("packages" in profile) {
+      const { mergePackages, PACKAGES_KEY } = await import("@/lib/packages");
+      let local: unknown = [];
+      try { local = switching ? [] : JSON.parse(window.localStorage.getItem(PACKAGES_KEY) || "[]"); } catch { local = []; }
+      window.localStorage.setItem(PACKAGES_KEY, JSON.stringify(mergePackages(profile.packages, local)));
+    }
   }
 
   const { data: clients, error: clientsError } = await supabase
