@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { recurringDraftsReady, runDueRecurring } from "@/lib/recurring";
 import Link from "next/link";
+import EmptyState from "@/components/EmptyState";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { loadAccountIntoCache } from "@/lib/account-cache";
@@ -300,7 +301,12 @@ export default function DashboardPage() {
               <h2 className="text-base font-semibold">Recent documents</h2>
               <a href="/documents" className="text-sm font-medium text-teal-600 hover:underline dark:text-teal-300">View all</a>
             </div>
-            {documents.length === 0 && <p className="px-5 py-8 text-center text-sm text-[var(--cr-muted)]">{loaded ? "No documents yet." : "Loading…"}</p>}
+            {documents.length === 0 && !loaded && (
+              <div className="space-y-3 px-5 py-4" aria-busy="true" aria-label="Loading">
+                {[0, 1, 2].map((n) => <div key={n} className="flex items-center justify-between gap-3"><div className="h-4 w-2/5 animate-pulse rounded bg-teal-500/10" /><div className="h-4 w-16 animate-pulse rounded bg-teal-500/10" /></div>)}
+              </div>
+            )}
+            {documents.length === 0 && loaded && <EmptyState icon="📄" title="No documents yet." line="Your recent invoices and proposals will show here." actionHref="/invoice" actionLabel="New invoice" />}
             {documents.slice(0, 5).map((doc) => (
               <a key={doc.id} href={`/documents?q=${encodeURIComponent(doc.title || "")}`} className="flex items-center justify-between gap-3 border-b border-teal-500/10 px-5 py-3 text-sm transition last:border-b-0 hover:bg-teal-500/5">
                 <span className="min-w-0">
