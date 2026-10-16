@@ -379,9 +379,9 @@ html.dark input.sig-typed,
 
 /* Phone tap targets: on touch screens give small text buttons/links a ~40px hit area (no visual change on desktop). */
 @media (pointer: coarse) {
-  .tap,
-  .tap-row > a,
-  .tap-row > button {
+  .tap:not(.hidden),
+  .tap-row > a:not(.hidden),
+  .tap-row > button:not(.hidden) {
     display: inline-flex;
     align-items: center;
     justify-content: center;
