@@ -8,6 +8,7 @@ import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import PortalShare from "@/components/PortalShare";
 import { backfillClientIds, renamePortalClient } from "@/lib/portal";
+import { noteClientSaved } from "@/lib/client-sync";
 
 type Client = {
   id: string;
@@ -117,7 +118,7 @@ export default function ClientsPage() {
       );
       saveLocal(next);
       if (userId) {
-        const { error } = await supabase
+        const { data: saved, error } = await supabase
           .from("clients")
           .update({
             name: form.name,
@@ -130,7 +131,14 @@ export default function ClientsPage() {
             notes: form.notes,
           })
           .eq("id", editingId)
-          .eq("user_id", userId);
+          .eq("user_id", userId)
+          .select("*");
+        // Carry the server's new updated_at into the cache (baseline for later queued contact changes).
+        const savedAt = !error && Array.isArray(saved) ? (saved[0] as { updated_at?: unknown } | undefined)?.updated_at : undefined;
+        if (typeof savedAt === "string" && savedAt) {
+          saveLocal(next.map((client) => (client.id === editingId ? { ...client, updated_at: savedAt } : client)));
+          noteClientSaved(userId, editingId);
+        }
         const before = clients.find((client) => client.id === editingId);
         if (!error && before && before.name.trim() !== form.name.trim()) await renamePortalClient(editingId, form.name);
         setMessage(error ? "Updated locally. Cloud update failed." : "Client updated.");

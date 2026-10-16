@@ -77,6 +77,19 @@ function queueContactPatch(userId: string, id: string, patch: Partial<Contact>, 
   writeQueue(userId, queue);
 }
 
+/**
+ * Call after a direct client save (Clients page) that already wrote the new updated_at into the cache.
+ * A contact change still queued from before that save is older than it, so it is dropped instead of
+ * overwriting the save; changes queued afterwards take their baseline from the refreshed cache.
+ */
+export function noteClientSaved(userId: string, id: string) {
+  const queue = readQueue(userId);
+  if (!queue[id]) return;
+  console.info(`[client-sync] queued contact change for client ${id} dropped: superseded by a direct save.`);
+  delete queue[id];
+  writeQueue(userId, queue);
+}
+
 /** Store the cloud's new updated_at on the cached client so the next queued change has the right baseline. */
 function rememberUpdatedAt(id: string, updatedAt: string) {
   try {
