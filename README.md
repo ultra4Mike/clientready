@@ -41,6 +41,31 @@ SQL migrations live in `supabase/migrations/`. They are **not applied automatica
 file once in the Supabase dashboard (SQL Editor → paste the file → Run), or with the Supabase CLI
 (`supabase db push`) if the project is linked.
 
+### Migrations (run manually, in this order)
+
+| File | What it adds |
+|---|---|
+| `20261015000000_approval_links.sql` | Approval links (required) |
+| `20261015010000_job_scheduling.sql` | Crew job status |
+| `20261015020000_crew_isolation_clock.sql` | Crew isolation, clock in/out, expenses |
+| `20261015030000_stripe_payments.sql` | Stripe Checkout recording |
+| `20261015040000_recurring_unique_period.sql` | One recurring invoice per period |
+| `20261015050000_client_portal.sql` | Client portal |
+| `20261015060000_crew_done_photos.sql` | Crew done + photos |
+| `20261015070000_portal_client_id.sql` | Portal client id |
+| `20261015080000_email_log_private.sql` | Private email log |
+| `20261015090000_photos_hidden_public.sql` | Photo visibility |
+| `20261015100000_document_tombstones.sql` | Synced deletes |
+| `20261015110000_on_my_way.sql` | On my way |
+| `20261015120000_late_fee_settings.sql` | Late fee settings |
+| `20261015130000_stripe_reliability.sql` | Pending payments, checkout sessions, timezone, idempotent recording |
+| `20261015140000_checkout_guard_pending_owner.sql` | One open checkout per invoice; owner on Stripe tables (after 130000) |
+| `20261015150000_review_link.sql` | Review link |
+| `20261015160000_crew_unavailable.sql` | Crew days off |
+
+All are re-runnable. `supabase/templates/` holds **review-before-run** templates that are not migrations.
+Open manual steps are tracked in `docs/OPEN_ITEMS.md`.
+
 ### `20261015000000_approval_links.sql` — client approval links (required)
 
 Approval links (`/approve?t=<token>`) let a customer view and approve one proposal or invoice
@@ -56,7 +81,7 @@ out of the `documents` table, so the migration adds:
 - An index on the token. `EXECUTE` is granted to `anon` and `authenticated` for the two functions.
 
 Until it is run, "Share approval link" still creates links but customers will see
-"Could not load this document". No service-role key is used anywhere in the app.
+"Could not load this document". The browser app only uses the public anon key. The server (Stripe routes under `src/app/api/pay` and `src/app/api/stripe`) uses `SUPABASE_SERVICE_ROLE_KEY` for service-role-only functions; it is never sent to the browser.
 
 ### `20261015010000_job_scheduling.sql` — job scheduling for crew (required for crew status updates)
 
