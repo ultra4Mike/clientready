@@ -44,13 +44,15 @@ export async function portalStatus(input: PortalClient | string): Promise<Portal
   const userId = await getUserId();
   if (!userId) return { token: null, state: "signed-out" };
   if (!clientKey(client.name)) return { token: null, state: "error" };
-  const query = (byId: boolean) => {
-    const base = supabase.from("client_portals").select(byId ? "token, client_id" : "token").eq("owner_id", userId).is("revoked_at", null);
-    return (byId ? base.or(idFilter(client)) : base.eq("client_key", clientKey(client.name))).order("created_at", { ascending: false }).limit(1);
-  };
-  let { data, error } = await query(Boolean(client.id));
-  if (client.id && noClientIdColumn(error)) ({ data, error } = await query(false));
+  // select=* never names client_id, so this works (no 400) before and after migration
+  // 20261015070000 adds that column; the match by id, else by name, happens here.
+  const { data: rows, error } = await supabase.from("client_portals").select("*").eq("owner_id", userId).is("revoked_at", null).order("created_at", { ascending: false }).limit(200);
   if (error) return { token: null, state: "error" };
+  const list = (rows || []) as { token?: string; client_id?: string | null; client_key?: string }[];
+  const key = clientKey(client.name);
+  const byId = client.id ? list.find((row) => row.client_id === client.id) : undefined;
+  const byName = list.find((row) => !row.client_id && row.client_key === key);
+  const data = byId ? [byId] : byName ? [byName] : [];
   const token = await linkRow(userId, client, data);
   return { token, state: "ok" };
 }
@@ -62,7 +64,8 @@ export async function activePortal(input: PortalClient | string): Promise<string
 
 async function linkRow(userId: string, client: PortalClient, data: unknown) {
   const row = Array.isArray(data) ? (data[0] as { token?: string; client_id?: string | null } | undefined) : undefined;
-  if (row?.token && client.id && !row.client_id) {
+  // Only when the column exists (the row carries the client_id key), else this update would 400.
+  if (row?.token && client.id && row && "client_id" in row && !row.client_id) {
     // Older name-keyed link: tie it to the client id so a later rename keeps the same portal.
     await supabase.from("client_portals").update({ client_id: client.id }).eq("owner_id", userId).eq("token", row.token);
   }
