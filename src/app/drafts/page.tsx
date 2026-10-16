@@ -66,11 +66,12 @@ export default function DraftsPage() {
               Costs ${readCostLines(draft).reduce((sum, line) => sum + Number(line.amount), 0).toFixed(2)} · Collected ${draft.collected_amount || "0"} {draft.collected_method || ""}
             </p>
             {readCostLines(draft).length > 0 && (
-              <ul className="mt-2 space-y-1 text-sm" data-testid="draft-costs">
+              <ul className="mt-2 divide-y divide-slate-200 rounded-lg border border-slate-200 text-sm dark:divide-teal-500/20 dark:border-teal-500/25" data-testid="draft-costs">
                 {readCostLines(draft).map((line, index) => (
-                  <li key={index} data-testid="draft-cost" data-kind={line.kind} data-amount={line.amount} className="flex flex-wrap items-center gap-2">
-                    <span>{crewKindLabel(line.kind)} · ${line.amount}{line.note ? ` · ${line.note}` : ""}</span>
-                    {line.receipt && <a href={line.receipt} download={`receipt-${draft.id}-${index + 1}.jpg`} className="text-xs underline" data-testid="draft-cost-receipt">Save receipt</a>}
+                  <li key={index} data-testid="draft-cost" data-kind={line.kind} data-amount={line.amount} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+                    <span className="min-w-0 flex-1"><span className="font-medium">{crewKindLabel(line.kind)}</span>{line.note ? <span className="text-[var(--cr-muted)]"> · {line.note}</span> : null}</span>
+                    <span className="tabular-nums font-medium">${line.amount}</span>
+                    {line.receipt && <a href={line.receipt} download={`receipt-${draft.id}-${index + 1}.jpg`} className="inline-flex min-h-11 items-center text-xs font-medium text-teal-700 underline dark:text-teal-300" data-testid="draft-cost-receipt">Save receipt</a>}
                   </li>
                 ))}
               </ul>

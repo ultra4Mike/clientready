@@ -83,7 +83,7 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
         <input aria-label="Note for crew" value={crewNote} maxLength={500} onChange={(event) => setCrewNote(event.target.value)} placeholder="Gate code, parking, what to bring…" className="rounded-md border border-slate-300 bg-transparent px-2 py-1.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" />
       </label>
       <label className="flex flex-col gap-1">Job-complete checklist <span className="text-xs opacity-60">(one per line; crew tick these before marking the job done)</span>
-        <textarea aria-label="Job-complete checklist" data-testid="checklist-input" rows={3} value={checklistText} onChange={(event) => setChecklistText(event.target.value)} placeholder={"Blow off driveway\nClose the gate\nPhoto of the back yard"} className="rounded-md border border-slate-300 bg-transparent px-2 py-1.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" />
+        <textarea aria-label="Job-complete checklist" data-testid="checklist-input" rows={3} value={checklistText} onChange={(event) => setChecklistText(event.target.value)} placeholder={"Blow off driveway\nClose the gate\nPhoto of the back yard"} className="min-h-20 rounded-md border border-slate-300 bg-transparent px-2.5 py-2 leading-relaxed text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" />
       </label>
       <div data-testid="crew-chips">
         <div className="mb-1 flex flex-wrap items-center gap-2">
