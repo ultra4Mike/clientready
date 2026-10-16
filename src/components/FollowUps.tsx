@@ -23,20 +23,20 @@ export default function FollowUps({ docs, today }: { docs: Doc[]; today: string 
   const mark = (item: FollowUp) => setOpened((current) => ({ ...current, [item.key]: noteFollowUpOpened(item.key) }));
   return (
     <section className="mt-6 space-y-3" data-testid="followups">
-      <h2 className="text-lg font-semibold">Follow-ups <span className="text-sm font-normal text-[var(--cr-muted)]">You send these yourself.</span></h2>
+      <h2 className="flex flex-wrap items-baseline gap-x-2 text-lg font-semibold">Follow-ups <span className="text-sm font-normal text-[var(--cr-muted)]">You send these yourself.</span></h2>
       {items.map((item) => {
         const when = opened[item.key] || followUpOpened(item.key);
         return (
-          <div key={item.key} data-testid={`followup-${item.kind}`} data-doc-id={item.docId} data-opened={when ? "1" : "0"} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 text-sm shadow-sm">
-            <p className="font-medium">{item.kind === "appointment" ? "Appointment reminder" : `Quote waiting ${item.sinceDays} days`} · {item.clientName || "Client"}{item.title ? ` · ${item.title}` : ""}</p>
-            <p className="mt-1 whitespace-pre-line text-[var(--cr-muted)]" data-testid="followup-text">{item.body}</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {item.phone && <a href={smsHref(item.phone, item.body)} onClick={() => mark(item)} data-testid="followup-sms" className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 px-3 font-medium">Text</a>}
-              {item.email && <a href={mailtoHref(item.email, item.subject, item.body)} onClick={() => mark(item)} data-testid="followup-email" className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 px-3 font-medium">Email</a>}
-              <button type="button" data-testid="followup-copy" onClick={() => { void navigator.clipboard?.writeText(item.body).catch(() => {}); setCopied(item.key); mark(item); }} className="min-h-11 rounded-lg border border-slate-300 px-3 font-medium">{copied === item.key ? "Copied" : "Copy"}</button>
-              <a href={`/invoice?id=${encodeURIComponent(item.docId)}`} className="inline-flex min-h-11 items-center px-2 underline">Open</a>
+          <div key={item.key} data-testid={`followup-${item.kind}`} data-doc-id={item.docId} data-opened={when ? "1" : "0"} className={`rounded-2xl border border-l-4 bg-[var(--cr-card)] p-4 text-sm shadow-sm transition sm:p-5 ${when ? "border-slate-500/20 border-l-slate-400 opacity-70" : item.kind === "appointment" ? "border-teal-500/20 border-l-sky-400" : "border-teal-500/20 border-l-amber-400"}`}>
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold"><span aria-hidden="true">{item.kind === "appointment" ? "📅" : "⏳"}</span>{item.kind === "appointment" ? "Appointment reminder" : `Quote waiting ${item.sinceDays} days`} · {item.clientName || "Client"}{item.title ? ` · ${item.title}` : ""}</p>
+            <p className="mt-2 whitespace-pre-line rounded-lg bg-slate-500/5 px-3 py-2 leading-relaxed text-[var(--cr-muted)]" data-testid="followup-text">{item.body}</p>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+              {item.phone && <a href={smsHref(item.phone, item.body)} onClick={() => mark(item)} data-testid="followup-sms" className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-teal-500 px-4 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400"><span aria-hidden="true">💬</span>Text</a>}
+              {item.email && <a href={mailtoHref(item.email, item.subject, item.body)} onClick={() => mark(item)} data-testid="followup-email" className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-teal-500/40 px-4 font-medium transition hover:border-teal-400"><span aria-hidden="true">✉️</span>Email</a>}
+              <button type="button" data-testid="followup-copy" onClick={() => { void navigator.clipboard?.writeText(item.body).catch(() => {}); setCopied(item.key); mark(item); }} className={`inline-flex min-h-11 items-center justify-center rounded-lg border px-4 font-medium transition ${copied === item.key ? "cr-tone-good border-emerald-300 bg-emerald-50 text-emerald-800" : "border-slate-300 hover:border-teal-500"}`}>{copied === item.key ? "Copied" : "Copy"}</button>
+              <a href={`/invoice?id=${encodeURIComponent(item.docId)}`} className="inline-flex min-h-11 items-center justify-center rounded-lg px-4 font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">Open ›</a>
             </div>
-            {when && <p className="mt-1 text-xs text-[var(--cr-muted)]" data-testid="followup-opened">Opened {new Date(when).toLocaleDateString("en-US", { month: "short", day: "numeric" })}.</p>}
+            {when && <p className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[var(--cr-muted)]" data-testid="followup-opened"><span aria-hidden="true">✓</span>Opened {new Date(when).toLocaleDateString("en-US", { month: "short", day: "numeric" })}.</p>}
           </div>
         );
       })}
