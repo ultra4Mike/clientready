@@ -127,7 +127,7 @@ export default function MobileNav({ onLogOut }: { onLogOut?: () => void }) {
           <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-50 border-t border-teal-500/20 bg-[var(--cr-panel)]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur print:hidden">
             <div className="mx-auto grid max-w-lg grid-cols-5">
               {mainLinks.filter((link) => TAB_HREFS.includes(link.href)).map((link) => (
-                <a key={link.href} href={link.href} className="flex flex-col items-center gap-1 px-1 py-2.5 text-[11px] font-medium transition hover:text-teal-400">
+                <a key={link.href} href={link.href} className="flex flex-col items-center gap-1 px-1 py-2.5 text-[11px] font-medium transition hover:text-teal-700 dark:hover:text-teal-300">
                   <TabIcon name={link.href} />
                   {link.href === "/dashboard" ? "Home" : link.label}
                 </a>
@@ -136,7 +136,7 @@ export default function MobileNav({ onLogOut }: { onLogOut?: () => void }) {
                 type="button"
                 aria-expanded={moreOpen}
                 onClick={() => { setCreateOpen(false); setMoreOpen(!moreOpen); }}
-                className={`relative flex flex-col items-center gap-1 px-1 py-2.5 text-[11px] font-medium transition hover:text-teal-400 ${moreOpen ? "text-teal-500 dark:text-teal-300" : ""}`}
+                className={`relative flex flex-col items-center gap-1 px-1 py-2.5 text-[11px] font-medium transition hover:text-teal-700 dark:hover:text-teal-300 ${moreOpen ? "text-teal-700 dark:text-teal-300" : ""}`}
               >
                 {moreOpen && <span aria-hidden="true" className="absolute inset-x-3 top-0 h-0.5 rounded-full bg-teal-400" />}
                 <TabIcon name="more" />
