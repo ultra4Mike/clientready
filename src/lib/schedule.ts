@@ -470,3 +470,35 @@ export async function crewSetJobStatus(docId: string, status: JobStatus) {
   const { error } = await supabase.rpc("crew_set_job_status", { p_doc_id: docId, p_status: status });
   return error ? error.message : "";
 }
+
+/** Minutes the owner wants between two jobs for the same person (drive time). */
+export const TRAVEL_BUFFER_MINUTES = 30;
+export type TravelWarning = { workerId: string; otherTitle: string; gap: number };
+
+/**
+ * Same person, same day: jobs that overlap or leave less than the travel buffer between them.
+ * A job without an end time counts as one hour. Done jobs and this job (docId) are skipped. Warning only.
+ */
+export function travelWarnings(docId: string, date: string, startTime: string, endTime: string, workerIds: string[], buffer = TRAVEL_BUFFER_MINUTES): TravelWarning[] {
+  if (!date || !startTime || !workerIds.length) return [];
+  let docs: { id: string; title?: string; data?: Record<string, unknown> }[] = [];
+  try {
+    docs = JSON.parse(window.localStorage.getItem("clientready-documents") || "[]") || [];
+  } catch {
+    docs = [];
+  }
+  const start = minutes(startTime);
+  const end = endTime ? minutes(endTime) : start + 60;
+  const out: TravelWarning[] = [];
+  for (const doc of docs) {
+    if (!doc || doc.id === docId) continue;
+    const other = readSchedule(doc.data);
+    if (!other || other.date !== date || !other.startTime || other.status === "done") continue;
+    const oStart = minutes(other.startTime);
+    const oEnd = other.endTime ? minutes(other.endTime) : oStart + 60;
+    const gap = oStart >= start ? oStart - end : start - oEnd;
+    if (gap >= buffer) continue;
+    for (const id of workerIds) if (other.workerIds.includes(id)) out.push({ workerId: id, otherTitle: doc.title || String(doc.data?.invoiceNumber || "another job"), gap });
+  }
+  return out;
+}

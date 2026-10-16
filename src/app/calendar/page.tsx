@@ -202,6 +202,7 @@ export default function CalendarPage() {
               key={`${editing.docId}-${editing.date || ""}-${editing.startTime || ""}`}
               value={readSchedule(editingDoc.data)}
               workers={workers}
+              docId={editing.docId}
               defaults={{ date: editing.date, startTime: editing.startTime }}
               onSave={(schedule, options) => save(editing.docId, schedule, options)}
               confirmRemove={(ids) => confirmRemovalFor(editing.docId, ids)}

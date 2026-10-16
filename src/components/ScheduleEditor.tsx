@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { refreshOwnerUnavailable, unavailableOn, type Unavailable } from "@/lib/unavailable";
-import { STATUS_LABEL, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
+import { STATUS_LABEL, TRAVEL_BUFFER_MINUTES, travelWarnings, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
 
 type Props = {
   value: Schedule | null;
@@ -13,10 +13,12 @@ type Props = {
   confirmRemove?: (removedIds: string[]) => boolean;
   onCancel?: () => void;
   saveLabel?: string;
+  /** This job, so it is not compared with itself for travel time. */
+  docId?: string;
 };
 
 /** Date, start/end time, assigned workers and status for one job. */
-export default function ScheduleEditor({ value, workers, defaults, onSave, onCancel, confirmRemove, saveLabel = "Save schedule" }: Props) {
+export default function ScheduleEditor({ value, workers, defaults, onSave, onCancel, confirmRemove, saveLabel = "Save schedule", docId = "" }: Props) {
   const [date, setDate] = useState(value?.date || defaults?.date || "");
   const [startTime, setStartTime] = useState(value?.startTime || defaults?.startTime || "");
   const [endTime, setEndTime] = useState(value?.endTime || "");
@@ -34,6 +36,7 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
   }, []);
   const off = date ? unavailableOn(daysOff, date) : new Map<string, string>();
   const names = new Map(workers.map((person) => [person.id, person.name]));
+  const travel = typeof window === "undefined" ? [] : travelWarnings(docId, date, startTime, endTime, workerIds);
   // Not already on the job, by id or (for older duplicate employee records) by email.
   const takenEmails = new Set(workers.filter((person) => workerIds.includes(person.id)).map((person) => (person.email || "").trim().toLowerCase()).filter(Boolean));
   const available = workers.filter((person) => !workerIds.includes(person.id) && !takenEmails.has((person.email || "").trim().toLowerCase()));
@@ -94,6 +97,11 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
         {workerIds.some((id) => off.has(id)) && (
           <p role="alert" data-testid="unavail-warning" className="mt-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-xs">
             Marked unavailable on this day: {workerIds.filter((id) => off.has(id)).map((id) => `${names.get(id) || "Worker"}${off.get(id) ? ` (${off.get(id)})` : ""}`).join(", ")}
+          </p>
+        )}
+        {travel.length > 0 && (
+          <p role="alert" data-testid="travel-warning" className="mt-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-xs">
+            Less than {TRAVEL_BUFFER_MINUTES} min travel time: {travel.map((w) => `${names.get(w.workerId) || "Worker"} ${w.gap < 0 ? "overlaps" : `has ${w.gap} min before/after`} ${w.otherTitle}`).join("; ")}. You can still save.
           </p>
         )}
         {picking && (

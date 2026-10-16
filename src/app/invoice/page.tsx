@@ -1037,7 +1037,7 @@ export default function NewInvoicePage() {
                 {schedule && <span className="text-xs" data-testid="schedule-summary">{schedule.date}{schedule.startTime ? ` ${schedule.startTime}` : ""}{schedule.endTime ? `–${schedule.endTime}` : ""} · {STATUS_LABEL[schedule.status]}</span>}
               </div>
               {docId && !locked
-                ? <ScheduleEditor key={scheduleKey} value={schedule} workers={workers} onSave={saveJobSchedule} confirmRemove={(ids) => confirmRemoval(workLogged(crew, ids, clockHoursFor(docId)))} />
+                ? <ScheduleEditor key={scheduleKey} docId={docId} value={schedule} workers={workers} onSave={saveJobSchedule} confirmRemove={(ids) => confirmRemoval(workLogged(crew, ids, clockHoursFor(docId)))} />
                 : <p className="text-xs text-slate-600">Save the document first, then schedule the job here or on the Calendar.</p>}
               {docId && <JobDonePanel docId={docId} schedule={schedule} onConfirmed={(next) => { setSchedule(next); setScheduleKey((key) => key + 1); }} />}
             </Section>
