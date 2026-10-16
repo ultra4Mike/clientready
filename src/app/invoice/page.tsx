@@ -23,6 +23,8 @@ import { syncClientContact } from "@/lib/client-sync";
 import { noteReviewAsked, reviewAskedAt, reviewMailHref, reviewMessage, reviewSmsHref } from "@/lib/review-request";
 import { readLateFeeSettings, suggestedLateFee, type LateFeeSettings } from "@/lib/late-fees";
 import { saveCrewJobs } from "@/lib/crew";
+import { depositInvoice, missingDeposits } from "@/lib/proposal-deposit";
+import { docTotal } from "@/lib/review";
 import { balanceDue, paidTotal, tipTotal, paymentFields, paymentMethods, readPayments, type Payment } from "@/lib/payments";
 import { JobPhotosEditor, JobPhotoStrip } from "@/components/JobPhotos";
 import { currentDocId } from "@/lib/doc-sync";
@@ -661,13 +663,14 @@ export default function NewInvoicePage() {
       endTime: jobEnd,
     }, crew);
     await syncScheduleCrewJobs(nextDoc);
+    const carried = isProposal ? await carryDepositToInvoice(cloudId, savePayments) : "";
     // R18: remember which invoice this crew report became, so opening the report again goes here.
     if (crewReport?.draftId && /^[0-9a-f-]{36}$/i.test(cloudId)) await supabase.from("job_drafts").update({ opened_doc_id: cloudId }).eq("id", crewReport.draftId).then(() => undefined, () => undefined);
     setWorkers(readWorkers());
     // Contact changes also go to the linked saved client (Clients page / portal).
     const clientsAfter = await syncClientContact(docClientId, { name: clientName, company: clientCompany, email: clientEmail, phone: clientPhone, address: clientAddress }).catch(() => null);
     if (clientsAfter) setSavedClients(clientsAfter as SavedClient[]);
-    setSaveMessage(isProposal ? "Proposal saved" : "Invoice saved");
+    setSaveMessage(isProposal ? `Proposal saved${carried}` : "Invoice saved");
   }
 
   async function saveJobSchedule(next: Schedule | null, options?: { keepOpen?: boolean; confirmed?: string[] }) {
@@ -738,6 +741,28 @@ export default function NewInvoicePage() {
     window.location.href = `/invoice?id=${encodeURIComponent(cloudId)}`;
   }
 
+  /** R21: a deposit recorded on the proposal after its invoice was made goes onto that first invoice, if it is still unpaid. */
+  async function carryDepositToInvoice(proposalId: string, proposalPayments: Payment[]): Promise<string> {
+    const docs = JSON.parse(window.localStorage.getItem("clientready-documents") || "[]") as SavedDocument[];
+    const carrier = depositInvoice(docs as unknown as { id: string; type?: string; data?: Record<string, unknown> }[], proposalId) as SavedDocument | null;
+    if (!carrier) return "";
+    const data = (carrier.data || {}) as Record<string, unknown>;
+    const current = readPayments(data);
+    const missing = missingDeposits(proposalPayments, current);
+    if (!missing.length) return "";
+    const owed = balanceDue(docTotal(carrier as unknown as Parameters<typeof docTotal>[0]), paidTotal(current), data.status);
+    if (data.status === "paid" || owed <= 0) {
+      return `. The new deposit was not added to ${String(data.invoiceNumber || "the invoice")} because it is already paid.`;
+    }
+    const next = { ...carrier, data: { ...data, ...paymentFields([...current, ...missing]), fromProposal: { ...((data.fromProposal || {}) as Record<string, unknown>), depositApplied: true } } } as SavedDocument;
+    const cloudId = await saveCloudDocument(next);
+    next.id = cloudId;
+    try {
+      window.localStorage.setItem("clientready-documents", JSON.stringify(docs.map((doc) => (doc.id === carrier.id ? next : doc))));
+    } catch { /* cloud copy is saved; this device catches up on next load */ }
+    return `. Deposit of $${paidTotal(missing).toFixed(2)} added to ${String(data.invoiceNumber || "the invoice")}.`;
+  }
+
   async function createInvoiceFromProposal() {
     if (locked) {
       setSaveMessage("Trial ended. Old documents stay viewable; saving new work needs a plan. Plan details coming soon (see Plans).");
@@ -748,9 +773,13 @@ export default function NewInvoicePage() {
       setSaveMessage("Save the proposal first, then create the invoice.");
       return;
     }
-    if (madeInvoices.length && !window.confirm(`An invoice was already made from this proposal (${madeInvoices.map((item) => item.number).join(", ")}). Make another one?`)) return;
     const raw = window.localStorage.getItem("clientready-documents");
     const docs = raw ? JSON.parse(raw) : [];
+    // R21: the deposit goes on the first invoice only; another invoice from this proposal starts with no payments.
+    const carrier = depositInvoice(docs, proposalId);
+    const depositPaid = paidTotal(payments);
+    if (madeInvoices.length && !window.confirm(`An invoice was already made from this proposal (${madeInvoices.map((item) => item.number).join(", ")}).${depositPaid > 0 ? ` The $${depositPaid.toFixed(2)} deposit is already on ${String((carrier?.data as { invoiceNumber?: string } | undefined)?.invoiceNumber || "that invoice")} and will NOT be copied to the new one.` : ""} Make another one?`)) return;
+    const copyDeposit = !carrier;
     const number = nextNumber("invoice");
     const labor = crew.length ? crew.reduce((sum, row) => sum + rowPay(row), 0).toFixed(2) : costs.labor;
     const nextDoc = {
@@ -762,7 +791,7 @@ export default function NewInvoicePage() {
       data: {
         clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, clientEmail, clientPhone, clientAddress,
         invoiceNumber: number, invoiceDate: ymd(new Date()), dueDate: plusDays(14),
-        jobStart, jobEnd, notes: "Payment is due within 14 days.", taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(payments), signature: null, proposalSignature: signature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), fromProposal: { id: proposalId, number: invoiceNumber || "Proposal" }, items,
+        jobStart, jobEnd, notes: "Payment is due within 14 days.", taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(copyDeposit ? payments : []), signature: null, proposalSignature: signature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), fromProposal: { id: proposalId, number: invoiceNumber || "Proposal", ...(copyDeposit ? { depositApplied: true } : {}) }, items,
         status: "draft", style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew,
       },
     };
