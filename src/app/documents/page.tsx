@@ -1,5 +1,6 @@
 "use client";
 
+import EmptyState from "@/components/EmptyState";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { fetchCloudDocuments, deleteCloudDocument, getUserId } from "@/lib/cloud-docs";
 import { mergeDocs, OWNER_KEY } from "@/lib/doc-sync";
@@ -255,12 +256,7 @@ export default function DocumentsPage() {
           <span>Document</span><span>Client</span><span className="hidden xl:block">Created</span><span>Status</span><span className="text-right">Total</span><span className="w-[14rem] text-right xl:w-[15.5rem]">Actions</span>
         </div>
         {documents.length === 0 && (
-          <div className="p-10 text-center">
-            <p className="font-medium">No documents yet</p>
-            <p className="mt-1 text-sm text-[var(--cr-muted)]">
-              Create your first invoice or proposal.
-            </p>
-          </div>
+          <EmptyState icon="📄" title="No documents yet" line="Create your first invoice or proposal." actionHref="/invoice" actionLabel="New invoice" />
         )}
 
         {documents.length > 0 && visibleDocs.length === 0 && (
