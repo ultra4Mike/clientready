@@ -95,25 +95,35 @@ export default function CalendarPage() {
     };
   }
 
-  function chip(job: Job, compact = false) {
+  function chip(job: Job, compact = false, agenda = false) {
+    const tid = agenda ? "agenda-" : "";
     const people = job.schedule.workerIds.map((id) => workerName.get(id)).filter(Boolean).join(", ");
     return (
       <div
         key={job.doc.id}
         draggable
-        data-testid={`job-${job.doc.id}`}
+        data-testid={`${tid}job-${job.doc.id}`}
         data-status={job.schedule.status}
         data-done={doneState(job.schedule) || undefined}
         onDragStart={(event) => event.dataTransfer.setData("text/plain", job.doc.id)}
         onClick={(event) => { event.stopPropagation(); setEditing({ docId: job.doc.id }); }}
-        className={`cursor-grab truncate rounded-md border border-l-4 px-2 py-1 text-left text-xs font-medium leading-snug shadow-sm ${statusClass(job.schedule)}`}
+        className={agenda ? `flex min-h-11 cursor-pointer flex-col justify-center rounded-lg border border-l-4 px-3 py-2 text-left text-sm font-medium leading-snug shadow-sm ${statusClass(job.schedule)}` : `cursor-grab truncate rounded-md border border-l-4 px-2 py-1 text-left text-xs font-medium leading-snug shadow-sm ${statusClass(job.schedule)}`}
         title={`${job.doc.title} · ${job.doc.clientName} · ${statusLabel(job.schedule)}${job.schedule.onMyWayAt && job.schedule.status !== "done" ? ` · ${job.schedule.onMyWayBy || "Crew"} on the way` : ""}${people ? ` · ${people}` : ""}`}
       >
-        {job.schedule.startTime && <span className="font-semibold">{timeLabel(job.schedule.startTime)} </span>}
-        {job.doc.clientName || job.doc.title}
+        {agenda ? (
+          <span className="flex min-w-0 items-baseline gap-2">
+            <span className="shrink-0 font-semibold tabular-nums">{job.schedule.startTime ? timeLabel(job.schedule.startTime) : "Any time"}</span>
+            <span className="min-w-0 truncate">{job.doc.title}{job.doc.clientName ? <span className="opacity-80"> · {job.doc.clientName}</span> : null}</span>
+          </span>
+        ) : (
+          <>
+            {job.schedule.startTime && <span className="font-semibold">{timeLabel(job.schedule.startTime)} </span>}
+            {job.doc.clientName || job.doc.title}
+          </>
+        )}
         {!compact && people && <span className="block truncate opacity-80">{people}</span>}
-        {job.schedule.onMyWayAt && job.schedule.status !== "done" && <span className="block truncate opacity-80" data-testid="omw">🚗 {compact ? "On way" : `On the way · ${omwTime(job.schedule.onMyWayAt)}`}</span>}
-        {doneState(job.schedule) === "awaiting" && <span className="block truncate opacity-80" data-testid="done-awaiting">{compact ? "To confirm" : DONE_LABEL.awaiting}</span>}
+        {job.schedule.onMyWayAt && job.schedule.status !== "done" && <span className="block truncate opacity-80" data-testid={`${tid}omw`}>🚗 {compact ? "On way" : `On the way · ${omwTime(job.schedule.onMyWayAt)}`}</span>}
+        {doneState(job.schedule) === "awaiting" && <span className="block truncate opacity-80" data-testid={`${tid}done-awaiting`}>{compact ? "To confirm" : DONE_LABEL.awaiting}</span>}
         {!compact && doneState(job.schedule) === "confirmed" && <span className="block truncate opacity-80">{DONE_LABEL.confirmed}</span>}
       </div>
     );
@@ -201,9 +211,9 @@ export default function CalendarPage() {
         )}
 
         <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_14rem]">
-          <div className="min-w-0 overflow-x-auto rounded-2xl border border-slate-500/25 bg-[var(--cr-card)] p-2 shadow-sm sm:p-3">
+          <div className="min-w-0 rounded-2xl border border-slate-500/25 bg-[var(--cr-card)] p-2 shadow-sm sm:p-3 min-[900px]:overflow-x-auto">
             {view === "week" && (
-              <div className="grid min-w-[44rem] grid-cols-[3.5rem_repeat(7,minmax(0,1fr))] text-xs" data-testid="week-grid">
+              <div className="hidden min-w-[44rem] grid-cols-[3.5rem_repeat(7,minmax(0,1fr))] text-xs min-[900px]:grid" data-testid="week-grid">
                 <div />
                 {weekDays.map((day) => (
                   <div key={day} className={`border-b border-slate-500/30 px-2 py-2.5 text-center text-sm font-semibold ${day === today ? "rounded-t-lg bg-teal-500/15 text-teal-600 dark:text-teal-300" : ""}`}>
@@ -244,8 +254,38 @@ export default function CalendarPage() {
               </div>
             )}
 
+
+            {(view === "week" || view === "month") && (() => {
+              const days = (view === "week" ? weekDays : monthCells.filter((day): day is string => Boolean(day)))
+                .filter((day) => view === "week" || day === today || jobs.some((job) => job.schedule.date === day) || docs.some((doc) => doc.type === "invoice" && doc.data?.dueDate === day && text(doc.data?.status) !== "paid"));
+              return (
+                <div className="space-y-3 min-[900px]:hidden" data-testid="agenda-list">
+                  {days.length === 0 && <p className="py-8 text-center text-sm text-[var(--cr-muted)]">No jobs this month.</p>}
+                  {days.map((day) => {
+                    const dayJobs = jobs.filter((job) => job.schedule.date === day).sort((a, b) => a.schedule.startTime.localeCompare(b.schedule.startTime));
+                    const due = view === "month" ? docs.filter((doc) => doc.type === "invoice" && doc.data?.dueDate === day && text(doc.data?.status) !== "paid") : [];
+                    return (
+                      <section key={day} data-testid={`agenda-day-${day}`}>
+                        <h2 className={`sticky top-0 z-10 -mx-2 mb-1.5 flex items-center gap-2 px-3 py-2 text-sm font-semibold backdrop-blur sm:-mx-3 ${day === today ? "bg-teal-500/15 text-teal-700 dark:text-teal-300" : "bg-[var(--cr-card)]/95"}`}>
+                          <span className={`inline-flex h-7 min-w-7 items-center justify-center rounded-full px-1.5 text-xs tabular-nums ${day === today ? "bg-teal-500 text-slate-950!" : "bg-slate-500/10"}`}>{parse(day).getDate()}</span>
+                          {parse(day).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+                          {day === today && <span className="ml-auto text-xs font-semibold uppercase tracking-wide">Today</span>}
+                        </h2>
+                        <div className="space-y-1.5">
+                          {dayJobs.map((job) => chip(job, false, true))}
+                          {due.map((doc) => (
+                            <a key={`agenda-due-${doc.id}`} href={`/invoice-view?id=${encodeURIComponent(doc.id)}`} className="flex min-h-11 items-center rounded-lg border border-dashed border-slate-500/30 px-3 text-sm text-[var(--cr-muted)]" data-testid={`agenda-due-${doc.id}`}>Due: {doc.title}</a>
+                          ))}
+                          {dayJobs.length === 0 && due.length === 0 && <p className="px-3 py-2 text-sm text-[var(--cr-muted)]">No jobs</p>}
+                        </div>
+                      </section>
+                    );
+                  })}
+                </div>
+              );
+            })()}
             {view === "month" && (
-              <div className="min-w-[36rem]" data-testid="month-grid">
+              <div className="hidden min-w-[36rem] min-[900px]:block" data-testid="month-grid">
                 <div className="grid grid-cols-7 gap-1.5 pb-1 text-center text-xs font-semibold uppercase tracking-wide opacity-70">{DAY_NAMES.map((name) => <div key={name}>{name}</div>)}</div>
                 <div className="mt-1 grid grid-cols-7 gap-1.5">
                   {monthCells.map((day, index) => (
