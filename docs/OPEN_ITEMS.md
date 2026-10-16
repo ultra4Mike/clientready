@@ -17,11 +17,12 @@ Shared by the three ClientReady bots. Update the **Status** column when you pick
 | M7 | Set Supabase env vars for builds/deploys (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`; server: `SUPABASE_SERVICE_ROLE_KEY`, Stripe keys, optional `BUSINESS_TIMEZONE`). Without the public ones `npm run build` fails prerendering /approve. | Owner | Open | 2026-10-15 |
 | M8 | Set Business timezone in Settings once migration M1 is run. | Owner | Open | 2026-10-15 |
 | M9 | Run migration `20261016000000_clients_updated_at.sql` on the live Supabase project (adds `clients.updated_at` + server touch trigger). Until it runs, the contact retry queue uses its fallback (no conditional update). | Owner | Open | 2026-10-16 |
+| M10 | Run migration `20261016010000_rls_hardening.sql` on live (policies → TO authenticated, WITH CHECK on UPDATE, revoke anon table grants and authenticated TRUNCATE/TRIGGER/REFERENCES, revoke anon EXECUTE on is_crew_email/list_crew_clients). Then re-run rls-audit.md steps 1–6. | Owner | Open | 2026-10-16 |
 
 ## 2. Open risks
 | # | Risk | Owner | Status | Added |
 |---|---|---|---|---|
-| R1 | Base-table RLS (documents, clients, profiles) is not in version control and unaudited. See M5. | Help | Open | 2026-10-15 |
+| R1 | Base-table RLS (documents, clients, profiles) is not in version control and unaudited. See M5. | Help | In progress 2026-10-16 — live audit done; fixes in migration 20261016010000 (M10), tested locally (cr-tests/rlshard.sh) | 2026-10-15 |
 | R2 | Overpayments are recorded, not refused; refunds are not handled in-app (Stripe dashboard + Remove payment). | Dev | Open | 2026-10-15 |
 | R3 | Stuck-payment orphan: a pending payment whose invoice was deleted and whose checkout predates migration 140000 has no owner → shows in nobody's notice; needs a DB query. | Dev | Open | 2026-10-15 |
 | R4 | Stuck-payment notice on Get paid loads once per page view; new stuck payments need a reload. Not shown on Dashboard. | Dev | Open | 2026-10-15 |

@@ -62,6 +62,8 @@ file once in the Supabase dashboard (SQL Editor → paste the file → Run), or 
 | `20261015140000_checkout_guard_pending_owner.sql` | One open checkout per invoice; owner on Stripe tables (after 130000) |
 | `20261015150000_review_link.sql` | Review link |
 | `20261015160000_crew_unavailable.sql` | Crew days off |
+| `20261016000000_clients_updated_at.sql` | clients.updated_at for the contact retry queue |
+| `20261016010000_rls_hardening.sql` | Base-table policies to authenticated, WITH CHECK, revoke anon grants |
 
 All are re-runnable. `supabase/templates/` holds **review-before-run** templates that are not migrations.
 Open manual steps are tracked in `docs/OPEN_ITEMS.md`.
