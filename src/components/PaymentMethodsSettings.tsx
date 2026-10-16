@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PAYMENT_METHODS_KEY, PROVIDERS, readLocalPaymentMethods, readPaymentMethods, type MethodConfig, type PaymentMethodsConfig, type ProviderId } from "@/lib/payments/providers";
 
-const input = "mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30";
+const input = "mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2.5 text-base outline-none sm:text-sm min-h-11 transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30";
 
 /** Settings: which payment methods customers see, with the owner's handles. Saved to profiles.payment_methods (migration 20261016070000). */
 export default function PaymentMethodsSettings() {
@@ -44,9 +44,9 @@ export default function PaymentMethodsSettings() {
       {PROVIDERS.map((provider) => {
         const cfg = config[provider.id] || {};
         return (
-          <div key={provider.id} className="rounded-xl border border-slate-200 p-3" data-testid={`pm-${provider.id}`}>
-            <label className="flex min-h-11 items-center gap-2 font-medium">
-              <input type="checkbox" name={`pm-${provider.id}-enabled`} data-testid={`pm-enable-${provider.id}`} checked={Boolean(cfg.enabled)} onChange={(event) => set(provider.id, { enabled: event.target.checked })} />
+          <div key={provider.id} className={`rounded-xl border p-3 transition sm:p-4 ${cfg.enabled ? "border-teal-500/50 bg-teal-500/5" : "border-slate-200"}`} data-testid={`pm-${provider.id}`}>
+            <label className="flex min-h-11 cursor-pointer items-center gap-3 font-medium">
+              <input className="h-5 w-5 shrink-0 accent-teal-500" type="checkbox" name={`pm-${provider.id}-enabled`} data-testid={`pm-enable-${provider.id}`} checked={Boolean(cfg.enabled)} onChange={(event) => set(provider.id, { enabled: event.target.checked })} />
               {provider.label}
             </label>
             {cfg.enabled && provider.fields.map((field) => (
@@ -56,12 +56,12 @@ export default function PaymentMethodsSettings() {
                   : <input name={`pm-${provider.id}-${field.key}`} className={input} placeholder={field.placeholder} value={cfg[field.key] as string || ""} onChange={(event) => set(provider.id, { [field.key]: event.target.value })} />}
               </label>
             ))}
-            {cfg.enabled && !provider.ready(cfg) && <p className="mt-1 text-xs text-amber-600">Add the details above or customers won&apos;t see this one.</p>}
+            {cfg.enabled && !provider.ready(cfg) && <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-300">Add the details above or customers won&apos;t see this one.</p>}
           </div>
         );
       })}
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" data-testid="pm-save" onClick={save} className="min-h-11 rounded-lg bg-teal-500 px-4 font-semibold text-slate-950">Save payment methods</button>
+        <button type="button" data-testid="pm-save" onClick={save} className="min-h-11 rounded-lg bg-teal-500 px-5 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">Save payment methods</button>
         {message && <p role="status" className="text-sm" data-testid="pm-message">{message}</p>}
       </div>
     </section>
