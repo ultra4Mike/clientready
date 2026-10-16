@@ -21,9 +21,11 @@ const SECTIONS: { title: string; body: string[] }[] = [
     "Approval links and the client portal let anyone who has the link view the documents you shared, approve them and, for invoices, pay. Share links only with the intended client and turn them off when no longer needed.",
     "A client's approval or drawn signature is recorded with their typed name and the date. Whether it forms a binding agreement depends on your arrangement with your client and the law where you work; ClientReady does not guarantee that it does.",
   ] },
-  { title: "6. Card payments (Stripe)", body: [
-    "Card payments are processed by Stripe under your own Stripe account, and Stripe's terms apply to them. ClientReady is not a payment processor, bank or money transmitter, and never holds your funds.",
-    "Stripe's processing fees, payout timing, holds and disputes are between you and Stripe. Refunds are made in your Stripe dashboard; ClientReady records payments on the invoice but cannot refund or release money.",
+  { title: "6. Getting paid", body: [
+    "Your clients pay you directly, through your own accounts and payment methods — for example Zelle, Venmo, Cash App, PayPal.me, check, bank transfer/ACH instructions, or an online card checkout from a payment provider you connect. ClientReady is not a payment processor, bank or money transmitter, never holds or moves your funds, and does not process payments itself.",
+    "Each payment provider's own terms, fees, payout timing and holds apply. You are responsible for your accounts with those providers and for the payment details you show your clients.",
+    "For manual methods (such as Zelle, Venmo, Cash App, PayPal.me, check or bank transfer), ClientReady never marks an invoice paid automatically — you record the payment yourself. A payment confirmed by a connected online provider may be recorded on the invoice for you.",
+    "Refunds, chargebacks and disputes are handled with the payment provider, or between you and your client. ClientReady cannot refund, reverse or release money.",
   ] },
   { title: "7. Offline use, sync and backups", body: [
     "ClientReady saves your work on your device first and syncs it to your account when you are online and signed in. Changes made on a device that never syncs, or lost when browser data is cleared before syncing, cannot be recovered by us.",

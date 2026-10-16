@@ -35,9 +35,13 @@ export default function PrivacyPage() {
         </p>
         <h2 className="mt-6 text-lg font-semibold text-slate-900">Payments and email</h2>
         <p className="mt-2">
-          Card payments are processed by Stripe. Card details are entered on Stripe&apos;s checkout page
-          and are not stored by ClientReady; we keep the payment amount, date and reference on the
-          invoice. If email sending is turned on, emails you choose to send go through our email
+          Clients pay the business directly through the business&apos;s own payment methods (for example
+          Zelle, Venmo, Cash App, PayPal.me, check, bank transfer, or a connected online payment
+          provider). ClientReady does not process payments or hold funds, and never receives card or
+          bank account numbers: those are entered with the payment provider, whose own terms and
+          privacy policy apply. ClientReady keeps the payment details shown on an invoice (such as a
+          payment handle or instructions) and the payments recorded on it (amount, date, method and
+          reference). If email sending is turned on, emails you choose to send go through our email
           provider (Resend), with replies going to your own address.
         </p>
         <h2 className="mt-6 text-lg font-semibold text-slate-900">Your responsibilities</h2>
