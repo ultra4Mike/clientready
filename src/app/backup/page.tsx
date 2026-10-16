@@ -82,7 +82,7 @@ export default function BackupPage() {
           <button
             type="button"
             onClick={downloadBackup}
-            className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50"
+            className="min-h-11 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50"
           >
             Download backup
           </button>
