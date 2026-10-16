@@ -5,7 +5,7 @@ import PortalShare from "@/components/PortalShare";
 import Section, { SectionDefaults, useOpenedExisting } from "@/components/Section";
 import EmailComposer from "@/components/EmailComposer";
 import StageBar from "@/components/StageBar";
-import { CREW_KINDS, crewKindLabel, estimateByKind, type CostFields } from "@/lib/cost-categories";
+import { applyCrewAmount, CREW_KINDS, crewKindLabel, estimateByKind, isCrewKind, readCostLines, type CostFields, type CostLine, type CrewKind } from "@/lib/cost-categories";
 import { documentStage, NEXT_LABEL, STAGE_LABEL, STAGES } from "@/lib/doc-stage";
 import { readEmailLog, type EmailLogEntry } from "@/lib/email";
 import { clientIdFor } from "@/lib/portal";
@@ -232,6 +232,8 @@ export default function NewInvoicePage() {
   const [crew, setCrew] = useState<CrewRow[]>([]);
   const [pickedEmployee, setPickedEmployee] = useState("");
   const [otherFees, setOtherFees] = useState<OtherFee[]>([]);
+  /** Crew job report this invoice came from (cost lines by category). Shown next to the estimate; applied only by the owner's tap. */
+  const [crewReport, setCrewReport] = useState<CrewReport | null>(null);
   const [locked, setLocked] = useState(false);
   const [daysLeft, setDaysLeft] = useState(14);
 
@@ -316,6 +318,21 @@ export default function NewInvoicePage() {
         setInvoiceDate(ymd(new Date()));
         setDueDate(plusDays(14));
         setNotes(kind === "proposal" ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
+        // Crew job report opened from /drafts. Costs are NOT copied into job costs; they show next to the estimate.
+        const draftRaw = window.localStorage.getItem("clientready-open-draft");
+        if (draftRaw) {
+          window.localStorage.removeItem("clientready-open-draft");
+          const draft = JSON.parse(draftRaw) as Record<string, unknown>;
+          const text = (key: string) => String(draft[key] || "");
+          setClientName(text("client_name")); setClientSearch(text("client_name")); setClientPhone(text("client_phone")); setClientAddress(text("client_address"));
+          if (text("work_date")) setInvoiceDate(text("work_date"));
+          setJobStart(text("start_time")); setJobEnd(text("end_time"));
+          setItems([{ ...emptyItem, description: text("work_done") || "Job", qty: "1", rate: "" }]);
+          setCosts((current) => ({ ...current, driveHours: text("drive_hours"), driveMinutes: text("drive_minutes"), notes: [text("notes"), text("collected_amount") ? `Collected ${text("collected_amount")} ${text("collected_method")}` : ""].filter(Boolean).join("\n") }));
+          const lines = readCostLines(draft);
+          if (lines.length) setCrewReport({ draftId: text("id"), worker: text("worker_name"), lines: lines.map(({ receipt, ...line }) => ({ ...line, ...(receipt ? { hasReceipt: true } : {}) })) });
+          setSaveMessage("Crew report loaded. Set the price, then save. Crew costs are listed under Job costs for you to use or skip.");
+        }
         return;
       }
       const docs = raw ? (JSON.parse(raw) as SavedDocument[]) : [];
@@ -392,6 +409,7 @@ export default function NewInvoicePage() {
       setJobTime(data.jobTime || "");
       setCosts({ ...emptyCosts, ...(data.jobCosts || {}), otherFees: loadedFees });
       setOtherFees(loadedFees);
+      setCrewReport(readCrewReport((data as Record<string, unknown>).crewReport));
       setCrew(loadedCrew.map((row) => ({ ...row, bonus: row.bonus || "" })));
       // Clock entries from the crew app feed each worker's hours (see feedClockHours).
       refreshOwnerClock().then((entries) => {
@@ -572,6 +590,18 @@ export default function NewInvoicePage() {
     }));
   }
 
+  /** Owner tap only: set the chosen job-cost categories to what the crew reported. */
+  function useCrewAmounts(list: [CrewKind, number][]) {
+    if (locked) return;
+    let next: CostFields & { otherFees: OtherFee[] } = { ...costs, otherFees };
+    let n = 0;
+    for (const [kind, amount] of list) next = applyCrewAmount(next, kind, amount, () => `${Date.now()}-${n++}`) as typeof next;
+    const { otherFees: fees, ...rest } = next;
+    setCosts((current) => ({ ...current, ...rest }));
+    setOtherFees(fees as OtherFee[]);
+    setSaveMessage("Job costs updated from the crew amounts. Save to keep them.");
+  }
+
   function clearForm() {
     if (locked) return;
     window.history.replaceState(null, "", "/invoice");
@@ -579,7 +609,7 @@ export default function NewInvoicePage() {
     setInvoiceNumber(nextNumber(docKind)); setInvoiceDate(ymd(new Date())); setDueDate(plusDays(14)); setJobStart(""); setJobEnd("");
     setNotes(isProposal ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
     setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setSignature(null); setProposalSignature(null); setPadKey((key) => key + 1); setDocPayLink(""); setPhotos([]); setShowPhotos(false); setChangeOrderOf(null); setFromProposal(null); setMadeInvoices([]); setChangeOrderNotes([]); setRecFreq("off"); setRecNext(""); setRecLoadedNext(""); setRecurringFrom(null); setApproval(null); setEmailLog([]); setEmailOpen(false); setSchedule(null); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
-    setStyle("clean"); setJobTime(""); setCosts(emptyCosts); setCrew([]); setOtherFees([]);
+    setStyle("clean"); setJobTime(""); setCosts(emptyCosts); setCrew([]); setOtherFees([]); setCrewReport(null);
   }
 
   /** `cash` (from "Mark paid in cash") saves with that payment list and status instead of the form's. */
@@ -605,7 +635,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(stored?.data?.schedule ? { schedule: stored.data.schedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew },
+      data: { clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(stored?.data?.schedule ? { schedule: stored.data.schedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew, ...(crewReport ? { crewReport } : {}) },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -1040,7 +1070,7 @@ export default function NewInvoicePage() {
                 <p>Left over: ${jobMath.leftOver.toFixed(2)}</p>
                 <p>Set aside ({setAsidePercent}%): ${jobMath.setAside.toFixed(2)}</p>
                 <p className="font-semibold">Yours after set-aside: ${jobMath.yours.toFixed(2)}</p>
-                <CrewSpend docId={docId} estimate={{ ...costs, otherFees }} />
+                <CrewSpend docId={docId} estimate={{ ...costs, otherFees }} report={crewReport} locked={locked} onUse={useCrewAmounts} />
               </div>
             </Section>
             <Section id="schedule" label="Schedule" className="print-hide space-y-3 rounded-xl border border-slate-200 p-4 text-sm sm:p-5" testId="schedule-section">
@@ -1274,45 +1304,66 @@ export default function NewInvoicePage() {
   );
 }
 type CostEstimate = CostFields;
+type CrewReport = { draftId: string; worker: string; lines: (Omit<CostLine, "receipt"> & { hasReceipt?: boolean })[] };
+function readCrewReport(value: unknown): CrewReport | null {
+  const raw = (value || null) as Partial<CrewReport> | null;
+  if (!raw || !Array.isArray(raw.lines)) return null;
+  const lines = raw.lines.filter((line) => line && isCrewKind(line.kind) && Number(line.amount) > 0).map((line) => ({ kind: line.kind, amount: String(line.amount), note: String(line.note || ""), ...(line.hasReceipt ? { hasReceipt: true } : {}) }));
+  return lines.length ? { draftId: String(raw.draftId || ""), worker: String(raw.worker || ""), lines } : null;
+}
 
-/** Owner only: what the crew actually spent on this job next to the cost estimate. Never changes the invoice. */
-function CrewSpend({ docId, estimate }: { docId: string; estimate: CostEstimate }) {
+/** Owner only: what the crew spent per category next to the cost estimate. Changes job costs only when the owner taps "Use crew amount" / "Add all". */
+function CrewSpend({ docId, estimate, report, locked, onUse }: { docId: string; estimate: CostEstimate; report: CrewReport | null; locked: boolean; onUse: (list: [CrewKind, number][]) => void }) {
   const [rows, setRows] = useState<{ id: string; worker_name: string; kind: string; amount: string; note: string; receipt: string }[]>([]);
   useEffect(() => {
     if (!docId) return;
     supabase.from("crew_expenses").select("*").eq("doc_id", docId).then(({ data }) => setRows(data || []));
   }, [docId]);
-  if (!rows.length) return null;
+  const reportRows = (report?.lines || []).map((line, index) => ({ id: `report-${index}`, worker_name: report?.worker || "Crew", kind: line.kind as string, amount: line.amount, note: line.note, receipt: "", fromReport: true, hasReceipt: Boolean(line.hasReceipt) }));
+  const all = [...rows.map((row) => ({ ...row, fromReport: false, hasReceipt: Boolean(row.receipt) })), ...reportRows];
+  if (!all.length) return null;
   const num = (value: unknown) => Number(String(value ?? "").replace(/[^0-9.-]/g, "")) || 0;
-  const known = CREW_KINDS.map((item) => item.kind as string);
-  // Crew rows with an unknown kind count as Other, so every crew dollar shows up in exactly one row.
-  const spent = (kind: string) => rows.filter((row) => (known.includes(row.kind) ? row.kind : "other") === kind).reduce((sum, row) => sum + num(row.amount), 0);
+  // Unknown kinds count as Other, so every crew dollar shows up in exactly one row.
+  const spent = (kind: string) => all.filter((row) => (isCrewKind(row.kind) ? row.kind : "other") === kind).reduce((sum, row) => sum + num(row.amount), 0);
   const byKind = estimateByKind(estimate);
-  const groups: [string, number, number, string, string][] = CREW_KINDS.map(({ kind, label }) => [label, byKind[kind].amount, spent(kind), byKind[kind].source, kind]);
-  const totalEstimate = groups.reduce((sum, [, est]) => sum + est, 0);
-  const totalActual = groups.reduce((sum, [, , actual]) => sum + actual, 0);
+  const groups = CREW_KINDS.map(({ kind, label }) => ({ kind, label, est: byKind[kind].amount, actual: spent(kind), source: byKind[kind].source }));
+  const shown = groups.filter((group) => group.est > 0 || group.actual > 0);
+  const differing = shown.filter((group) => group.actual > 0 && Math.abs(group.actual - group.est) >= 0.005);
+  const totalEstimate = shown.reduce((sum, group) => sum + group.est, 0);
+  const totalActual = shown.reduce((sum, group) => sum + group.actual, 0);
   const diffClass = (diff: number) => (diff > 0.005 ? "font-semibold text-red-600" : diff < -0.005 ? "text-teal-700" : "");
   const diffText = (diff: number) => (Math.abs(diff) < 0.005 ? "on estimate" : diff > 0 ? `+$${diff.toFixed(2)} over` : `$${(-diff).toFixed(2)} under`);
   return (
     <div className="print-hide mt-4 rounded-xl border border-amber-300/40 p-3 text-sm" id="crew-spend" data-testid="crew-vs-estimate">
-      <p className="font-medium">Crew spend vs your estimate</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-medium">Crew spend vs your estimate</p>
+        {differing.length > 1 && !locked && (
+          <button type="button" data-testid="cve-use-all" className="min-h-11 rounded-lg border border-teal-500/40 px-3 text-sm font-semibold transition hover:border-teal-400 hover:bg-teal-500/10" onClick={() => onUse(differing.map((group) => [group.kind, group.actual]))}>Add all crew amounts ({differing.length})</button>
+        )}
+      </div>
       <table className="mt-2 w-full text-left text-sm">
-        <thead><tr className="text-xs text-[var(--cr-muted)]"><th className="font-normal">Cost</th><th className="text-right font-normal">Estimate</th><th className="text-right font-normal">Crew spent</th><th className="text-right font-normal">Difference</th></tr></thead>
+        <thead><tr className="text-xs text-[var(--cr-muted)]"><th className="font-normal">Cost</th><th className="text-right font-normal">Estimate</th><th className="text-right font-normal">Crew spent</th><th className="text-right font-normal">Difference</th><th /></tr></thead>
         <tbody>
-          {groups.filter(([, est, actual]) => est > 0 || actual > 0).map(([label, est, actual, source, kind]) => (
-            <tr key={label} data-testid="cve-row" data-kind={kind}><td>{label}<span className="block text-xs text-[var(--cr-muted)]">Estimate from: {source}</span></td><td className="text-right tabular-nums">${est.toFixed(2)}</td><td className="text-right tabular-nums">${actual.toFixed(2)}</td><td className={`text-right tabular-nums ${diffClass(actual - est)}`}>{diffText(actual - est)}</td></tr>
-          ))}
-          <tr className="border-t border-slate-200 font-semibold" data-testid="cve-total"><td>Total</td><td className="text-right tabular-nums">${totalEstimate.toFixed(2)}</td><td className="text-right tabular-nums">${totalActual.toFixed(2)}</td><td className={`text-right tabular-nums ${diffClass(totalActual - totalEstimate)}`}>{diffText(totalActual - totalEstimate)}</td></tr>
-          {byKind.lunch.amount > 0 && (
-            <tr data-testid="cve-lunch" className="text-[var(--cr-muted)]"><td>Lunch / meals<span className="block text-xs">Your cost only · not tracked by crew · not in the total above</span></td><td className="text-right tabular-nums">${byKind.lunch.amount.toFixed(2)}</td><td className="text-right">—</td><td /></tr>
-          )}
+          {shown.map(({ kind, label, est, actual, source }) => {
+            const differs = actual > 0 && Math.abs(actual - est) >= 0.005;
+            return (
+              <tr key={kind} data-testid="cve-row" data-kind={kind} data-estimate={est.toFixed(2)} data-crew={actual.toFixed(2)} data-differs={differs ? "1" : "0"}>
+                <td>{label}<span className="block text-xs text-[var(--cr-muted)]">Estimate from: {source}</span></td>
+                <td className="text-right tabular-nums">${est.toFixed(2)}</td>
+                <td className="text-right tabular-nums">${actual.toFixed(2)}</td>
+                <td className={`text-right tabular-nums ${diffClass(actual - est)}`}>{differs ? <span data-testid="cve-diff">{diffText(actual - est)}</span> : actual > 0 ? "on estimate" : "—"}</td>
+                <td className="pl-2 text-right">{differs && !locked && <button type="button" data-testid={`cve-use-${kind}`} className="min-h-11 rounded-lg border border-teal-500/40 px-2 text-xs font-semibold transition hover:border-teal-400 hover:bg-teal-500/10" onClick={() => onUse([[kind, actual]])}>{est > 0 ? "Use crew amount" : "Add to job costs"}</button>}</td>
+              </tr>
+            );
+          })}
+          <tr className="border-t border-slate-200 font-semibold" data-testid="cve-total"><td>Total</td><td className="text-right tabular-nums">${totalEstimate.toFixed(2)}</td><td className="text-right tabular-nums">${totalActual.toFixed(2)}</td><td className={`text-right tabular-nums ${diffClass(totalActual - totalEstimate)}`}>{diffText(totalActual - totalEstimate)}</td><td /></tr>
         </tbody>
       </table>
-      <p className="mt-2 text-xs text-[var(--cr-muted)]">Receipts from your crew. Check them before you change your fee. This does not change the invoice or your costs.</p>
-      {rows.map((row) => (
-        <div key={row.id} className="mt-2">
-          <p>{row.worker_name} · {crewKindLabel(row.kind)} · ${num(row.amount).toFixed(2)} · {row.note}</p>
-          {row.receipt && <a href={row.receipt} download={`receipt-${row.id}.jpg`} className="text-xs underline">Save receipt</a>}
+      <p className="mt-2 text-xs text-[var(--cr-muted)]">From your crew&apos;s receipts and job report. Nothing changes until you tap a button, and then only your job costs (never the invoice).</p>
+      {all.map((row) => (
+        <div key={row.id} className="mt-2" data-testid="cve-line" data-kind={row.kind} data-source={row.fromReport ? "report" : "expense"}>
+          <p>{row.worker_name} · {crewKindLabel(row.kind)} · ${num(row.amount).toFixed(2)} · {row.note}{row.fromReport ? " · job report" : ""}</p>
+          {row.receipt ? <a href={row.receipt} download={`receipt-${row.id}.jpg`} className="text-xs underline">Save receipt</a> : row.hasReceipt ? <a href="/drafts" className="text-xs underline">Receipt on Crew drafts</a> : null}
         </div>
       ))}
     </div>

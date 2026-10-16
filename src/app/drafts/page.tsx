@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { supabase } from "@/lib/supabase";
+import { crewKindLabel, readCostLines } from "@/lib/cost-categories";
 
 type Draft = {
   id: string;
@@ -18,6 +19,7 @@ type Draft = {
   hours: string;
   parts_cost: string;
   parts_note: string;
+  costs?: unknown;
   drive_hours: string;
   drive_minutes: string;
   notes: string;
@@ -41,7 +43,9 @@ export default function DraftsPage() {
   }, []);
 
   function openAsInvoice(draft: Draft) {
-    window.localStorage.setItem("clientready-open-draft", JSON.stringify(draft));
+    // Receipts stay on the report (too big to hand over); the invoice only notes that one exists.
+    const lines = readCostLines(draft).map(({ receipt, ...line }) => ({ ...line, ...(receipt ? { receipt: "1" } : {}) }));
+    window.localStorage.setItem("clientready-open-draft", JSON.stringify({ ...draft, costs: lines }));
     window.location.href = "/invoice";
   }
 
@@ -59,8 +63,18 @@ export default function DraftsPage() {
             </p>
             <p className="mt-3 text-sm leading-6">{draft.work_done}</p>
             <p className="mt-1 text-sm text-[var(--cr-muted)]">
-              Parts ${draft.parts_cost || "0"} · Collected ${draft.collected_amount || "0"} {draft.collected_method || ""}
+              Costs ${readCostLines(draft).reduce((sum, line) => sum + Number(line.amount), 0).toFixed(2)} · Collected ${draft.collected_amount || "0"} {draft.collected_method || ""}
             </p>
+            {readCostLines(draft).length > 0 && (
+              <ul className="mt-2 space-y-1 text-sm" data-testid="draft-costs">
+                {readCostLines(draft).map((line, index) => (
+                  <li key={index} data-testid="draft-cost" data-kind={line.kind} data-amount={line.amount} className="flex flex-wrap items-center gap-2">
+                    <span>{crewKindLabel(line.kind)} · ${line.amount}{line.note ? ` · ${line.note}` : ""}</span>
+                    {line.receipt && <a href={line.receipt} download={`receipt-${draft.id}-${index + 1}.jpg`} className="text-xs underline" data-testid="draft-cost-receipt">Save receipt</a>}
+                  </li>
+                ))}
+              </ul>
+            )}
             <button type="button" onClick={() => openAsInvoice(draft)} className="mt-4 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 sm:w-auto">Open as invoice</button>
           </div>
         ))}

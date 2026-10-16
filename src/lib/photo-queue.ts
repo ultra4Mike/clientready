@@ -3,7 +3,7 @@
  * Kept in IndexedDB (photos are too big for localStorage), per signed-in user. Only network failures
  * are queued; a server "no" (not assigned, bad photo) is shown right away and never retried blindly.
  */
-export type QueueKind = "done" | "expense";
+export type QueueKind = "done" | "expense" | "report";
 export type QueueItem = {
   id: string;
   user: string;

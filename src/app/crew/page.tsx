@@ -5,7 +5,7 @@ import { nativePhotoClick } from "@/lib/native-camera";
 import { confirmLogoutWithQueue, enqueue, flushQueue, isNetworkError, newUploadKey, queued, removeQueued, type QueueItem, type QueueKind } from "@/lib/photo-queue";
 import EmptyState from "@/components/EmptyState";
 import CrewDaysOff from "@/components/CrewDaysOff";
-import { CREW_KINDS } from "@/lib/cost-categories";
+import { CREW_KINDS, legacySummary, type CostLine, type CrewKind } from "@/lib/cost-categories";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { crewMarkDone, crewCheckItem, crewOnMyWay, omwTime, crewSetJobStatus, onMyWaySmsHref, STATUS_CLASS, STATUS_LABEL, type JobStatus } from "@/lib/schedule";
@@ -42,10 +42,12 @@ type Cache = { name: string; jobs: Job[]; clock: ClockEntry[]; expenses: Expense
 
 const empty = {
   clientName: "", clientPhone: "", clientAddress: "", workDone: "", workDate: "",
-  startTime: "", endTime: "", hours: "", partsCost: "", partsNote: "",
+  startTime: "", endTime: "", hours: "",
   driveHours: "", driveMinutes: "", notes: "", finished: false, collectedAmount: "", collectedMethod: "cash",
 };
-// Same names as the owner's "Crew spend vs your estimate" rows.
+type CostDraft = { id: string; kind: CrewKind; amount: string; note: string; receipt: string };
+const newCostLine = (): CostDraft => ({ id: Math.random().toString(36).slice(2), kind: "parts", amount: "", note: "", receipt: "" });
+// Same keys and names as the owner's job costs ("Crew spend vs your estimate" rows).
 const KINDS = CREW_KINDS.map(({ kind, label }) => [kind, label] as const);
 const input = "w-full rounded-xl border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30";
 const cardClass = "rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5";
@@ -138,6 +140,7 @@ export default function CrewPage() {
   const [busy, setBusy] = useState("");
   const [theme, setTheme] = useState("dark");
   const [form, setForm] = useState(empty);
+  const [costLines, setCostLines] = useState<CostDraft[]>(() => [newCostLine()]);
   const [reportOpen, setReportOpen] = useState(false);
   const [spendOpen, setSpendOpen] = useState<string>("");
   const [doneFor, setDoneFor] = useState("");
@@ -250,6 +253,7 @@ export default function CrewPage() {
   }
 
   async function sendQueued(item: QueueItem) {
+    if (item.kind === "report") return insertReport(item.payload, item.id);
     if (item.kind === "done") return crewMarkDone(item.docId, (item.payload.photos as string[]) || [], item.id);
     return addExpense(item.docId, item.payload, item.id);
   }
@@ -368,19 +372,45 @@ export default function CrewPage() {
     setFixing(null);
   }
 
+  /** Job report insert; the upload key is the row id, so a retry after a lost reply cannot add it twice. */
+  async function insertReport(row: Record<string, unknown>, key: string) {
+    let { error } = await supabase.from("job_drafts").insert({ ...row, id: key });
+    // Before migration 20261016120000 there is no costs column; parts_cost / parts_note still carry the total.
+    if (error && /costs/.test(error.message || "") && error.code !== "23505") ({ error } = await supabase.from("job_drafts").insert({ ...row, id: key, costs: undefined }));
+    if (error?.code === "23505") return "";
+    return error ? error.message : "";
+  }
+
+  async function pickLineReceipt(id: string, file: File | undefined) {
+    if (!file) return;
+    try {
+      const receipt = await compressImage(file);
+      setCostLines((current) => current.map((line) => (line.id === id ? { ...line, receipt } : line)));
+    } catch (error) {
+      setMessage((error as Error).message);
+    }
+  }
+
   async function saveDraft(event: FormEvent) {
     event.preventDefault();
     if (!form.clientName.trim() || !ownerId) return setMessage("Add who the job was for.");
-    const { error } = await supabase.from("job_drafts").insert({
-      id: Date.now().toString(), owner_id: ownerId, employee_id: employeeId, worker_name: name, worker_email: email,
+    if (costLines.some((line) => !line.amount.trim() && (line.note.trim() || line.receipt))) return setMessage("Add the amount for each cost, or remove the empty line.");
+    const costs: CostLine[] = costLines.filter((line) => line.amount.trim()).map(({ kind, amount, note, receipt }) => ({ kind, amount: amount.trim(), note: note.trim(), ...(receipt ? { receipt } : {}) }));
+    const row = {
+      owner_id: ownerId, employee_id: employeeId, worker_name: name, worker_email: email,
       client_name: form.clientName, client_phone: form.clientPhone, client_address: form.clientAddress,
       work_done: form.workDone, work_date: form.workDate, start_time: form.startTime, end_time: form.endTime,
-      hours: form.hours || hoursBetween(form.startTime, form.endTime), parts_cost: form.partsCost, parts_note: form.partsNote,
+      hours: form.hours || hoursBetween(form.startTime, form.endTime), ...legacySummary(costs), costs,
       drive_hours: form.driveHours, drive_minutes: form.driveMinutes, notes: form.notes, finished: form.finished,
       collected_amount: form.collectedAmount, collected_method: form.collectedMethod, status: "draft",
-    });
-    if (error) return setMessage(error.message);
+    };
+    setBusy("report");
+    const result = await sendOrQueue("report", "", row, (key) => insertReport(row, key));
+    setBusy("");
+    if (result.error) return setMessage(result.error);
     setForm(empty);
+    setCostLines([newCostLine()]);
+    if (result.queued) { setReportOpen(false); return setMessage("Saved on this phone. The job report will send when you're back online."); }
     setReportOpen(false);
     setMessage("Job report sent. The owner will review it.");
     load();
@@ -599,7 +629,7 @@ export default function CrewPage() {
             {queue.some((item) => !item.lastError) && <p className="flex flex-wrap items-center gap-2"><span className="cr-tone-teal inline-flex items-center gap-1.5 rounded-full border border-teal-500/40 bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800"><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-teal-500" />{queue.filter((item) => !item.lastError).length} waiting to upload</span>{offline && <span className="text-xs opacity-75">Sends when back online</span>}{!offline && <button type="button" className="ml-auto inline-flex min-h-11 min-w-11 items-center rounded-lg bg-teal-600 px-4 font-semibold text-white hover:bg-teal-500" data-testid="crew-queue-retry" onClick={() => flush()}>Send now</button>}</p>}
             {queue.filter((item) => item.lastError).map((item) => (
               <p key={item.id} className="cr-tone-bad flex flex-wrap items-center gap-2 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-rose-800" data-testid="crew-queue-failed" data-doc-id={item.docId}>
-                <span className="min-w-0 flex-1 basis-48">{item.kind === "done" ? "Done photos" : "Expense"} for {cards.find((card) => card.doc_id === item.docId)?.client_name || "a job"} couldn&apos;t be sent: {item.lastError}</span>
+                <span className="min-w-0 flex-1 basis-48">{item.kind === "done" ? "Done photos" : item.kind === "report" ? "Job report" : "Expense"} for {cards.find((card) => card.doc_id === item.docId)?.client_name || "a job"} couldn&apos;t be sent: {item.lastError}</span>
                 <button type="button" className="ml-auto inline-flex min-h-11 min-w-11 items-center rounded-lg border border-rose-400/60 px-4 font-semibold" data-testid="crew-queue-discard" onClick={() => removeQueued(item.id).then(() => refreshQueue())}>Discard</button>
               </p>
             ))}
@@ -688,7 +718,7 @@ export default function CrewPage() {
 
         {tab === "reports" && (
           <section className="space-y-3">
-            <button type="button" onClick={() => setReportOpen(!reportOpen)} className="w-full rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">{reportOpen ? "Close" : "New job report"}</button>
+            <button type="button" data-testid="report-open" onClick={() => setReportOpen(!reportOpen)} className="w-full rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">{reportOpen ? "Close" : "New job report"}</button>
             {reportOpen && (
               <form onSubmit={saveDraft} className={`${cardClass} space-y-3`}>
                 <select className={input} onChange={(event) => { const client = clients.find((item) => item.id === event.target.value); if (client) setForm({ ...form, clientName: client.name, clientPhone: client.phone || "", clientAddress: client.address || "" }); }}>
@@ -705,11 +735,33 @@ export default function CrewPage() {
                   <label className="space-y-1 text-sm font-medium">Start<input type="time" className={input} value={form.startTime} onChange={(event) => setForm({ ...form, startTime: event.target.value })} /></label>
                   <label className="space-y-1 text-sm font-medium">End<input type="time" className={input} value={form.endTime} onChange={(event) => setForm({ ...form, endTime: event.target.value })} /></label>
                 </div>
-                <input className={input} placeholder="Parts, gas, or dump fee you paid" value={form.partsCost} onChange={(event) => setForm({ ...form, partsCost: event.target.value })} />
-                <input className={input} placeholder="What it was" value={form.partsNote} onChange={(event) => setForm({ ...form, partsNote: event.target.value })} />
+                <fieldset className="space-y-2 rounded-xl border border-teal-500/20 p-3" data-testid="report-costs">
+                  <legend className="px-1 text-sm font-medium">Costs you paid</legend>
+                  {costLines.map((line, index) => (
+                    <div key={line.id} className="space-y-2 border-b border-teal-500/10 pb-2 last:border-0 last:pb-0" data-testid="report-cost-line">
+                      <div className="grid grid-cols-2 gap-2">
+                        <select aria-label={`Cost ${index + 1} category`} data-testid="report-cost-kind" className={input} value={line.kind} onChange={(event) => setCostLines((current) => current.map((item) => (item.id === line.id ? { ...item, kind: event.target.value as CrewKind } : item)))}>
+                          {KINDS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                        </select>
+                        <input aria-label={`Cost ${index + 1} amount`} data-testid="report-cost-amount" inputMode="decimal" className={input} placeholder="Amount $" value={line.amount} onChange={(event) => setCostLines((current) => current.map((item) => (item.id === line.id ? { ...item, amount: event.target.value } : item)))} />
+                      </div>
+                      <input aria-label={`Cost ${index + 1} note`} data-testid="report-cost-note" className={input} placeholder="What it was" value={line.note} onChange={(event) => setCostLines((current) => current.map((item) => (item.id === line.id ? { ...item, note: event.target.value } : item)))} />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-teal-500/50 px-3 text-sm font-medium transition hover:bg-teal-500/10">
+                          📷 {line.receipt ? "Retake receipt" : "Receipt photo (optional)"}
+                          <input aria-label={`Cost ${index + 1} receipt photo`} data-testid="report-cost-receipt" type="file" accept="image/*" capture="environment" className="sr-only" onClick={nativePhotoClick((files) => pickLineReceipt(line.id, files[0]))} onChange={(event) => { pickLineReceipt(line.id, event.target.files?.[0]); event.target.value = ""; }} />
+                        </label>
+                        {/* eslint-disable-next-line @next/next/no-img-element -- local data URL preview */}
+                        {line.receipt && <img src={line.receipt} alt={`Receipt ${index + 1}`} className="h-11 w-11 rounded-lg object-cover" data-testid="report-cost-receipt-preview" />}
+                        {costLines.length > 1 && <button type="button" data-testid="report-cost-remove" className="ml-auto min-h-11 rounded-xl border border-rose-500/40 px-3 text-sm font-medium text-rose-600 dark:text-rose-300" onClick={() => setCostLines((current) => current.filter((item) => item.id !== line.id))}>Remove</button>}
+                      </div>
+                    </div>
+                  ))}
+                  {costLines.length < 20 && <button type="button" data-testid="report-cost-add" className="min-h-11 w-full rounded-xl border border-teal-500/40 px-3 text-sm font-medium transition hover:border-teal-400 hover:bg-teal-500/10" onClick={() => setCostLines((current) => [...current, newCostLine()])}>＋ Add another cost</button>}
+                </fieldset>
                 <textarea className={`${input} min-h-16`} placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
                 <label className="flex items-center gap-3 rounded-xl border border-teal-500/20 px-3 py-3 text-sm font-medium"><input className="h-4 w-4 accent-teal-500" type="checkbox" checked={form.finished} onChange={(event) => setForm({ ...form, finished: event.target.checked })} /> Job is finished</label>
-                <button type="submit" className="sticky bottom-3 w-full rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! shadow-lg transition hover:bg-teal-400">Send job report</button>
+                <button type="submit" data-testid="report-submit" disabled={busy !== ""} className="sticky bottom-3 w-full rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! shadow-lg transition hover:bg-teal-400">Send job report</button>
               </form>
             )}
             <h2 className="pt-2 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Reports you sent</h2>
