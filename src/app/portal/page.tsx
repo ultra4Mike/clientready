@@ -67,7 +67,7 @@ export default function PortalPage() {
           <p className="text-sm font-semibold text-slate-600">{portal.business.name}</p>
           <h1 className="text-2xl font-bold tracking-tight">Documents for {portal.clientName}</h1>
           <p className="mt-1 text-sm text-slate-600">{[portal.business.email, portal.business.phone].filter(Boolean).join(" · ")}</p>
-          <p className={`mt-4 inline-flex flex-wrap items-baseline gap-x-2 rounded-xl px-4 py-3 text-lg font-semibold ${owed > 0 ? "bg-amber-50 text-amber-900 ring-1 ring-amber-200" : "bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200"}`} data-testid="portal-owed">Total still owed: <span className="text-2xl font-bold tabular-nums">${owed.toFixed(2)}</span></p>
+          <p className={`mt-4 inline-flex flex-wrap items-baseline gap-x-2 rounded-xl px-4 py-3 text-lg font-semibold ${owed > 0 ? "cr-tone-warn bg-amber-50 text-amber-900 ring-1 ring-amber-200" : "cr-tone-good bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200"}`} data-testid="portal-owed">Total still owed: <span className="text-2xl font-bold tabular-nums">${owed.toFixed(2)}</span></p>
           </div>
         </div>
         <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white shadow-sm" data-testid="portal-list">
@@ -84,7 +84,7 @@ export default function PortalPage() {
               </span>
               <span className="shrink-0 text-right text-sm">
                 <span className="block font-semibold tabular-nums">${total.toFixed(2)}</span>
-                {doc.type === "invoice" && <span className={`mt-0.5 inline-block text-xs font-semibold ${rowOwed > 0 ? "text-amber-700" : "text-emerald-700"}`}>{rowOwed > 0 ? `$${rowOwed.toFixed(2)} owed` : paid > 0 ? "Paid" : ""}</span>}
+                {doc.type === "invoice" && <span className={`mt-0.5 inline-block text-xs font-semibold ${rowOwed > 0 ? "text-amber-700 cr-text-warn" : "text-emerald-700 cr-text-good"}`}>{rowOwed > 0 ? `$${rowOwed.toFixed(2)} owed` : paid > 0 ? "Paid" : ""}</span>}
               </span>
               <span aria-hidden="true" className="shrink-0 text-xl text-slate-400">›</span>
             </a>
