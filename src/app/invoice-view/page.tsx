@@ -249,7 +249,7 @@ export default function InvoiceViewPage() {
             <div className="shrink-0 text-right">
               {approval && <div className="mb-1"><ApprovalBadge approval={approval} /></div>}
               {changeOrderOf && <p className="change-order-badge mb-1 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide" data-testid="change-order-badge">Change order</p>}
-              <p className="text-xs uppercase tracking-wide text-slate-500">Invoice · <span className={`rounded-full px-2 py-0.5 font-semibold ${status === "paid" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{status}</span></p>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Invoice · <span className={`rounded-full px-2 py-0.5 font-semibold ${status === "paid" ? "cr-tone-good bg-emerald-100 text-emerald-800" : "cr-tone-warn bg-amber-100 text-amber-800"}`}>{status}</span></p>
               <h1 className="mt-0.5 text-2xl font-bold leading-tight tracking-tight">{invoiceNumber || "Invoice"}</h1>
               <p className="text-sm text-slate-600">Date: {invoiceDate || "-"} · Due: {dueDate || "-"}</p>
               {changeOrderOf && (
@@ -328,7 +328,7 @@ export default function InvoiceViewPage() {
                   <span>${tipTotal(payments).toFixed(2)}</span>
                 </div>
               )}
-              <div className="mt-2 flex items-baseline justify-between rounded-lg bg-teal-50 px-3 py-2 text-lg font-bold text-teal-900 print:bg-transparent print:px-0">
+              <div className="mt-2 flex items-baseline justify-between cr-tone-teal rounded-lg bg-teal-50 px-3 py-2 text-lg font-bold text-teal-900 print:bg-transparent print:px-0">
                 <span>Still owed</span>
                 <span>${totals.balance.toFixed(2)}</span>
               </div>
