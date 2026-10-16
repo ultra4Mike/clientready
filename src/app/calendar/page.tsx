@@ -106,7 +106,7 @@ export default function CalendarPage() {
         data-done={doneState(job.schedule) || undefined}
         onDragStart={(event) => event.dataTransfer.setData("text/plain", job.doc.id)}
         onClick={(event) => { event.stopPropagation(); setEditing({ docId: job.doc.id }); }}
-        className={`cursor-grab truncate rounded-md border px-2 py-1 text-left text-xs font-medium shadow-sm ${statusClass(job.schedule)}`}
+        className={`cursor-grab truncate rounded-md border border-l-4 px-2 py-1 text-left text-xs font-medium leading-snug shadow-sm ${statusClass(job.schedule)}`}
         title={`${job.doc.title} · ${job.doc.clientName} · ${statusLabel(job.schedule)}${job.schedule.onMyWayAt && job.schedule.status !== "done" ? ` · ${job.schedule.onMyWayBy || "Crew"} on the way` : ""}${people ? ` · ${people}` : ""}`}
       >
         {job.schedule.startTime && <span className="font-semibold">{timeLabel(job.schedule.startTime)} </span>}
@@ -152,19 +152,19 @@ export default function CalendarPage() {
       <PageHeader title="Calendar" subtitle={<><span className="hidden sm:inline">Drag jobs onto the week or month. Click a slot or job to edit it.</span><span className="sm:hidden">Tap a slot or job to edit it.</span></>} actions={<a href="/invoice" className="rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">New job</a>} />
       <section className="py-0">
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-          <div className="inline-flex w-full gap-1 rounded-xl border border-slate-500/30 p-1 sm:w-auto" role="tablist">
+          <div className="inline-flex w-full gap-1 rounded-xl border border-slate-500/30 bg-[var(--cr-card)] p-1 shadow-sm sm:w-auto" role="tablist">
             {(["week", "month", "worker"] as View[]).map((item) => (
-              <button key={item} type="button" role="tab" aria-selected={view === item} onClick={() => setView(item)} className={`flex-1 rounded-lg border px-3 py-1.5 text-sm font-medium transition sm:flex-none ${view === item ? "border-teal-400 bg-teal-500/15 text-teal-700 dark:text-teal-300" : "border-slate-500/40"}`}>
+              <button key={item} type="button" role="tab" aria-selected={view === item} onClick={() => setView(item)} className={`flex min-h-11 flex-1 items-center justify-center rounded-lg px-4 text-sm font-medium transition sm:flex-none ${view === item ? "bg-teal-500 font-semibold text-slate-950! shadow-sm" : "text-[var(--cr-muted)] hover:bg-teal-500/10 hover:text-teal-600 dark:hover:text-teal-300"}`}>
                 {item === "week" ? "Week" : item === "month" ? "Month" : "By worker"}
               </button>
             ))}
           </div>
           {view !== "worker" && (
             <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={() => shift(-1)} className="rounded-lg border border-slate-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400">Previous</button>
+              <button type="button" onClick={() => shift(-1)} className="inline-flex min-h-11 items-center rounded-lg border border-slate-500/30 px-3 text-sm font-medium transition hover:border-teal-400"><span aria-hidden="true" className="mr-1">‹</span>Previous</button>
               <h1 className="min-w-0 flex-1 text-center text-lg font-bold tracking-tight sm:flex-none sm:px-2" data-testid="calendar-heading">{heading}</h1>
-              <button type="button" onClick={() => shift(1)} className="rounded-lg border border-slate-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400">Next</button>
-              <button type="button" onClick={() => setAnchor(today)} className="rounded-lg bg-teal-500 px-3 py-1.5 text-sm font-semibold text-slate-950! transition hover:bg-teal-400">Today</button>
+              <button type="button" onClick={() => shift(1)} className="inline-flex min-h-11 items-center rounded-lg border border-slate-500/30 px-3 text-sm font-medium transition hover:border-teal-400">Next<span aria-hidden="true" className="ml-1">›</span></button>
+              <button type="button" onClick={() => setAnchor(today)} className="inline-flex min-h-11 items-center rounded-lg bg-teal-500 px-4 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">Today</button>
             </div>
           )}
         </div>
@@ -310,7 +310,7 @@ export default function CalendarPage() {
                   data-testid={`unscheduled-${doc.id}`}
                   onDragStart={(event) => event.dataTransfer.setData("text/plain", doc.id)}
                   onClick={() => setEditing({ docId: doc.id, date: current })}
-                  className="cursor-grab truncate rounded-lg border border-slate-500/40 px-2.5 py-1.5 text-xs transition hover:border-teal-400"
+                  className="flex min-h-11 cursor-grab items-center truncate rounded-lg border border-slate-500/40 px-3 text-xs font-medium transition hover:border-teal-400 hover:bg-teal-500/5"
                 >
                   {doc.title} · {doc.clientName || "No client"}
                 </div>
