@@ -329,12 +329,12 @@ export default function InvoiceViewPage() {
           {notes && <p className="mt-6 whitespace-pre-line text-sm text-slate-600">{notes}</p>}
           <JobPhotoStrip photos={photos} />
           {(payUrlFor(docPayLink, paymentLink) || signature || proposalSignature) && (
-            <div className="print-keep mt-3 grid grid-cols-2 items-end gap-6 border-t border-slate-200 pt-3">
+            <div className="print-keep mt-3 grid grid-cols-1 items-end gap-6 sm:grid-cols-2 print:grid-cols-2 border-t border-slate-200 pt-3">
               <div className="space-y-3">
                 <SignatureBlock signature={proposalSignature} label="Proposal accepted" />
                 <SignatureBlock signature={signature} />
               </div>
-              <div className="flex justify-end">
+              <div className="flex justify-start sm:justify-end print:justify-end">
                 <PayQr url={payUrlFor(docPayLink, paymentLink)} />
               </div>
             </div>
