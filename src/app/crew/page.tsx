@@ -102,6 +102,19 @@ function dayGroup(date: string, today: string) {
   return date < today ? "past" : date === today ? "today" : "upcoming";
 }
 
+/** Applies checklist ticks still waiting in the offline queue (oldest first) on top of the loaded jobs. */
+function withQueuedTicks(jobs: Job[], queue: QueueItem[], who: string): Job[] {
+  const ticks = queue.filter((item) => item.kind === "check" && !item.lastError);
+  if (!ticks.length) return jobs;
+  return jobs.map((row) => {
+    const mine = ticks.filter((item) => item.docId === row.doc_id);
+    if (!mine.length || !row.id.includes("-sched-")) return row;
+    let list = readChecklist(row.checklist);
+    for (const tick of mine) list = list.map((entry) => entry.id === tick.payload.itemId ? (tick.payload.done ? { ...entry, done: true, doneBy: entry.doneBy || who } : { id: entry.id, text: entry.text }) : entry);
+    return { ...row, checklist: list };
+  });
+}
+
 function buildCards(jobs: Job[]): Card[] {
   const cards: Card[] = [];
   for (const job of jobs) {
@@ -259,6 +272,7 @@ export default function CrewPage() {
   }
 
   async function sendQueued(item: QueueItem) {
+    if (item.kind === "check") return crewCheckItem(item.docId, String(item.payload.itemId || ""), Boolean(item.payload.done));
     if (item.kind === "report") return insertReport(item.payload, item.id);
     if (item.kind === "done") return crewMarkDone(item.docId, (item.payload.photos as string[]) || [], item.id);
     return addExpense(item.docId, item.payload, item.id);
@@ -304,7 +318,8 @@ export default function CrewPage() {
     if (!error) await load();
   }
 
-  const cards = useMemo(() => buildCards(jobs), [jobs]);
+  // Checklist ticks saved offline are shown as ticked until they send (they replay in order, before "done").
+  const cards = useMemo(() => buildCards(withQueuedTicks(jobs, queue, name)), [jobs, queue, name]);
   const open = clock.find((entry) => !entry.ended_at);
   const weekStart = today ? addDays(today, -new Date(`${today}T00:00:00`).getDay()) : "";
   const weekDays = weekStart ? Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)) : [];
@@ -349,8 +364,8 @@ export default function CrewPage() {
       ? { ...row, checklist: readChecklist(row.checklist).map((item) => item.id === itemId ? (value ? { ...item, done: true, doneBy: name } : { id: item.id, text: item.text }) : item) }
       : row);
     setJobs(flip(done));
-    const problem = await crewCheckItem(card.doc_id, itemId, done);
-    if (problem) { setJobs(flip(!done)); setMessage(problem); }
+    const result = await sendOrQueue("check", card.doc_id, { itemId, done }, () => crewCheckItem(card.doc_id, itemId, done));
+    if (result.error) { setJobs(flip(!done)); setMessage(result.error); }
   }
 
   async function markDone(card: Card) {
