@@ -2,7 +2,7 @@
 
 import GlobalSearch from "@/components/GlobalSearch";
 import TrialBanner from "@/components/TrialBanner";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { clearLocalBusiness } from "@/lib/account-cache";
@@ -22,6 +22,16 @@ function Logo() {
   );
 }
 
+function readTheme() {
+  return document.documentElement.classList.contains("light") ? "light" : "dark";
+}
+
+function subscribeTheme(onChange: () => void) {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  return () => observer.disconnect();
+}
+
 export default function AppShell({
   children,
   title,
@@ -33,12 +43,9 @@ export default function AppShell({
   showTitle?: boolean;
 }) {
   const pathname = usePathname() || "";
-  const [theme, setTheme] = useState("dark");
-useEffect(() => {
-    const savedTheme = window.localStorage.getItem("clientready-theme") || "dark";
-    Promise.resolve().then(() => setTheme(savedTheme)); // storage read right after mount (same pattern as fae8b09)
-    document.documentElement.classList.toggle("dark", savedTheme === "dark");
-    document.documentElement.classList.toggle("light", savedTheme === "light");
+  // The theme is whatever class the layout's inline script put on <html> (read before paint; the server renders "dark").
+  const theme = useSyncExternalStore(subscribeTheme, readTheme, () => "dark");
+  useEffect(() => {
     isCrewUser().then((crew) => {
       if (crew) window.location.href = "/crew";
     });
@@ -50,7 +57,6 @@ useEffect(() => {
   }, []);
 
   function saveTheme(next: string) {
-    setTheme(next);
     window.localStorage.setItem("clientready-theme", next);
     document.documentElement.classList.toggle("dark", next === "dark");
     document.documentElement.classList.toggle("light", next === "light");
@@ -104,10 +110,17 @@ useEffect(() => {
         onClick={() => saveTheme(theme === "dark" ? "light" : "dark")}
         className="flex h-11 w-11 items-center justify-center rounded-full transition hover:bg-teal-500/10 min-[900px]:h-auto min-[900px]:w-auto min-[900px]:rounded-none min-[900px]:hover:bg-transparent"
       >
-        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 min-[900px]:hidden" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-          {theme === "dark" ? <path d="M12 4V2m0 20v-2m8-8h2M2 12h2m13.66-5.66 1.41-1.41M4.93 19.07l1.41-1.41m0-11.32L4.93 4.93m14.14 14.14-1.41-1.41M12 17a5 5 0 100-10 5 5 0 000 10z" /> : <path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" />}
+        {/* Icon and text follow the <html> class through CSS, so they are right before hydration too. */}
+        <svg aria-hidden="true" data-theme-icon="sun" viewBox="0 0 24 24" className="hidden h-5 w-5 dark:block min-[900px]:hidden!" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 4V2m0 20v-2m8-8h2M2 12h2m13.66-5.66 1.41-1.41M4.93 19.07l1.41-1.41m0-11.32L4.93 4.93m14.14 14.14-1.41-1.41M12 17a5 5 0 100-10 5 5 0 000 10z" />
         </svg>
-        <span className="hidden min-[900px]:inline">{theme === "dark" ? "Light" : "Dark"}</span>
+        <svg aria-hidden="true" data-theme-icon="moon" viewBox="0 0 24 24" className="block h-5 w-5 dark:hidden min-[900px]:hidden!" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" />
+        </svg>
+        <span className="hidden min-[900px]:inline">
+          <span className="hidden dark:inline">Light</span>
+          <span className="dark:hidden">Dark</span>
+        </span>
       </button>
       <a href="/profile" className="hidden min-h-11 items-center rounded-lg px-3 transition hover:bg-teal-500/10 hover:text-teal-500 min-[900px]:inline-flex">Profile</a>
       <button type="button" onClick={logOut} className="hidden min-h-11 whitespace-nowrap items-center rounded-lg px-3 transition hover:bg-teal-500/10 hover:text-teal-500 min-[900px]:inline-flex">
