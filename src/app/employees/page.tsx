@@ -201,7 +201,7 @@ export default function EmployeesPage() {
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Add or edit a person</h2>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none sm:p-6">
         <div className="flex min-w-0 flex-col gap-3 rounded-xl border border-teal-500/20 p-4 [&>input]:w-full [&>select]:w-full">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-500">Person & role</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-300">Person & role</h2>
         <input name="name" aria-label="Name" autoComplete="name" className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
         <input name="email" aria-label="Login email" autoComplete="email" className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Email they will use to log in" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
         <input name="phone" aria-label="Phone" autoComplete="tel" className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Phone" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
@@ -212,7 +212,7 @@ export default function EmployeesPage() {
         </select>
         </div>
         <div className="grid min-w-0 grid-cols-1 gap-3 rounded-xl border border-teal-500/20 p-4 min-[360px]:grid-cols-2 [&>*]:min-w-0">
-          <h2 className="col-span-full text-xs font-semibold uppercase tracking-wide text-teal-500">Pay & start date</h2>
+          <h2 className="col-span-full text-xs font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-300">Pay & start date</h2>
         <label className="block min-w-0 text-sm font-medium">
           Hourly rate
           <input name="rate" autoComplete="off" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="24" value={form.rate} onChange={(event) => setForm({ ...form, rate: event.target.value })} />
