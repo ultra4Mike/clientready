@@ -253,7 +253,7 @@ async function saveDocument() {
           />
           </div>
 
-          <div className="print-hide sticky bottom-0 z-10 -mx-4 -mb-4 flex flex-col gap-3 rounded-b-2xl border-t border-slate-200 bg-[var(--cr-card)] px-4 py-4 sm:-mx-6 sm:-mb-6 sm:flex-row sm:px-6">
+          <div className="mobile-savebar print-hide sticky bottom-0 z-10 -mx-4 -mb-4 flex flex-col gap-3 rounded-b-2xl border-t border-slate-200 bg-[var(--cr-card)] px-4 py-4 sm:-mx-6 sm:-mb-6 sm:flex-row sm:px-6">
             <button
               type="button"
               onClick={saveDocument}
