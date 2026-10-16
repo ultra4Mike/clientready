@@ -618,7 +618,7 @@ export default function NewInvoicePage() {
     const savePayments = over ? over.payments : payments;
     const saveStatus = over ? over.status : status;
     if (locked) {
-      setSaveMessage("Trial ended. Subscribe to save. $7.99/mo or $19.99 for 3 months.");
+      setSaveMessage("Trial ended. Old documents stay viewable; saving new work needs a plan. Plan details coming soon (see Plans).");
       return;
     }
     const raw = window.localStorage.getItem("clientready-documents");
@@ -686,7 +686,7 @@ export default function NewInvoicePage() {
   }
 
   async function generateRecurringNow() {
-    if (locked) return setSaveMessage("Trial ended. Subscribe to save. $7.99/mo or $19.99 for 3 months.");
+    if (locked) return setSaveMessage("Trial ended. Old documents stay viewable; saving new work needs a plan. Plan details coming soon (see Plans).");
     const raw = window.localStorage.getItem("clientready-documents");
     const docs = raw ? (JSON.parse(raw) as SavedDocument[]) : [];
     const stored = readRecurring(docs.find((doc) => doc.id === docId)?.data?.recurring);
@@ -700,7 +700,7 @@ export default function NewInvoicePage() {
   /** New draft invoice copied from the saved version of this invoice. The original is not changed. */
   async function createChangeOrder() {
     if (locked) {
-      setSaveMessage("Trial ended. Subscribe to save. $7.99/mo or $19.99 for 3 months.");
+      setSaveMessage("Trial ended. Old documents stay viewable; saving new work needs a plan. Plan details coming soon (see Plans).");
       return;
     }
     const raw = window.localStorage.getItem("clientready-documents");
@@ -739,7 +739,7 @@ export default function NewInvoicePage() {
 
   async function createInvoiceFromProposal() {
     if (locked) {
-      setSaveMessage("Trial ended. Subscribe to save. $7.99/mo or $19.99 for 3 months.");
+      setSaveMessage("Trial ended. Old documents stay viewable; saving new work needs a plan. Plan details coming soon (see Plans).");
       return;
     }
     const proposalId = currentDocId(docId);
