@@ -8,12 +8,12 @@ Shared by the three ClientReady bots. Update the **Status** column when you pick
 ## 1. Manual steps for the owner
 | # | Item | Owner | Status | Added |
 |---|---|---|---|---|
-| M1 | Run migration `20261015130000_stripe_reliability.sql` in Supabase (SQL Editor → paste → Run). | Owner | Open | 2026-10-15 |
-| M2 | Then run `20261015140000_checkout_guard_pending_owner.sql` (must come **after** M1). | Owner | Open | 2026-10-15 |
-| M3 | Also run newer migrations `20261015150000_review_link.sql` and `20261015160000_crew_unavailable.sql` (found in git log), and confirm all older ones (000000–120000) were run. See README → Migrations. | Owner | Open | 2026-10-15 |
+| M1 | Run migration `20261015130000_stripe_reliability.sql` in Supabase (SQL Editor → paste → Run). | Owner | Done 2026-10-16 (run and verified) | 2026-10-15 |
+| M2 | Then run `20261015140000_checkout_guard_pending_owner.sql` (must come **after** M1). | Owner | Done 2026-10-16 (run and verified) | 2026-10-15 |
+| M3 | Also run newer migrations `20261015150000_review_link.sql` and `20261015160000_crew_unavailable.sql` (found in git log), and confirm all older ones (000000–120000) were run. See README → Migrations. | Owner | Partly done 2026-10-16 — 030000, 130000, 140000, 150000, 160000 run and verified; confirm the other older migrations (000000–120000 except 030000) | 2026-10-15 |
 | M4 | Set the real support inbox: replace placeholder `SUPPORT_EMAIL = "support@clientready.app"` in `src/lib/help/articles.ts` (only TODO in the repo). | Owner → Help | Open | 2026-10-15 |
 | M5 | Do the RLS security check: follow `clientready-help/rls-audit.md` steps 1–6; only use the template `supabase/templates/base_owner_rls.REVIEW_BEFORE_RUN.sql` after review. | Owner | Open | 2026-10-15 |
-| M6 | After M1–M2: make a real test card payment (Stripe test mode) through an approval link and the portal; confirm it appears once on the invoice with the correct local date; try two tabs at once to confirm the double-checkout guard. | Owner + Dev | Open | 2026-10-15 |
+| M6 | Migrations now run — next step: after M1–M2, make a real test card payment (Stripe test mode) through an approval link and the portal; confirm it appears once on the invoice with the correct local date; try two tabs at once to confirm the double-checkout guard. | Owner + Dev | Open | 2026-10-15 |
 | M7 | Set Supabase env vars for builds/deploys (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`; server: `SUPABASE_SERVICE_ROLE_KEY`, Stripe keys, optional `BUSINESS_TIMEZONE`). Without the public ones `npm run build` fails prerendering /approve. | Owner | Open | 2026-10-15 |
 | M8 | Set Business timezone in Settings once migration M1 is run. | Owner | Open | 2026-10-15 |
 
@@ -27,7 +27,7 @@ Shared by the three ClientReady bots. Update the **Status** column when you pick
 | R5 | Document sync is "newest updatedAt wins" using device clocks; a wrong device clock can overwrite real edits (only approvals and Stripe payments are protected). | Help | Open | 2026-10-15 |
 | R6 | Client contact retry queue is per device (localStorage), not per user; a queued update can overwrite a newer edit from another device. | Help | Open | 2026-10-15 |
 | R7 | README said "No service-role key is used anywhere" — now corrected (this commit). | Help | Done | 2026-10-15 |
-| R8 | Privacy page (`src/app/privacy/page.tsx`) still says data stays in the browser / cloud storage not live — outdated; needs real copy (owner/legal wording). | Owner + Visual | Open | 2026-10-15 |
+| R8 | Privacy page (`src/app/privacy/page.tsx`) still says data stays in the browser / cloud storage not live — outdated; needs real copy (owner/legal wording). | Owner + Visual | In progress 2026-10-16 — draft text in place, marked for owner/legal review | 2026-10-15 |
 | R9 | Checkout claim row can be left without a session if the server crashes mid-request (ignored after 2 min; Stripe session still payable and recorded via webhook). | Dev | Open | 2026-10-15 |
 | R10 | New migrations 150000 (review link) and 160000 (crew unavailable) added by other bots — confirm they degrade quietly until run. | Dev | Open | 2026-10-15 |
 
@@ -47,5 +47,5 @@ Shared by the three ClientReady bots. Update the **Status** column when you pick
 ## 5. Lint debt
 | # | Item | Owner | Status | Added |
 |---|---|---|---|---|
-| L1 | `src/components/AppShell.tsx`: react-hooks/set-state-in-effect (theme read in effect) — pre-existing. | Visual | Open | 2026-10-15 |
+| L1 | `src/components/AppShell.tsx`: react-hooks/set-state-in-effect (theme read in effect) — pre-existing. | Visual | Done 2026-10-16 (Help: setState deferred one microtask, same pattern as fae8b09) | 2026-10-15 |
 | L2 | `src/app/collect/page.tsx`: 2 pre-existing lint errors (set-state-in-effect; "value cannot be modified"). | Dev | Open | 2026-10-15 |

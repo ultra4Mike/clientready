@@ -34,7 +34,7 @@ export default function AppShell({
   const [theme, setTheme] = useState("dark");
 useEffect(() => {
     const savedTheme = window.localStorage.getItem("clientready-theme") || "dark";
-    setTheme(savedTheme);
+    Promise.resolve().then(() => setTheme(savedTheme)); // storage read right after mount (same pattern as fae8b09)
     document.documentElement.classList.toggle("dark", savedTheme === "dark");
     document.documentElement.classList.toggle("light", savedTheme === "light");
     isCrewUser().then((crew) => {

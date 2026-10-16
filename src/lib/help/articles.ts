@@ -201,7 +201,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
   { id: "schedule", category: "Calendar & jobs", question: "How do I schedule a job?",
     steps: ["Save the invoice, then use its Schedule section — or open Calendar and click a slot or job.", "Set Date, Start and End, and + Add crew.", "Tap Save schedule. It appears on Calendar, Today and This week.", "On the Calendar you can also drag jobs onto the week or month."], related: ["crew-assign"], keywords: ["appointment", "booking"] },
   { id: "calendar-views", category: "Calendar & jobs", question: "What's the difference between Calendar, Today and This week?",
-    steps: ["Calendar: month/week view of all jobs; use Previous / Next and Today.", "Today: just today's jobs with quick actions.", "This week: the next seven days in a list."], keywords: ["view", "week", "day"] },
+    steps: ["Calendar: week or month view of all jobs; use Previous / Next and Today. On phones, Week and Month show as a day-by-day list with today highlighted.", "Today: just today's jobs with quick actions.", "This week: the next seven days in a list."], keywords: ["view", "week", "day"] },
   { id: "reschedule", category: "Calendar & jobs", question: "How do I move or cancel a job?",
     steps: ["Open the job.", "Change the date/time and save, or tap Unschedule to take it off the calendar."], keywords: ["move", "cancel", "reschedule"] },
   { id: "on-my-way", category: "Calendar & jobs", question: "How does 'On my way' work?",
