@@ -47,7 +47,7 @@ export default function NeedsReview({ documents, onDocuments, loading = false, o
         <span data-testid="needs-review-count" className="rounded-full bg-teal-500/15 px-2.5 py-0.5 text-xs font-semibold text-teal-700 dark:text-teal-200">{loading ? "…" : items.length}</span>
       </div>
       {loading ? (
-        <p className="text-sm text-[var(--cr-muted)]">Loading…</p>
+        <div className="space-y-2" aria-busy="true"><span className="sr-only">Loading…</span>{[0, 1].map((n) => <div key={n} className="h-12 animate-pulse rounded-xl bg-teal-500/10 motion-reduce:animate-none" />)}</div>
       ) : items.length === 0 ? (
         <p className="text-sm text-[var(--cr-muted)]">Nothing waiting. You are all caught up.</p>
       ) : (
