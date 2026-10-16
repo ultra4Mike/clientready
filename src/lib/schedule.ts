@@ -1,7 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { isUuid, saveCloudDocument, type CloudDoc } from "@/lib/cloud-docs";
 import { moneySnapshot } from "@/lib/change-orders";
-import { mergeScheduleBlocks, samePlan } from "@/lib/schedule-merge";
 
 export type JobStatus = "scheduled" | "in_progress" | "done";
 export type Schedule = {
@@ -11,8 +10,6 @@ export type Schedule = {
   workerIds: string[];
   status: JobStatus;
   updatedAt: string;
-  /** When the owner last changed date/time/crew/note (crew actions never change this). */
-  plannedAt?: string;
   /** Note shown to the assigned crew (not the customer-facing invoice notes). */
   crewNote?: string;
   /** Set by the crew's "mark done" (with photos); confirmedAt is set by the owner. */
@@ -90,7 +87,6 @@ export function readSchedule(data: Record<string, unknown> | undefined): Schedul
       workerIds: Array.isArray(raw.workerIds) ? raw.workerIds.map(String) : [],
       status,
       updatedAt: String(raw.updatedAt || ""),
-      ...(raw.plannedAt ? { plannedAt: String(raw.plannedAt) } : {}),
       ...(raw.crewNote ? { crewNote: String(raw.crewNote).slice(0, 500) } : {}),
       ...(raw.doneAt ? { doneAt: String(raw.doneAt) } : {}),
       ...(raw.doneBy ? { doneBy: String(raw.doneBy) } : {}),
@@ -292,13 +288,7 @@ export function applySchedule<T extends CloudDoc>(docs: T[], docId: string, sche
   const crew = (Array.isArray(data.crew) ? data.crew : []) as CrewRow[];
   if (schedule) {
     const ids = dedupeWorkerIds(data.schedule ? schedule.workerIds : [...schedule.workerIds, ...crewIds(crew)]);
-    const now = new Date().toISOString();
-    const stored = data.schedule as Record<string, unknown> | undefined;
-    const nextBlock = { ...schedule, workerIds: ids };
-    // plannedAt moves only when the owner actually changes the plan, so a status tap from a page
-    // holding an older copy never claims to be the newest plan.
-    const plannedAt = stored && samePlan(stored, nextBlock) ? (stored.plannedAt as string | undefined) || schedule.plannedAt : now;
-    data.schedule = { ...nextBlock, updatedAt: now, ...(plannedAt ? { plannedAt } : {}) };
+    data.schedule = { ...schedule, workerIds: ids, updatedAt: new Date().toISOString() };
     data.crew = crewForWorkers(crew, ids, schedule);
   } else {
     delete data.schedule;
@@ -469,8 +459,7 @@ export async function confirmJobDone(docId: string) {
   if (isUuid(docId)) {
     const { data } = await supabase.from("documents").select("data").eq("id", docId).maybeSingle();
     const cloud = readSchedule((data?.data || undefined) as Record<string, unknown> | undefined);
-    // Crew progress (done) comes from the newer copy; the date/time/crew never move with it.
-    if (cloud) schedule = (mergeScheduleBlocks(schedule || undefined, cloud, "local") as Schedule | undefined) || cloud;
+    if (cloud && scheduleStamp(cloud) >= scheduleStamp(schedule)) schedule = cloud;
   }
   if (!schedule || schedule.status !== "done") return null;
   return saveSchedule(docId, { ...schedule, confirmedAt: new Date().toISOString() });

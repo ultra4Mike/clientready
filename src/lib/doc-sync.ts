@@ -1,7 +1,6 @@
 import { isUuid, saveCloudDocument, type CloudDoc } from "@/lib/cloud-docs";
 import { keepStripePayments } from "@/lib/payments";
 import { localTombstones } from "@/lib/doc-tombstones";
-import { mergeScheduleBlocks } from "@/lib/schedule-merge";
 
 export const OWNER_KEY = "clientready-cache-owner";
 export const DOCS_KEY = "clientready-documents";
@@ -26,11 +25,13 @@ function withCloudApproval<T extends AnyDoc>(winner: T, cloud: T): T {
   return { ...winner, data };
 }
 
-/** The schedule block merges field-wise (see schedule-merge): crew progress by updatedAt, the plan by plannedAt. */
-function withNewerSchedule<T extends AnyDoc>(winner: T, local: T, cloud: T, ownerSide: "local" | "cloud"): T {
-  const merged = mergeScheduleBlocks(local.data?.schedule as Record<string, unknown> | undefined, cloud.data?.schedule as Record<string, unknown> | undefined, ownerSide);
-  if (!merged) return winner;
-  return { ...winner, data: { ...(winner.data || {}), schedule: merged } };
+/** The schedule block merges on its own updatedAt, so a crew status change isn't lost to a newer local edit elsewhere. */
+function withNewerSchedule<T extends AnyDoc>(winner: T, local: T, cloud: T): T {
+  const a = local.data?.schedule as { updatedAt?: string } | undefined;
+  const b = cloud.data?.schedule as { updatedAt?: string } | undefined;
+  if (!a && !b) return winner;
+  const pick = !a ? b : !b ? a : Date.parse(b.updatedAt || "") > Date.parse(a.updatedAt || "") ? b : a;
+  return { ...winner, data: { ...(winner.data || {}), schedule: pick } };
 }
 
 /**
@@ -60,12 +61,12 @@ export function mergeDocs<T extends AnyDoc>(allLocal: T[], allCloud: T[]) {
     const localTime = stampOf(mine);
     const cloudTime = stampOf(doc);
     if (localTime > cloudTime) {
-      const base = withNewerSchedule(withCloudApproval(mine, doc), mine, doc, "local");
+      const base = withNewerSchedule(withCloudApproval(mine, doc), mine, doc);
       const kept = { ...base, data: keepStripePayments(base.data || {}, doc.data) };
       merged.push(kept);
       pushUp.push(kept);
     } else {
-      merged.push(withNewerSchedule(withCloudApproval({ ...doc, data: { ...(mine.data || {}), ...(doc.data || {}) } }, doc), mine, doc, "cloud"));
+      merged.push(withNewerSchedule(withCloudApproval({ ...doc, data: { ...(mine.data || {}), ...(doc.data || {}) } }, doc), mine, doc));
     }
   }
   for (const doc of local) if (!cloudById.has(doc.id)) merged.push(doc);
