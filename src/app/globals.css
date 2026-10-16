@@ -417,3 +417,9 @@ html::-webkit-scrollbar { width: 10px; height: 10px; }
 html::-webkit-scrollbar-track { background: transparent; }
 html::-webkit-scrollbar-thumb { background: rgba(13, 148, 136, 0.35); border-radius: 9999px; border: 2px solid transparent; background-clip: padding-box; }
 html.dark::-webkit-scrollbar-thumb { background-color: rgba(45, 212, 191, 0.35); }
+
+/* Subtle content fade-in on page load */
+@keyframes cr-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.app-main > * { animation: cr-fade-in 220ms ease-out both; }
+@media (prefers-reduced-motion: reduce) { .app-main > * { animation: none; } }
+@media print { .app-main > * { animation: none; } }
