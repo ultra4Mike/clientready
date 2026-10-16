@@ -1,5 +1,6 @@
 "use client";
 
+import { preferredContactFor } from "@/lib/contact-method";
 import EmptyState from "@/components/EmptyState";
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
@@ -266,6 +267,7 @@ export default function CollectPage() {
 
             {reminderId === doc.id && (
               <ReminderPanel
+                prefer={preferredContactFor(doc.data?.clientId, doc.clientName || doc.data?.clientName)}
                 input={{
                   clientName: doc.clientName || String(doc.data?.clientName || ""),
                   invoiceNumber: String(doc.data?.invoiceNumber || doc.title || ""),

@@ -1,5 +1,6 @@
 "use client";
 
+import { CONTACT_METHODS, contactMethodLabel, readContactMethod, type ContactMethod } from "@/lib/contact-method";
 import { clientFromRow, readCachedClients } from "@/lib/client-rows";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -22,6 +23,7 @@ type Client = {
   visitTime: string;
   notes: string;
   preferences?: string;
+  contactMethod?: ContactMethod;
   updated_at?: string; // cloud baseline for the contact retry queue (absent before migration 20261016000000)
 };
 
@@ -35,6 +37,7 @@ const emptyClient = {
   visitTime: "",
   notes: "",
   preferences: "",
+  contactMethod: "" as ContactMethod,
 };
 
 function fromRow(row: Record<string, string>) {
@@ -120,12 +123,13 @@ export default function ClientsPage() {
           visit_time: form.visitTime,
           notes: form.notes,
           preferences: form.preferences,
+          preferred_contact: form.contactMethod,
         };
         let { data: saved, error } = await supabase.from("clients").update(fields).eq("id", editingId).eq("user_id", userId).select("*");
         // Before migration 20261016060000 there is no preferences column: save the rest, keep preferences on this device.
-        if (error && /preferences/.test(error.message || "")) {
-          const { preferences: _p, ...rest } = fields;
-          void _p;
+        if (error && /preferences|preferred_contact/.test(error.message || "")) {
+          const { preferences: _p, preferred_contact: _c, ...rest } = fields;
+          void _p; void _c;
           ({ data: saved, error } = await supabase.from("clients").update(rest).eq("id", editingId).eq("user_id", userId).select("*"));
         }
         // Carry the server's new updated_at into the cache (baseline for later queued contact changes).
@@ -156,13 +160,14 @@ export default function ClientsPage() {
         visit_time: form.visitTime,
         notes: form.notes,
         preferences: form.preferences,
+        preferred_contact: form.contactMethod,
       };
       let { data, error } = await supabase.from("clients").insert(fields).select("*").single();
-      if (error && /preferences/.test(error.message || "")) {
-        const { preferences: _p, ...rest } = fields;
-        void _p;
+      if (error && /preferences|preferred_contact/.test(error.message || "")) {
+        const { preferences: _p, preferred_contact: _c, ...rest } = fields;
+        void _p; void _c;
         ({ data, error } = await supabase.from("clients").insert(rest).select("*").single());
-        if (!error && data) data = { ...data, preferences: form.preferences };
+        if (!error && data) data = { ...data, preferences: form.preferences, preferred_contact: form.contactMethod };
       }
       if (error || !data) {
         saveLocal([...clients, { id: Date.now().toString(), ...form }]);
@@ -197,6 +202,7 @@ export default function ClientsPage() {
       visitTime: client.visitTime || "",
       notes: client.notes || "",
       preferences: client.preferences || "",
+      contactMethod: readContactMethod(client.contactMethod),
     });
   }
 
@@ -265,6 +271,13 @@ export default function ClientsPage() {
             </label>
             </div>
             <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+            <label className="block text-sm font-medium text-slate-600">
+              Preferred contact
+              <select name="contactMethod" id="client-contact-method" data-testid="client-contact-method-input" className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={form.contactMethod} onChange={(event) => setForm({ ...form, contactMethod: readContactMethod(event.target.value) })}>
+                <option value="">No preference</option>
+                {CONTACT_METHODS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+              </select>
+            </label>
             <textarea name="preferences" aria-label="Client preferences" data-testid="client-preferences-input" className="min-h-16 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2.5 text-base sm:text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Preferences: text or call, gate code, pets, best times…" value={form.preferences} onChange={(event) => setForm({ ...form, preferences: event.target.value })} />
             <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:justify-end">
               <button type="submit" className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">{editingId ? "Update client" : "Save client"}</button>
@@ -298,7 +311,7 @@ export default function ClientsPage() {
                 {client.nextVisit ? <p className="font-medium"><span className="md:hidden">Next visit: </span>{client.nextVisit}</p> : <p className="hidden text-slate-500 md:block">—</p>}
                 {client.visitTime && <p className="text-slate-600">{client.visitTime}</p>}
               </div>
-              <div className="min-w-0 text-sm text-slate-600"><p className="line-clamp-2">{client.notes}</p>{client.preferences && <p className="mt-1 line-clamp-2" data-testid="client-preferences"><span className="font-semibold text-teal-700 dark:text-teal-300">⭐ Prefers:</span> {client.preferences}</p>}</div>
+              <div className="min-w-0 text-sm text-slate-600"><p className="line-clamp-2">{client.notes}</p>{client.contactMethod && <p className="mt-1" data-testid="client-contact-method" data-method={client.contactMethod}><span className="font-semibold text-teal-700 dark:text-teal-300">{CONTACT_METHODS.find((item) => item.value === client.contactMethod)?.icon} Best by:</span> {contactMethodLabel(client.contactMethod)}</p>}{client.preferences && <p className="mt-1 line-clamp-2" data-testid="client-preferences"><span className="font-semibold text-teal-700 dark:text-teal-300">⭐ Prefers:</span> {client.preferences}</p>}</div>
               <div className="grid grid-cols-3 gap-2 md:flex md:justify-end">
                 <button type="button" aria-expanded={portalFor === client.id} data-testid="client-portal-toggle" onClick={() => setPortalFor(portalFor === client.id ? "" : client.id)} className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition sm:min-h-0 ${portalFor === client.id ? "border-teal-400 bg-teal-500/15 text-teal-700 dark:text-teal-300" : "border-slate-300 hover:border-teal-500"}`}><span aria-hidden="true">🔗</span>Portal</button>
                 <button type="button" onClick={() => editClient(client)} className="min-h-11 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium transition hover:border-teal-500 sm:min-h-10">Edit</button>

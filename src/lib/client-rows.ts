@@ -4,9 +4,11 @@
  * drops what another page relies on. Before migration 20261016060000 there is no preferences column:
  * the value this device already has is kept.
  */
+import { readContactMethod, type ContactMethod } from "./contact-method";
+
 export type CachedClient = {
   id: string; name: string; company: string; email: string; phone: string; address: string;
-  nextVisit: string; visitTime: string; notes: string; preferences: string; updated_at?: string;
+  nextVisit: string; visitTime: string; notes: string; preferences: string; contactMethod: ContactMethod; updated_at?: string;
 };
 
 export function readCachedClients(): Partial<CachedClient>[] {
@@ -33,6 +35,8 @@ export function clientFromRow(row: Record<string, unknown>, cached: Partial<Cach
     visitTime: s(row.visit_time),
     notes: s(row.notes),
     preferences: "preferences" in row ? s(row.preferences) : s(local?.preferences),
+    // Before migration 20261016150000 there is no preferred_contact column: keep this device's value.
+    contactMethod: readContactMethod("preferred_contact" in row ? row.preferred_contact : local?.contactMethod),
     ...(typeof row.updated_at === "string" && row.updated_at ? { updated_at: row.updated_at } : {}),
   };
 }

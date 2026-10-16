@@ -1,5 +1,6 @@
 "use client";
 
+import { CONTACT_METHODS, contactMethodLabel, readContactMethod } from "@/lib/contact-method";
 import Link from "next/link";
 import PortalShare from "@/components/PortalShare";
 import Section, { SectionDefaults, useOpenedExisting } from "@/components/Section";
@@ -50,7 +51,7 @@ import { readSignature, type Signature } from "@/lib/signature";
 import { amountOf, documentTotals, discountLabel, normalizeDiscountType, type DiscountType } from "@/lib/discount";
 
 type LineItem = { description: string; qty: string; rate: string; category?: LineCategory };
-type SavedClient = { id: string; name: string; company: string; email: string; phone: string; address: string; preferences?: string };
+type SavedClient = { id: string; name: string; company: string; email: string; phone: string; address: string; preferences?: string; contactMethod?: string };
 type SavedDocument = { id: string; type: "invoice" | "proposal"; title: string; clientName: string; createdAt: string; data: Record<string, unknown> };
 type OtherFee = { id: string; name: string; amount: string };
 type JobCosts = {
@@ -877,6 +878,7 @@ export default function NewInvoicePage() {
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Client email" value={clientEmail} onChange={(event) => setClientEmail(event.target.value)} />
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Client phone" value={clientPhone} onChange={(event) => setClientPhone(event.target.value)} />
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Client address" value={clientAddress} onChange={(event) => setClientAddress(event.target.value)} />
+            {(() => { const method = readContactMethod(savedClients.find((client) => client.id === docClientId)?.contactMethod); return method ? <p className="print-hide inline-flex items-center gap-2 rounded-lg border border-teal-500/30 bg-teal-500/5 px-3 py-1.5 text-sm" data-testid="invoice-contact-method" data-method={method}><span aria-hidden="true">{CONTACT_METHODS.find((item) => item.value === method)?.icon}</span><span className="font-semibold text-teal-700 dark:text-teal-300">Best by:</span> {contactMethodLabel(method)}</p> : null; })()}
             {(() => { const prefs = savedClients.find((client) => client.id === docClientId)?.preferences?.trim(); return prefs ? <p className="print-hide flex items-start gap-2 rounded-lg border border-l-4 border-teal-500/30 border-l-teal-500 bg-teal-500/5 px-3 py-2.5 text-sm" data-testid="invoice-client-preferences"><span aria-hidden="true">⭐</span><span className="font-semibold text-teal-700 dark:text-teal-300">Client prefers:</span> {prefs}</p> : null; })()}
             <button type="button" onClick={saveClientFromForm} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Save as client</button>
             </Section>
@@ -1230,6 +1232,7 @@ export default function NewInvoicePage() {
                 input={{ clientName, invoiceNumber, owed: totals.balance, dueDate, payUrl: payUrlFor(docPayLink, paymentLink), businessName: businessName === "Your business" ? "" : businessName, ownerName, today: ymd(new Date()) }}
                 phone={clientPhone}
                 email={clientEmail}
+                prefer={readContactMethod(savedClients.find((client) => client.id === docClientId)?.contactMethod)}
                 onClose={() => setReminderOpen(false)}
               />
             </div>
