@@ -71,7 +71,7 @@ export default function HomePage() {
             <div className="mt-6 flex justify-between border-t border-slate-200 pt-3 text-sm"><span>Fall cleanup</span><span>$520.00</span></div>
             <div className="mt-2 flex justify-between text-sm"><span>Haul away</span><span>$265.00</span></div>
             <div className="mt-4 flex justify-between border-t border-slate-200 pt-3 font-semibold"><span>Total</span><span>$785.00</span></div>
-            <div className="mt-auto pt-6"><p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">Pay here: Venmo @northyard</p><p className="muted mt-3 text-xs">Thank you for your business.</p></div>
+            <div className="mt-auto pt-6"><p className="pay-box rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">Pay here: Venmo @northyard</p><p className="muted mt-3 text-xs">Thank you for your business.</p></div>
           </div>
 
           <div className="sample-owner rounded-2xl border border-amber-300 bg-amber-50 p-6 shadow-sm">

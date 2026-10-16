@@ -104,7 +104,7 @@ html.dark body {
 }
 
 html.dark .owner-costs {
-  background-color: #10262c !important;
+  background-color: #0b1f24 !important;
   color: #e2f6f4 !important;
   border-color: rgba(45, 212, 191, 0.35) !important;
 }
@@ -128,12 +128,12 @@ html.dark .owner-costs .bg-white span {
 html.dark .owner-costs input,
 html.dark .owner-costs textarea,
 html.dark .owner-costs select {
-  background-color: #061418 !important;
+  background-color: #10262c !important;
   color: #e2f6f4 !important;
   border-color: rgba(45, 212, 191, 0.35) !important;
 }
 
-html.dark .owner-costs button {
+html.dark .owner-costs button:not([data-testid="section-toggle"]) {
   color: #042f2e !important;
   background-color: #2dd4bf !important;
   border: 1px solid #042f2e !important;
@@ -145,6 +145,12 @@ html.dark .sample-sheet p,
 html.dark .sample-sheet span,
 html.dark .sample-sheet div {
   color: #0f172a !important;
+}
+
+html.dark .sample-sheet .pay-box {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #334155 !important;
 }
 
 html.dark .sample-sheet.bg-white {
@@ -382,4 +388,24 @@ html.dark input.sig-typed,
     min-height: 40px;
     min-width: 40px;
   }
+}
+
+/* Calendar week/month scroller: themed scrollbar in dark mode */
+html.dark :has(> [data-testid="week-grid"]),
+html.dark :has(> [data-testid="month-grid"]) {
+  scrollbar-color: rgba(45, 212, 191, 0.35) transparent;
+  color-scheme: dark;
+}
+
+/* Section collapse toggle keeps its plain chevron style inside themed cards */
+html.dark .owner-costs [data-testid="section-toggle"],
+html.dark .owner-costs [data-testid="section-toggle"] span {
+  background-color: transparent !important;
+  border: 0 !important;
+  color: var(--cr-muted) !important;
+}
+
+/* Hide the floating quick-create + on pages with a sticky mobile save bar */
+body:has(.mobile-savebar) .quick-create-fab {
+  display: none !important;
 }

@@ -102,7 +102,7 @@ export default function MobileNav({ onLogOut }: { onLogOut?: () => void }) {
             </div>
           )}
           {createOpen && !moreOpen && <div className="fixed inset-0 z-40 bg-slate-950/50 print:hidden" onClick={() => setCreateOpen(false)} />}
-          <div className={`fixed right-4 ${moreOpen ? "hidden" : ""} bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 flex flex-col items-end gap-2 print:hidden`}>
+          <div className={`quick-create-fab fixed right-4 ${moreOpen ? "hidden" : ""} bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 flex flex-col items-end gap-2 print:hidden`}>
             {createOpen && (
               <div className="w-48 overflow-hidden rounded-2xl border border-teal-500/20 bg-[var(--cr-panel)] py-1 shadow-2xl">
                 {QUICK_CREATE.map((item) => (
