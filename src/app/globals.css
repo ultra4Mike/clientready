@@ -423,3 +423,12 @@ html.dark::-webkit-scrollbar-thumb { background-color: rgba(45, 212, 191, 0.35);
 .app-main > * { animation: cr-fade-in 200ms ease-out; }
 @media (prefers-reduced-motion: reduce) { .app-main > * { animation: none; } }
 @media print { .app-main > * { animation: none; } }
+
+/* Status tones (pills/panels). Beat the html.dark element/text rules: (0,2,0)+ with !important. */
+html.dark .cr-tone-good, html.dark .cr-tone-good * { background-color: rgba(6, 78, 59, 0.45) !important; color: #a7f3d0 !important; border-color: rgba(4, 120, 87, 0.7) !important; --tw-ring-color: rgba(4, 120, 87, 0.7) !important; }
+html.dark .cr-tone-warn, html.dark .cr-tone-warn * { background-color: rgba(120, 53, 15, 0.45) !important; color: #fde68a !important; border-color: rgba(180, 83, 9, 0.7) !important; --tw-ring-color: rgba(180, 83, 9, 0.7) !important; }
+html.dark .cr-tone-teal { background-color: rgba(19, 78, 74, 0.5) !important; color: #99f6e4 !important; border-color: rgba(15, 118, 110, 0.7) !important; }
+html.dark .cr-tone-teal p, html.dark .cr-tone-teal span, html.dark .cr-tone-teal div { color: #ccfbf1 !important; }
+html.dark .cr-tone-good * , html.dark .cr-tone-warn * { background-color: transparent !important; }
+html.dark .cr-text-good { color: #6ee7b7 !important; }
+html.dark .cr-text-warn { color: #fcd34d !important; }
