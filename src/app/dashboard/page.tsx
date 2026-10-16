@@ -257,7 +257,7 @@ export default function DashboardPage() {
             <h2 className="text-base font-semibold">Invoice overview</h2>
             <span className="text-xs text-[var(--cr-muted)]">Last 6 months · {stats.paidRate}% of invoices marked paid</span>
           </div>
-          <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full sm:h-56">
+          <svg viewBox={`0 0 ${width} ${height + 28}`} className="h-auto w-full overflow-visible sm:h-56">
             {[1, 2, 3, 4].map((line) => (
               <line
                 key={line}
@@ -281,11 +281,11 @@ export default function DashboardPage() {
                 <text
                   key={`${point.key}-label`}
                   x={x}
-                  y={height - 2}
-                  textAnchor="middle"
+                  y={height + 22}
+                  textAnchor={index === 0 ? "start" : index === chart.points.length - 1 ? "end" : "middle"}
                   fill="currentColor"
                   opacity="0.8"
-                  className="text-[28px] sm:text-[10px]"
+                  className="text-[34px] sm:text-[16px]"
                 >
                   {point.label}
                 </text>
