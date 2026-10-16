@@ -26,6 +26,7 @@ import { JobPhotosEditor, JobPhotoStrip } from "@/components/JobPhotos";
 import { currentDocId } from "@/lib/doc-sync";
 import { isQuotaError, readPhotos, type JobPhoto } from "@/lib/photos";
 import LineSplit from "@/components/LineSplit";
+import { completeMessage, mailHref, scheduledMessage } from "@/lib/job-messages";
 import { ownerRating, starsText, type Rating } from "@/lib/ratings";
 import { applyPackage, deletePackage, readPackages, savePackage, syncPackages, type JobPackage } from "@/lib/packages";
 import ReminderPanel from "@/components/ReminderPanel";
@@ -194,6 +195,8 @@ export default function NewInvoicePage() {
   const [packages, setPackages] = useState<JobPackage[]>([]);
   const [packageName, setPackageName] = useState("");
   const [rating, setRating] = useState<Rating | null>(null);
+  const [jobMsg, setJobMsg] = useState<{ kind: string; text: string } | null>(null);
+  const [jobMsgCopied, setJobMsgCopied] = useState(false);
   useEffect(() => {
     let live = true;
     Promise.resolve().then(() => { if (live) setRating(null); });
@@ -1112,6 +1115,24 @@ export default function NewInvoicePage() {
                 Customer rating: <span className="text-amber-500" aria-label={`${rating.stars} of 5 stars`}>{starsText(rating.stars)}</span>{rating.comment ? <> · “{rating.comment}”</> : null}
               </p>
             )}
+            {!isProposal && schedule?.date && (() => {
+              const kind = schedule.status === "done" ? "complete" : "scheduled";
+              const draft = kind === "complete" ? completeMessage(clientName, businessName, invoiceNumber) : scheduledMessage(clientName, businessName, schedule);
+              const body = jobMsg && jobMsg.kind === `${kind}:${draft}` ? jobMsg.text : draft;
+              const sms = reviewSmsHref(clientPhone, body);
+              const mail = mailHref(clientEmail, kind === "complete" ? "Job complete" : "You're scheduled", body);
+              return (
+                <div className="w-full rounded-lg border border-teal-500/30 px-3 py-2 text-sm" data-testid="job-message" data-kind={kind}>
+                  <p className="font-medium">{kind === "complete" ? "Draft: job complete" : "Draft: you're scheduled"} <span className="text-xs font-normal text-[var(--cr-muted)]">You send it yourself.</span></p>
+                  <textarea aria-label="Message to client" name="jobMessage" data-testid="job-message-text" rows={3} className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm" value={body} onChange={(event) => { setJobMsg({ kind: `${kind}:${draft}`, text: event.target.value }); setJobMsgCopied(false); }} />
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {sms && <a href={sms} data-testid="job-message-sms" className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium max-sm:min-h-11">Text</a>}
+                    {mail && <a href={mail} data-testid="job-message-email" className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium max-sm:min-h-11">Email</a>}
+                    <button type="button" data-testid="job-message-copy" className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium max-sm:min-h-11" onClick={() => { void navigator.clipboard?.writeText(body).catch(() => {}); setJobMsgCopied(true); }}>{jobMsgCopied ? "Copied" : "Copy"}</button>
+                  </div>
+                </div>
+              );
+            })()}
             {!isProposal && docId && status === "paid" && (() => {
               const asked = reviewAsked || reviewAskedAt(docId);
               if (!reviewLink.trim()) return <p className="w-full text-xs text-[var(--cr-muted)]" data-testid="review-request-setup">Paid. Add a review link in <Link href="/profile" className="underline">Settings</Link> to ask {clientName.trim() || "this client"} for a review.</p>;
