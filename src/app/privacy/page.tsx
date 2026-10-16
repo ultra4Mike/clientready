@@ -11,9 +11,9 @@ export default function PrivacyPage() {
           <div className="font-semibold">Privacy</div>
         </div>
       </header>
-      <section className="mx-auto my-6 max-w-3xl rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] px-5 py-8 leading-7 text-[var(--cr-text)] opacity-95 shadow-sm sm:my-10 sm:px-10 sm:py-12">
+      <section className="mx-4 my-6 max-w-3xl rounded-2xl sm:mx-auto border border-teal-500/20 bg-[var(--cr-card)] px-5 py-8 leading-7 text-[var(--cr-text)] opacity-95 shadow-sm sm:my-10 sm:px-10 sm:py-12">
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Privacy Policy</h1>
-        <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/40! dark:bg-amber-950/60! dark:text-amber-200!">
           Draft — pending owner/legal review. Not final legal text.
         </p>
         <h2 className="mt-6 text-lg font-semibold text-slate-900">What we store</h2>

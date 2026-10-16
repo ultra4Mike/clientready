@@ -11,7 +11,7 @@ export default function TermsPage() {
           <div className="font-semibold">Terms</div>
         </div>
       </header>
-      <section className="mx-auto my-6 max-w-3xl rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] px-5 py-8 leading-7 text-[var(--cr-text)] opacity-95 shadow-sm sm:my-10 sm:px-10 sm:py-12">
+      <section className="mx-4 my-6 max-w-3xl rounded-2xl sm:mx-auto border border-teal-500/20 bg-[var(--cr-card)] px-5 py-8 leading-7 text-[var(--cr-text)] opacity-95 shadow-sm sm:my-10 sm:px-10 sm:py-12">
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Terms of Use</h1>
         <p className="mt-5">
           ClientReady is a document and job-tracking tool for small businesses.
