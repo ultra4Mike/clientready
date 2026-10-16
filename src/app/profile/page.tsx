@@ -18,6 +18,9 @@ const emptyProfile = {
   logo: "",
   paymentLink: "",
   setAsidePercent: "30",
+  lateFeeType: "off",
+  lateFeeValue: "",
+  lateFeeGraceDays: "0",
 };
 
 export default function ProfilePage() {
@@ -59,6 +62,9 @@ export default function ProfilePage() {
         logo: row.logo || "",
         paymentLink: row.payment_link || "",
         setAsidePercent: local.setAsidePercent || "30",
+        lateFeeType: row.late_fee_type || local.lateFeeType || "off",
+        lateFeeValue: row.late_fee_value ?? local.lateFeeValue ?? "",
+        lateFeeGraceDays: row.late_fee_grace_days ?? local.lateFeeGraceDays ?? "0",
       });
     }
 
@@ -83,7 +89,7 @@ export default function ProfilePage() {
     const { data } = await supabase.auth.getUser();
     const user = data.user;
     if (user) {
-      const { error } = await supabase.from("profiles").upsert({
+      const row = {
         id: user.id,
         business_name: profile.businessName,
         owner_name: profile.ownerName,
@@ -96,7 +102,11 @@ export default function ProfilePage() {
         payment_link: profile.paymentLink,
         logo: profile.logo,
         updated_at: new Date().toISOString(),
-      });
+      };
+      const lateFees = { late_fee_type: profile.lateFeeType, late_fee_value: profile.lateFeeValue, late_fee_grace_days: profile.lateFeeGraceDays };
+      let { error } = await supabase.from("profiles").upsert({ ...row, ...lateFees });
+      // Before migration 20261015120000 runs there are no late fee columns: save the rest (late fees stay on this device).
+      if (error && /late_fee/.test(error.message || "")) ({ error } = await supabase.from("profiles").upsert(row));
       if (error) {
         setMessage("Saved on this computer. Cloud save failed: " + error.message);
         setSaved(true);
@@ -202,6 +212,19 @@ export default function ProfilePage() {
           <input className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="30" value={profile.setAsidePercent} onChange={(event) => update("setAsidePercent", event.target.value)} />
         </label>
         <p className="-mt-1 text-xs text-[var(--cr-muted)]">Default is 30%. This is a cushion for taxes. It is not a tax return.</p>
+        <fieldset className="space-y-2" data-testid="late-fee-settings">
+          <legend className="text-sm font-medium text-[var(--cr-muted)]">Late fee (suggested only, you add it yourself)</legend>
+          <div className="grid grid-cols-3 gap-2">
+            <select aria-label="Late fee type" data-testid="late-fee-type" className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm" value={profile.lateFeeType} onChange={(event) => update("lateFeeType", event.target.value)}>
+              <option value="off">Off</option>
+              <option value="flat">Flat $</option>
+              <option value="percent">% of unpaid</option>
+            </select>
+            <input aria-label="Late fee amount" data-testid="late-fee-value" inputMode="decimal" placeholder={profile.lateFeeType === "percent" ? "5" : "25"} className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm" value={profile.lateFeeValue} onChange={(event) => update("lateFeeValue", event.target.value)} disabled={profile.lateFeeType === "off"} />
+            <input aria-label="Grace days after due date" data-testid="late-fee-grace" inputMode="numeric" placeholder="Grace days" className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm" value={profile.lateFeeGraceDays} onChange={(event) => update("lateFeeGraceDays", event.target.value)} disabled={profile.lateFeeType === "off"} />
+          </div>
+          <p className="text-xs text-[var(--cr-muted)]">After the due date plus grace days, an unpaid invoice shows a suggested late fee. Nothing is added or sent unless you tap it.</p>
+        </fieldset>
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
           Logo
           <input type="file" accept="image/*" className={`mt-1.5 block w-full rounded-lg border border-dashed border-teal-500/40 p-3 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-teal-500 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-slate-950! ${profile.logo ? "text-[var(--cr-muted)]/60 text-xs" : ""}`} onChange={(event) => handleLogo(event.target.files?.[0])} />

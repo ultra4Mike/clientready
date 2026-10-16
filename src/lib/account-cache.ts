@@ -1,6 +1,22 @@
 import { supabase } from "@/lib/supabase";
 import { fetchCloudDocuments, type CloudDoc } from "@/lib/cloud-docs";
 import { flushDeletes } from "@/lib/doc-tombstones";
+
+/** Late fee settings from the profile row; before migration 120000 (no columns) keep this device's values. */
+function lateFeeFields(row: Record<string, unknown>) {
+  let local: Record<string, unknown> = {};
+  try {
+    local = JSON.parse(window.localStorage.getItem("clientready-profile") || "{}") || {};
+  } catch {
+    local = {};
+  }
+  const has = "late_fee_type" in row;
+  return {
+    lateFeeType: has ? row.late_fee_type || "off" : local.lateFeeType || "off",
+    lateFeeValue: has ? row.late_fee_value ?? "" : local.lateFeeValue ?? "",
+    lateFeeGraceDays: has ? row.late_fee_grace_days ?? "0" : local.lateFeeGraceDays ?? "0",
+  };
+}
 import { DOCS_KEY, mergeDocs, OWNER_KEY, parkDocsFor, parkUnsyncedDocs, syncLocalDocs, takeParkedDocs } from "@/lib/doc-sync";
 
 const keys = [
@@ -71,6 +87,7 @@ export async function loadAccountIntoCache(): Promise<boolean> {
         logo: profile.logo || "",
         paymentLink: profile.payment_link || "",
         setAsidePercent: profile.set_aside_percent || "30",
+        ...lateFeeFields(profile),
       })
     );
   }

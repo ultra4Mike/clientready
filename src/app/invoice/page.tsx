@@ -17,6 +17,7 @@ import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
 import { getTrialState } from "@/lib/trial";
 import { syncClientContact } from "@/lib/client-sync";
+import { readLateFeeSettings, suggestedLateFee, type LateFeeSettings } from "@/lib/late-fees";
 import { saveCrewJobs } from "@/lib/crew";
 import { balanceDue, paidTotal, paymentFields, paymentMethods, readPayments, type Payment } from "@/lib/payments";
 import { JobPhotosEditor, JobPhotoStrip } from "@/components/JobPhotos";
@@ -211,6 +212,7 @@ export default function NewInvoicePage() {
   const [daysLeft, setDaysLeft] = useState(14);
 
   const isProposal = docKind === "proposal";
+  const [lateFeeSettings, setLateFeeSettings] = useState<LateFeeSettings>(() => readLateFeeSettings(null));
 
   useEffect(() => {
     const raw = window.localStorage.getItem("clientready-profile");
@@ -223,6 +225,7 @@ export default function NewInvoicePage() {
     setPaymentLink(profile.paymentLink || "");
     setLogo(profile.logo || "");
     setSetAsidePercent(profile.setAsidePercent || "30");
+    setLateFeeSettings(readLateFeeSettings(profile));
   }, []);
 
   useEffect(() => {
@@ -417,6 +420,15 @@ export default function NewInvoicePage() {
   function addPayment() {
     setPayments((current) => [...current, { id: Date.now().toString(), amount: current.length ? "" : (totals.balance || totals.total).toFixed(2), method: "Cash", date: ymd(new Date()), ref: "" }]);
   }
+  const lateFee = isProposal || !docId ? null : suggestedLateFee({ settings: lateFeeSettings, status, dueDate, balance: totals.balance, items, today: ymd(new Date()) });
+
+  /** Owner tap: append the suggested late fee as its own line. Existing lines stay as they are; nothing is saved until the owner saves. */
+  function addLateFee() {
+    if (!lateFee || locked) return;
+    setItems((current) => [...current, { description: lateFee.description, qty: "1", rate: lateFee.amount.toFixed(2) }]);
+    setSaveMessage(`Late fee of $${lateFee.amount.toFixed(2)} added as a new line. Review it, then save.`);
+  }
+
   /** Owner tap: record the remaining balance as a cash payment dated today, mark the invoice paid, and save. */
   async function markPaidCash() {
     const amount = totals.balance;
@@ -1058,6 +1070,12 @@ export default function NewInvoicePage() {
           <div className="print-hide mb-4 flex flex-wrap gap-2 sm:gap-3">
             <button type="button" onClick={() => window.print()} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Print / Save PDF</button>
             {!locked && !isProposal && status !== "paid" && <button type="button" onClick={copyPayLink} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">{paymentLink.trim() ? "Pay / Copy pay link" : "Add how to pay"}</button>}
+            {!locked && lateFee && (
+              <div className="w-full rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" data-testid="late-fee" data-amount={lateFee.amount.toFixed(2)} data-days-late={lateFee.daysLate}>
+                <p>Suggested late fee: <b>${lateFee.amount.toFixed(2)}</b> ({lateFee.daysLate} days past due, {lateFee.how}).{Number(taxPercent) > 0 ? " Tax % applies to it as a line item." : ""}</p>
+                <button type="button" data-testid="late-fee-add" onClick={addLateFee} className="mt-1 rounded-lg border border-amber-500/50 px-3 py-1.5 text-sm font-medium max-sm:min-h-11">Add late fee line</button>
+              </div>
+            )}
             {!locked && !isProposal && docId && status !== "paid" && totals.balance > 0.004 && <button type="button" data-testid="mark-paid-cash" onClick={markPaidCash} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Mark paid in cash (${totals.balance.toFixed(2)})</button>}
             {!isProposal && docId && status !== "draft" && status !== "paid" && totals.balance > 0 && <button type="button" data-testid="invoice-reminder" onClick={() => setReminderOpen((open) => !open)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Reminder</button>}
           </div>
