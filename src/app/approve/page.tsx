@@ -164,7 +164,7 @@ export default function ApprovePage() {
                 Your name (optional)
                 <input aria-label="Your name" value={name} maxLength={100} onChange={(event) => setName(event.target.value)} className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal text-slate-900 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" />
               </label>
-              <button type="button" disabled={busy} onClick={approve} className="w-full rounded-lg bg-emerald-600 px-5 py-2.5 font-semibold text-white shadow-sm transition hover:bg-emerald-500 disabled:opacity-60 sm:w-auto">
+              <button type="button" disabled={busy} onClick={approve} className="min-h-11 w-full rounded-lg bg-emerald-600 px-5 py-2.5 font-semibold text-white shadow-sm transition hover:bg-emerald-500 disabled:opacity-60 sm:w-auto">
                 {busy ? "Approving…" : `Approve ${isProposal ? "proposal" : "invoice"}`}
               </button>
             </div>
