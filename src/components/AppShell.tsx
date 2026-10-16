@@ -107,7 +107,7 @@ useEffect(() => {
         <span className="hidden min-[900px]:inline">{theme === "dark" ? "Light" : "Dark"}</span>
       </button>
       <a href="/profile" className="hidden min-h-11 items-center rounded-lg px-3 transition hover:bg-teal-500/10 hover:text-teal-500 min-[900px]:inline-flex">Profile</a>
-      <button type="button" onClick={logOut} className="hidden min-h-11 items-center rounded-lg px-3 transition hover:bg-teal-500/10 hover:text-teal-500 min-[900px]:inline-flex">
+      <button type="button" onClick={logOut} className="hidden min-h-11 whitespace-nowrap items-center rounded-lg px-3 transition hover:bg-teal-500/10 hover:text-teal-500 min-[900px]:inline-flex">
         Log out
       </button>
     </div>
