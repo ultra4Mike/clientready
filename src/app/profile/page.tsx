@@ -266,6 +266,12 @@ export default function ProfilePage() {
         <button type="submit" className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50 w-full sm:w-auto">Update password</button>
         {passwordMessage && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-[var(--cr-muted)]">{passwordMessage}</p>}
       </form>
+
+      <section id="delete-account" className="scroll-mt-24 mt-6 rounded-2xl border border-rose-500/30 bg-[var(--cr-card)] p-4 shadow-sm sm:p-6" data-testid="settings-delete">
+        <h2 className="text-lg font-bold tracking-tight">Delete account</h2>
+        <p className="mt-1 text-sm text-[var(--cr-muted)]">Permanently delete your login and all your business data.</p>
+        <a href="/account/delete" className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-rose-600 px-4 text-sm font-semibold text-white" data-testid="settings-delete-open">Delete account</a>
+      </section>
         </div>
       </div>
       <div data-testid="settings-legal" className="mt-6 flex items-center gap-3 border-t border-teal-500/15 pt-4 text-sm">

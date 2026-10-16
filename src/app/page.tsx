@@ -6,6 +6,12 @@ import { useEffect, useState } from "react";
 
 export default function HomePage() {
   const [theme, setTheme] = useState("dark");
+  const [deleted, setDeleted] = useState(false);
+  useEffect(() => {
+    const done = new URLSearchParams(window.location.search).get("deleted") === "1";
+    if (done) window.history.replaceState(null, "", "/");
+    setDeleted(done);
+  }, []);
 
   useEffect(() => {
     const saved = window.localStorage.getItem("clientready-theme") || "dark";
@@ -25,6 +31,7 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-[var(--cr-bg)] text-[var(--cr-text)]">
+      {deleted && <p role="status" data-testid="account-deleted" className="bg-emerald-600 px-4 py-2 text-center text-sm font-medium text-white">Your account was deleted.</p>}
       <header className="sticky top-0 z-20 border-b border-teal-500/20 bg-[var(--cr-panel)] print:hidden">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3 sm:py-4">
           <Link href="/" className="flex items-center gap-2 font-semibold">
