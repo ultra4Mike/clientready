@@ -1,3 +1,4 @@
+import { clientFromRow, readCachedClients } from "@/lib/client-rows";
 import { supabase } from "@/lib/supabase";
 import { fetchCloudDocuments, type CloudDoc } from "@/lib/cloud-docs";
 import { flushDeletes } from "@/lib/doc-tombstones";
@@ -36,6 +37,7 @@ const keys = [
   "clientready-mileage",
   "clientready-inventory",
 ];
+
 
 /** Wipes the business cache (sign-out). Never-uploaded documents are parked for the same account first. */
 export function clearLocalBusiness() {
@@ -111,18 +113,7 @@ export async function loadAccountIntoCache(): Promise<boolean> {
   if (!clientsError && clients) window.localStorage.setItem(
     "clientready-clients",
     JSON.stringify(
-      clients.map((row) => ({
-        id: row.id,
-        name: row.name || "",
-        company: row.company || "",
-        email: row.email || "",
-        phone: row.phone || "",
-        address: row.address || "",
-        nextVisit: row.next_visit || "",
-        visitTime: row.visit_time || "",
-        notes: row.notes || "",
-        ...(typeof row.updated_at === "string" && row.updated_at ? { updated_at: row.updated_at } : {}),
-      }))
+      clients.map((row) => clientFromRow(row as Record<string, unknown>, readCachedClients()))
     )
   );
 

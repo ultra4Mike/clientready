@@ -1,5 +1,6 @@
 "use client";
 
+import { clientFromRow, readCachedClients } from "@/lib/client-rows";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
@@ -20,6 +21,7 @@ type Client = {
   nextVisit: string;
   visitTime: string;
   notes: string;
+  preferences?: string;
   updated_at?: string; // cloud baseline for the contact retry queue (absent before migration 20261016000000)
 };
 
@@ -32,21 +34,11 @@ const emptyClient = {
   nextVisit: "",
   visitTime: "",
   notes: "",
+  preferences: "",
 };
 
 function fromRow(row: Record<string, string>) {
-  return {
-    id: row.id,
-    name: row.name || "",
-    company: row.company || "",
-    email: row.email || "",
-    phone: row.phone || "",
-    address: row.address || "",
-    nextVisit: row.next_visit || "",
-    visitTime: row.visit_time || "",
-    notes: row.notes || "",
-    ...(typeof row.updated_at === "string" && row.updated_at ? { updated_at: row.updated_at } : {}),
-  };
+  return clientFromRow(row, readCachedClients());
 }
 
 export default function ClientsPage() {
@@ -118,21 +110,24 @@ export default function ClientsPage() {
       );
       saveLocal(next);
       if (userId) {
-        const { data: saved, error } = await supabase
-          .from("clients")
-          .update({
-            name: form.name,
-            company: form.company,
-            email: form.email,
-            phone: form.phone,
-            address: form.address,
-            next_visit: form.nextVisit || null,
-            visit_time: form.visitTime,
-            notes: form.notes,
-          })
-          .eq("id", editingId)
-          .eq("user_id", userId)
-          .select("*");
+        const fields = {
+          name: form.name,
+          company: form.company,
+          email: form.email,
+          phone: form.phone,
+          address: form.address,
+          next_visit: form.nextVisit || null,
+          visit_time: form.visitTime,
+          notes: form.notes,
+          preferences: form.preferences,
+        };
+        let { data: saved, error } = await supabase.from("clients").update(fields).eq("id", editingId).eq("user_id", userId).select("*");
+        // Before migration 20261016060000 there is no preferences column: save the rest, keep preferences on this device.
+        if (error && /preferences/.test(error.message || "")) {
+          const { preferences: _p, ...rest } = fields;
+          void _p;
+          ({ data: saved, error } = await supabase.from("clients").update(rest).eq("id", editingId).eq("user_id", userId).select("*"));
+        }
         // Carry the server's new updated_at into the cache (baseline for later queued contact changes).
         const savedAt = !error && Array.isArray(saved) ? (saved[0] as { updated_at?: unknown } | undefined)?.updated_at : undefined;
         if (typeof savedAt === "string" && savedAt) {
@@ -150,21 +145,25 @@ export default function ClientsPage() {
     }
 
     if (userId) {
-      const { data, error } = await supabase
-        .from("clients")
-        .insert({
-          user_id: userId,
-          name: form.name,
-          company: form.company,
-          email: form.email,
-          phone: form.phone,
-          address: form.address,
-          next_visit: form.nextVisit || null,
-          visit_time: form.visitTime,
-          notes: form.notes,
-        })
-        .select("*")
-        .single();
+      const fields = {
+        user_id: userId,
+        name: form.name,
+        company: form.company,
+        email: form.email,
+        phone: form.phone,
+        address: form.address,
+        next_visit: form.nextVisit || null,
+        visit_time: form.visitTime,
+        notes: form.notes,
+        preferences: form.preferences,
+      };
+      let { data, error } = await supabase.from("clients").insert(fields).select("*").single();
+      if (error && /preferences/.test(error.message || "")) {
+        const { preferences: _p, ...rest } = fields;
+        void _p;
+        ({ data, error } = await supabase.from("clients").insert(rest).select("*").single());
+        if (!error && data) data = { ...data, preferences: form.preferences };
+      }
       if (error || !data) {
         saveLocal([...clients, { id: Date.now().toString(), ...form }]);
         setMessage("Saved locally. Cloud save failed: " + (error?.message || ""));
@@ -197,6 +196,7 @@ export default function ClientsPage() {
       nextVisit: client.nextVisit || "",
       visitTime: client.visitTime || "",
       notes: client.notes || "",
+      preferences: client.preferences || "",
     });
   }
 
@@ -265,6 +265,7 @@ export default function ClientsPage() {
             </label>
             </div>
             <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+            <textarea name="preferences" aria-label="Client preferences" data-testid="client-preferences-input" className="min-h-16 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Preferences: text or call, gate code, pets, best times…" value={form.preferences} onChange={(event) => setForm({ ...form, preferences: event.target.value })} />
             <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:justify-end">
               <button type="submit" className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">{editingId ? "Update client" : "Save client"}</button>
               <button type="button" onClick={cancelEdit} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Cancel</button>
@@ -297,7 +298,7 @@ export default function ClientsPage() {
                 {client.nextVisit ? <p className="font-medium"><span className="md:hidden">Next visit: </span>{client.nextVisit}</p> : <p className="hidden text-slate-500 md:block">—</p>}
                 {client.visitTime && <p className="text-slate-600">{client.visitTime}</p>}
               </div>
-              <p className="line-clamp-2 text-sm text-slate-600">{client.notes}</p>
+              <div className="min-w-0 text-sm text-slate-600"><p className="line-clamp-2">{client.notes}</p>{client.preferences && <p className="line-clamp-2" data-testid="client-preferences"><span className="font-medium">Prefers:</span> {client.preferences}</p>}</div>
               <div className="grid grid-cols-3 gap-2 md:flex md:justify-end">
                 <button type="button" aria-expanded={portalFor === client.id} data-testid="client-portal-toggle" onClick={() => setPortalFor(portalFor === client.id ? "" : client.id)} className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition sm:min-h-0 ${portalFor === client.id ? "border-teal-400 bg-teal-500/15 text-teal-700 dark:text-teal-300" : "border-slate-300 hover:border-teal-500"}`}><span aria-hidden="true">🔗</span>Portal</button>
                 <button type="button" onClick={() => editClient(client)} className="min-h-11 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium transition hover:border-teal-500 sm:min-h-10">Edit</button>

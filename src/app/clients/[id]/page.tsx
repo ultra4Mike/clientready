@@ -1,5 +1,6 @@
 "use client";
 
+import { clientFromRow, readCachedClients } from "@/lib/client-rows";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -38,7 +39,8 @@ export default function ClientRecordPage() {
       if (data.user) {
         const { data: rows } = await supabase.from("clients").select("*").eq("user_id", data.user.id);
         if (Array.isArray(rows) && rows.length) {
-          const next = rows.map((row) => ({ id: row.id, name: row.name || "", company: row.company || "", email: row.email || "", phone: row.phone || "", address: row.address || "", notes: row.notes || "", ...(typeof row.updated_at === "string" && row.updated_at ? { updated_at: row.updated_at } : {}) }));
+          const cached = readCachedClients();
+          const next = rows.map((row) => clientFromRow(row as Record<string, unknown>, cached));
           window.localStorage.setItem("clientready-clients", JSON.stringify(next));
         }
       }
@@ -80,6 +82,7 @@ export default function ClientRecordPage() {
                   <div className="min-w-0 [&>[data-page-header]]:mb-1 [&>[data-page-header]]:border-0 [&>[data-page-header]]:pb-0 [&_h2]:break-words">
                     <PageHeader title={client.name} subtitle={<span className="flex flex-wrap gap-x-1.5 gap-y-0.5">{[client.company, client.email, client.phone].filter(Boolean).map((part, index, all) => <span key={index} className="inline-block max-w-full truncate whitespace-nowrap">{part}{index < all.length - 1 && <span aria-hidden="true" className="ml-1.5">·</span>}</span>)}</span>} />
                     {client.address && <p className="text-sm text-[var(--cr-muted)]" data-testid="client-address">{client.address}</p>}
+                    {(client as { preferences?: string }).preferences && <p className="text-sm" data-testid="client-preferences"><span className="font-medium">Prefers:</span> {(client as { preferences?: string }).preferences}</p>}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0 sm:flex-wrap sm:justify-end">

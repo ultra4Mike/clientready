@@ -27,6 +27,7 @@ import { currentDocId } from "@/lib/doc-sync";
 import { isQuotaError, readPhotos, type JobPhoto } from "@/lib/photos";
 import LineSplit from "@/components/LineSplit";
 import { completeMessage, mailHref, scheduledMessage } from "@/lib/job-messages";
+import { clientFromRow, readCachedClients } from "@/lib/client-rows";
 import { ownerRating, starsText, type Rating } from "@/lib/ratings";
 import { applyPackage, deletePackage, readPackages, savePackage, syncPackages, type JobPackage } from "@/lib/packages";
 import ReminderPanel from "@/components/ReminderPanel";
@@ -46,7 +47,7 @@ import { readSignature, type Signature } from "@/lib/signature";
 import { amountOf, documentTotals, discountLabel, normalizeDiscountType, type DiscountType } from "@/lib/discount";
 
 type LineItem = { description: string; qty: string; rate: string; category?: LineCategory };
-type SavedClient = { id: string; name: string; company: string; email: string; phone: string; address: string };
+type SavedClient = { id: string; name: string; company: string; email: string; phone: string; address: string; preferences?: string };
 type SavedDocument = { id: string; type: "invoice" | "proposal"; title: string; clientName: string; createdAt: string; data: Record<string, unknown> };
 type OtherFee = { id: string; name: string; amount: string };
 type JobCosts = {
@@ -270,14 +271,7 @@ export default function NewInvoicePage() {
       if (!user) return;
       const { data: rows } = await supabase.from("clients").select("*").eq("user_id", user.id);
       if (!rows) return;
-      const next = rows.map((row) => ({
-        id: row.id,
-        name: row.name || "",
-        company: row.company || "",
-        email: row.email || "",
-        phone: row.phone || "",
-        address: row.address || "",
-      }));
+      const next = rows.map((row) => clientFromRow(row as Record<string, unknown>, readCachedClients()));
       setSavedClients(next);
       window.localStorage.setItem("clientready-clients", JSON.stringify(next));
     }
@@ -846,6 +840,7 @@ export default function NewInvoicePage() {
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Client email" value={clientEmail} onChange={(event) => setClientEmail(event.target.value)} />
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Client phone" value={clientPhone} onChange={(event) => setClientPhone(event.target.value)} />
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Client address" value={clientAddress} onChange={(event) => setClientAddress(event.target.value)} />
+            {(() => { const prefs = savedClients.find((client) => client.id === docClientId)?.preferences?.trim(); return prefs ? <p className="print-hide rounded-lg border border-teal-500/30 bg-teal-500/5 px-3 py-2 text-sm" data-testid="invoice-client-preferences"><span className="font-medium">Client prefers:</span> {prefs}</p> : null; })()}
             <button type="button" onClick={saveClientFromForm} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Save as client</button>
             </Section>
             <Section id="details" label="Details" className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
