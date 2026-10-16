@@ -459,3 +459,7 @@ html.dark #crew-spend .cr-tone-warn, html.dark #crew-spend .cr-tone-warn * { bac
 html.dark #crew-spend .cr-tone-good, html.dark #crew-spend .cr-tone-good * { background-color: rgba(6, 78, 59, 0.45) !important; color: #a7f3d0 !important; border-color: rgba(4, 120, 87, 0.7) !important; }
 html.dark #crew-spend .cr-tone-bad *, html.dark #crew-spend .cr-tone-warn *, html.dark #crew-spend .cr-tone-good * { background-color: transparent !important; }
 html.dark #crew-spend a { color: #5eead4 !important; }
+
+/* Crew page: slightly brighter meta text in dark mode. */
+html.dark .crew-page { --cr-muted: #cde6e2; }
+html.dark .crew-page .owner-costs [data-testid="report-cost-line"] { background-color: #10262c !important; border-color: rgba(45, 212, 191, 0.25) !important; }

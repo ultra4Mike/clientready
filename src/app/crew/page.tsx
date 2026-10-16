@@ -49,8 +49,8 @@ type CostDraft = { id: string; kind: CrewKind; amount: string; note: string; rec
 const newCostLine = (): CostDraft => ({ id: Math.random().toString(36).slice(2), kind: "parts", amount: "", note: "", receipt: "" });
 // Same keys and names as the owner's job costs ("Crew spend vs your estimate" rows).
 const KINDS = CREW_KINDS.map(({ kind, label }) => [kind, label] as const);
-const input = "w-full rounded-xl border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30";
-const cardClass = "rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5";
+const input = "min-h-11 w-full rounded-xl border border-teal-700/40 bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-slate-500 dark:border-teal-500/30 dark:placeholder:text-slate-400 transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30";
+const cardClass = "rounded-2xl border border-teal-700/30 bg-[var(--cr-card)] dark:border-teal-500/20 p-4 shadow-sm sm:p-5";
 
 function ymd(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -435,7 +435,7 @@ export default function CrewPage() {
       <article key={`${card.id}`} className={`${cardClass}${past ? " opacity-80" : ""}`} data-testid={`crew-card-${card.doc_id}`} data-past={past ? "true" : "false"} data-today={when === "today" ? "true" : "false"} data-group={when} data-completed={status === "done" ? "true" : "false"}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-teal-600 dark:text-teal-300">
+            <p className="text-xs font-semibold uppercase tracking-wide text-teal-800 dark:text-teal-300">
               {card.job_date ? dayLabel(card.job_date) : "No date yet"}
               {card.start_time ? ` · ${timeLabel(card.start_time)}${card.end_time ? `–${timeLabel(card.end_time)}` : ""}` : ""}
             </p>
@@ -446,7 +446,7 @@ export default function CrewPage() {
 
         <div className="mt-3 grid grid-cols-2 gap-2 text-sm [&>*]:min-w-0 [&>*]:break-words">
           {card.client_phone
-            ? <a href={`tel:${card.client_phone}`} className="flex min-h-11 items-center justify-center rounded-xl border border-teal-500/30 px-3 py-2 text-center font-medium transition hover:border-teal-400 hover:bg-teal-500/10" data-testid={`call-${card.doc_id}`} data-action="call">📞 Call {card.client_phone}</a>
+            ? <a href={`tel:${card.client_phone}`} className="flex min-h-11 items-center justify-center rounded-xl border border-teal-500/30 px-3 py-2 text-center font-medium transition hover:border-teal-400 hover:bg-teal-500/10" data-testid={`call-${card.doc_id}`} data-action="call"><span className="flex flex-col items-center leading-tight"><span>📞 Call</span><span className="whitespace-nowrap text-xs font-normal tabular-nums opacity-80">{card.client_phone}</span></span></a>
             : <span className="flex min-h-11 items-center justify-center rounded-xl border border-dashed border-teal-500/20 px-3 py-2 text-center opacity-50">No phone</span>}
           {mapUrl
             ? <a href={mapUrl} target="_blank" rel="noreferrer" className="flex min-h-11 items-center justify-center rounded-xl border border-teal-500/30 px-3 py-2 text-center font-medium transition hover:border-teal-400 hover:bg-teal-500/10" data-testid={`map-${card.doc_id}`} data-action="map">📍 Map</a>
@@ -460,11 +460,11 @@ export default function CrewPage() {
 
         {card.scheduled && card.items.length > 0 && (
           <fieldset className="mt-3 space-y-1 rounded-xl border border-teal-500/30 p-3 text-sm" data-testid={`crew-checklist-${card.doc_id}`}>
-            <legend className="px-1 font-semibold">Checklist · {checklistProgress(card.items).done}/{card.items.length}</legend>
+            <legend className="flex items-center gap-2 px-1 font-semibold">Checklist <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold tabular-nums ${checklistProgress(card.items).complete ? "cr-tone-good border-emerald-300 bg-emerald-50 text-emerald-800" : "cr-tone-warn border-amber-300 bg-amber-50 text-amber-900"}`}>{checklistProgress(card.items).done}/{card.items.length}</span></legend>
             {card.items.map((item) => (
-              <label key={item.id} className="flex min-h-11 cursor-pointer items-center gap-3" data-testid="checklist-item" data-done={item.done ? "1" : "0"}>
-                <input type="checkbox" className="h-5 w-5 accent-teal-500" checked={Boolean(item.done)} disabled={Boolean(card.done_confirmed)} onChange={(event) => tickItem(card, item.id, event.target.checked)} data-testid={`check-${item.id}`} />
-                <span className={item.done ? "line-through opacity-60" : ""}>{item.text}</span>
+              <label key={item.id} className="-mx-1 flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-1 py-1 transition hover:bg-teal-500/5" data-testid="checklist-item" data-done={item.done ? "1" : "0"}>
+                <input type="checkbox" className="h-6 w-6 shrink-0 cursor-pointer rounded accent-teal-600 disabled:cursor-not-allowed" checked={Boolean(item.done)} disabled={Boolean(card.done_confirmed)} onChange={(event) => tickItem(card, item.id, event.target.checked)} data-testid={`check-${item.id}`} />
+                <span className={item.done ? "text-[var(--cr-muted)] line-through opacity-70" : ""}>{item.text}</span>
               </label>
             ))}
           </fieldset>
@@ -508,7 +508,7 @@ export default function CrewPage() {
             <button type="button" disabled={busy !== "" || donePhotos.length === 0 || !checklistProgress(card.items).complete} onClick={() => markDone(card)} data-testid={`done-submit-${card.doc_id}`} className="min-h-11 w-full rounded-xl bg-teal-500 px-4 py-2.5 font-semibold text-slate-950 disabled:opacity-50">
               Mark done
             </button>
-            {!checklistProgress(card.items).complete && <p className="text-xs text-amber-600" data-testid="checklist-remaining">Tick every checklist item first ({card.items.length - checklistProgress(card.items).done} left).</p>}
+            {!checklistProgress(card.items).complete && <p className="cr-tone-warn inline-flex rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900" data-testid="checklist-remaining">Tick every checklist item first ({card.items.length - checklistProgress(card.items).done} left).</p>}
             {donePhotos.length === 0 && <p className="text-xs text-[var(--cr-muted)]">Add at least one photo to mark the job done.</p>}
           </div>
         )}
@@ -561,7 +561,7 @@ export default function CrewPage() {
 
         <div className="mt-3">
           {spendOpen === card.doc_id ? (
-            <div className="space-y-3 rounded-xl border border-teal-500/30 p-3 sm:p-4" data-testid={`expense-form-${card.doc_id}`}>
+            <div className="space-y-3 border-t border-teal-500/20 pt-3" data-testid={`expense-form-${card.doc_id}`}>
               <div className="grid grid-cols-2 gap-2">
                 <select aria-label="Category" className={input} value={spend.kind} onChange={(event) => setSpend({ ...spend, kind: event.target.value })}>
                   {KINDS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -576,12 +576,12 @@ export default function CrewPage() {
               {/* eslint-disable-next-line @next/next/no-img-element -- local data URL preview */}
               {spend.receipt && <img src={spend.receipt} alt="Receipt preview" className="max-h-40 rounded-lg" data-testid="receipt-preview" />}
               <div className="flex gap-2">
-                <button type="button" disabled={busy !== ""} onClick={() => saveExpense(card)} className="flex-1 rounded-xl bg-teal-500 px-3 py-2.5 font-semibold text-slate-950! transition hover:bg-teal-400 disabled:opacity-60">Save expense</button>
-                <button type="button" onClick={() => setSpendOpen("")} className="rounded-xl border border-teal-500/30 px-4 py-2.5 font-medium transition hover:border-teal-400">Cancel</button>
+                <button type="button" disabled={busy !== ""} onClick={() => saveExpense(card)} className="min-h-11 flex-1 rounded-xl bg-teal-500 px-3 py-2.5 font-semibold text-slate-950! transition hover:bg-teal-400 disabled:opacity-60">Save expense</button>
+                <button type="button" onClick={() => setSpendOpen("")} className="min-h-11 min-w-24 rounded-xl border border-teal-700/40 px-4 py-2.5 font-medium transition hover:border-teal-400 hover:bg-teal-500/10 dark:border-teal-500/40">Cancel</button>
               </div>
             </div>
           ) : (
-            <button type="button" data-testid={`add-expense-${card.doc_id}`} onClick={() => { setSpend({ kind: "parts", amount: "", note: "", receipt: "" }); setSpendOpen(card.doc_id); }} className="w-full rounded-xl border border-teal-500/40 px-3 py-2.5 text-sm font-medium transition hover:border-teal-400 hover:bg-teal-500/10">
+            <button type="button" data-testid={`add-expense-${card.doc_id}`} onClick={() => { setSpend({ kind: "parts", amount: "", note: "", receipt: "" }); setSpendOpen(card.doc_id); }} className="min-h-11 w-full rounded-xl border border-teal-700/40 px-3 py-2.5 text-sm font-medium transition hover:border-teal-400 hover:bg-teal-500/10 dark:border-teal-500/40">
               🧾 Add expense / receipt
             </button>
           )}
@@ -607,7 +607,7 @@ export default function CrewPage() {
   const tabs: [Tab, string][] = [["today", "Today"], ["week", "This week"], ["hours", "My hours"], ["reports", "Reports"]];
 
   return (
-    <main className="min-h-screen bg-[var(--cr-bg)] pb-24 text-[var(--cr-text)]">
+    <main className="crew-page min-h-screen bg-[var(--cr-bg)] pb-24 text-[var(--cr-text)]">
       <header className="app-topbar sticky top-0 z-10 border-b border-teal-500/20 bg-[var(--cr-bg)] px-4 py-3 shadow-sm print:hidden">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -619,14 +619,13 @@ export default function CrewPage() {
           </div>
           <div className="flex flex-wrap items-center justify-end gap-1 text-sm sm:gap-3">
             {open && <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-200 tabular-nums" data-testid="header-timer">⏱ {fmtTimer((now) - Date.parse(open.started_at))}</span>}
-            <button type="button" onClick={switchTheme} className="tap inline-flex min-h-11 items-center rounded-lg px-2.5 py-2 font-medium sm:px-3 transition hover:bg-teal-500/10">{theme === "dark" ? "Light" : "Dark"}</button>
+            <button type="button" onClick={switchTheme} className="tap inline-flex min-h-11 w-16 items-center justify-center rounded-lg px-2.5 py-2 font-medium sm:px-3 transition hover:bg-teal-500/10">{theme === "dark" ? "Light" : "Dark"}</button>
             <button type="button" className="tap inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-2.5 py-2 font-medium sm:px-3 transition hover:bg-teal-500/10" onClick={async () => { if (!(await confirmLogoutWithQueue(userId))) return; await supabase.auth.signOut(); window.location.href = "/"; }}>Log out</button>
-            <a href="/account/delete" className="tap inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-2.5 py-2 text-sm sm:px-3 text-rose-700 transition hover:bg-rose-500/10 dark:text-rose-300" data-testid="crew-delete-account">Delete account</a>
           </div>
         </div>
-        <nav className="mx-auto mt-3 grid max-w-3xl grid-cols-4 gap-1 rounded-xl border border-teal-500/20 bg-[var(--cr-card)] p-1 text-xs sm:text-sm" role="tablist">
+        <nav className="mx-auto mt-3 grid max-w-3xl grid-cols-4 gap-1 rounded-xl border border-teal-700/30 bg-[var(--cr-card)] dark:border-teal-500/20 p-1 text-xs sm:text-sm" role="tablist">
           {tabs.map(([key, label]) => (
-            <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => { setTab(key); window.scrollTo({ top: 0 }); }} className={`rounded-lg px-1 py-2 font-medium transition ${tab === key ? "bg-teal-500 font-semibold text-slate-950! shadow-sm" : "hover:bg-teal-500/10"}`}>{label}</button>
+            <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => { setTab(key); window.scrollTo({ top: 0 }); }} className={`min-h-11 rounded-lg px-1 py-2 font-medium leading-tight transition ${tab === key ? "bg-teal-500 font-semibold text-slate-950! shadow-sm" : "hover:bg-teal-500/10"}`}>{label}</button>
           ))}
         </nav>
       </header>
@@ -728,50 +727,50 @@ export default function CrewPage() {
 
         {tab === "reports" && (
           <section className="space-y-3">
-            <button type="button" data-testid="report-open" onClick={() => setReportOpen(!reportOpen)} className="w-full rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">{reportOpen ? "Close" : "New job report"}</button>
+            <button type="button" data-testid="report-open" onClick={() => setReportOpen(!reportOpen)} className={`min-h-11 w-full rounded-xl px-4 py-3 font-semibold transition ${reportOpen ? "border border-teal-700/40 hover:bg-teal-500/10 dark:border-teal-500/40" : "bg-teal-500 text-slate-950! shadow-sm hover:bg-teal-400"}`}>{reportOpen ? "Close" : "New job report"}</button>
             {reportOpen && (
               <form onSubmit={saveDraft} className={`${cardClass} space-y-3`}>
-                <select id="report-savedClient" name="savedClient" aria-label="Saved client" className={input} onChange={(event) => { const client = clients.find((item) => item.id === event.target.value); if (client) setForm({ ...form, clientName: client.name, clientPhone: client.phone || "", clientAddress: client.address || "" }); }}>
+                <label className="block space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Client</span><select id="report-savedClient" name="savedClient" aria-label="Saved client" className={input} onChange={(event) => { const client = clients.find((item) => item.id === event.target.value); if (client) setForm({ ...form, clientName: client.name, clientPhone: client.phone || "", clientAddress: client.address || "" }); }}>
                   <option value="">Pick a client</option>
                   {clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
-                </select>
-                <input id="report-clientName" name="clientName" className={input} placeholder="Who it was for" value={form.clientName} onChange={(event) => setForm({ ...form, clientName: event.target.value })} />
-                <input id="report-clientPhone" name="clientPhone" className={input} placeholder="Phone" value={form.clientPhone} onChange={(event) => setForm({ ...form, clientPhone: event.target.value })} />
-                <input id="report-clientAddress" name="clientAddress" className={input} placeholder="Address" value={form.clientAddress} onChange={(event) => setForm({ ...form, clientAddress: event.target.value })} />
-                <textarea id="report-workDone" name="workDone" className={`${input} min-h-20`} placeholder="What was done" value={form.workDone} onChange={(event) => setForm({ ...form, workDone: event.target.value })} />
+                </select></label>
+                <label className="block space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Name</span><input id="report-clientName" name="clientName" className={input} placeholder="Who it was for" value={form.clientName} onChange={(event) => setForm({ ...form, clientName: event.target.value })} /></label>
+                <div className="grid gap-3 sm:grid-cols-2"><label className="block space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Phone</span><input id="report-clientPhone" inputMode="tel" name="clientPhone" className={input} placeholder="Phone" value={form.clientPhone} onChange={(event) => setForm({ ...form, clientPhone: event.target.value })} /></label>
+                <label className="block space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Address</span><input id="report-clientAddress" name="clientAddress" className={input} placeholder="Address" value={form.clientAddress} onChange={(event) => setForm({ ...form, clientAddress: event.target.value })} /></label></div>
+                <label className="block space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Work done</span><textarea id="report-workDone" name="workDone" className={`${input} min-h-20`} placeholder="What was done" value={form.workDone} onChange={(event) => setForm({ ...form, workDone: event.target.value })} /></label>
                 <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
-                  <label className="space-y-1 text-sm font-medium">Date<input id="report-workDate" name="workDate" type="date" className={input} value={form.workDate} onChange={(event) => setForm({ ...form, workDate: event.target.value })} /></label>
-                  <label className="space-y-1 text-sm font-medium">Hours<input id="report-hours" name="hours" className={input} value={form.hours} onChange={(event) => setForm({ ...form, hours: event.target.value })} /></label>
-                  <label className="space-y-1 text-sm font-medium">Start<input id="report-startTime" name="startTime" type="time" className={input} value={form.startTime} onChange={(event) => setForm({ ...form, startTime: event.target.value })} /></label>
-                  <label className="space-y-1 text-sm font-medium">End<input id="report-endTime" name="endTime" type="time" className={input} value={form.endTime} onChange={(event) => setForm({ ...form, endTime: event.target.value })} /></label>
+                  <label className="space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Date</span><input id="report-workDate" name="workDate" type="date" className={input} value={form.workDate} onChange={(event) => setForm({ ...form, workDate: event.target.value })} /></label>
+                  <label className="space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Hours</span><input id="report-hours" name="hours" className={input} value={form.hours} onChange={(event) => setForm({ ...form, hours: event.target.value })} /></label>
+                  <label className="space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Start</span><input id="report-startTime" name="startTime" type="time" className={input} value={form.startTime} onChange={(event) => setForm({ ...form, startTime: event.target.value })} /></label>
+                  <label className="space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">End</span><input id="report-endTime" name="endTime" type="time" className={input} value={form.endTime} onChange={(event) => setForm({ ...form, endTime: event.target.value })} /></label>
                 </div>
-                <fieldset className="space-y-2 rounded-xl border border-teal-500/20 p-3" data-testid="report-costs">
-                  <legend className="px-1 text-sm font-medium">Costs you paid</legend>
+                <fieldset className="owner-costs space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-slate-900" data-testid="report-costs">
+                  <legend className="rounded-md px-1 text-sm font-medium">Costs you paid</legend>
                   {costLines.map((line, index) => (
-                    <div key={line.id} className="space-y-2 border-b border-teal-500/10 pb-2 last:border-0 last:pb-0" data-testid="report-cost-line">
-                      <div className="grid grid-cols-2 gap-2">
-                        <select aria-label={`Cost ${index + 1} category`} data-testid="report-cost-kind" id={`report-cost-${index}-kind`} name={`costs[${index}].kind`} className={input} value={line.kind} onChange={(event) => setCostLines((current) => current.map((item) => (item.id === line.id ? { ...item, kind: event.target.value as CrewKind } : item)))}>
+                    <div key={line.id} className="space-y-2 rounded-lg border border-slate-200 bg-white p-2.5" data-testid="report-cost-line">
+                      <div className="grid grid-cols-[minmax(0,1fr)_7.5rem] gap-2">
+                        <select aria-label={`Cost ${index + 1} category`} data-testid="report-cost-kind" id={`report-cost-${index}-kind`} name={`costs[${index}].kind`} className={`${input} bg-white`} value={line.kind} onChange={(event) => setCostLines((current) => current.map((item) => (item.id === line.id ? { ...item, kind: event.target.value as CrewKind } : item)))}>
                           {KINDS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                         </select>
-                        <input aria-label={`Cost ${index + 1} amount`} data-testid="report-cost-amount" id={`report-cost-${index}-amount`} name={`costs[${index}].amount`} inputMode="decimal" className={input} placeholder="Amount $" value={line.amount} onChange={(event) => setCostLines((current) => current.map((item) => (item.id === line.id ? { ...item, amount: event.target.value } : item)))} />
+                        <input aria-label={`Cost ${index + 1} amount`} data-testid="report-cost-amount" id={`report-cost-${index}-amount`} name={`costs[${index}].amount`} inputMode="decimal" className={`${input} bg-white text-right tabular-nums`} placeholder="Amount $" value={line.amount} onChange={(event) => setCostLines((current) => current.map((item) => (item.id === line.id ? { ...item, amount: event.target.value } : item)))} />
                       </div>
-                      <input aria-label={`Cost ${index + 1} note`} data-testid="report-cost-note" id={`report-cost-${index}-note`} name={`costs[${index}].note`} className={input} placeholder="What it was" value={line.note} onChange={(event) => setCostLines((current) => current.map((item) => (item.id === line.id ? { ...item, note: event.target.value } : item)))} />
+                      <input aria-label={`Cost ${index + 1} note`} data-testid="report-cost-note" id={`report-cost-${index}-note`} name={`costs[${index}].note`} className={`${input} bg-white`} placeholder="What it was" value={line.note} onChange={(event) => setCostLines((current) => current.map((item) => (item.id === line.id ? { ...item, note: event.target.value } : item)))} />
                       <div className="flex flex-wrap items-center gap-2">
-                        <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-teal-500/50 px-3 text-sm font-medium transition hover:bg-teal-500/10">
-                          📷 {line.receipt ? "Retake receipt" : "Receipt photo (optional)"}
+                        <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-400 px-3 text-sm font-medium transition hover:border-teal-500 hover:bg-teal-500/10">
+                          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>{line.receipt ? "Retake receipt" : "Receipt photo (optional)"}
                           <input aria-label={`Cost ${index + 1} receipt photo`} data-testid="report-cost-receipt" id={`report-cost-${index}-receipt`} name={`costs[${index}].receipt`} type="file" accept="image/*" capture="environment" className="sr-only" onClick={nativePhotoClick((files) => pickLineReceipt(line.id, files[0]))} onChange={(event) => { pickLineReceipt(line.id, event.target.files?.[0]); event.target.value = ""; }} />
                         </label>
                         {/* eslint-disable-next-line @next/next/no-img-element -- local data URL preview */}
                         {line.receipt && <img src={line.receipt} alt={`Receipt ${index + 1}`} className="h-11 w-11 rounded-lg object-cover" data-testid="report-cost-receipt-preview" />}
-                        {costLines.length > 1 && <button type="button" data-testid="report-cost-remove" className="ml-auto min-h-11 rounded-xl border border-rose-500/40 px-3 text-sm font-medium text-rose-600 dark:text-rose-300" onClick={() => setCostLines((current) => current.filter((item) => item.id !== line.id))}>Remove</button>}
+                        {costLines.length > 1 && <button type="button" data-testid="report-cost-remove" className="ml-auto min-h-11 rounded-lg border border-rose-500/40 px-3 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10 dark:text-rose-300" onClick={() => setCostLines((current) => current.filter((item) => item.id !== line.id))}>Remove</button>}
                       </div>
                     </div>
                   ))}
-                  {costLines.length < 20 && <button type="button" data-testid="report-cost-add" className="min-h-11 w-full rounded-xl border border-teal-500/40 px-3 text-sm font-medium transition hover:border-teal-400 hover:bg-teal-500/10" onClick={() => setCostLines((current) => [...current, newCostLine()])}>＋ Add another cost</button>}
+                  {costLines.length < 20 && <button type="button" data-testid="report-cost-add" className="min-h-11 w-full rounded-lg bg-teal-500 px-3 text-sm font-semibold text-slate-950! transition hover:bg-teal-400" onClick={() => setCostLines((current) => [...current, newCostLine()])}>＋ Add another cost</button>}
                 </fieldset>
-                <textarea id="report-notes" name="notes" className={`${input} min-h-16`} placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
-                <label className="flex items-center gap-3 rounded-xl border border-teal-500/20 px-3 py-3 text-sm font-medium"><input id="report-finished" name="finished" className="h-4 w-4 accent-teal-500" type="checkbox" checked={form.finished} onChange={(event) => setForm({ ...form, finished: event.target.checked })} /> Job is finished</label>
-                <button type="submit" data-testid="report-submit" disabled={busy !== ""} className="sticky bottom-3 w-full rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! shadow-lg transition hover:bg-teal-400">Send job report</button>
+                <label className="block space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Notes</span><textarea id="report-notes" name="notes" className={`${input} min-h-16`} placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>
+                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-teal-700/30 px-3 py-2 text-sm font-medium dark:border-teal-500/20"><input id="report-finished" name="finished" className="h-6 w-6 accent-teal-600" type="checkbox" checked={form.finished} onChange={(event) => setForm({ ...form, finished: event.target.checked })} /> Job is finished</label>
+                <button type="submit" data-testid="report-submit" disabled={busy !== ""} className="sticky bottom-3 min-h-11 w-full rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! shadow-lg transition hover:bg-teal-400">Send job report</button>
               </form>
             )}
             <h2 className="pt-2 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Reports you sent</h2>
@@ -786,6 +785,7 @@ export default function CrewPage() {
           </section>
         )}
         {userId && <p className="pt-4 text-center text-xs text-[var(--cr-muted)]">You only see your own jobs, time and expenses. Prices and company costs are not shown.</p>}
+        <footer className="flex justify-center border-t border-teal-500/15 pt-3"><a href="/account/delete" className="tap inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-3 py-2 text-xs text-rose-700 underline-offset-2 transition hover:bg-rose-500/10 hover:underline dark:text-rose-300" data-testid="crew-delete-account">Delete my account</a></footer>
       </div>
     </main>
   );
