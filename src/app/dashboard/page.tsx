@@ -297,9 +297,9 @@ export default function DashboardPage() {
       )}
 
           <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] shadow-sm" data-testid="recent-docs">
-            <div className="flex items-center justify-between border-b border-teal-500/15 px-5 py-4">
+            <div className="flex items-center gap-3 border-b border-teal-500/15 px-5 py-4 min-[900px]:justify-between">
               <h2 className="text-base font-semibold">Recent documents</h2>
-              <a href="/documents" className="text-sm font-medium text-teal-600 hover:underline dark:text-teal-300">View all</a>
+              <a href="/documents" className="inline-flex min-h-11 items-center text-sm font-medium text-teal-600 hover:underline dark:text-teal-300">View all</a>
             </div>
             {documents.length === 0 && !loaded && (
               <div className="space-y-3 px-5 py-4" aria-busy="true" aria-label="Loading">
