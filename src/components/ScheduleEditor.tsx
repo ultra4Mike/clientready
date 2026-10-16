@@ -1,5 +1,6 @@
 "use client";
 
+import { checklistFromLines } from "@/lib/checklist";
 import { useEffect, useState } from "react";
 import { refreshOwnerUnavailable, unavailableOn, type Unavailable } from "@/lib/unavailable";
 import { STATUS_LABEL, TRAVEL_BUFFER_MINUTES, travelWarnings, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
@@ -25,6 +26,7 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
   const [workerIds, setWorkerIds] = useState<string[]>(value?.workerIds || []);
   const [status, setStatus] = useState<JobStatus>(value?.status || "scheduled");
   const [crewNote, setCrewNote] = useState(value?.crewNote || "");
+  const [checklistText, setChecklistText] = useState((value?.checklist || []).map((item) => item.text).join("\n"));
   const [error, setError] = useState("");
   const [picking, setPicking] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
@@ -62,7 +64,7 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
     if (!date) return setError("Pick a date.");
     if (startTime && endTime && endTime <= startTime) return setError("End time must be after the start time.");
     setError("");
-    onSave({ date, startTime, ...(endTime ? { endTime } : {}), workerIds, status, updatedAt: value?.updatedAt || "", ...(crewNote.trim() ? { crewNote: crewNote.trim() } : {}) });
+    onSave({ date, startTime, ...(endTime ? { endTime } : {}), workerIds, status, updatedAt: value?.updatedAt || "", ...(crewNote.trim() ? { crewNote: crewNote.trim() } : {}), ...(checklistFromLines(checklistText, value?.checklist).length ? { checklist: checklistFromLines(checklistText, value?.checklist) } : {}) });
   }
 
   return (
@@ -79,6 +81,9 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
       </div>
       <label className="flex flex-col gap-1">Note for crew <span className="text-xs opacity-60">(shown to assigned crew only, not the customer)</span>
         <input aria-label="Note for crew" value={crewNote} maxLength={500} onChange={(event) => setCrewNote(event.target.value)} placeholder="Gate code, parking, what to bring…" className="rounded-md border border-slate-300 bg-transparent px-2 py-1.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" />
+      </label>
+      <label className="flex flex-col gap-1">Job-complete checklist <span className="text-xs opacity-60">(one per line; crew tick these before marking the job done)</span>
+        <textarea aria-label="Job-complete checklist" data-testid="checklist-input" rows={3} value={checklistText} onChange={(event) => setChecklistText(event.target.value)} placeholder={"Blow off driveway\nClose the gate\nPhoto of the back yard"} className="rounded-md border border-slate-300 bg-transparent px-2 py-1.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" />
       </label>
       <div data-testid="crew-chips">
         <div className="mb-1 flex flex-wrap items-center gap-2">

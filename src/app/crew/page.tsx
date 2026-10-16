@@ -1,5 +1,6 @@
 "use client";
 
+import { checklistProgress, readChecklist, type ChecklistItem } from "@/lib/checklist";
 import { nativePhotoClick } from "@/lib/native-camera";
 import { confirmLogoutWithQueue, enqueue, flushQueue, isNetworkError, newUploadKey, queued, removeQueued, type QueueItem, type QueueKind } from "@/lib/photo-queue";
 import EmptyState from "@/components/EmptyState";
@@ -7,7 +8,7 @@ import CrewDaysOff from "@/components/CrewDaysOff";
 import { CREW_KINDS } from "@/lib/cost-categories";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { crewMarkDone, crewOnMyWay, omwTime, crewSetJobStatus, onMyWaySmsHref, STATUS_CLASS, STATUS_LABEL, type JobStatus } from "@/lib/schedule";
+import { crewMarkDone, crewCheckItem, crewOnMyWay, omwTime, crewSetJobStatus, onMyWaySmsHref, STATUS_CLASS, STATUS_LABEL, type JobStatus } from "@/lib/schedule";
 import { compressPhoto } from "@/lib/photos";
 import { compressImage, crewClockIn, crewClockOut, crewEditClock, entryHours, fmtHours, fmtTimer, type ClockEntry } from "@/lib/clock";
 
@@ -31,8 +32,9 @@ type Job = {
   pay: number;
   note: string;
   status: string;
+  checklist?: unknown;
 };
-type Card = Job & { scheduled: boolean; crewNote: string; payRow?: Job };
+type Card = Job & { scheduled: boolean; crewNote: string; payRow?: Job; items: ChecklistItem[] };
 type Expense = { id: string; doc_id: string; kind: string; amount: string; note: string; receipt?: string; created_at?: string };
 type Draft = { id: string; client_name: string; work_date: string; hours: string; work_done: string; status: string };
 type Tab = "today" | "week" | "hours" | "reports";
@@ -98,16 +100,17 @@ function buildCards(jobs: Job[]): Card[] {
     if (job.id.includes("-sched-")) continue;
     if (cards.some((card) => card.doc_id === job.doc_id)) {
       // A second pay row on the same job (another day): keep it as its own card.
-      cards.push({ ...job, scheduled: false, crewNote: "", payRow: job });
+      cards.push({ ...job, scheduled: false, crewNote: "", payRow: job, items: [] });
       continue;
     }
-    cards.push({ ...job, scheduled: false, crewNote: "", payRow: job });
+    cards.push({ ...job, scheduled: false, crewNote: "", payRow: job, items: [] });
   }
   for (const sched of jobs.filter((job) => job.id.includes("-sched-"))) {
     const index = cards.findIndex((card) => card.doc_id === sched.doc_id && !card.scheduled);
     const merged = {
       scheduled: true, schedule_status: sched.schedule_status, done_confirmed: Boolean(sched.done_confirmed), job_date: sched.job_date || "", start_time: sched.start_time,
       end_time: sched.end_time, client_email: sched.client_email, crewNote: sched.note || "", on_my_way_at: sched.on_my_way_at || "",
+      items: readChecklist(sched.checklist),
     };
     if (index >= 0) cards[index] = { ...cards[index], ...merged, job_date: sched.job_date || cards[index].job_date };
     else cards.push({ ...sched, ...merged });
@@ -331,6 +334,15 @@ export default function CrewPage() {
     }
   }
 
+  async function tickItem(card: Card, itemId: string, done: boolean) {
+    const flip = (value: boolean) => (rows: Job[]) => rows.map((row) => row.doc_id === card.doc_id && row.id.includes("-sched-")
+      ? { ...row, checklist: readChecklist(row.checklist).map((item) => item.id === itemId ? (value ? { ...item, done: true, doneBy: name } : { id: item.id, text: item.text }) : item) }
+      : row);
+    setJobs(flip(done));
+    const problem = await crewCheckItem(card.doc_id, itemId, done);
+    if (problem) { setJobs(flip(!done)); setMessage(problem); }
+  }
+
   async function markDone(card: Card) {
     await act(`status-${card.doc_id}`, async () => {
       const result = await sendOrQueue("done", card.doc_id, { photos: donePhotos }, (key) => crewMarkDone(card.doc_id, donePhotos, key));
@@ -408,6 +420,17 @@ export default function CrewPage() {
           <p className="mt-2 rounded-xl bg-teal-500/10 px-3 py-2 text-sm" data-testid="crew-note">📝 {card.crewNote || card.payRow?.note}</p>
         )}
 
+        {card.scheduled && card.items.length > 0 && (
+          <fieldset className="mt-3 space-y-1 rounded-xl border border-teal-500/30 p-3 text-sm" data-testid={`crew-checklist-${card.doc_id}`}>
+            <legend className="px-1 font-semibold">Checklist · {checklistProgress(card.items).done}/{card.items.length}</legend>
+            {card.items.map((item) => (
+              <label key={item.id} className="flex min-h-11 cursor-pointer items-center gap-3" data-testid="checklist-item" data-done={item.done ? "1" : "0"}>
+                <input type="checkbox" className="h-5 w-5 accent-teal-500" checked={Boolean(item.done)} disabled={Boolean(card.done_confirmed)} onChange={(event) => tickItem(card, item.id, event.target.checked)} data-testid={`check-${item.id}`} />
+                <span className={item.done ? "line-through opacity-60" : ""}>{item.text}</span>
+              </label>
+            ))}
+          </fieldset>
+        )}
         {card.scheduled && (
           <div className="mt-3 grid grid-cols-3 gap-2" role="group" aria-label="Job status">
             {(Object.keys(STATUS_LABEL) as JobStatus[]).map((key) => (
@@ -444,9 +467,10 @@ export default function CrewPage() {
                 {donePhotos.map((photo, index) => <img key={index} src={photo} alt={`Finished job photo ${index + 1}`} className="h-16 w-16 rounded-lg object-cover" />)}
               </div>
             )}
-            <button type="button" disabled={busy !== "" || donePhotos.length === 0} onClick={() => markDone(card)} data-testid={`done-submit-${card.doc_id}`} className="min-h-11 w-full rounded-xl bg-teal-500 px-4 py-2.5 font-semibold text-slate-950 disabled:opacity-50">
+            <button type="button" disabled={busy !== "" || donePhotos.length === 0 || !checklistProgress(card.items).complete} onClick={() => markDone(card)} data-testid={`done-submit-${card.doc_id}`} className="min-h-11 w-full rounded-xl bg-teal-500 px-4 py-2.5 font-semibold text-slate-950 disabled:opacity-50">
               Mark done
             </button>
+            {!checklistProgress(card.items).complete && <p className="text-xs text-amber-600" data-testid="checklist-remaining">Tick every checklist item first ({card.items.length - checklistProgress(card.items).done} left).</p>}
             {donePhotos.length === 0 && <p className="text-xs text-[var(--cr-muted)]">Add at least one photo to mark the job done.</p>}
           </div>
         )}

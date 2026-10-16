@@ -1,3 +1,4 @@
+import { readChecklist, type ChecklistItem } from "@/lib/checklist";
 import { supabase } from "@/lib/supabase";
 import { isUuid, saveCloudDocument, type CloudDoc } from "@/lib/cloud-docs";
 import { moneySnapshot } from "@/lib/change-orders";
@@ -19,6 +20,8 @@ export type Schedule = {
   /** Set by the crew's "On my way" tap (time + crew member's name). Shown to the owner; never sent. */
   onMyWayAt?: string;
   onMyWayBy?: string;
+  /** Job-complete checklist (owner writes, crew tick). */
+  checklist?: ChecklistItem[];
 };
 export type Worker = { id: string; name: string; email?: string; phone?: string; role?: string; rate?: string; active?: boolean };
 /** The older per-job crew/pay rows (data.crew). */
@@ -93,6 +96,7 @@ export function readSchedule(data: Record<string, unknown> | undefined): Schedul
       ...(raw.confirmedAt ? { confirmedAt: String(raw.confirmedAt) } : {}),
       ...(raw.onMyWayAt ? { onMyWayAt: String(raw.onMyWayAt) } : {}),
       ...(raw.onMyWayBy ? { onMyWayBy: String(raw.onMyWayBy).slice(0, 80) } : {}),
+      ...(readChecklist(raw.checklist).length ? { checklist: readChecklist(raw.checklist) } : {}),
     };
   }
   if (data?.jobTime && isDate(data?.dueDate)) {
@@ -396,8 +400,13 @@ export async function syncScheduleCrewJobs(doc: CloudDoc) {
       end_time: schedule.endTime || "",
       done_confirmed: schedule.status === "done" && Boolean(schedule.confirmedAt),
       on_my_way_at: schedule.onMyWayAt || "",
+      checklist: schedule.checklist || [],
     }));
   let { error } = await supabase.from("crew_jobs").insert(rows);
+  // Before the checklist migration (20261016110000) runs, crew_jobs has no checklist column.
+  if (error && /checklist/.test(error.message || "")) {
+    ({ error } = await supabase.from("crew_jobs").insert(rows.map(({ checklist: _skip, ...row }) => { void _skip; return row; })));
+  }
   // Before the on-my-way migration (110000) runs, crew_jobs has no on_my_way_at column: insert without it.
   if (error && /on_my_way_at/.test(error.message || "")) {
     ({ error } = await supabase.from("crew_jobs").insert(rows.map(({ on_my_way_at: _skip, ...row }) => { void _skip; return row; })));
@@ -445,6 +454,13 @@ export async function crewMarkDone(docId: string, photos: string[], clientKey = 
   }
   if (error) return error.message;
   return data === false ? "Could not mark this job done." : "";
+}
+
+/** Crew: tick or untick one checklist item on an assigned job (refused once the owner confirmed it). */
+export async function crewCheckItem(docId: string, itemId: string, done: boolean) {
+  const { data, error } = await supabase.rpc("crew_check_item", { p_doc_id: docId, p_item_id: itemId, p_done: done });
+  if (error) return error.message;
+  return data === false ? "Could not update the checklist." : "";
 }
 
 /** Owner: photos the crew attached when marking the job done (newest first). */
