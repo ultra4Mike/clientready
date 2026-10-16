@@ -4,7 +4,7 @@
  * and short `steps`. Optional: `summary` (one-line definition), `tips`, `related` (other ids), `keywords`.
  * Button and screen names should match the app exactly. No UI changes needed.
  */
-export const SUPPORT_EMAIL = "support@clientreadyapp.com"; // TODO: confirm the real support inbox.
+export const SUPPORT_EMAIL = "support@clientreadyapp.com";
 
 export const HELP_CATEGORIES = [
   "Getting started", "Invoices", "Proposals", "Clients", "Payments", "Client portal", "Email & sharing",
