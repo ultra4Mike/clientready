@@ -207,14 +207,14 @@ export default function InvoiceViewPage() {
   return (
     <AppShell title="Invoice">
       <div className="print-hide mx-auto mb-6 flex max-w-3xl flex-wrap items-center justify-between gap-3">
-        <a href="/documents" className="text-sm font-medium text-[var(--cr-muted)] transition hover:text-teal-600 dark:hover:text-teal-300">
+        <a href="/documents" className="inline-flex min-h-11 items-center text-sm font-medium text-[var(--cr-muted)] transition hover:text-teal-600 dark:hover:text-teal-300">
           Back to documents
         </a>
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
           <button
             type="button"
             onClick={() => window.print()}
-            className="rounded-xl border border-teal-500/30 px-4 py-2 text-sm font-medium text-teal-700 transition dark:text-teal-200 hover:border-teal-400/60 hover:bg-teal-500/10"
+            className="min-h-11 rounded-xl border border-teal-500/30 px-4 py-2 text-sm font-medium text-teal-700 transition dark:text-teal-200 hover:border-teal-400/60 hover:bg-teal-500/10"
           >
             Print / Save PDF
           </button>
@@ -222,7 +222,7 @@ export default function InvoiceViewPage() {
             <button
               type="button"
               onClick={copyPayLink}
-              className="rounded-xl border border-teal-500/30 px-4 py-2 text-sm font-medium text-teal-700 transition dark:text-teal-200 hover:border-teal-400/60 hover:bg-teal-500/10"
+              className="min-h-11 rounded-xl border border-teal-500/30 px-4 py-2 text-sm font-medium text-teal-700 transition dark:text-teal-200 hover:border-teal-400/60 hover:bg-teal-500/10"
             >
               {paymentLink.trim() ? "Pay / Copy pay link" : "Add how to pay"}
             </button>
@@ -230,7 +230,7 @@ export default function InvoiceViewPage() {
           <button
             type="button"
             onClick={editInvoice}
-            className="rounded-xl bg-teal-500 px-4 py-2 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400"
+            className="min-h-11 rounded-xl bg-teal-500 px-4 py-2 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400"
           >
             Edit invoice
           </button>
@@ -239,7 +239,7 @@ export default function InvoiceViewPage() {
       {message && <p className="print-hide mx-auto mb-4 max-w-3xl rounded-xl border border-teal-500/20 bg-teal-500/5 px-4 py-2 text-sm text-[var(--cr-muted)]">{message}</p>}
 
       <section className="print-reset mx-auto max-w-3xl">
-        <div id="preview" className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-lg sm:p-10">
+        <div id="preview" className="rounded-2xl border border-slate-200 border-t-4 border-t-teal-500 bg-white p-5 text-slate-900 shadow-lg sm:p-10 print:border-t print:border-t-slate-200">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 text-sm text-slate-600">
               {logo && <img src={logo} alt="Business logo" className="mb-2 h-10 w-auto" />}
@@ -249,7 +249,7 @@ export default function InvoiceViewPage() {
             <div className="shrink-0 text-right">
               {approval && <div className="mb-1"><ApprovalBadge approval={approval} /></div>}
               {changeOrderOf && <p className="change-order-badge mb-1 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide" data-testid="change-order-badge">Change order</p>}
-              <p className="text-xs uppercase tracking-wide text-slate-500">Invoice · {status}</p>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Invoice · <span className={`rounded-full px-2 py-0.5 font-semibold ${status === "paid" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{status}</span></p>
               <h1 className="mt-0.5 text-2xl font-bold leading-tight tracking-tight">{invoiceNumber || "Invoice"}</h1>
               <p className="text-sm text-slate-600">Date: {invoiceDate || "-"} · Due: {dueDate || "-"}</p>
               {changeOrderOf && (
@@ -275,11 +275,11 @@ export default function InvoiceViewPage() {
             {items.map((item, index) => {
               const amount = amountOf(item.qty) * amountOf(item.rate);
               return (
-                <div key={index} className="flex justify-between gap-4 border-b border-slate-100 py-2 text-sm last:border-b-0">
-                  <span>
+                <div key={index} className="flex justify-between gap-4 border-b border-slate-100 py-2.5 text-sm last:border-b-0">
+                  <span className="min-w-0 break-words">
                     {item.description || "Item"} · {item.qty} x ${item.rate}
                   </span>
-                  <span>${amount.toFixed(2)}</span>
+                  <span className="shrink-0 tabular-nums">${amount.toFixed(2)}</span>
                 </div>
               );
             })}
@@ -312,7 +312,7 @@ export default function InvoiceViewPage() {
                 <span>Tax</span>
                 <span>${totals.tax.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between font-semibold">
+              <div className="flex justify-between border-t border-slate-200 pt-2 text-base font-bold">
                 <span>Total</span>
                 <span>${totals.total.toFixed(2)}</span>
               </div>
@@ -328,7 +328,7 @@ export default function InvoiceViewPage() {
                   <span>${tipTotal(payments).toFixed(2)}</span>
                 </div>
               )}
-              <div className="mt-2 flex justify-between border-t border-slate-200 pt-2 text-lg font-bold">
+              <div className="mt-2 flex items-baseline justify-between rounded-lg bg-teal-50 px-3 py-2 text-lg font-bold text-teal-900 print:bg-transparent print:px-0">
                 <span>Still owed</span>
                 <span>${totals.balance.toFixed(2)}</span>
               </div>
