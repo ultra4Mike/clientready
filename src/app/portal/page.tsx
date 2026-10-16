@@ -41,6 +41,7 @@ export default function PortalPage() {
   if (state !== "ready" || !portal) {
     return (
       <main className="mx-auto max-w-xl px-4 py-16 text-center text-slate-700">
+        {state === "loading" && <div aria-hidden="true" className="mx-auto mb-6 h-10 w-10 animate-spin rounded-full border-2 border-teal-500/30 border-t-teal-500 motion-reduce:animate-none" />}
         <h1 className="text-xl font-semibold" data-testid="portal-state">
           {state === "loading" ? "Loading…" : state === "missing" ? "This link is not valid" : "Could not load your documents"}
         </h1>
@@ -56,18 +57,21 @@ export default function PortalPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-6 text-slate-900 sm:px-4 sm:py-10">
       <section className="mx-auto max-w-3xl space-y-4">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="h-1.5 bg-gradient-to-r from-teal-400 to-teal-600" aria-hidden="true" />
+          <div className="p-5 sm:p-6">
           {/* eslint-disable-next-line @next/next/no-img-element -- data URL logo from the profile */}
           {portal.business.logo && <img src={portal.business.logo} alt="Business logo" className="mb-2 h-10 w-auto" />}
           <p className="text-sm font-semibold text-slate-600">{portal.business.name}</p>
           <h1 className="text-2xl font-bold tracking-tight">Documents for {portal.clientName}</h1>
           <p className="mt-1 text-sm text-slate-600">{[portal.business.email, portal.business.phone].filter(Boolean).join(" · ")}</p>
-          <p className="mt-3 text-lg font-semibold" data-testid="portal-owed">Total still owed: ${owed.toFixed(2)}</p>
+          <p className={`mt-4 inline-flex flex-wrap items-baseline gap-x-2 rounded-xl px-4 py-3 text-lg font-semibold ${owed > 0 ? "bg-amber-50 text-amber-900 ring-1 ring-amber-200" : "bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200"}`} data-testid="portal-owed">Total still owed: <span className="text-2xl font-bold tabular-nums">${owed.toFixed(2)}</span></p>
+          </div>
         </div>
         <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white shadow-sm" data-testid="portal-list">
           {rows.length === 0 && <p className="p-5 text-sm text-slate-600">Nothing has been shared yet.</p>}
           {rows.map(({ doc, total, paid, owed: rowOwed, approval }) => (
-            <a key={doc.id} href={portalDocUrl(token, doc.id)} data-testid="portal-doc" className="flex items-center justify-between gap-3 p-4 transition hover:bg-slate-50">
+            <a key={doc.id} href={portalDocUrl(token, doc.id)} data-testid="portal-doc" className="flex min-h-16 items-center justify-between gap-3 p-4 transition hover:bg-slate-50 sm:px-5">
               <span className="min-w-0">
                 <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">{doc.type === "proposal" ? "Proposal" : "Invoice"}</span>
                 <span className="block font-semibold">{text(doc.data.invoiceNumber) || doc.title}</span>
@@ -77,9 +81,10 @@ export default function PortalPage() {
                 </span>
               </span>
               <span className="shrink-0 text-right text-sm">
-                <span className="block font-semibold">${total.toFixed(2)}</span>
-                {doc.type === "invoice" && <span className="block text-xs text-slate-600">{rowOwed > 0 ? `$${rowOwed.toFixed(2)} owed` : paid > 0 ? "Paid" : ""}</span>}
+                <span className="block font-semibold tabular-nums">${total.toFixed(2)}</span>
+                {doc.type === "invoice" && <span className={`mt-0.5 inline-block text-xs font-semibold ${rowOwed > 0 ? "text-amber-700" : "text-emerald-700"}`}>{rowOwed > 0 ? `$${rowOwed.toFixed(2)} owed` : paid > 0 ? "Paid" : ""}</span>}
               </span>
+              <span aria-hidden="true" className="shrink-0 text-xl text-slate-400">›</span>
             </a>
           ))}
         </div>
