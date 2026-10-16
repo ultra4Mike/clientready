@@ -383,7 +383,12 @@ export default function CrewPage() {
     let { error } = await supabase.from("job_drafts").insert({ ...row, id: key });
     // Before migration 20261016120000 there is no costs column; parts_cost / parts_note still carry the total.
     if (error && /costs/.test(error.message || "") && error.code !== "23505") ({ error } = await supabase.from("job_drafts").insert({ ...row, id: key, costs: undefined }));
-    if (error?.code === "23505") return "";
+    if (error?.code === "23505") {
+      // R19: only treat it as already sent if the existing row is really this worker's report.
+      const { data: existing } = await supabase.from("job_drafts").select("id, worker_email").eq("id", key).maybeSingle();
+      const mine = existing && String((existing as { worker_email?: string }).worker_email || "").toLowerCase() === String(row.worker_email || "").toLowerCase();
+      return mine ? "" : "This report could not be matched to you. Discard it and send it again.";
+    }
     return error ? error.message : "";
   }
 
