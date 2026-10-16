@@ -39,3 +39,12 @@ Splash: background `#061418`, centered `icon-512.png` at ~30% width.
 
 Optional light-mode set: dashboard and invoice-view.
 Capture tip: run in standalone mode (installed PWA or Capacitor build) so safe areas and the bottom tab bar match the store app; hide the sync dot if it shows "offline".
+
+## Capacitor assets (`assets/`, for `npx capacitor-assets generate`)
+| File | Size | Notes |
+|---|---|---|
+| `assets/icon.png` | 1024×1024, opaque | Same artwork as the web icon: full-bleed teal `#14b8a6`, dark C |
+| `assets/icon-foreground.png` | 1024×1024, transparent | Dark C only, ~35% of canvas (inside the 66% adaptive safe zone) |
+| `assets/icon-background.png` | 1024×1024, opaque | Solid teal `#14b8a6` |
+| `assets/splash.png` | 2732×2732, opaque | Light `#f4fbfb`, centered teal tile at 20% width |
+| `assets/splash-dark.png` | 2732×2732, opaque | Dark `#061418`, centered teal tile at 20% width |
