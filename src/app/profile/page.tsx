@@ -1,5 +1,6 @@
 "use client";
 
+import PushSettings from "@/components/PushSettings";
 import PaymentMethodsSettings from "@/components/PaymentMethodsSettings";
 import TimezoneCombobox from "@/components/TimezoneCombobox";
 import LegalLinks from "@/components/LegalLinks";
@@ -266,6 +267,8 @@ export default function ProfilePage() {
         <button type="submit" className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50 w-full sm:w-auto">Update password</button>
         {passwordMessage && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-[var(--cr-muted)]">{passwordMessage}</p>}
       </form>
+
+      <PushSettings />
 
       <section id="delete-account" className="scroll-mt-24 mt-6 rounded-2xl border border-rose-500/30 bg-[var(--cr-card)] p-4 shadow-sm sm:p-6" data-testid="settings-delete">
         <h2 className="text-lg font-bold tracking-tight">Delete account</h2>

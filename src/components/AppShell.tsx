@@ -6,6 +6,7 @@ import { ReactNode, useEffect, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { clearLocalBusiness } from "@/lib/account-cache";
+import { disablePush } from "@/lib/push";
 import { isCrewUser } from "@/lib/crew";
 import SyncPill from "@/components/SyncPill";
 import { flushClientContactQueue } from "@/lib/client-sync";
@@ -63,6 +64,8 @@ export default function AppShell({
   }
 
   async function logOut() {
+    // This device stops getting the account's notifications (before the session ends, so the row can be removed).
+    await disablePush().catch(() => undefined);
     clearLocalBusiness();
     await supabase.auth.signOut();
     window.location.href = "/";
