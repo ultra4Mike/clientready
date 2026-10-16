@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { refreshOwnerUnavailable, unavailableOn, type Unavailable } from "@/lib/unavailable";
 import { STATUS_LABEL, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
 
 type Props = {
@@ -25,6 +26,13 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
   const [error, setError] = useState("");
   const [picking, setPicking] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
+  const [daysOff, setDaysOff] = useState<Unavailable[]>([]);
+  useEffect(() => {
+    let live = true;
+    refreshOwnerUnavailable().then((rows) => { if (live) setDaysOff(rows); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
+  const off = date ? unavailableOn(daysOff, date) : new Map<string, string>();
   const names = new Map(workers.map((person) => [person.id, person.name]));
   // Not already on the job, by id or (for older duplicate employee records) by email.
   const takenEmails = new Set(workers.filter((person) => workerIds.includes(person.id)).map((person) => (person.email || "").trim().toLowerCase()).filter(Boolean));
@@ -77,12 +85,17 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
         {workerIds.length === 0 && <p className="text-xs opacity-70">No one assigned yet.</p>}
         <div className="flex flex-wrap gap-2">
           {workerIds.map((id) => (
-            <span key={id} data-testid={`crew-chip-${id}`} className="inline-flex items-center gap-1 rounded-full border border-slate-400 px-2 py-0.5 text-xs">
+            <span key={id} data-testid={`crew-chip-${id}`} data-unavailable={off.has(id) ? "1" : undefined} className="inline-flex items-center gap-1 rounded-full border border-slate-400 px-2 py-0.5 text-xs">
               {names.get(id) || "Former worker"}
               <button type="button" aria-label={`Remove ${names.get(id) || "worker"}`} onClick={() => changeWorkers(workerIds.filter((item) => item !== id))} className="tap leading-none opacity-70 hover:opacity-100">×</button>
             </span>
           ))}
         </div>
+        {workerIds.some((id) => off.has(id)) && (
+          <p role="alert" data-testid="unavail-warning" className="mt-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-xs">
+            Marked unavailable on this day: {workerIds.filter((id) => off.has(id)).map((id) => `${names.get(id) || "Worker"}${off.get(id) ? ` (${off.get(id)})` : ""}`).join(", ")}
+          </p>
+        )}
         {picking && (
           <div role="dialog" aria-label="Add crew" className="mt-2 rounded-lg border border-slate-400 bg-[var(--cr-card,white)] p-3 shadow-lg" data-testid="crew-picker">
             {workers.length === 0 ? (
@@ -94,7 +107,7 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
                 {available.map((person) => (
                   <label key={person.id} className="flex items-center gap-2">
                     <input type="checkbox" aria-label={`Assign ${person.name}`} checked={picked.includes(person.id)} onChange={() => setPicked((current) => (current.includes(person.id) ? current.filter((item) => item !== person.id) : [...current, person.id]))} />
-                    {person.name}{person.role ? <span className="text-xs opacity-60"> · {person.role}</span> : null}
+                    {person.name}{person.role ? <span className="text-xs opacity-60"> · {person.role}</span> : null}{off.has(person.id) ? <span className="text-xs text-amber-600" data-testid={`unavail-${person.id}`}> · unavailable</span> : null}
                   </label>
                 ))}
               </div>

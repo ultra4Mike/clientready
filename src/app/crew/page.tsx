@@ -1,6 +1,7 @@
 "use client";
 
 import EmptyState from "@/components/EmptyState";
+import CrewDaysOff from "@/components/CrewDaysOff";
 import { CREW_KINDS } from "@/lib/cost-categories";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -557,6 +558,8 @@ export default function CrewPage() {
             </div>
           </section>
         )}
+
+        {tab === "hours" && <CrewDaysOff />}
 
         {tab === "reports" && (
           <section className="space-y-3">
