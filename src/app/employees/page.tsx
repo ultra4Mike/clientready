@@ -1,5 +1,6 @@
 "use client";
 
+import EmptyState from "@/components/EmptyState";
 import { FormEvent, useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
@@ -231,7 +232,7 @@ export default function EmployeesPage() {
       <div className="order-1 min-w-0 lg:order-none">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">People ({employees.length})</h2>
       <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-        {employees.length === 0 && <p className="rounded-2xl border border-dashed border-teal-500/30 p-8 text-center text-sm text-[var(--cr-muted)] lg:col-span-2">No employees yet.</p>}
+        {employees.length === 0 && <EmptyState icon="👥" title="No employees yet." line="Add a person with the form to track crew hours and pay." className="rounded-2xl border border-dashed border-teal-500/30 lg:col-span-2" />}
         {employees.map((person) => (
           <div key={person.id} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
             <p className="text-base font-semibold">{person.name} <span className="font-medium text-teal-600 dark:text-teal-300">· ${Number(person.rate || 0).toFixed(2)}/hr</span></p>
