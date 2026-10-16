@@ -12,17 +12,18 @@ Shared by the three ClientReady bots. Update the **Status** column when you pick
 | M2 | Then run `20261015140000_checkout_guard_pending_owner.sql` (must come **after** M1). | Owner | Done 2026-10-16 (run and verified) | 2026-10-15 |
 | M3 | Also run newer migrations `20261015150000_review_link.sql` and `20261015160000_crew_unavailable.sql` (found in git log), and confirm all older ones (000000–120000) were run. See README → Migrations. | Owner | Partly done 2026-10-16 — 030000, 130000, 140000, 150000, 160000 run and verified; confirm the other older migrations (000000–120000 except 030000) | 2026-10-15 |
 | M4 | Set the real support inbox: replace placeholder `SUPPORT_EMAIL = "support@clientready.app"` in `src/lib/help/articles.ts` (only TODO in the repo). | Owner → Help | Open | 2026-10-15 |
-| M5 | Do the RLS security check: follow `clientready-help/rls-audit.md` steps 1–6; only use the template `supabase/templates/base_owner_rls.REVIEW_BEFORE_RUN.sql` after review. | Owner | Open | 2026-10-15 |
+| M5 | Do the RLS security check: follow `clientready-help/rls-audit.md` steps 1–6; only use the template `supabase/templates/base_owner_rls.REVIEW_BEFORE_RUN.sql` after review. | Owner | Done 2026-10-16 — all 6 rls-audit checks pass on live; live is_crew_email/list_crew_clients were safe for anon and are now revoked | 2026-10-15 |
 | M6 | Migrations now run — next step: after M1–M2, make a real test card payment (Stripe test mode) through an approval link and the portal; confirm it appears once on the invoice with the correct local date; try two tabs at once to confirm the double-checkout guard. | Owner + Dev | Open | 2026-10-15 |
 | M7 | Set Supabase env vars for builds/deploys (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`; server: `SUPABASE_SERVICE_ROLE_KEY`, Stripe keys, optional `BUSINESS_TIMEZONE`). Without the public ones `npm run build` fails prerendering /approve. | Owner | Open | 2026-10-15 |
 | M8 | Set Business timezone in Settings once migration M1 is run. | Owner | Open | 2026-10-15 |
-| M9 | Run migration `20261016000000_clients_updated_at.sql` on the live Supabase project (adds `clients.updated_at` + server touch trigger). Until it runs, the contact retry queue uses its fallback (no conditional update). | Owner | Open | 2026-10-16 |
-| M10 | Run migration `20261016010000_rls_hardening.sql` on live (policies → TO authenticated, WITH CHECK on UPDATE, revoke anon table grants and authenticated TRUNCATE/TRIGGER/REFERENCES, revoke anon EXECUTE on is_crew_email/list_crew_clients). Then re-run rls-audit.md steps 1–6. | Owner | Open | 2026-10-16 |
+| M9 | Run migration `20261016000000_clients_updated_at.sql` on the live Supabase project (adds `clients.updated_at` + server touch trigger). Until it runs, the contact retry queue uses its fallback (no conditional update). | Owner | Done 2026-10-16 (run and verified on live) | 2026-10-16 |
+| M10 | Run migration `20261016010000_rls_hardening.sql` on live (policies → TO authenticated, WITH CHECK on UPDATE, revoke anon table grants and authenticated TRUNCATE/TRIGGER/REFERENCES, revoke anon EXECUTE on is_crew_email/list_crew_clients). Then re-run rls-audit.md steps 1–6. | Owner | Done 2026-10-16 (run and verified on live) | 2026-10-16 |
+| M11 | Supabase Auth "Confirm email" enabled, so nobody can sign up with a crew member's email (without access to that inbox) and pass as crew. | Owner | Done 2026-10-16 | 2026-10-16 |
 
 ## 2. Open risks
 | # | Risk | Owner | Status | Added |
 |---|---|---|---|---|
-| R1 | Base-table RLS (documents, clients, profiles) is not in version control and unaudited. See M5. | Help | In progress 2026-10-16 — live audit done; fixes in migration 20261016010000 (M10), tested locally (cr-tests/rlshard.sh) | 2026-10-15 |
+| R1 | Base-table RLS (documents, clients, profiles) is not in version control and unaudited. See M5. | Help | Done 2026-10-16 — audited and hardened (M5, M10) | 2026-10-15 |
 | R2 | Overpayments are recorded, not refused; refunds are not handled in-app (Stripe dashboard + Remove payment). | Dev | Open | 2026-10-15 |
 | R3 | Stuck-payment orphan: a pending payment whose invoice was deleted and whose checkout predates migration 140000 has no owner → shows in nobody's notice; needs a DB query. | Dev | Open | 2026-10-15 |
 | R4 | Stuck-payment notice on Get paid loads once per page view; new stuck payments need a reload. Not shown on Dashboard. | Dev | Open | 2026-10-15 |
