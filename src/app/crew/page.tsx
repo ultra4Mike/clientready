@@ -318,7 +318,7 @@ export default function CrewPage() {
           {card.scheduled && <span data-testid={`job-state-${card.doc_id}`} className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${STATUS_CLASS[status]}`}>{status === "done" ? (card.done_confirmed ? "Done · confirmed" : "Done · awaiting confirmation") : STATUS_LABEL[status]}</span>}
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+        <div className="mt-3 grid grid-cols-2 gap-2 text-sm [&>*]:min-w-0 [&>*]:break-words">
           {card.client_phone
             ? <a href={`tel:${card.client_phone}`} className="flex min-h-11 items-center justify-center rounded-xl border border-teal-500/30 px-3 py-2 text-center font-medium transition hover:border-teal-400 hover:bg-teal-500/10" data-testid="call">📞 Call {card.client_phone}</a>
             : <span className="flex min-h-11 items-center justify-center rounded-xl border border-dashed border-teal-500/20 px-3 py-2 text-center opacity-50">No phone</span>}
@@ -396,7 +396,7 @@ export default function CrewPage() {
           {fixing && mine.some((entry) => entry.id === fixing.id) && (
             <div className="mt-3 space-y-3 rounded-xl border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
               <p className="text-xs">Forgot to clock in or out? Set the real times and say why. Your boss sees the reason.</p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 [&>*]:min-w-0">
                 <label className="space-y-1 text-xs font-medium">Start<input type="datetime-local" className={input} value={fixing.start} onChange={(event) => setFixing({ ...fixing, start: event.target.value })} /></label>
                 <label className="space-y-1 text-xs font-medium">End<input type="datetime-local" className={input} value={fixing.end} onChange={(event) => setFixing({ ...fixing, end: event.target.value })} /></label>
               </div>
@@ -469,8 +469,8 @@ export default function CrewPage() {
           </div>
           <div className="flex items-center gap-3 text-sm">
             {open && <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-200 tabular-nums" data-testid="header-timer">⏱ {fmtTimer((now) - Date.parse(open.started_at))}</span>}
-            <button type="button" onClick={switchTheme} className="tap rounded-lg px-2 py-1 font-medium transition hover:bg-teal-500/10">{theme === "dark" ? "Light" : "Dark"}</button>
-            <button type="button" className="tap rounded-lg px-2 py-1 font-medium transition hover:bg-teal-500/10" onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}>Log out</button>
+            <button type="button" onClick={switchTheme} className="tap rounded-lg px-3 py-2 font-medium transition hover:bg-teal-500/10">{theme === "dark" ? "Light" : "Dark"}</button>
+            <button type="button" className="tap rounded-lg px-3 py-2 font-medium transition hover:bg-teal-500/10" onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}>Log out</button>
           </div>
         </div>
         <nav className="mx-auto mt-3 grid max-w-3xl grid-cols-4 gap-1 rounded-xl border border-teal-500/20 bg-[var(--cr-card)] p-1 text-xs sm:text-sm" role="tablist">
@@ -559,7 +559,7 @@ export default function CrewPage() {
                 <input className={input} placeholder="Phone" value={form.clientPhone} onChange={(event) => setForm({ ...form, clientPhone: event.target.value })} />
                 <input className={input} placeholder="Address" value={form.clientAddress} onChange={(event) => setForm({ ...form, clientAddress: event.target.value })} />
                 <textarea className={`${input} min-h-20`} placeholder="What was done" value={form.workDone} onChange={(event) => setForm({ ...form, workDone: event.target.value })} />
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
                   <label className="space-y-1 text-sm font-medium">Date<input type="date" className={input} value={form.workDate} onChange={(event) => setForm({ ...form, workDate: event.target.value })} /></label>
                   <label className="space-y-1 text-sm font-medium">Hours<input className={input} value={form.hours} onChange={(event) => setForm({ ...form, hours: event.target.value })} /></label>
                   <label className="space-y-1 text-sm font-medium">Start<input type="time" className={input} value={form.startTime} onChange={(event) => setForm({ ...form, startTime: event.target.value })} /></label>
