@@ -69,7 +69,7 @@ export default function TodayPage() {
   return (
     <AppShell title="Today">
       <section className="py-2 sm:py-4" data-testid="today" data-state={state}>
-        <PageHeader title="Today" subtitle={today ? niceYmd(today) : "Loading…"} actions={<span className="flex gap-2"><a href="/route" data-testid="today-route" className="inline-flex min-h-11 items-center rounded-lg border border-teal-500/30 px-4 text-sm font-medium transition hover:border-teal-400 sm:min-h-10">Route</a><a href="/calendar" className="inline-flex min-h-11 items-center rounded-lg border border-teal-500/30 px-4 text-sm font-medium transition hover:border-teal-400 sm:min-h-10">Calendar</a></span>} />
+        <PageHeader title="Today" subtitle={today ? niceYmd(today) : "Loading…"} actions={<span className="flex gap-2"><a href="/route" data-testid="today-route" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-teal-500 px-4 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400"><span aria-hidden="true">🗺️</span>Route</a><a href="/calendar" className="inline-flex min-h-11 items-center rounded-lg border border-teal-500/30 px-4 text-sm font-medium transition hover:border-teal-400 sm:min-h-10">Calendar</a></span>} />
         {message && <p className="mb-3 rounded-lg border border-teal-500/30 bg-teal-500/10 px-3 py-2 text-sm" role="status" data-testid="today-message">{message}</p>}
         {state === "loading" && <div className="space-y-3" aria-hidden="true">{[0, 1, 2].map((n) => <div key={n} className="h-28 animate-pulse rounded-2xl bg-teal-500/10" />)}<p className="sr-only">Loading…</p></div>}
         {state === "empty" && (
