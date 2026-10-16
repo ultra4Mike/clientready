@@ -1,5 +1,6 @@
 "use client";
 
+import TimezoneCombobox from "@/components/TimezoneCombobox";
 import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import StripeSetup from "@/components/StripeSetup";
@@ -32,7 +33,6 @@ export default function ProfilePage() {
   const [nextPassword, setNextPassword] = useState("");
   const [passwordMessage, setPasswordMessage] = useState("");
   const [timezone, setTimezone] = useState("America/Chicago");
-  const timezones = typeof Intl !== "undefined" && "supportedValuesOf" in Intl ? Intl.supportedValuesOf("timeZone") : [timezone];
 
   useEffect(() => {
     async function load() {
@@ -202,13 +202,7 @@ export default function ProfilePage() {
           Tax ID / EIN
           <input className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Tax ID / EIN" value={profile.taxId} onChange={(event) => update("taxId", event.target.value)} />
         </label>
-        <label className="block text-sm font-medium text-[var(--cr-muted)]">
-          Business timezone
-          <select data-testid="business-timezone" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={timezone} onChange={(event) => setTimezone(event.target.value)}>
-            {(timezones.includes(timezone) ? timezones : [timezone, ...timezones]).map((zone) => <option key={zone} value={zone}>{zone.replace(/_/g, " ")}</option>)}
-          </select>
-          <span className="mt-1 block text-xs">Used for the date on card payments.</span>
-        </label>
+        <TimezoneCombobox value={timezone} onChange={setTimezone} address={profile.address} />
         <label className="block text-sm font-medium text-[var(--cr-muted)] sm:col-span-2">
           Default payment terms
           <textarea className="mt-1.5 min-h-24 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Default payment terms" value={profile.paymentTerms} onChange={(event) => update("paymentTerms", event.target.value)} />
