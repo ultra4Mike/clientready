@@ -1,5 +1,6 @@
 "use client";
 
+import { csvText, downloadCsv } from "@/lib/csv";
 import EmptyState from "@/components/EmptyState";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { fetchCloudDocuments, deleteCloudDocument, getUserId } from "@/lib/cloud-docs";
@@ -56,6 +57,9 @@ export default function DocumentsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkMessage, setBulkMessage] = useState("");
   const deferredSearch = useDeferredValue(search);
   const stages = useMemo(() => new Map(documents.map((doc) => [doc.id, documentStage(doc, documents)])), [documents]);
   const stageOf = (doc: SavedDocument) => stages.get(doc.id) || documentStage(doc, documents);
@@ -137,6 +141,31 @@ export default function DocumentsPage() {
     if (!ok) return;
     saveList(documents.filter((doc) => doc.id !== id));
     deleteCloudDocument(id);
+  }
+
+  const toggleSelected = (id: string) => setSelected((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+
+  function exportCsv(list: SavedDocument[]) {
+    const rows = list.map((doc) => {
+      const f = factsById.get(doc.id) || facts(doc);
+      return [doc.type, String(doc.data?.invoiceNumber || doc.title || ""), doc.clientName || "", f.date, String(doc.data?.status || "draft"), f.total.toFixed(2), (f.total - f.owed > 0 && doc.type === "invoice" ? f.total - f.owed : 0).toFixed(2), f.owed.toFixed(2)];
+    });
+    downloadCsv(`documents-${new Date().toISOString().slice(0, 10)}.csv`, csvText(["Type", "Number", "Client", "Date", "Status", "Total", "Paid", "Owed"], rows));
+    setBulkMessage(`Exported ${list.length} document${list.length === 1 ? "" : "s"}.`);
+  }
+
+  /** Removes selected documents after one confirm. Paid invoices and invoices with payments are kept (records). */
+  function removeSelected() {
+    const chosen = documents.filter((doc) => selected.has(doc.id));
+    const keep = chosen.filter((doc) => doc.type === "invoice" && (doc.data?.status === "paid" || paidTotal(readPayments(doc.data || {})) > 0));
+    const remove = chosen.filter((doc) => !keep.includes(doc));
+    if (!remove.length) return setBulkMessage("Nothing removed: paid invoices and invoices with payments are kept.");
+    if (!window.confirm(`Delete ${remove.length} document${remove.length === 1 ? "" : "s"}?${keep.length ? ` ${keep.length} with payments will be kept.` : ""} This can't be undone.`)) return;
+    const ids = new Set(remove.map((doc) => doc.id));
+    saveList(documents.filter((doc) => !ids.has(doc.id)));
+    remove.forEach((doc) => deleteCloudDocument(doc.id));
+    setSelected(new Set([...selected].filter((id) => !ids.has(id))));
+    setBulkMessage(`Deleted ${remove.length}.${keep.length ? ` Kept ${keep.length} with payments.` : ""}`);
   }
 
   const factsById = useMemo(() => new Map(documents.map((doc) => [doc.id, facts(doc)])), [documents]);
@@ -248,9 +277,23 @@ export default function DocumentsPage() {
       </div>
       <div className="mt-2 flex items-center justify-between text-xs text-[var(--cr-muted)]">
         <span data-testid="doc-count">{visibleDocs.length} of {documents.length} documents</span>
+        <span className="flex items-center gap-3">
+          {visibleDocs.length > 0 && <button type="button" data-testid="docs-export" className="font-medium text-teal-600 dark:text-teal-300" onClick={() => exportCsv(selecting && selected.size ? visibleDocs.filter((doc) => selected.has(doc.id)) : visibleDocs)}>{selecting && selected.size ? `Export ${selected.size} (CSV)` : "Export CSV"}</button>}
+          {documents.length > 0 && <button type="button" data-testid="docs-select" aria-pressed={selecting} className="font-medium text-teal-600 dark:text-teal-300" onClick={() => { setSelecting(!selecting); setSelected(new Set()); setBulkMessage(""); }}>{selecting ? "Done" : "Select"}</button>}
+        </span>
         {filtersOn && <button type="button" className="font-medium text-teal-600 dark:text-teal-300" onClick={() => { setSearch(""); setTypeFilter("all"); setStatusFilter("all"); setFromDate(""); setToDate(""); }}>Clear filters</button>}
       </div>
 
+      {selecting && (
+        <div className="sticky top-2 z-10 mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-teal-500/30 bg-[var(--cr-panel)] px-3 py-2 text-sm shadow" data-testid="bulk-bar">
+          <span data-testid="bulk-count">{selected.size} selected</span>
+          <button type="button" data-testid="bulk-all" className="min-h-11 rounded-lg border border-slate-300 px-3" onClick={() => setSelected(new Set(visibleDocs.map((doc) => doc.id)))}>Select all shown</button>
+          <button type="button" data-testid="bulk-none" disabled={!selected.size} className="min-h-11 rounded-lg border border-slate-300 px-3 disabled:opacity-50" onClick={() => setSelected(new Set())}>Clear</button>
+          <button type="button" data-testid="bulk-remove" disabled={!selected.size} className="min-h-11 rounded-lg border border-rose-500/40 px-3 text-rose-600 disabled:opacity-50 dark:text-rose-300" onClick={removeSelected}>Delete selected</button>
+          {bulkMessage && <span role="status" data-testid="bulk-message">{bulkMessage}</span>}
+        </div>
+      )}
+      {!selecting && bulkMessage && <p role="status" className="mt-2 text-xs" data-testid="bulk-message">{bulkMessage}</p>}
       <div className="mt-6 overflow-hidden rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] shadow-sm">
         <div className="hidden gap-4 border-b border-teal-500/20 bg-teal-500/5 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)] md:grid md:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_6.5rem_minmax(6.5rem,auto)_auto] md:gap-x-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_6.5rem_6.5rem_minmax(6.5rem,auto)_auto]">
           <span>Document</span><span>Client</span><span className="hidden xl:block">Created</span><span>Status</span><span className="text-right">Total</span><span className="w-[14rem] text-right xl:w-[15.5rem]">Actions</span>
@@ -274,7 +317,10 @@ export default function DocumentsPage() {
             title={`${STAGE_LABEL[stageOf(doc).stage]}${NEXT_LABEL[stageOf(doc).next] ? ` · Next: ${NEXT_LABEL[stageOf(doc).next]}` : ""}`}
             className="grid grid-cols-2 gap-x-4 gap-y-2 border-b border-teal-500/10 px-4 py-4 transition last:border-b-0 hover:bg-teal-500/5 md:items-center md:px-5 md:py-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_6.5rem_minmax(6.5rem,auto)_auto] md:gap-x-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_6.5rem_6.5rem_minmax(6.5rem,auto)_auto]"
           >
-            <button type="button" onClick={() => openDocument(doc)} className="col-span-2 min-w-0 text-left md:col-span-1">
+            {selecting && <label className="col-span-2 flex min-h-11 items-center gap-2 text-sm md:hidden"><input type="checkbox" data-testid="doc-select" checked={selected.has(doc.id)} onChange={() => toggleSelected(doc.id)} aria-label={`Select ${doc.title || "document"}`} /> Select</label>}
+            <span className="col-span-2 flex min-w-0 items-center gap-3 md:col-span-1">
+            {selecting && <input type="checkbox" className="hidden h-5 w-5 shrink-0 md:block" data-testid="doc-select-wide" checked={selected.has(doc.id)} onChange={() => toggleSelected(doc.id)} aria-label={`Select ${doc.title || "document"}`} />}
+            <button type="button" onClick={() => openDocument(doc)} className="min-w-0 flex-1 text-left">
               <p className="truncate text-base font-semibold md:text-sm">{doc.title || "Untitled"}</p>
               <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-[var(--cr-muted)]">
                 <span className="capitalize">{doc.type}</span>
@@ -284,6 +330,7 @@ export default function DocumentsPage() {
               </p>
               <ApprovalBadge approval={readApproval(doc.data?.approval)} className="mt-1" />
             </button>
+            </span>
             <div className="min-w-0 text-sm">
               <p className="truncate">{doc.clientName || "No client"}</p>
               <p className="hidden text-xs tabular-nums text-[var(--cr-muted)] md:block xl:hidden">{doc.createdAt}</p>
