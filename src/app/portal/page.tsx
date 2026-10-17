@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import LegalLinks from "@/components/LegalLinks";
 import { fetchPortal, portalDocUrl, type PortalBusiness, type PortalDoc } from "@/lib/portal";
 import { amountOf, documentTotals } from "@/lib/discount";
+import { portalTimeline } from "@/lib/portal-timeline";
 import { payNowAmount, readStages, stagePlan, todayYmd } from "@/lib/stages";
 import { balanceDue, paidTotal, readPayments } from "@/lib/payments";
 import { readApproval } from "@/lib/approval";
@@ -65,6 +66,7 @@ export default function PortalPage() {
 
   const rows = portal.documents.map((doc) => ({ doc, ...figures(doc), approval: readApproval(doc.data.approval) }));
   const owed = rows.reduce((sum, row) => sum + row.owed, 0);
+  const timeline = portalTimeline(rows.map((row) => ({ ...row.doc, total: row.total, owed: row.owed })));
   const dueNow = Math.round(rows.reduce((sum, row) => sum + row.dueNow, 0) * 100) / 100;
 
   return (
@@ -103,6 +105,25 @@ export default function PortalPage() {
             </a>
           ))}
         </div>
+        {timeline.length > 0 && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" data-testid="portal-timeline">
+            <h2 className="text-base font-semibold">History</h2>
+            <ol className="mt-3 space-y-0">
+              {timeline.slice(0, 50).map((item) => (
+                <li key={item.key} data-testid="portal-tl-item" data-kind={item.kind} data-upcoming={item.upcoming ? "1" : "0"} className="relative flex gap-3 border-l-2 border-slate-200 pb-3 pl-4 last:pb-0">
+                  <span aria-hidden="true" className={`absolute -left-[7px] top-1 h-3 w-3 rounded-full ring-2 ring-white ${item.upcoming ? "bg-amber-400" : item.kind === "payment" || item.kind === "paid" ? "bg-emerald-500" : item.kind === "due" ? "bg-rose-500" : "bg-teal-500"}`} />
+                  <a href={portalDocUrl(token, item.docId)} className="flex min-h-11 min-w-0 flex-1 items-start justify-between gap-3 text-sm hover:underline">
+                    <span className="min-w-0">
+                      <span className="block font-medium">{item.title}</span>
+                      <span className="block text-xs text-slate-500">{item.upcoming ? "Upcoming · " : ""}{item.date}</span>
+                    </span>
+                    {typeof item.amount === "number" && item.amount > 0 && <span className={`shrink-0 tabular-nums font-semibold ${item.kind === "payment" ? "text-emerald-700 cr-text-good" : ""}`}>{item.kind === "payment" ? "−" : ""}${item.amount.toFixed(2)}</span>}
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
       </section>
       <LegalLinks className="mt-8 text-center" />
     </main>
