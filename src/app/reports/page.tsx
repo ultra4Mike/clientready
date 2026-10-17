@@ -7,11 +7,13 @@ import PageHeader from "@/components/PageHeader";
 import { supabase } from "@/lib/supabase";
 import { buildReport, MONTHS, reportYears } from "@/lib/reports";
 import { csvText, downloadCsv } from "@/lib/csv";
+import { accountantFiles } from "@/lib/accountant-export";
+import { downloadBytes, zipFiles } from "@/lib/zip";
 import { taxCategories } from "@/lib/tax-categories";
 import { mileage, totalMiles } from "@/lib/mileage";
 
 type Doc = { id: string; type: string; title?: string; clientName?: string; createdAt?: string; data?: Record<string, unknown> };
-type CrewExpense = { amount?: unknown; created_at?: string };
+type CrewExpense = { amount?: unknown; created_at?: string; kind?: string; note?: string; worker_name?: string; doc_id?: string };
 
 const usd = (value: number) => `${value < 0 ? "-" : ""}$${Math.abs(value).toFixed(2)}`;
 
@@ -32,7 +34,7 @@ export default function ReportsPage() {
     });
     supabase.auth.getSession().then(({ data }) => {
       if (!data.session) return;
-      supabase.from("crew_expenses").select("amount, created_at").then(({ data: rows, error }) => {
+      supabase.from("crew_expenses").select("amount, created_at, kind, note, worker_name, doc_id").then(({ data: rows, error }) => {
         if (!error && rows) setCrewExpenses(rows as CrewExpense[]);
       });
     });
@@ -56,6 +58,11 @@ export default function ReportsPage() {
           </select>
         </label>
         <div className="flex flex-wrap gap-2 text-sm">
+          <button type="button" data-testid="report-export-accountant" onClick={() => {
+            let business = "";
+            try { business = String(JSON.parse(window.localStorage.getItem("clientready-profile") || "{}").businessName || ""); } catch { /* ignore */ }
+            downloadBytes(`clientready-accountant-${year}.zip`, zipFiles(accountantFiles(documents, crewExpenses, mileage.read(), year, business)));
+          }} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-teal-500 px-4 text-sm font-semibold text-slate-950! transition hover:bg-teal-400">Accountant package (.zip)</button>
           <button type="button" data-testid="report-export-months" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-teal-500/40 px-4 text-sm font-medium text-teal-700 transition hover:border-teal-400 hover:bg-teal-500/10 dark:text-teal-300" onClick={() => downloadCsv(`report-${year}-months.csv`, csvText(["Month", "Billed", "Collected", "Job costs", "Crew receipts"], [...report.months.map((row) => [MONTHS[row.month], row.billed.toFixed(2), row.collected.toFixed(2), row.jobCosts.toFixed(2), row.crewReceipts.toFixed(2)]), ["Total", report.totals.billed.toFixed(2), report.totals.collected.toFixed(2), report.totals.jobCosts.toFixed(2), report.totals.crewReceipts.toFixed(2)]]))}><svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14" /></svg>Export months (CSV)</button>
           <button type="button" data-testid="report-export-jobs" disabled={!report.jobs.length} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-teal-500/40 px-4 text-sm font-medium text-teal-700 transition hover:border-teal-400 hover:bg-teal-500/10 dark:text-teal-300 disabled:opacity-50" onClick={() => downloadCsv(`report-${year}-jobs.csv`, csvText(["Invoice", "Client", "Date", "Total", "Job cost", "Profit"], report.jobs.map((job) => [job.number, job.client, job.date.slice(0, 10), job.total.toFixed(2), job.cost.toFixed(2), job.profit.toFixed(2)])))}><svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14" /></svg>Export jobs (CSV)</button>
         </div>
