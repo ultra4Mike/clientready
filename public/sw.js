@@ -1,14 +1,31 @@
 /* ClientReady service worker: offline app shell + push display. Never caches API calls, Supabase
    responses or anything cross-origin, so business data only lives in the app's own storage. */
-const VERSION = "cr-v1";
+const VERSION = "cr-v2";
 const SHELL = `${VERSION}-shell`;
 const STATIC = `${VERSION}-static`;
 const PRECACHE = ["/offline", "/icons/icon-192.png"];
+// Field pages kept ready for no-signal use even if never opened online on this device (best effort:
+// a failure here never blocks install). Their /_next/static scripts and styles are cached too.
+const WARM_PAGES = ["/today", "/schedule", "/crew", "/calendar"];
+
+async function warm(path) {
+  try {
+    const response = await fetch(path, { credentials: "same-origin" });
+    if (!response.ok || response.type !== "basic") return;
+    const html = await response.clone().text();
+    await (await caches.open(SHELL)).put(self.location.origin + path, response);
+    const assets = [...new Set([...html.matchAll(/(?:src|href)="(\/_next\/static\/[^"]+)"/g)].map((m) => m[1]))];
+    const statics = await caches.open(STATIC);
+    await Promise.all(assets.map(async (url) => { if (!(await statics.match(url))) await statics.add(url).catch(() => undefined); }));
+  } catch {
+    // offline during install: the page is cached the first time it is opened online instead
+  }
+}
 // Public token pages show someone else's document; don't keep copies of them.
 const NO_CACHE_PAGES = ["/approve", "/portal", "/invoice-view", "/account/delete"];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(SHELL).then((cache) => cache.addAll(PRECACHE)).then(() => self.skipWaiting()));
+  event.waitUntil(caches.open(SHELL).then((cache) => cache.addAll(PRECACHE)).then(() => Promise.all(WARM_PAGES.map(warm))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (event) => {
