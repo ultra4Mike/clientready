@@ -1,5 +1,6 @@
 "use client";
 
+import { profitAlertJobs, readMinMargin } from "@/lib/profit-alerts";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { recurringDraftsReady, runDueRecurring } from "@/lib/recurring";
 import Link from "next/link";
@@ -326,6 +327,7 @@ export default function DashboardPage() {
           {recurringReady} recurring draft{recurringReady === 1 ? "" : "s"} ready for review
         </a>
       )}
+      <ProfitAlertsCard loaded={loaded} documents={documents} />
       <GettingStarted loading={!loaded} documents={documents} />
       <NeedsReview loading={!loaded} onCount={setReviewCount} documents={documents} onDocuments={(docs) => setDocuments(uniqueDocs(docs as SavedDocument[]))} />
           {loaded && reviewCount === 0 && recurringReady === 0 && stats.overdueCount === 0 && (
@@ -355,5 +357,30 @@ export default function DashboardPage() {
         </aside>
       </div>
     </AppShell>
+  );
+}
+/** Owner: recent jobs that lost money, fell under the minimum margin, or where the crew spent over the estimate. */
+function ProfitAlertsCard({ loaded, documents }: { loaded: boolean; documents: SavedDocument[] }) {
+  const [minMargin, setMinMargin] = useState(20);
+  useEffect(() => {
+    Promise.resolve().then(() => { try { setMinMargin(readMinMargin(JSON.parse(window.localStorage.getItem("clientready-profile") || "{}"))); } catch { /* default */ } });
+  }, []);
+  const rows = useMemo(() => (loaded ? profitAlertJobs(documents as never, minMargin) : []), [loaded, documents, minMargin]);
+  if (!rows.length) return null;
+  return (
+    <div data-testid="profit-alerts" className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
+      <p className="font-semibold">Profit alerts <span className="font-normal text-[var(--cr-muted)]">· last 90 days</span></p>
+      <ul className="mt-2 space-y-1.5">
+        {rows.slice(0, 5).map((row) => (
+          <li key={row.id}>
+            <a href={`/invoice?id=${encodeURIComponent(row.id)}`} data-testid="profit-alert-row" data-kind={row.alerts[0].kind} className="flex min-h-11 items-center justify-between gap-3 rounded-lg px-2 hover:bg-amber-500/10">
+              <span className="min-w-0"><span className="block font-medium">{row.number}{row.client ? ` · ${row.client}` : ""}</span><span className="block text-xs text-[var(--cr-muted)]">{row.alerts.map((alert) => alert.kind === "loss" ? "Loss" : alert.kind === "low-margin" ? "Low margin" : "Crew over estimate").join(" · ")}</span></span>
+              <span className={`shrink-0 tabular-nums font-semibold ${row.left < 0 ? "text-rose-700" : ""}`}>{row.left < 0 ? "−" : ""}${Math.abs(row.left).toFixed(2)}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+      {rows.length > 5 && <p className="mt-1 text-xs text-[var(--cr-muted)]">+{rows.length - 5} more</p>}
+    </div>
   );
 }

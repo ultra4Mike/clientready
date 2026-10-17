@@ -21,6 +21,7 @@ import { getTrialState } from "@/lib/trial";
 import { priceSummary, PRICES_ARE_PLACEHOLDERS } from "@/lib/plans";
 import { syncClientContact } from "@/lib/client-sync";
 import { noteReviewAsked, reviewAskedAt, reviewMailHref, reviewMessage, reviewSmsHref } from "@/lib/review-request";
+import { crewReportTotal, profitAlerts, readMinMargin } from "@/lib/profit-alerts";
 import { readLateFeeSettings, suggestedLateFee, type LateFeeSettings } from "@/lib/late-fees";
 import { saveCrewJobs } from "@/lib/crew";
 import { depositInvoice, missingDeposits } from "@/lib/proposal-deposit";
@@ -233,6 +234,7 @@ export default function NewInvoicePage() {
   const [jobTime, setJobTime] = useState("");
   const [costs, setCosts] = useState<JobCosts>(emptyCosts);
   const [setAsidePercent, setSetAsidePercent] = useState("30");
+  const [minMargin, setMinMargin] = useState(20);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [crew, setCrew] = useState<CrewRow[]>([]);
   const [pickedEmployee, setPickedEmployee] = useState("");
@@ -259,6 +261,7 @@ export default function NewInvoicePage() {
     setPaymentLink(profile.paymentLink || "");
     setLogo(profile.logo || "");
     setSetAsidePercent(profile.setAsidePercent || "30");
+    setMinMargin(readMinMargin(profile));
     setLateFeeSettings(readLateFeeSettings(profile));
     setReviewLink(profile.reviewLink || "");
   }, []);
@@ -825,6 +828,7 @@ export default function NewInvoicePage() {
     const setAside = leftOver > 0 ? leftOver * ((Number(setAsidePercent) || 0) / 100) : 0;
     return { jobCost, leftOver, setAside, yours: leftOver - setAside };
   }, [costs, otherFees, totals.total, setAsidePercent]);
+  const jobAlerts = isProposal ? [] : profitAlerts({ total: totals.total, jobCost: jobMath.jobCost, crewTotal: crewReportTotal(crewReport), minMargin });
 
   const payUrl = payUrlFor(docPayLink, paymentLink);
   const qrUrl = invoiceQrUrl(approval?.token, printOrigin(), docPayLink, paymentLink);
@@ -1110,6 +1114,9 @@ export default function NewInvoicePage() {
                 <p>Left over: ${jobMath.leftOver.toFixed(2)}</p>
                 <p>Set aside ({setAsidePercent}%): ${jobMath.setAside.toFixed(2)}</p>
                 <p className="font-semibold">Yours after set-aside: ${jobMath.yours.toFixed(2)}</p>
+                {jobAlerts.map((alert) => (
+                  <p key={alert.kind} role="status" data-testid="profit-alert" data-kind={alert.kind} className={`rounded-lg border px-3 py-2 text-sm ${alert.kind === "loss" ? "border-rose-400/60 bg-rose-50 text-rose-800" : "border-amber-400/60 bg-amber-50 text-amber-900"}`}>⚠ {alert.text}</p>
+                ))}
                 <CrewSpend docId={docId} estimate={{ ...costs, otherFees }} report={crewReport} locked={locked} onUse={useCrewAmounts} />
               </div>
             </Section>
