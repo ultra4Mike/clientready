@@ -1,9 +1,15 @@
 "use client";
 
 import { checklistFromLines } from "@/lib/checklist";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { refreshOwnerUnavailable, unavailableOn, type Unavailable } from "@/lib/unavailable";
 import { STATUS_LABEL, TRAVEL_BUFFER_MINUTES, travelWarnings, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
+
+function watchOnline(callback: () => void) {
+  window.addEventListener("online", callback);
+  window.addEventListener("offline", callback);
+  return () => { window.removeEventListener("online", callback); window.removeEventListener("offline", callback); };
+}
 
 type Props = {
   value: Schedule | null;
@@ -59,6 +65,8 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
     setWorkerIds(next);
     if (value) onSave({ ...value, workerIds: next }, { keepOpen: true, confirmed: removed });
   }
+
+  const offline = useSyncExternalStore(watchOnline, () => navigator.onLine === false, () => false);
 
   function save() {
     if (!date) return setError("Pick a date.");
@@ -133,6 +141,11 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
         )}
       </div>
       {error && <p className="text-red-600">{error}</p>}
+      {offline && (
+        <p role="status" data-testid="schedule-offline-note" data-crew={workerIds.length > 0 ? "1" : "0"} className="rounded-lg border border-amber-400/60 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
+          No signal: this saves on this device only.{workerIds.length > 0 ? " Your crew won't see the change on their phones until you're back online." : " It syncs when you're back online."}
+        </p>
+      )}
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={save} className="rounded-lg bg-slate-900 px-3 py-1.5 text-white">{saveLabel}</button>
         {value && <button type="button" onClick={() => onSave(null)} className="rounded-lg border border-slate-300 px-3 py-1.5">Unschedule</button>}
