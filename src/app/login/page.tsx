@@ -6,6 +6,7 @@ import LegalLinks from "@/components/LegalLinks";
 import { FormEvent, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { loadAccountIntoCache } from "@/lib/account-cache";
+import { afterAuthPath, pendingPlan, usePlanFromUrl } from "@/lib/pending-plan";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -13,6 +14,8 @@ export default function LoginPage() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [resetMode, setResetMode] = useState(false);
+  // ?plan= (or a plan picked before an email-confirmation round trip): checkout opens after logging in.
+  const plan = usePlanFromUrl();
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -47,7 +50,7 @@ export default function LoginPage() {
       }
     }
     await loadAccountIntoCache();
-    window.location.href = "/dashboard";
+    window.location.href = afterAuthPath(plan || pendingPlan());
   }
 
   return (
@@ -71,7 +74,7 @@ export default function LoginPage() {
       </button>
       </div>
       <p className="mt-6 text-center text-sm text-[var(--cr-muted)]">
-        New here? <a href="/signup" className="font-semibold text-teal-600 hover:underline">Create an account</a>
+        New here? <a href={plan ? `/signup?plan=${plan}` : "/signup"} className="font-semibold text-teal-600 hover:underline">Create an account</a>
       </p>
       <LegalLinks className="mt-4 text-center" />
       </div>

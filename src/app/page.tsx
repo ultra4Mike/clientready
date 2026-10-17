@@ -7,13 +7,18 @@ import { isNativeApp } from "@/lib/native";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
 
-/** Starts plan checkout; a signed-in owner's session links the subscription to their account. */
-async function startCheckout(priceId: string) {
+/**
+ * Starts plan checkout for a signed-in owner (their session links the subscription to their account).
+ * Visitors without an account go to sign-up first with the plan carried through, then to checkout.
+ */
+async function startCheckout(priceId: string, plan: string) {
   const { data } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
   const token = data.session?.access_token;
-  const response = await fetch("/api/checkout", { method: "POST", headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ priceId }) }).catch(() => null);
-  const result = (await response?.json().catch(() => null)) as { url?: string; error?: string } | null;
+  if (!token) return void (window.location.href = `/signup?plan=${plan}`);
+  const response = await fetch("/api/checkout", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ priceId }) }).catch(() => null);
+  const result = (await response?.json().catch(() => null)) as { url?: string; error?: string; signup?: string } | null;
   if (result?.url) window.location.href = result.url;
+  else if (result?.signup) window.location.href = result.signup;
   else window.alert(result?.error || "Could not open checkout. Nothing was charged.");
 }
 
@@ -155,7 +160,7 @@ export default function HomePage() {
               <p className="mt-3 text-sm text-[var(--cr-muted)]">{plan.blurb}</p>
               {!plan.free && <div className="min-h-4 flex-1" aria-hidden="true" />}
               {!plan.free && (checkoutPrices[plan.id]
-                ? <button type="button" data-purchase data-testid={`home-checkout-${plan.id}`} data-mode="checkout" onClick={() => void startCheckout(checkoutPrices[plan.id])} className={`mt-auto inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-teal-500 px-4 font-semibold text-slate-950! transition hover:bg-teal-400 active:bg-teal-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--cr-card)] ${plan.highlight ? "shadow-lg shadow-teal-500/30" : "shadow-sm"}`}>Choose {plan.name}</button>
+                ? <button type="button" data-purchase data-testid={`home-checkout-${plan.id}`} data-mode="checkout" onClick={() => void startCheckout(checkoutPrices[plan.id], plan.id)} className={`mt-auto inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-teal-500 px-4 font-semibold text-slate-950! transition hover:bg-teal-400 active:bg-teal-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--cr-card)] ${plan.highlight ? "shadow-lg shadow-teal-500/30" : "shadow-sm"}`}>Choose {plan.name}</button>
                 : <a href="/signup" data-purchase data-testid={`home-checkout-${plan.id}`} data-mode="trial" className={`mt-auto inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-teal-500 px-4 font-semibold text-slate-950! transition hover:bg-teal-400 active:bg-teal-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--cr-card)] ${plan.highlight ? "shadow-lg shadow-teal-500/30" : "shadow-sm"}`}>Start free trial</a>)}
             </div>
           ))}

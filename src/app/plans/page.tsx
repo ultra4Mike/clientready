@@ -9,6 +9,7 @@ import { PLANS, PRICES_ARE_PLACEHOLDERS } from "@/lib/plans";
 /** Public plans page. Prices come from src/lib/plans.ts and are placeholders; there is no checkout yet. */
 export default function PlansPage() {
   const [soon, setSoon] = useState("");
+  const [errorText, setErrorText] = useState("");
   // Subscription checkout only when the server has Stripe keys + price ids; otherwise the buttons start the free trial.
   const [live, setLive] = useState<Record<string, boolean>>({});
   useEffect(() => {
@@ -18,11 +19,11 @@ export default function PlansPage() {
     setSoon(plan);
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
-    if (!token) return void (window.location.href = "/signup");
+    if (!token) return void (window.location.href = `/signup?plan=${plan}`);
     const response = await fetch("/api/stripe/subscribe", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ plan }) }).catch(() => null);
-    const result = (await response?.json().catch(() => null)) as { url?: string } | null;
+    const result = (await response?.json().catch(() => null)) as { url?: string; error?: string } | null;
     if (result?.url) window.location.href = result.url;
-    else setSoon("error");
+    else { setSoon("error"); setErrorText(result?.error || ""); }
   }
   return (
     <main className="mx-auto max-w-5xl px-4 py-10 sm:py-14" data-testid="plans" data-purchase>
@@ -51,7 +52,7 @@ export default function PlansPage() {
           </div>
         ))}
       </div>
-      {soon === "error" && <p role="status" className="mt-6 rounded-lg border border-teal-500/30 bg-teal-500/5 px-4 py-3 text-sm" data-testid="plans-soon">Could not open checkout. Nothing was charged.</p>}
+      {soon === "error" && <p role="status" className="mt-6 rounded-lg border border-teal-500/30 bg-teal-500/5 px-4 py-3 text-sm" data-testid="plans-soon">{errorText || "Could not open checkout. Nothing was charged."}</p>}
     </main>
   );
 }

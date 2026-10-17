@@ -1,3 +1,4 @@
+import { handleSubscriptionEvent, SUBSCRIPTION_EVENTS } from "@/lib/stripe-subscription-events";
 import { serviceClient, stripeConfig, verifyStripeSignature } from "@/lib/stripe-server";
 
 export const runtime = "nodejs";
@@ -12,11 +13,15 @@ type Session = {
   payment_intent?: string | null;
   metadata?: { doc_id?: string };
   client_reference_id?: string | null;
+  mode?: string;
 };
 
 /**
- * Stripe calls this after a Checkout. A verified, paid session is recorded as a payment on the
- * invoice (once per session). The invoice status is not changed here.
+ * Stripe calls this (signature checked with STRIPE_WEBHOOK_SECRET).
+ * - Plan subscriptions: checkout.session.completed (mode subscription), customer.subscription.updated /
+ *   .deleted and invoice.payment_failed set the owner's plan (lib/stripe-subscription-events), once per event.
+ * - Invoice payments: a verified, paid Checkout session (mode payment) is recorded as a payment on the
+ *   invoice (once per session). The invoice status is not changed here.
  */
 export async function POST(request: Request) {
   const config = stripeConfig();
@@ -25,11 +30,16 @@ export async function POST(request: Request) {
   if (!verifyStripeSignature(payload, request.headers.get("stripe-signature") || "", config.webhookSecret)) {
     return Response.json({ error: "Bad signature." }, { status: 400 });
   }
-  let event: { id?: string; type?: string; data?: { object?: Session } };
+  let event: { id?: string; type?: string; created?: number; data?: { object?: Session } };
   try {
     event = JSON.parse(payload);
   } catch {
     return Response.json({ error: "Bad payload." }, { status: 400 });
+  }
+  const isPlanCheckout = event.type === "checkout.session.completed" && event.data?.object?.mode === "subscription";
+  if (isPlanCheckout || (event.type && event.type !== "checkout.session.completed" && SUBSCRIPTION_EVENTS.includes(event.type))) {
+    const result = await handleSubscriptionEvent(event as Parameters<typeof handleSubscriptionEvent>[0]);
+    return Response.json(result.body, { status: result.status });
   }
   if (event.type !== "checkout.session.completed" && event.type !== "checkout.session.async_payment_succeeded") {
     return Response.json({ received: true });

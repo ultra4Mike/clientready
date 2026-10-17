@@ -63,9 +63,9 @@ export function verifyStripeSignature(payload: string, header: string, secret: s
 /**
  * Plan subscriptions (one flow for /api/stripe/subscribe and /api/checkout). Price ids come from
  * STRIPE_PRICE_MONTHLY / STRIPE_PRICE_QUARTERLY, or NEXT_PUBLIC_STRIPE_PRICE_MONTHLY / _3MONTHS.
- * Live only when STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and that plan's price are ALL set: a paid
- * subscription does not unlock the plan until the subscription webhook exists, so without the webhook
- * secret every plan button stays on trial sign-up.
+ * Live only when STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and that plan's price are ALL set: the
+ * webhook (/api/stripe/webhook) is what unlocks the plan, so without its secret every plan button stays on
+ * trial sign-up. SUPABASE_SERVICE_ROLE_KEY is required too (the webhook writes the plan with it).
  */
 export type PlanId = "monthly" | "quarterly";
 export function planPrices(): Record<PlanId, string> {
@@ -75,7 +75,7 @@ export function planPrices(): Record<PlanId, string> {
   };
 }
 export function subscriptionsLive() {
-  const ready = Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET);
+  const ready = Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET && process.env.SUPABASE_SERVICE_ROLE_KEY);
   const prices = planPrices();
   return { monthly: ready && Boolean(prices.monthly), quarterly: ready && Boolean(prices.quarterly), prices: { monthly: ready ? prices.monthly : "", quarterly: ready ? prices.quarterly : "" } };
 }
@@ -90,23 +90,98 @@ export async function userFromRequest(request: Request) {
   return error || !data.user ? null : { id: data.user.id, email: data.user.email || "" };
 }
 
-/**
- * Creates the Stripe subscription Checkout session. Stripe is created here (lazily), never at module
- * load, so builds and pages work with no Stripe env. The owner's user id goes in client_reference_id and
- * metadata.user_id (and their email as customer_email) so the future webhook can unlock the plan.
- */
-export async function createSubscriptionCheckout(input: { price: string; plan: string; user: { id: string; email: string } | null; successUrl: string; cancelUrl: string }) {
+/** Stripe client, created lazily inside a request (never at module load). STRIPE_API_BASE points it at a test mock. */
+export async function stripeClient() {
   const { default: Stripe } = await import("stripe");
   const { secretKey } = stripeConfig();
   const base = process.env.STRIPE_API_BASE ? new URL(process.env.STRIPE_API_BASE) : null;
-  const stripe = new Stripe(secretKey, base ? { host: base.hostname, port: Number(base.port) || undefined, protocol: base.protocol.replace(":", "") as "http" | "https" } : {});
+  return new Stripe(secretKey, base ? { host: base.hostname, port: Number(base.port) || undefined, protocol: base.protocol.replace(":", "") as "http" | "https" } : {});
+}
+
+/** Billing state of an owner (service role; never sent to crew). */
+export type Billing = { plan: string; status: string; periodEnd: string | null; customer: string; subscription: string };
+export async function billingFor(userId: string): Promise<Billing | null> {
+  const { data, error } = await serviceClient().from("profiles").select("plan, subscription_status, plan_period_end, stripe_customer_id, stripe_subscription_id").eq("id", userId).maybeSingle();
+  if (error || !data) return null;
+  return { plan: String(data.plan || ""), status: String(data.subscription_status || ""), periodEnd: data.plan_period_end ? String(data.plan_period_end) : null, customer: String(data.stripe_customer_id || ""), subscription: String(data.stripe_subscription_id || "") };
+}
+/** Statuses that keep saves unlocked (past_due: Stripe is still retrying the card). Same rule as src/lib/trial.ts. */
+export const LIVE_STATUSES = ["active", "trialing", "past_due"];
+
+/**
+ * Creates the Stripe subscription Checkout session for a signed-in owner. The user id goes in
+ * client_reference_id, metadata.user_id and the subscription's metadata (so later subscription and invoice
+ * events can be matched too); an owner who subscribed before reuses their Stripe customer, otherwise
+ * their email is passed as customer_email.
+ */
+export async function createSubscriptionCheckout(input: { price: string; plan: string; user: { id: string; email: string }; customer?: string; successUrl: string; cancelUrl: string }) {
+  const stripe = await stripeClient();
+  const metadata = { plan: input.plan, user_id: input.user.id };
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     line_items: [{ price: input.price, quantity: 1 }],
     success_url: input.successUrl,
     cancel_url: input.cancelUrl,
-    ...(input.user ? { client_reference_id: input.user.id, customer_email: input.user.email || undefined } : {}),
-    metadata: { plan: input.plan, ...(input.user ? { user_id: input.user.id } : {}) },
+    client_reference_id: input.user.id,
+    ...(input.customer ? { customer: input.customer } : input.user.email ? { customer_email: input.user.email } : {}),
+    metadata,
+    subscription_data: { metadata },
   });
+  return session.url || "";
+}
+
+/**
+ * Shared by /api/checkout and /api/stripe/subscribe: signed-in owners only, one live subscription per owner
+ * (a live one is sent to Manage subscription instead), Stripe customer reused when known.
+ */
+export async function startPlanCheckout(request: Request, plan: PlanId, urls: { successUrl: string; cancelUrl: string }) {
+  const user = await userFromRequest(request);
+  if (!user) return Response.json({ error: "Sign in or create an account first.", signup: `/signup?plan=${plan}` }, { status: 401 });
+  const billing = await billingFor(user.id).catch(() => null);
+  if (billing && billing.subscription && LIVE_STATUSES.includes(billing.status)) {
+    return Response.json({ error: "You already have an active plan. Use Manage subscription in Settings to change or cancel it.", manage: true }, { status: 409 });
+  }
+  const url = await createSubscriptionCheckout({ price: planPrices()[plan], plan, user, customer: billing?.customer || "", ...urls }).catch(() => "");
+  if (!url) return Response.json({ error: "Could not open checkout. Nothing was charged." }, { status: 502 });
+  return Response.json({ url });
+}
+
+/** Plan id for a Stripe price id (only the configured monthly / 3-month prices). */
+export function planForPrice(price: string): PlanId | "" {
+  const prices = planPrices();
+  if (price && price === prices.monthly) return "monthly";
+  if (price && price === prices.quarterly) return "quarterly";
+  return "";
+}
+
+type Obj = Record<string, unknown>;
+const obj = (value: unknown): Obj => (value && typeof value === "object" ? (value as Obj) : {});
+const str = (value: unknown) => (typeof value === "string" ? value : value && typeof value === "object" && typeof (value as Obj).id === "string" ? String((value as Obj).id) : "");
+const time = (value: unknown) => (typeof value === "number" && value > 0 ? new Date(value * 1000).toISOString() : null);
+
+/** The parts of a Stripe Subscription the app stores. Period end is on the item (API 2025-03-31+) or the subscription (older). */
+export function subscriptionFacts(sub: Obj) {
+  const items = Array.isArray(obj(sub.items).data) ? (obj(sub.items).data as Obj[]) : [];
+  const item = items[0] || {};
+  const price = str(item.price) || str(obj(item.plan).id);
+  const periodEnd = time(item.current_period_end) || time(sub.current_period_end);
+  const metadata = obj(sub.metadata);
+  return {
+    subscription: str(sub.id),
+    customer: str(sub.customer),
+    status: typeof sub.status === "string" ? sub.status : "",
+    price,
+    plan: planForPrice(price) || (metadata.plan === "monthly" || metadata.plan === "quarterly" ? (metadata.plan as PlanId) : ""),
+    ours: Boolean(planForPrice(price) || metadata.user_id),
+    periodEnd,
+    cancelAtPeriodEnd: typeof sub.cancel_at_period_end === "boolean" ? sub.cancel_at_period_end || Boolean(sub.cancel_at) : null,
+    userId: typeof metadata.user_id === "string" ? metadata.user_id : "",
+  };
+}
+
+/** Stripe customer portal session (manage card, switch plan, cancel). */
+export async function createPortalSession(customer: string, returnUrl: string) {
+  const stripe = await stripeClient();
+  const session = await stripe.billingPortal.sessions.create({ customer, return_url: returnUrl });
   return session.url || "";
 }
