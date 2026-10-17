@@ -10,6 +10,7 @@ import { csvText, downloadCsv } from "@/lib/csv";
 import { accountantFiles } from "@/lib/accountant-export";
 import { downloadBytes, zipFiles } from "@/lib/zip";
 import { taxCategories } from "@/lib/tax-categories";
+import { bestCustomers, type CustomerSort } from "@/lib/best-customers";
 import { mileage, totalMiles } from "@/lib/mileage";
 
 type Doc = { id: string; type: string; title?: string; clientName?: string; createdAt?: string; data?: Record<string, unknown> };
@@ -43,6 +44,8 @@ export default function ReportsPage() {
   const years = useMemo(() => reportYears(documents), [documents]);
   const report = useMemo(() => buildReport(documents, crewExpenses, year), [documents, crewExpenses, year]);
   const tax = useMemo(() => taxCategories(documents, year), [documents, year]);
+  const [customerSort, setCustomerSort] = useState<CustomerSort>("profit");
+  const customers = useMemo(() => bestCustomers(documents, year, customerSort), [documents, year, customerSort]);
   const [miles, setMiles] = useState(0);
   useEffect(() => { Promise.resolve().then(() => setMiles(totalMiles(mileage.read(), year))); }, [year, documents]);
   const cell = "px-2 py-1.5 text-right tabular-nums";
@@ -165,6 +168,41 @@ export default function ReportsPage() {
             {miles > 0 && <li className="rounded-lg bg-slate-500/5 px-3 py-2" data-testid="tax-miles">🚗 Mileage log: {miles} business miles in {year} (Line 9 if you use the standard mileage rate).</li>}
             {tax.tips > 0 && <li className="rounded-lg bg-slate-500/5 px-3 py-2" data-testid="tax-tips">💵 Tips received: {usd(tax.tips)} (part of gross receipts, Line 1; not in the totals above).</li>}
           </ul>
+        </div>
+        <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5" data-testid="best-customers">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-base font-semibold">Best customers {year}</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-2 text-sm">Sort by
+                <select data-testid="best-sort" value={customerSort} onChange={(event) => setCustomerSort(event.target.value as CustomerSort)} className="min-h-11 rounded-lg border border-teal-500/30 bg-transparent px-3 text-sm">
+                  <option value="profit">Profit</option><option value="billed">Billed</option><option value="collected">Collected</option><option value="jobs">Jobs</option>
+                </select>
+              </label>
+              <button type="button" data-testid="best-export" disabled={!customers.length} onClick={() => downloadCsv(`clientready-best-customers-${year}.csv`, csvText(["Rank", "Client", "Jobs", "Billed", "Collected", "Profit", "Avg days to pay", "Still owed", "Last job"], customers.map((row, index) => [index + 1, row.name, row.jobs, row.billed.toFixed(2), row.collected.toFixed(2), row.profit.toFixed(2), row.avgDaysToPay ?? "", row.owed.toFixed(2), row.lastJob])))} className="inline-flex min-h-11 items-center rounded-lg border border-teal-500/40 px-4 text-sm font-medium text-teal-700 disabled:opacity-50 dark:text-teal-300">Export CSV</button>
+            </div>
+          </div>
+          {customers.length === 0 ? <p className="mt-2 text-sm text-[var(--cr-muted)]">No billed jobs in {year} yet.</p> : (
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead><tr className="text-xs text-slate-500"><th className="px-2 py-1.5 text-left">#</th><th className="px-2 py-1.5 text-left">Client</th><th className={cell}>Jobs</th><th className={cell}>Billed</th><th className={cell}>Collected</th><th className={cell}>Profit</th><th className={cell}>Avg days to pay</th><th className={cell}>Still owed</th></tr></thead>
+                <tbody>
+                  {customers.slice(0, 10).map((row, index) => (
+                    <tr key={row.key} data-testid="best-row" data-profit={row.profit.toFixed(2)} data-billed={row.billed.toFixed(2)} className="border-t border-slate-200/60">
+                      <td className="px-2 py-1.5">{index + 1}</td>
+                      <td className="px-2 py-1.5">{row.clientId ? <a href={`/clients/${encodeURIComponent(row.clientId)}`} className="font-medium underline-offset-2 hover:underline">{row.name}</a> : <span className="font-medium">{row.name}</span>}{row.lastJob && <span className="block text-xs text-[var(--cr-muted)]">last job {row.lastJob}</span>}</td>
+                      <td className={cell}>{row.jobs}</td>
+                      <td className={cell}>{usd(row.billed)}</td>
+                      <td className={cell}>{usd(row.collected)}</td>
+                      <td className={`${cell} font-semibold ${row.profit < 0 ? "text-rose-700" : ""}`}>{usd(row.profit)}</td>
+                      <td className={cell}>{row.avgDaysToPay === null ? "—" : `${row.avgDaysToPay} d`}</td>
+                      <td className={cell}>{row.owed > 0 ? usd(row.owed) : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {customers.length > 10 && <p className="mt-1 text-xs text-[var(--cr-muted)]">Top 10 of {customers.length}. Export CSV for all.</p>}
+            </div>
+          )}
         </div>
       </div>
     </AppShell>
