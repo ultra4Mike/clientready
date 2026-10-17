@@ -12,6 +12,7 @@ export type ClockEntry = {
   edited_reason?: string | null;
   edited_at?: string | null;
   edited_by?: string | null;
+  phone_time?: boolean;
 };
 
 const OWNER_CACHE = "clientready-clock-entries";
@@ -54,13 +55,32 @@ export async function ownerEditClock(id: string, startedAt: string, endedAt: str
   return error ? error.message : "";
 }
 
-export async function crewClockIn(docId: string) {
-  const { error } = await supabase.rpc("crew_clock_in", { p_doc_id: docId });
+/**
+ * Clock in/out. With `at` + `key` (offline queue) the phone's tap time is sent, and the key makes a retry
+ * add nothing. Falls back to the server-time call before migration 20261017090000.
+ */
+async function clockCall(fn: "crew_clock_in" | "crew_clock_out", docId: string, at?: string, key?: string) {
+  if (!at && !key) {
+    const { error } = await supabase.rpc(fn, { p_doc_id: docId });
+    return error ? error.message : "";
+  }
+  let { error } = await supabase.rpc(fn, { p_doc_id: docId, p_at: at || null, p_client_key: key || "" });
+  if (error && /could not find the function|PGRST202/i.test(`${error.message} ${error.code || ""}`)) ({ error } = await supabase.rpc(fn, { p_doc_id: docId }));
   return error ? error.message : "";
 }
-export async function crewClockOut(docId: string) {
-  const { error } = await supabase.rpc("crew_clock_out", { p_doc_id: docId });
-  return error ? error.message : "";
+export function crewClockIn(docId: string, at?: string, key?: string) { return clockCall("crew_clock_in", docId, at, key); }
+export function crewClockOut(docId: string, at?: string, key?: string) { return clockCall("crew_clock_out", docId, at, key); }
+
+/** Shows clock taps still waiting in the offline queue (oldest first) on top of the loaded entries. */
+export function withQueuedClock(entries: ClockEntry[], queue: { id: string; kind: string; docId: string; payload: Record<string, unknown>; lastError?: string }[], email = ""): ClockEntry[] {
+  let list = entries.slice();
+  for (const item of queue) {
+    if (item.lastError) continue;
+    const at = String(item.payload.at || "");
+    if (item.kind === "clock-in") list.push({ id: `pending-${item.id}`, doc_id: item.docId, employee_id: "", worker_email: email, started_at: at, ended_at: null });
+    if (item.kind === "clock-out") list = list.map((entry) => entry.doc_id === item.docId && !entry.ended_at ? { ...entry, ended_at: at } : entry);
+  }
+  return list;
 }
 export async function crewEditClock(id: string, startedAt: string, endedAt: string, reason: string) {
   const { error } = await supabase.rpc("crew_edit_clock", { p_id: id, p_started: startedAt, p_ended: endedAt, p_reason: reason });

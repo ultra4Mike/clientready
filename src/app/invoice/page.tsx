@@ -1080,6 +1080,7 @@ export default function NewInvoicePage() {
                             <div key={entry.id} className="mt-1 flex flex-wrap items-center gap-2" data-testid="owner-clock-entry">
                               <span>{new Date(entry.started_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} – {entry.ended_at ? new Date(entry.ended_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : <b className="text-amber-700">still clocked in</b>}</span>
                               {entry.edited_reason && <span className="italic">({entry.edited_reason})</span>}
+                              {entry.phone_time && <span className="italic" data-testid="clock-phone-time" title="Tapped with no signal; the phone's time was used">(phone time)</span>}
                               <button type="button" className="underline" onClick={() => setClockFix({ id: entry.id, start: toLocalInput(entry.started_at), end: toLocalInput(entry.ended_at || new Date().toISOString()) })}>Fix</button>
                             </div>
                           ))}

@@ -10,7 +10,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { crewMarkDone, crewCheckItem, crewOnMyWay, omwTime, crewSetJobStatus, onMyWaySmsHref, STATUS_CLASS, STATUS_LABEL, type JobStatus } from "@/lib/schedule";
 import { compressPhoto } from "@/lib/photos";
-import { compressImage, crewClockIn, crewClockOut, crewEditClock, entryHours, fmtHours, fmtTimer, type ClockEntry } from "@/lib/clock";
+import { compressImage, crewClockIn, crewClockOut, crewEditClock, entryHours, withQueuedClock, fmtHours, fmtTimer, type ClockEntry } from "@/lib/clock";
 
 type Client = { id: string; name: string; phone: string; address: string };
 type Job = {
@@ -148,7 +148,7 @@ export default function CrewPage() {
   const [ownerId, setOwnerId] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [clock, setClock] = useState<ClockEntry[]>([]);
+  const [loadedClock, setClock] = useState<ClockEntry[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -272,6 +272,8 @@ export default function CrewPage() {
   }
 
   async function sendQueued(item: QueueItem) {
+    if (item.kind === "clock-in") return crewClockIn(item.docId, String(item.payload.at), item.id);
+    if (item.kind === "clock-out") return crewClockOut(item.docId, String(item.payload.at), item.id);
     if (item.kind === "check") return crewCheckItem(item.docId, String(item.payload.itemId || ""), Boolean(item.payload.done));
     if (item.kind === "report") return insertReport(item.payload, item.id);
     if (item.kind === "done") return crewMarkDone(item.docId, (item.payload.photos as string[]) || [], item.id);
@@ -320,6 +322,8 @@ export default function CrewPage() {
 
   // Checklist ticks saved offline are shown as ticked until they send (they replay in order, before "done").
   const cards = useMemo(() => buildCards(withQueuedTicks(jobs, queue, name)), [jobs, queue, name]);
+  // Clock taps saved offline show right away (the phone's tap time is sent when back online).
+  const clock = useMemo(() => withQueuedClock(loadedClock, queue), [loadedClock, queue]);
   const open = clock.find((entry) => !entry.ended_at);
   const weekStart = today ? addDays(today, -new Date(`${today}T00:00:00`).getDay()) : "";
   const weekDays = weekStart ? Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)) : [];
@@ -366,6 +370,14 @@ export default function CrewPage() {
     setJobs(flip(done));
     const result = await sendOrQueue("check", card.doc_id, { itemId, done }, () => crewCheckItem(card.doc_id, itemId, done));
     if (result.error) { setJobs(flip(!done)); setMessage(result.error); }
+  }
+
+  /** Clock in/out with the tap time; with no signal it is saved on the phone and sent later. */
+  async function clockTap(kind: "clock-in" | "clock-out", docId: string) {
+    const at = new Date().toISOString();
+    const label = kind === "clock-in" ? "Clocked in" : "Clocked out";
+    await act(`clock-${docId}`, async () => (await sendOrQueue(kind, docId, { at }, (key) => (kind === "clock-in" ? crewClockIn : crewClockOut)(docId, at, key))).error,
+      navigator.onLine ? `${label}.` : `${label} on this phone at ${clockTime(at)}. It will send when you're back online.`);
   }
 
   async function markDone(card: Card) {
@@ -543,11 +555,11 @@ export default function CrewPage() {
               {running && <p className="text-xs text-[var(--cr-muted)]">Clocked in at {clockTime(running.started_at)} · {fmtHours(total)} total</p>}
             </div>
             {running ? (
-              <button type="button" disabled={busy !== ""} data-testid={`clock-out-${card.doc_id}`} onClick={() => act(`clock-${card.doc_id}`, () => crewClockOut(card.doc_id), "Clocked out.")} className="rounded-xl bg-amber-500 px-4 py-3 font-semibold text-slate-950!">Clock out</button>
+              <button type="button" disabled={busy !== ""} data-testid={`clock-out-${card.doc_id}`} onClick={() => clockTap("clock-out", card.doc_id)} className="rounded-xl bg-amber-500 px-4 py-3 font-semibold text-slate-950!">Clock out</button>
             ) : past ? (
               <p data-testid={`past-state-${card.doc_id}`} data-completed={status === "done" ? "true" : "false"} className="rounded-xl border border-slate-300/60 px-3 py-2 text-sm font-semibold text-[var(--cr-muted)]">{status === "done" ? "✓ Completed" : "Past job"}</p>
             ) : (
-              <button type="button" disabled={busy !== "" || Boolean(open)} data-testid={`clock-in-${card.doc_id}`} onClick={() => act(`clock-${card.doc_id}`, () => crewClockIn(card.doc_id), "Clocked in.")} className="rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! disabled:opacity-40">{open ? "On another job" : "Clock in"}</button>
+              <button type="button" disabled={busy !== "" || Boolean(open)} data-testid={`clock-in-${card.doc_id}`} onClick={() => clockTap("clock-in", card.doc_id)} className="rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! disabled:opacity-40">{open ? "On another job" : "Clock in"}</button>
             )}
           </div>
           {mine.length > 0 && (
@@ -557,7 +569,7 @@ export default function CrewPage() {
                   <span>{dayLabel(ymd(new Date(entry.started_at)))} · {clockTime(entry.started_at)} – {entry.ended_at ? clockTime(entry.ended_at) : "now"}{entry.edited_reason ? ` · edited: ${entry.edited_reason}` : ""}</span>
                   <span className="flex items-center gap-2">
                     <span className="tabular-nums">{fmtHours(entryHours(entry, now))}</span>
-                    <button type="button" className="text-xs font-medium text-teal-700 underline-offset-2 hover:underline dark:text-teal-300" onClick={() => setFixing({ id: entry.id, start: localInput(entry.started_at), end: localInput(entry.ended_at || new Date().toISOString()), reason: "" })}>Fix time</button>
+                    {entry.id.startsWith("pending-") ? <span className="text-xs text-[var(--cr-muted)]" data-testid="clock-pending">Not sent yet</span> : <button type="button" className="text-xs font-medium text-teal-700 underline-offset-2 hover:underline dark:text-teal-300" onClick={() => setFixing({ id: entry.id, start: localInput(entry.started_at), end: localInput(entry.ended_at || new Date().toISOString()), reason: "" })}>Fix time</button>}
                   </span>
                 </li>
               ))}
