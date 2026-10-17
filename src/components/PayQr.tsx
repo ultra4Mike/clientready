@@ -42,7 +42,7 @@ export default function PayQr({ url, size = 104 }: { url: string; size?: number 
         <path d={path} fill="#000000" />
       </svg>
       </div>
-      <div className="min-w-0">
+      <div className="w-full min-w-0 sm:w-auto">
         <p className="font-semibold">Scan to pay</p>
         <p className="text-xs opacity-80">Point your phone camera at the code</p>
         <p className="qr-url break-all text-xs opacity-80">{safe}</p>
@@ -71,11 +71,20 @@ function QrActions({ url }: { url: string }) {
     }
     await copy();
   }
-  const button = "inline-flex min-h-11 items-center rounded-lg border border-teal-500/40 px-3 text-sm font-medium transition hover:border-teal-400 hover:bg-teal-500/10";
+  const button = "cr-qr-btn inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-teal-500/40 bg-teal-500/5 px-3 text-sm font-semibold transition hover:border-teal-400 hover:bg-teal-500/10 focus-visible:outline-2 focus-visible:outline-teal-400 sm:flex-none";
+  const icon = { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
   return (
-    <div className="print-hide mt-2 flex flex-wrap justify-center gap-2 sm:justify-start">
-      <button type="button" className={button} data-testid="pay-qr-copy" data-state={copied ? "copied" : "idle"} onClick={copy}>{copied ? "Copied" : "Copy link"}</button>
-      <button type="button" className={button} data-testid="pay-qr-share" onClick={share}>Share</button>
+    <div className="print-hide mt-3 grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
+      <button type="button" className={`${button} ${copied ? "cr-tone-good border-emerald-500/60 bg-emerald-50 text-emerald-700" : ""}`} data-testid="pay-qr-copy" data-state={copied ? "copied" : "idle"} onClick={copy} aria-live="polite">
+        {copied
+          ? <svg {...icon}><path d="M20 6 9 17l-5-5" /></svg>
+          : <svg {...icon}><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" /></svg>}
+        {copied ? "Copied" : "Copy link"}
+      </button>
+      <button type="button" className={button} data-testid="pay-qr-share" onClick={share}>
+        <svg {...icon}><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7" /><path d="m16 6-4-4-4 4" /><path d="M12 2v13" /></svg>
+        Share
+      </button>
     </div>
   );
 }

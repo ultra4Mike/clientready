@@ -1334,7 +1334,7 @@ export default function NewInvoicePage() {
                 <div className="flex justify-end">{!isProposal && <PayQr url={qrUrl} />}</div>
               </div>
             ) : null}
-            {!isProposal && !qrUrl && <p className="print-hide mt-4 rounded-lg border border-dashed border-slate-400/60 px-3 py-2 text-xs text-slate-500" data-testid="qr-hint">No QR code yet. Make a customer link under Approval (or add a pay link) and a Scan to pay QR appears here and on the PDF.</p>}
+            {!isProposal && !qrUrl && <p className="cr-qr-hint print-hide mt-4 flex items-start gap-2 rounded-lg border border-dashed border-slate-400/60 bg-slate-500/5 px-3 py-2.5 text-xs leading-relaxed text-slate-500" data-testid="qr-hint">No QR code yet. Make a customer link under Approval (or add a pay link) and a Scan to pay QR appears here and on the PDF.</p>}
           </div>
         </div>
       </section>

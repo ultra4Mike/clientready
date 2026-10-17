@@ -42,18 +42,18 @@ export default function PlanSection() {
     setError(result?.error || "Could not open checkout. Nothing was charged.");
   }
 
-  const button = "inline-flex min-h-11 items-center rounded-lg bg-teal-500 px-4 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-60";
+  const button = "inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-teal-500 px-4 sm:w-auto font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-60";
   return (
     <section id="plan" className="scroll-mt-24 mt-6 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-6" data-testid="settings-plan" data-plan={trial.plan} data-expired={trial.expired ? "1" : "0"}>
-      <h2 className="text-lg font-bold tracking-tight">Plan</h2>
-      <p className="mt-2 text-sm"><span className="text-[var(--cr-muted)]">Current plan: </span><span className="font-semibold" data-testid="plan-name">{name}</span></p>
-      <p className={`mt-1 text-sm ${trial.expired && !paid ? "font-semibold text-amber-700 dark:text-amber-300" : ""}`} data-testid="plan-status">{status}</p>
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Plan</h2>
+      <p className="mt-1 text-xl font-bold tracking-tight" data-testid="plan-name">{name}</p>
+      <p className={`mt-2 inline-flex max-w-full items-start gap-1.5 rounded-2xl border px-2.5 py-1 text-xs font-semibold ${paid ? "cr-tone-teal border-teal-300 bg-teal-50 text-teal-800" : trial.expired ? "cr-tone-bad border-rose-300 bg-rose-50 text-rose-700" : "cr-tone-warn border-amber-300 bg-amber-50 text-amber-800"}`} data-testid="plan-status">{status}</p>
       {!native && !paid && (
-        <div className="mt-3" data-purchase>
+        <div className="mt-4" data-purchase>
           {checkout
             ? <button type="button" className={button} data-testid="plan-upgrade" data-mode="checkout" disabled={busy} onClick={upgrade}>{busy ? "Opening checkout…" : "Upgrade plan"}</button>
             : <Link href="/plans" className={button} data-testid="plan-upgrade" data-mode="plans">Upgrade plan</Link>}
-          {error && <p role="alert" className="mt-2 text-sm text-rose-700 dark:text-rose-300" data-testid="plan-upgrade-error">{error}</p>}
+          {error && <p role="alert" className="cr-tone-bad mt-2 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-700" data-testid="plan-upgrade-error">{error}</p>}
         </div>
       )}
     </section>

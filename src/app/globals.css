@@ -472,3 +472,8 @@ html.dark .cr-panel .text-rose-700 { color: #fda4af !important; }
 html.dark .cr-panel .text-emerald-700 { color: #6ee7b7 !important; }
 /* Native app (Capacitor): no prices, plans or purchase links (see src/lib/native.ts). */
 .native-app [data-purchase] { display: none !important; }
+
+/* Pay QR actions + hint */
+html.dark .cr-qr-btn { color: #99f6e4 !important; }
+html.dark .cr-qr-btn.cr-tone-good { color: #a7f3d0 !important; }
+html.dark .cr-qr-hint { color: #94a3b8 !important; border-color: rgba(148, 163, 184, 0.4) !important; background-color: rgba(148, 163, 184, 0.06) !important; }
