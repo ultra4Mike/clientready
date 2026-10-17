@@ -1,4 +1,5 @@
-// Owner-tap follow-up drafts: quotes waiting for approval, and tomorrow's appointment reminders.
+// Owner-tap follow-up drafts: quotes waiting for approval, tomorrow's appointment reminders and
+// seasonal reminders (a client who had a job around this time last year and nothing booked since).
 // Nothing here sends anything; the owner opens each draft in their own text/email app.
 import { documentStage } from "@/lib/doc-stage";
 import { readApproval } from "@/lib/approval";
@@ -6,7 +7,7 @@ import { readEmailLog } from "@/lib/email";
 import { readSchedule } from "@/lib/schedule";
 
 type Doc = { id: string; type: string; title?: string; clientName?: string; createdAt?: string; data?: Record<string, unknown> };
-export type FollowUp = { key: string; kind: "quote" | "appointment"; docId: string; title: string; clientName: string; phone: string; email: string; subject: string; body: string; sinceDays?: number };
+export type FollowUp = { key: string; kind: "quote" | "appointment" | "seasonal"; docId: string; title: string; clientName: string; phone: string; email: string; subject: string; body: string; sinceDays?: number };
 
 export const QUOTE_FOLLOWUP_DAYS = 3;
 const s = (value: unknown) => (typeof value === "string" ? value : "");
@@ -55,7 +56,9 @@ export function followUps(docs: Doc[], today: string, businessName: string, appr
         body: `Hi ${first(clientName)}, this is ${biz(businessName)} with a reminder that we're scheduled for tomorrow${timeText(schedule.startTime)}. Reply here if you need to change it. See you then!` });
     }
   }
-  return out.sort((a, b) => (a.kind === b.kind ? (b.sinceDays || 0) - (a.sinceDays || 0) : a.kind === "appointment" ? -1 : 1));
+  out.push(...seasonalFollowUps(docs, today, businessName));
+  const rank = { appointment: 0, quote: 1, seasonal: 2 } as const;
+  return out.sort((a, b) => (a.kind === b.kind ? (b.sinceDays || 0) - (a.sinceDays || 0) : rank[a.kind] - rank[b.kind]));
 }
 
 const OPENED_KEY = "clientready-followups-opened";
@@ -68,4 +71,72 @@ export function noteFollowUpOpened(key: string) {
   all[key] = new Date().toISOString();
   window.localStorage.setItem(OPENED_KEY, JSON.stringify(all));
   return all[key];
+}
+
+/** Seasonal window: last year's job dated from 14 days before to 30 days after today's date a year ago. */
+export const SEASON_BEFORE_DAYS = 14;
+export const SEASON_AFTER_DAYS = 30;
+/** Anything for the client in the last 60 days (or scheduled ahead) means they're already booked. */
+export const SEASON_RECENT_DAYS = 60;
+const SKIP_KEY = "clientready-seasonal-skip";
+
+function shift(today: string, days: number) {
+  const [y, m, d] = today.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d + days));
+  return date.toISOString().slice(0, 10);
+}
+const clientOf = (doc: Doc) => {
+  const data = doc.data || {};
+  const id = s(data.clientId);
+  const name = (s(data.clientName) || doc.clientName || "").trim();
+  return { key: id ? `id:${id}` : `name:${name.toLowerCase()}`, name };
+};
+
+/** Owner chose "Skip this year" for a client: { clientKey: year }. */
+export function seasonalSkips(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try { return JSON.parse(window.localStorage.getItem(SKIP_KEY) || "{}"); } catch { return {}; }
+}
+export function skipSeasonal(clientKey: string, year: string) {
+  const next = { ...seasonalSkips(), [clientKey]: year };
+  window.localStorage.setItem(SKIP_KEY, JSON.stringify(next));
+  return next;
+}
+
+export function seasonalFollowUps(docs: Doc[], today: string, businessName: string, skips: Record<string, string> = seasonalSkips()): FollowUp[] {
+  const yearAgo = shift(today, -365);
+  const from = shift(yearAgo, -SEASON_BEFORE_DAYS);
+  const to = shift(yearAgo, SEASON_AFTER_DAYS);
+  const recent = shift(today, -SEASON_RECENT_DAYS);
+  const year = today.slice(0, 4);
+  const lastYear = new Map<string, Doc>();
+  const booked = new Set<string>();
+  for (const doc of docs) {
+    if (doc.type !== "invoice" && doc.type !== "proposal") continue;
+    const client = clientOf(doc);
+    if (!client.name) continue;
+    const data = doc.data || {};
+    const date = ymd(s(data.invoiceDate) || s(doc.createdAt));
+    const schedule = doc.type === "invoice" ? readSchedule(data) : null;
+    if (date >= recent || (schedule && schedule.date >= today)) booked.add(client.key);
+    if (doc.type !== "invoice" || s(data.status) === "draft" || date < from || date > to) continue;
+    const seen = lastYear.get(client.key);
+    if (!seen || date > ymd(s(seen.data?.invoiceDate) || s(seen.createdAt))) lastYear.set(client.key, doc);
+  }
+  const out: FollowUp[] = [];
+  for (const [key, doc] of lastYear) {
+    if (booked.has(key) || skips[key] === year) continue;
+    const data = doc.data || {};
+    const clientName = clientOf(doc).name;
+    const items = Array.isArray(data.items) ? (data.items as { description?: unknown }[]) : [];
+    const what = s(items.find((item) => s(item.description).trim())?.description).trim();
+    const date = ymd(s(data.invoiceDate) || s(doc.createdAt));
+    const month = new Date(`${date}T12:00:00`).toLocaleDateString("en-US", { month: "long" });
+    out.push({
+      key: `season:${key}:${year}`, kind: "seasonal", docId: doc.id, title: s(data.invoiceNumber) || doc.title || "", clientName, phone: s(data.clientPhone), email: s(data.clientEmail),
+      sinceDays: daysBetween(date, today), subject: `Time for your ${what ? what.toLowerCase() : "service"} again?`,
+      body: `Hi ${first(clientName)}, this is ${biz(businessName)}. Last ${month} we did ${what ? what.charAt(0).toLowerCase() + what.slice(1) : "a job"} for you. Want us to get you on the schedule again this year? Just reply here and we'll set it up. Thank you!`,
+    });
+  }
+  return out;
 }
