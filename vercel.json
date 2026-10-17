@@ -1,0 +1,3 @@
+{
+  "ignoreCommand": "echo \"$VERCEL_GIT_COMMIT_MESSAGE\" | grep -qiE '\\[(skip ci|ci skip)\\]'"
+}
