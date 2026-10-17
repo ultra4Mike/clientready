@@ -18,7 +18,7 @@ export default function PrivacyPage() {
         </p>
         <h2 className="mt-6 text-lg font-semibold text-slate-900">What we store</h2>
         <p className="mt-2">
-          ClientReady stores your business profile, clients, proposals, invoices, payments you record,
+          ClientReady stores your business profile, clients (including notes and preferred contact method you add), proposals, invoices, payments you record,
           job schedules, crew time and expenses, and job photos so you can run your work.
         </p>
         <h2 className="mt-6 text-lg font-semibold text-slate-900">Where it is stored</h2>
