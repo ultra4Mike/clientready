@@ -175,6 +175,7 @@ export default function NewInvoicePage() {
   const [notes, setNotes] = useState("Payment is due within 14 days.");
   const [taxPercent, setTaxPercent] = useState("0");
   const [discountType, setDiscountType] = useState<DiscountType>("percent");
+  const [noLateFee, setNoLateFee] = useState(false);
   const [discountValue, setDiscountValue] = useState("");
   const [payments, setPayments] = useState<Payment[]>([]);
   const [signature, setSignature] = useState<Signature | null>(null);
@@ -355,7 +356,7 @@ export default function NewInvoicePage() {
       const data = (doc.data || {}) as {
         clientName?: string; clientCompany?: string; clientEmail?: string; clientPhone?: string; clientAddress?: string;
         invoiceNumber?: string; invoiceDate?: string; dueDate?: string; jobStart?: string; jobEnd?: string; notes?: string;
-        taxPercent?: string; discountType?: string; discountValue?: string; signature?: unknown; proposalSignature?: unknown; payLink?: string; photos?: unknown; showPhotos?: unknown; fromProposal?: { id?: string; number?: string }; changeOrderOf?: unknown; changeOrderNotes?: unknown; recurring?: unknown; recurringFrom?: unknown; approval?: unknown; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
+        taxPercent?: string; discountType?: string; discountValue?: string; noLateFee?: unknown; signature?: unknown; proposalSignature?: unknown; payLink?: string; photos?: unknown; showPhotos?: unknown; fromProposal?: { id?: string; number?: string }; changeOrderOf?: unknown; changeOrderNotes?: unknown; recurring?: unknown; recurringFrom?: unknown; approval?: unknown; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
       };
       const kind: DocKind = doc.type === "proposal" ? "proposal" : "invoice";
       const loadedItems = Array.isArray(data.items) && data.items.length ? data.items.map((item) => ({ ...item, category: normalizeCategory(item.category) })) : [{ ...emptyItem }];
@@ -377,6 +378,7 @@ export default function NewInvoicePage() {
       setNotes(data.notes || (kind === "proposal" ? "This proposal is valid for 14 days." : "Payment is due within 14 days."));
       setTaxPercent(data.taxPercent || "0");
       setDiscountType(normalizeDiscountType(data.discountType));
+      setNoLateFee(data.noLateFee === true);
       setDiscountValue(data.discountValue || "");
       setPayments(readPayments(data));
       setSignature(readSignature(data.signature));
@@ -463,7 +465,7 @@ export default function NewInvoicePage() {
   function addPayment() {
     setPayments((current) => [...current, { id: Date.now().toString(), amount: current.length ? "" : (totals.balance || totals.total).toFixed(2), method: "Cash", date: ymd(new Date()), ref: "" }]);
   }
-  const lateFee = isProposal || !docId ? null : suggestedLateFee({ settings: lateFeeSettings, status, dueDate, balance: totals.balance, items, today: ymd(new Date()) });
+  const lateFee = isProposal || !docId ? null : suggestedLateFee({ settings: lateFeeSettings, status, dueDate, balance: totals.balance, items, today: ymd(new Date()), skip: noLateFee });
 
   /** Owner tap: append the suggested late fee as its own line. Existing lines stay as they are; nothing is saved until the owner saves. */
   function addLateFee() {
@@ -639,7 +641,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(stored?.data?.schedule ? { schedule: stored.data.schedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew, ...(crewReport ? { crewReport } : {}) },
+      data: { clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(stored?.data?.schedule ? { schedule: stored.data.schedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew, ...(crewReport ? { crewReport } : {}) },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -1175,8 +1177,14 @@ export default function NewInvoicePage() {
             {!locked && lateFee && (
               <div className="w-full rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" data-testid="late-fee" data-amount={lateFee.amount.toFixed(2)} data-days-late={lateFee.daysLate}>
                 <p>Suggested late fee: <b>${lateFee.amount.toFixed(2)}</b> ({lateFee.daysLate} days past due, {lateFee.how}).{Number(taxPercent) > 0 ? " Tax % applies to it as a line item." : ""}</p>
-                <button type="button" data-testid="late-fee-add" onClick={addLateFee} className="mt-1 rounded-lg border border-amber-500/50 px-3 py-1.5 text-sm font-medium max-sm:min-h-11">Add late fee line</button>
+                <span className="mt-1 flex flex-wrap gap-2">
+                  <button type="button" data-testid="late-fee-add" onClick={addLateFee} className="rounded-lg border border-amber-500/50 px-3 py-1.5 text-sm font-medium max-sm:min-h-11">Add late fee line</button>
+                  <button type="button" data-testid="late-fee-skip" onClick={() => { setNoLateFee(true); setSaveMessage("No late fees will be suggested for this invoice. Save to keep it."); }} className="rounded-lg px-3 py-1.5 text-sm text-[var(--cr-muted)] underline-offset-2 hover:underline max-sm:min-h-11">Don&apos;t suggest for this invoice</button>
+                </span>
               </div>
+            )}
+            {!locked && !isProposal && noLateFee && (
+              <p className="w-full text-xs text-[var(--cr-muted)]" data-testid="late-fee-skipped">Late fees off for this invoice. <button type="button" data-testid="late-fee-unskip" className="underline" onClick={() => setNoLateFee(false)}>Turn back on</button></p>
             )}
             {!isProposal && rating && (
               <p className="w-full rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-sm font-medium" data-testid="owner-rating" data-stars={rating.stars}>

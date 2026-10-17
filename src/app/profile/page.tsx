@@ -1,5 +1,6 @@
 "use client";
 
+import { lateFeeRulesFromRow, lateFeeRulesToRow } from "@/lib/late-fees";
 import PlanSection from "@/components/PlanSection";
 import PushSettings from "@/components/PushSettings";
 import PaymentMethodsSettings from "@/components/PaymentMethodsSettings";
@@ -26,6 +27,9 @@ const emptyProfile = {
   lateFeeType: "off",
   lateFeeValue: "",
   lateFeeGraceDays: "0",
+  lateFeeMax: "",
+  lateFeeMinBalance: "",
+  lateFeeRepeatDays: "",
   reviewLink: "",
 };
 
@@ -74,6 +78,7 @@ export default function ProfilePage() {
         lateFeeType: row.late_fee_type || local.lateFeeType || "off",
         lateFeeValue: row.late_fee_value ?? local.lateFeeValue ?? "",
         lateFeeGraceDays: row.late_fee_grace_days ?? local.lateFeeGraceDays ?? "0",
+        ...(row.late_fee_rules && Object.keys(row.late_fee_rules).length ? lateFeeRulesFromRow(row.late_fee_rules) : { lateFeeMax: local.lateFeeMax || "", lateFeeMinBalance: local.lateFeeMinBalance || "", lateFeeRepeatDays: local.lateFeeRepeatDays || "" }),
         reviewLink: row.review_link ?? local.reviewLink ?? "",
       });
     }
@@ -114,7 +119,9 @@ export default function ProfilePage() {
         updated_at: new Date().toISOString(),
       };
       const lateFees = { late_fee_type: profile.lateFeeType, late_fee_value: profile.lateFeeValue, late_fee_grace_days: profile.lateFeeGraceDays };
-      let { error } = await supabase.from("profiles").upsert({ ...row, ...lateFees, review_link: profile.reviewLink });
+      let { error } = await supabase.from("profiles").upsert({ ...row, ...lateFees, late_fee_rules: lateFeeRulesToRow(profile), review_link: profile.reviewLink });
+      // Before migration 20261017100000 (late_fee_rules): save without the rules (they stay on this device).
+      if (error && /late_fee_rules/.test(error.message || "")) ({ error } = await supabase.from("profiles").upsert({ ...row, ...lateFees, review_link: profile.reviewLink }));
       // Before migration 20261015150000 (review_link) runs: save without it (the link stays on this device).
       if (error && /review_link/.test(error.message || "")) ({ error } = await supabase.from("profiles").upsert({ ...row, ...lateFees }));
       // Before migration 20261015120000 runs there are no late fee columns: save the rest (late fees stay on this device).
@@ -238,6 +245,13 @@ export default function ProfilePage() {
             <input name="lateFeeValue" aria-label="Late fee amount" data-testid="late-fee-value" inputMode="decimal" placeholder={profile.lateFeeType === "percent" ? "5" : "25"} className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm" value={profile.lateFeeValue} onChange={(event) => update("lateFeeValue", event.target.value)} disabled={profile.lateFeeType === "off"} />
             <input name="lateFeeGraceDays" aria-label="Grace days after due date" data-testid="late-fee-grace" inputMode="numeric" placeholder="Grace days" className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm" value={profile.lateFeeGraceDays} onChange={(event) => update("lateFeeGraceDays", event.target.value)} disabled={profile.lateFeeType === "off"} />
           </div>
+          {profile.lateFeeType !== "off" && (
+            <div className="grid grid-cols-3 gap-2" data-testid="late-fee-rules">
+              <label className="text-xs text-[var(--cr-muted)]">Max total $<input name="lateFeeMax" data-testid="late-fee-max" inputMode="decimal" placeholder="No cap" className="mt-1 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm" value={profile.lateFeeMax} onChange={(event) => update("lateFeeMax", event.target.value)} /></label>
+              <label className="text-xs text-[var(--cr-muted)]">Only if unpaid ≥ $<input name="lateFeeMinBalance" data-testid="late-fee-min" inputMode="decimal" placeholder="Any" className="mt-1 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm" value={profile.lateFeeMinBalance} onChange={(event) => update("lateFeeMinBalance", event.target.value)} /></label>
+              <label className="text-xs text-[var(--cr-muted)]">Again every (days)<input name="lateFeeRepeatDays" data-testid="late-fee-repeat" inputMode="numeric" placeholder="Once" className="mt-1 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm" value={profile.lateFeeRepeatDays} onChange={(event) => update("lateFeeRepeatDays", event.target.value)} /></label>
+            </div>
+          )}
           <p className="text-xs text-[var(--cr-muted)]">After the due date plus grace days, an unpaid invoice shows a suggested late fee. Nothing is added or sent unless you tap it.</p>
         </fieldset>
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
