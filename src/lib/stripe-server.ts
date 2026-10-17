@@ -59,3 +59,54 @@ export function verifyStripeSignature(payload: string, header: string, secret: s
     return b.length === a.length && timingSafeEqual(a, b);
   });
 }
+
+/**
+ * Plan subscriptions (one flow for /api/stripe/subscribe and /api/checkout). Price ids come from
+ * STRIPE_PRICE_MONTHLY / STRIPE_PRICE_QUARTERLY, or NEXT_PUBLIC_STRIPE_PRICE_MONTHLY / _3MONTHS.
+ * Live only when STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and that plan's price are ALL set: a paid
+ * subscription does not unlock the plan until the subscription webhook exists, so without the webhook
+ * secret every plan button stays on trial sign-up.
+ */
+export type PlanId = "monthly" | "quarterly";
+export function planPrices(): Record<PlanId, string> {
+  return {
+    monthly: process.env.STRIPE_PRICE_MONTHLY || process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY || "",
+    quarterly: process.env.STRIPE_PRICE_QUARTERLY || process.env.NEXT_PUBLIC_STRIPE_PRICE_3MONTHS || "",
+  };
+}
+export function subscriptionsLive() {
+  const ready = Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET);
+  const prices = planPrices();
+  return { monthly: ready && Boolean(prices.monthly), quarterly: ready && Boolean(prices.quarterly), prices: { monthly: ready ? prices.monthly : "", quarterly: ready ? prices.quarterly : "" } };
+}
+
+/** The signed-in owner behind a Bearer token, or null (anonymous visitors on the home page). */
+export async function userFromRequest(request: Request) {
+  const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+  const { supabaseUrl } = stripeConfig();
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+  if (!token || !supabaseUrl || !anon) return null;
+  const { data, error } = await createClient(supabaseUrl, anon, { auth: { persistSession: false } }).auth.getUser(token).catch(() => ({ data: { user: null }, error: true }));
+  return error || !data.user ? null : { id: data.user.id, email: data.user.email || "" };
+}
+
+/**
+ * Creates the Stripe subscription Checkout session. Stripe is created here (lazily), never at module
+ * load, so builds and pages work with no Stripe env. The owner's user id goes in client_reference_id and
+ * metadata.user_id (and their email as customer_email) so the future webhook can unlock the plan.
+ */
+export async function createSubscriptionCheckout(input: { price: string; plan: string; user: { id: string; email: string } | null; successUrl: string; cancelUrl: string }) {
+  const { default: Stripe } = await import("stripe");
+  const { secretKey } = stripeConfig();
+  const base = process.env.STRIPE_API_BASE ? new URL(process.env.STRIPE_API_BASE) : null;
+  const stripe = new Stripe(secretKey, base ? { host: base.hostname, port: Number(base.port) || undefined, protocol: base.protocol.replace(":", "") as "http" | "https" } : {});
+  const session = await stripe.checkout.sessions.create({
+    mode: "subscription",
+    line_items: [{ price: input.price, quantity: 1 }],
+    success_url: input.successUrl,
+    cancel_url: input.cancelUrl,
+    ...(input.user ? { client_reference_id: input.user.id, customer_email: input.user.email || undefined } : {}),
+    metadata: { plan: input.plan, ...(input.user ? { user_id: input.user.id } : {}) },
+  });
+  return session.url || "";
+}

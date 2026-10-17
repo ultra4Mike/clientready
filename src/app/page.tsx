@@ -3,11 +3,29 @@
 import { PLANS, PRICES_ARE_PLACEHOLDERS } from "@/lib/plans";
 import Link from "next/link";
 import NativeLoginOnly from "@/components/NativeLoginOnly";
+import { isNativeApp } from "@/lib/native";
+import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
+
+/** Starts plan checkout; a signed-in owner's session links the subscription to their account. */
+async function startCheckout(priceId: string) {
+  const { data } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+  const token = data.session?.access_token;
+  const response = await fetch("/api/checkout", { method: "POST", headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ priceId }) }).catch(() => null);
+  const result = (await response?.json().catch(() => null)) as { url?: string; error?: string } | null;
+  if (result?.url) window.location.href = result.url;
+  else window.alert(result?.error || "Could not open checkout. Nothing was charged.");
+}
 
 export default function HomePage() {
   const [theme, setTheme] = useState("dark");
   const [deleted, setDeleted] = useState(false);
+  // Price ids only when subscriptions are fully live on the server (key + webhook secret + price); else trial sign-up.
+  const [checkoutPrices, setCheckoutPrices] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (isNativeApp()) return;
+    fetch("/api/stripe/subscribe", { cache: "no-store" }).then((response) => response.json()).then((data) => setCheckoutPrices(data?.prices || {})).catch(() => undefined);
+  }, []);
   useEffect(() => {
     const done = new URLSearchParams(window.location.search).get("deleted") === "1";
     if (done) window.history.replaceState(null, "", "/");
@@ -134,6 +152,9 @@ export default function HomePage() {
               <p className={`text-sm ${plan.highlight ? "font-semibold text-teal-600 dark:text-teal-300" : "text-[var(--cr-muted)]"}`}>{plan.name}</p>
               <p className="mt-2 text-4xl font-bold tracking-tight tabular-nums">{plan.price}</p>
               <p className="mt-3 text-sm text-[var(--cr-muted)]">{plan.blurb}</p>
+              {!plan.free && (checkoutPrices[plan.id]
+                ? <button type="button" data-purchase data-testid={`home-checkout-${plan.id}`} data-mode="checkout" onClick={() => void startCheckout(checkoutPrices[plan.id])} className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-teal-500 px-4 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">Choose {plan.name}</button>
+                : <a href="/signup" data-purchase data-testid={`home-checkout-${plan.id}`} data-mode="trial" className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-teal-500/40 px-4 font-semibold transition hover:border-teal-400">Start free trial</a>)}
             </div>
           ))}
         </div>
