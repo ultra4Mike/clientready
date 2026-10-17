@@ -9,6 +9,7 @@ const SECTIONS: { title: string; body: string[] }[] = [
   { title: "2. Your account and the free trial", body: [
     "You need an account to use ClientReady. Keep your login details private; you are responsible for activity on your account.",
     "New accounts get a 14-day free trial. After the trial, continued use may require a paid plan at the price shown at the time ([Pricing and billing terms]).",
+    "Paid plans are bought on the ClientReady website (not in the iPhone or Android app) through a secure checkout run by our payment processor, Stripe, whose terms also apply. [Pricing and billing terms — owner/legal to confirm before checkout is turned on: whether plans renew automatically each billing period until cancelled, how to cancel (for example a billing page or emailing support@clientreadyapp.com), when cancellation takes effect, and the refund policy for partial periods.]",
   ] },
   { title: "3. Your data and your clients", body: [
     "You own the business information, client details, documents and photos you put into ClientReady. You are responsible for having the right to store your clients' information and for the accuracy of your invoices, proposals, prices and taxes.",
