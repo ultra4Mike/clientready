@@ -2,6 +2,7 @@
 
 import { nativePhotoClick } from "@/lib/native-camera";
 import { useState } from "react";
+import PhotoAnnotator from "@/components/PhotoAnnotator";
 import { compressPhoto, dataUrlBytes, MAX_PHOTOS, orderByTag, PHOTO_TAG_LABEL, type JobPhoto, type PhotoTag } from "@/lib/photos";
 
 type EditorProps = { photos: JobPhoto[]; onChange: (photos: JobPhoto[]) => void; showOnCopy?: boolean; onShowOnCopyChange?: (value: boolean) => void };
@@ -9,6 +10,8 @@ type EditorProps = { photos: JobPhoto[]; onChange: (photos: JobPhoto[]) => void;
 export function JobPhotosEditor({ photos, onChange, showOnCopy = false, onShowOnCopyChange }: EditorProps) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [drawing, setDrawing] = useState("");
+  const drawingPhoto = photos.find((photo) => photo.id === drawing);
 
   async function addFiles(list: FileList | File[] | null) {
     if (!list || !list.length) return;
@@ -53,6 +56,7 @@ export function JobPhotosEditor({ photos, onChange, showOnCopy = false, onShowOn
         )}
       </div>
       {busy && <p className="text-sm text-slate-600">Shrinking photos…</p>}
+      {drawingPhoto && <PhotoAnnotator src={drawingPhoto.dataUrl} onCancel={() => setDrawing("")} onSave={(dataUrl) => { onChange(photos.map((item) => item.id === drawingPhoto.id ? { ...item, dataUrl, annotated: true } : item)); setDrawing(""); }} />}
       {photos.length > 0 && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {photos.map((photo) => (
@@ -65,7 +69,8 @@ export function JobPhotosEditor({ photos, onChange, showOnCopy = false, onShowOn
                 <option value="before">Before</option>
                 <option value="after">After</option>
               </select>
-              <button type="button" className="min-h-11 rounded-lg border border-rose-500/40 px-3 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10 sm:min-h-10 dark:text-rose-300" onClick={() => onChange(photos.filter((item) => item.id !== photo.id))}>Remove</button>
+<button type="button" data-testid="photo-annotate" onClick={() => setDrawing(photo.id)} className="mr-2 min-h-11 rounded-lg border border-teal-500/40 px-3 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 sm:min-h-10 dark:text-teal-300">{photo.annotated ? "Draw more" : "Draw on photo"}</button>
+                            <button type="button" className="min-h-11 rounded-lg border border-rose-500/40 px-3 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10 sm:min-h-10 dark:text-rose-300" onClick={() => onChange(photos.filter((item) => item.id !== photo.id))}>Remove</button>
             </div>
           ))}
         </div>

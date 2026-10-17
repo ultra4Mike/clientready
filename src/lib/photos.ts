@@ -1,6 +1,6 @@
 /** tag: "before" / "after" the work (optional). */
 export type PhotoTag = "" | "before" | "after";
-export type JobPhoto = { id: string; dataUrl: string; caption: string; addedAt: string; tag?: PhotoTag };
+export type JobPhoto = { id: string; dataUrl: string; caption: string; addedAt: string; tag?: PhotoTag; annotated?: boolean };
 export const PHOTO_TAG_LABEL: Record<Exclude<PhotoTag, "">, string> = { before: "Before", after: "After" };
 const tagOf = (value: unknown): PhotoTag => (value === "before" || value === "after" ? value : "");
 /** Before photos first, then untagged, then after; stable within each group. */
@@ -25,7 +25,7 @@ export function readPhotos(value: unknown): JobPhoto[] {
     .map((raw, index) => {
       const item = (raw || {}) as Partial<JobPhoto>;
       const tag = tagOf(item.tag);
-      return { id: String(item.id || `ph${index}`), dataUrl: String(item.dataUrl || ""), caption: String(item.caption || ""), addedAt: String(item.addedAt || ""), ...(tag ? { tag } : {}) };
+      return { id: String(item.id || `ph${index}`), dataUrl: String(item.dataUrl || ""), caption: String(item.caption || ""), addedAt: String(item.addedAt || ""), ...(tag ? { tag } : {}), ...(item.annotated === true ? { annotated: true } : {}) };
     })
     .filter((photo) => /^data:image\/(jpeg|png|webp);base64,/.test(photo.dataUrl))
     .slice(0, MAX_PHOTOS);
