@@ -148,13 +148,15 @@ export default function HomePage() {
         <h2 className="text-center text-3xl font-bold tracking-tight">Simple pricing</h2>
         <div className="mt-6 grid gap-4 md:grid-cols-3" data-testid="home-pricing">
           {PLANS.map((plan) => (
-            <div key={plan.id} className={`rounded-2xl bg-[var(--cr-card)] p-6 ${plan.highlight ? "border-2 border-teal-400 shadow-md" : "border border-teal-500/20 shadow-sm"}`}>
+            <div key={plan.id} className={`relative flex flex-col rounded-2xl bg-[var(--cr-card)] p-6 ${plan.highlight ? "border-2 border-teal-400 shadow-xl shadow-teal-500/10 md:-my-2 md:py-8" : "border border-teal-500/20 shadow-sm"}`}>
+              {plan.highlight && <span aria-hidden="true" className="absolute -top-3 left-6 rounded-full bg-teal-500 px-3 py-0.5 text-xs font-bold uppercase tracking-wide text-slate-950!">Recommended</span>}
               <p className={`text-sm ${plan.highlight ? "font-semibold text-teal-600 dark:text-teal-300" : "text-[var(--cr-muted)]"}`}>{plan.name}</p>
               <p className="mt-2 text-4xl font-bold tracking-tight tabular-nums">{plan.price}</p>
               <p className="mt-3 text-sm text-[var(--cr-muted)]">{plan.blurb}</p>
+              {!plan.free && <div className="min-h-4 flex-1" aria-hidden="true" />}
               {!plan.free && (checkoutPrices[plan.id]
-                ? <button type="button" data-purchase data-testid={`home-checkout-${plan.id}`} data-mode="checkout" onClick={() => void startCheckout(checkoutPrices[plan.id])} className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-teal-500 px-4 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">Choose {plan.name}</button>
-                : <a href="/signup" data-purchase data-testid={`home-checkout-${plan.id}`} data-mode="trial" className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-teal-500/40 px-4 font-semibold transition hover:border-teal-400">Start free trial</a>)}
+                ? <button type="button" data-purchase data-testid={`home-checkout-${plan.id}`} data-mode="checkout" onClick={() => void startCheckout(checkoutPrices[plan.id])} className={`mt-auto inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-teal-500 px-4 font-semibold text-slate-950! transition hover:bg-teal-400 active:bg-teal-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--cr-card)] ${plan.highlight ? "shadow-lg shadow-teal-500/30" : "shadow-sm"}`}>Choose {plan.name}</button>
+                : <a href="/signup" data-purchase data-testid={`home-checkout-${plan.id}`} data-mode="trial" className={`mt-auto inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-teal-500 px-4 font-semibold text-slate-950! transition hover:bg-teal-400 active:bg-teal-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--cr-card)] ${plan.highlight ? "shadow-lg shadow-teal-500/30" : "shadow-sm"}`}>Start free trial</a>)}
             </div>
           ))}
         </div>
