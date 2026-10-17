@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import LegalLinks from "@/components/LegalLinks";
 import { fetchPortal, portalDocUrl, type PortalBusiness, type PortalDoc } from "@/lib/portal";
 import { amountOf, documentTotals } from "@/lib/discount";
+import { payNowAmount, readStages, stagePlan, todayYmd } from "@/lib/stages";
 import { balanceDue, paidTotal, readPayments } from "@/lib/payments";
 import { readApproval } from "@/lib/approval";
 
@@ -17,7 +18,11 @@ function figures(doc: PortalDoc) {
   const subtotal = items.reduce((sum, item) => sum + amountOf(item.qty) * amountOf(item.rate), 0);
   const total = documentTotals(subtotal, text(doc.data.taxPercent), text(doc.data.discountType), text(doc.data.discountValue)).total;
   const paid = paidTotal(readPayments(doc.data));
-  return { total, paid, owed: doc.type === "invoice" ? balanceDue(total, paid, doc.data.status) : 0 };
+  const owed = doc.type === "invoice" ? balanceDue(total, paid, doc.data.status) : 0;
+  // Payment plan / stages: only the current payment is due now.
+  const stages = readStages(doc.data.stages);
+  const dueNow = owed > 0 && stages.length ? payNowAmount(total, owed, stages, todayYmd()) : owed;
+  return { total, paid, owed, dueNow, plan: stages.length > 0 && owed > 0 ? stagePlan(total, owed, stages, todayYmd()).current : null };
 }
 
 /** Public, no-login client portal: every sent invoice/proposal for one client of one business. */
@@ -60,6 +65,7 @@ export default function PortalPage() {
 
   const rows = portal.documents.map((doc) => ({ doc, ...figures(doc), approval: readApproval(doc.data.approval) }));
   const owed = rows.reduce((sum, row) => sum + row.owed, 0);
+  const dueNow = Math.round(rows.reduce((sum, row) => sum + row.dueNow, 0) * 100) / 100;
 
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-6 text-slate-900 sm:px-4 sm:py-10">
@@ -73,12 +79,12 @@ export default function PortalPage() {
           <h1 className="text-2xl font-bold tracking-tight">Documents for {portal.clientName}</h1>
           <p className="mt-1 text-sm text-slate-600">{[portal.business.email, portal.business.phone].filter(Boolean).join(" · ")}</p>
           <p className={`mt-4 inline-flex flex-wrap items-baseline gap-x-2 rounded-xl px-4 py-3 text-lg font-semibold ${owed > 0 ? "cr-tone-warn bg-amber-50 text-amber-900 ring-1 ring-amber-200" : "cr-tone-good bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200"}`} data-testid="portal-owed">Total still owed: <span className="text-2xl font-bold tabular-nums">${owed.toFixed(2)}</span></p>
-          {owed > 0 && <PayOptions config={payMethods} amount={owed} reference="" publicCopy />}
+          {owed > 0 && <PayOptions config={payMethods} amount={dueNow} reference="" publicCopy dueNote={dueNow < owed - 0.004 ? `Payment plan: $${dueNow.toFixed(2)} due now (of $${owed.toFixed(2)} owed)` : ""} />}
           </div>
         </div>
         <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white shadow-sm" data-testid="portal-list">
           {rows.length === 0 && <p className="p-5 text-sm text-slate-600">Nothing has been shared yet.</p>}
-          {rows.map(({ doc, total, paid, owed: rowOwed, approval }) => (
+          {rows.map(({ doc, total, paid, owed: rowOwed, approval, plan }) => (
             <a key={doc.id} href={portalDocUrl(token, doc.id)} data-testid="portal-doc" className="flex min-h-16 items-center justify-between gap-3 p-4 transition hover:bg-slate-50 sm:px-5">
               <span className="min-w-0">
                 <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">{doc.type === "proposal" ? "Proposal" : "Invoice"}</span>
@@ -86,6 +92,7 @@ export default function PortalPage() {
                 <span className="block text-xs text-slate-600">
                   {text(doc.data.invoiceDate)}{text(doc.data.dueDate) ? ` · ${doc.type === "proposal" ? "valid until" : "due"} ${text(doc.data.dueDate)}` : ""}
                   {approval?.status === "approved" ? " · Approved" : approval ? " · Waiting for your approval" : ""}
+                  {plan && <span className="block font-semibold text-teal-700" data-testid="portal-plan-next">{plan.state === "upcoming" ? "Next payment" : plan.state === "overdue" ? "Overdue" : "Due now"}: ${plan.remaining.toFixed(2)}{plan.dueDate ? ` on ${plan.dueDate}` : ""} ({plan.label || "payment"})</span>}
                 </span>
               </span>
               <span className="shrink-0 text-right text-sm">

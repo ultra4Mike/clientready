@@ -259,7 +259,7 @@ export default function ApprovePage() {
               {cardEnabled && totals.balance >= 0.5 && <p className="mt-2 text-xs text-slate-500">Secure checkout by Stripe. {payNow < totals.balance ? "You pay the amount due now; the rest follows the payment schedule." : "You pay what is still owed."}</p>}
             </div>
           )}
-          {!isProposal && text(data.status) !== "paid" && totals.balance > 0.004 && <PayOptions config={payMethods} amount={totals.balance} reference={number} publicCopy />}
+          {!isProposal && text(data.status) !== "paid" && totals.balance > 0.004 && <PayOptions config={payMethods} amount={payNow} reference={number} publicCopy dueNote={stages.length && payNow < totals.balance - 0.004 ? `Payment plan: $${payNow.toFixed(2)} due now (of $${totals.balance.toFixed(2)} still owed)` : ""} />}
           {!isProposal && <StageSchedule stages={stages} total={totals.total} balance={totals.balance} />}
           {text(data.notes) && <p className="mt-3 text-sm text-slate-600">{text(data.notes)}</p>}
           {data.showPhotos === true && <JobPhotoStrip photos={readPhotos(data.photos)} />}

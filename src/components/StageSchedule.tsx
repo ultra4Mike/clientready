@@ -1,6 +1,7 @@
 "use client";
 
-import { STAGE_KIND_LABEL, stagePlan, todayYmd, type Stage } from "@/lib/stages";
+import { useState } from "react";
+import { installmentStages, STAGE_KIND_LABEL, stagePlan, todayYmd, type PlanEvery, type Stage } from "@/lib/stages";
 
 const STATE_LABEL = { paid: "Paid", due: "Due now", overdue: "Overdue", upcoming: "Upcoming" } as const;
 const STATE_CLASS = { paid: "text-emerald-700", due: "font-semibold text-teal-700", overdue: "font-semibold text-red-600", upcoming: "text-slate-500" } as const;
@@ -51,6 +52,7 @@ export function StageEditor({ stages, onChange, total, balance }: { stages: Stag
         <h2 className="min-w-0 font-medium">Payment stages (optional)</h2>
         <button type="button" className="tap min-h-11 shrink-0 whitespace-nowrap rounded-lg border border-teal-500/40 px-3 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 sm:min-h-10 dark:text-teal-300" onClick={add} data-testid="stage-add">Add stage</button>
       </div>
+      <PlanMaker total={total} balance={balance} hasStages={stages.length > 0} onMake={onChange} />
       {stages.length === 0 && <p className="text-xs text-slate-500">Split this invoice into deposit / progress / final payments with due dates. The invoice total does not change.</p>}
       {plan.rows.map((row) => (
         <div key={row.id} className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-2 sm:grid-cols-5" data-testid="stage-edit-row">
@@ -73,5 +75,31 @@ export function StageEditor({ stages, onChange, total, balance }: { stages: Stag
         </p>
       )}
     </div>
+  );
+}
+
+/** Owner: "split what's owed into N payments" quick fill for the stages. Never records or sends anything. */
+function PlanMaker({ total, balance, hasStages, onMake }: { total: number; balance: number; hasStages: boolean; onMake: (stages: Stage[]) => void }) {
+  const [count, setCount] = useState("3");
+  const [every, setEvery] = useState<PlanEvery>("month");
+  const [first, setFirst] = useState(todayYmd());
+  const field = "mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm";
+  if (!(balance > 0.004)) return null;
+  const n = Math.min(24, Math.max(2, Math.floor(Number(count)) || 2));
+  function make() {
+    if (hasStages && !window.confirm("Replace the current payment stages with this payment plan?")) return;
+    onMake(installmentStages(total, balance, n, first, every));
+  }
+  return (
+    <details className="rounded-lg border border-dashed border-teal-500/40 p-3 text-sm" data-testid="plan-maker">
+      <summary className="cursor-pointer font-medium text-teal-700 dark:text-teal-300">Payment plan: split ${balance.toFixed(2)} owed into payments</summary>
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        <label className="text-xs text-slate-600">Payments<input aria-label="Number of payments" data-testid="plan-count" inputMode="numeric" className={field} value={count} onChange={(event) => setCount(event.target.value)} /></label>
+        <label className="text-xs text-slate-600">Every<select aria-label="How often" data-testid="plan-every" className={field} value={every} onChange={(event) => setEvery(event.target.value as PlanEvery)}><option value="week">Week</option><option value="2weeks">2 weeks</option><option value="month">Month</option></select></label>
+        <label className="text-xs text-slate-600">First due<input aria-label="First payment due" data-testid="plan-first" type="date" className={field} value={first} onChange={(event) => setFirst(event.target.value)} /></label>
+      </div>
+      <p className="mt-2 text-xs text-slate-500">{n} payments of about ${(balance / n).toFixed(2)}. Customers see the schedule and what is due now on their link and portal, and pay by your manual methods (Zelle, Venmo, check…). You still record each payment yourself.</p>
+      <button type="button" data-testid="plan-make" onClick={make} className="mt-2 min-h-11 rounded-lg bg-teal-600 px-4 text-sm font-semibold text-white">Make payment plan</button>
+    </details>
   );
 }

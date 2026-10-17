@@ -76,3 +76,36 @@ export function todayYmd() {
   const date = new Date();
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
+
+export type PlanEvery = "week" | "2weeks" | "month";
+
+function addPeriod(ymd: string, every: PlanEvery, times: number) {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  if (every === "month") {
+    const target = new Date(Date.UTC(y, m - 1 + times, 1));
+    const last = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+    target.setUTCDate(Math.min(d, last));
+    return target.toISOString().slice(0, 10);
+  }
+  date.setUTCDate(date.getUTCDate() + times * (every === "week" ? 7 : 14));
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Payment plan: splits what is still owed into `count` equal payments (2-24), the first due on `firstDue`
+ * and then every week / 2 weeks / month. Money already paid becomes a "Paid so far" stage so payments
+ * keep applying in order. Only builds stages (data.stages); totals, items and payments never change.
+ */
+export function installmentStages(total: number, balance: number, count: number, firstDue: string, every: PlanEvery, newId: (i: number) => string = (i) => `plan-${Date.now()}-${i}`): Stage[] {
+  const n = Math.min(24, Math.max(2, Math.floor(count) || 2));
+  const paidSoFar = round(Math.max(total - balance, 0));
+  const each = Math.floor((balance / n) * 100) / 100;
+  const out: Stage[] = [];
+  if (paidSoFar > 0.004) out.push({ id: newId(-1), label: "Paid so far", kind: "deposit", mode: "amount", value: paidSoFar.toFixed(2), dueDate: "" });
+  for (let i = 0; i < n; i++) {
+    const last = i === n - 1;
+    out.push({ id: newId(i), label: `Payment ${i + 1} of ${n}`, kind: last ? "final" : "progress", mode: "amount", value: last ? "" : each.toFixed(2), dueDate: /^\d{4}-\d{2}-\d{2}$/.test(firstDue) ? addPeriod(firstDue, every, i) : "" });
+  }
+  return out;
+}

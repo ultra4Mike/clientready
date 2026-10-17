@@ -13,7 +13,7 @@ const BRAND: Record<string, { bg: string; mark: string }> = {
 };
 
 /** "Ways to pay": one row per enabled method with Copy and, where the app has one, a deep link. Nothing is recorded. */
-export default function PayOptions({ config, amount, reference, publicCopy = false, className = "" }: { config: PaymentMethodsConfig; amount: number; reference: string; publicCopy?: boolean; className?: string }) {
+export default function PayOptions({ config, amount, reference, publicCopy = false, className = "", dueNote = "" }: { config: PaymentMethodsConfig; amount: number; reference: string; publicCopy?: boolean; className?: string; dueNote?: string }) {
   const [copied, setCopied] = useState("");
   const options = payOptions(config, { amount, reference }, publicCopy);
   if (!options.length) return null;
@@ -24,6 +24,7 @@ export default function PayOptions({ config, amount, reference, publicCopy = fal
   return (
     <div className={`print-keep mt-4 rounded-2xl border border-slate-200 p-4 text-sm sm:p-5 ${className}`} data-testid="pay-options">
       <p className="text-base font-semibold">Ways to pay</p>
+      {dueNote && <p className="mt-1 text-sm font-semibold text-teal-800" data-testid="pay-options-due">{dueNote}</p>}
       <ul className="mt-3 grid gap-2.5 sm:grid-cols-2">
         {options.map((option) => {
           const brand = BRAND[option.id] || { bg: "#0d9488", mark: option.label.slice(0, 1) };
