@@ -31,4 +31,7 @@ export const UPCOMING_HELP_ARTICLES: UpcomingArticle[] = [
     steps: ["Clients must agree to receive texts; their phone must be on their client card.", "From an invoice, proposal or job, choose [TBD: in-app text action label] and review the message.", "Tap [TBD: send label]. Replies come back to [SMS reply destination]."],
     tips: ["Today, texts open in your own Messages app and are sent from your phone number.", "Clients can reply STOP to opt out."],
     related: ["auto-reminders"], keywords: ["sms", "text", "message", "phone"] },
+  { feature: "reimbursements", status: "draft", id: "crew-reimbursements", category: "Crew", question: "How do I pay crew back for what they spent?",
+    steps: ["[TBD: where reimbursements live, e.g. a Reimbursements page].", "[TBD: how crew costs are marked owed, approved and paid back].", "[TBD: labels and how it affects job costs and Reports]."],
+    tips: ["Draft only: Dev's reimbursements feature is in progress and not committed; labels not verified."], related: ["crew-costs-review", "crew-expenses"], keywords: ["reimburse", "pay back", "crew expenses", "owed to crew"] },
 ];
