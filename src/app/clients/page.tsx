@@ -289,13 +289,13 @@ export default function ClientsPage() {
         {message && <p className="mb-4 rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-slate-600">{message}</p>}
 
         <div className="overflow-hidden rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] shadow-sm">
-          <div className="hidden gap-4 border-b border-slate-200 bg-teal-500/5 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600 md:grid md:grid-cols-[minmax(0,1.6fr)_minmax(0,1.6fr)_9rem_minmax(0,1.2fr)_10rem]">
+          <div className="hidden gap-4 border-b border-slate-200 bg-teal-500/5 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600 md:grid md:grid-cols-[minmax(0,1.6fr)_minmax(0,1.6fr)_9rem_minmax(0,1.2fr)_max-content]">
             <span>Client</span><span>Contact</span><span>Next visit</span><span>Notes</span><span className="text-right">Actions</span>
           </div>
           {clients.length === 0 && <EmptyState icon="👤" title="No saved clients yet." line="Add a client to reuse their details on invoices." />}
           {clients.length > 0 && visible.length === 0 && <p className="p-10 text-center text-sm text-slate-600">No clients match that search.</p>}
           {visible.map((client) => (
-            <div key={client.id} className="grid gap-3 border-b border-slate-200 px-4 py-4 transition last:border-b-0 hover:bg-teal-500/5 md:items-center md:gap-4 md:px-5 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1.6fr)_9rem_minmax(0,1.2fr)_10rem]">
+            <div key={client.id} className="grid gap-3 border-b border-slate-200 px-4 py-4 transition last:border-b-0 hover:bg-teal-500/5 md:items-center md:gap-4 md:px-5 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1.6fr)_9rem_minmax(0,1.2fr)_max-content]">
               <div className="flex min-w-0 items-center gap-3">
                 <span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-teal-400/30 to-teal-600/20 text-sm font-bold uppercase tracking-wide text-teal-700 ring-1 ring-teal-500/25 dark:text-teal-200">{client.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("") || "?"}</span>
                 <div className="min-w-0">
@@ -311,8 +311,8 @@ export default function ClientsPage() {
                 {client.nextVisit ? <p className="font-medium"><span className="md:hidden">Next visit: </span>{client.nextVisit}</p> : <p className="hidden text-slate-500 md:block">—</p>}
                 {client.visitTime && <p className="text-slate-600">{client.visitTime}</p>}
               </div>
-              <div className="min-w-0 text-sm text-slate-600"><p className="line-clamp-2">{client.notes}</p>{client.contactMethod && <p className="mt-1" data-testid="client-contact-method" data-method={client.contactMethod}><span className="font-semibold text-teal-700 dark:text-teal-300">{CONTACT_METHODS.find((item) => item.value === client.contactMethod)?.icon} Best by:</span> {contactMethodLabel(client.contactMethod)}</p>}{client.preferences && <p className="mt-1 line-clamp-2" data-testid="client-preferences"><span className="font-semibold text-teal-700 dark:text-teal-300">⭐ Prefers:</span> {client.preferences}</p>}</div>
-              <div className="grid grid-cols-3 gap-2 md:flex md:justify-end">
+              <div className="min-w-0 overflow-hidden break-words text-sm text-slate-600" data-testid="client-notes"><p className="line-clamp-2">{client.notes}</p>{client.contactMethod && <p className="mt-1" data-testid="client-contact-method" data-method={client.contactMethod}><span className="font-semibold text-teal-700 dark:text-teal-300">{CONTACT_METHODS.find((item) => item.value === client.contactMethod)?.icon} Best by:</span> {contactMethodLabel(client.contactMethod)}</p>}{client.preferences && <p className="mt-1 line-clamp-2" data-testid="client-preferences"><span className="font-semibold text-teal-700 dark:text-teal-300">⭐ Prefers:</span> {client.preferences}</p>}</div>
+              <div className="grid grid-cols-3 gap-2 md:flex md:flex-nowrap md:justify-end" data-testid="client-actions">
                 <button type="button" aria-expanded={portalFor === client.id} data-testid="client-portal-toggle" onClick={() => setPortalFor(portalFor === client.id ? "" : client.id)} className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition sm:min-h-0 ${portalFor === client.id ? "border-teal-400 bg-teal-500/15 text-teal-700 dark:text-teal-300" : "border-slate-300 hover:border-teal-500"}`}><span aria-hidden="true">🔗</span>Portal</button>
                 <button type="button" onClick={() => editClient(client)} className="min-h-11 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium transition hover:border-teal-500 sm:min-h-10">Edit</button>
                 <button type="button" onClick={() => removeClient(client.id)} className="min-h-11 rounded-lg border border-rose-500/40 px-3 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10 sm:min-h-10 dark:text-rose-300">Remove</button>
