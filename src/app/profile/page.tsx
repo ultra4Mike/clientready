@@ -75,8 +75,8 @@ export default function ProfilePage() {
         taxId: row.tax_id || "",
         logo: row.logo || "",
         paymentLink: row.payment_link || "",
-        setAsidePercent: local.setAsidePercent || "30",
-        profitAlertMargin: local.profitAlertMargin ?? "20",
+        setAsidePercent: (typeof row.set_aside_percent === "string" && row.set_aside_percent.trim()) || local.setAsidePercent || "30",
+        profitAlertMargin: (typeof row.profit_alert_margin === "string" && row.profit_alert_margin.trim()) || (local.profitAlertMargin ?? "20"),
         lateFeeType: row.late_fee_type || local.lateFeeType || "off",
         lateFeeValue: row.late_fee_value ?? local.lateFeeValue ?? "",
         lateFeeGraceDays: row.late_fee_grace_days ?? local.lateFeeGraceDays ?? "0",
@@ -128,6 +128,12 @@ export default function ProfilePage() {
       if (error && /review_link/.test(error.message || "")) ({ error } = await supabase.from("profiles").upsert({ ...row, ...lateFees }));
       // Before migration 20261015120000 runs there are no late fee columns: save the rest (late fees stay on this device).
       if (error && /late_fee/.test(error.message || "")) ({ error } = await supabase.from("profiles").upsert(row));
+      // Set-aside % and profit alert margin (migration 20261020090000). Ignored quietly before it runs (they stay on this device).
+      // set_aside_percent is an original profiles column; profit_alert_margin needs migration 20261020090000.
+      if (!error) {
+        const money = await supabase.from("profiles").update({ set_aside_percent: String(profile.setAsidePercent ?? ""), profit_alert_margin: String(profile.profitAlertMargin ?? "") }).eq("id", user.id);
+        if (money.error && /profit_alert_margin/.test(money.error.message || "")) await supabase.from("profiles").update({ set_aside_percent: String(profile.setAsidePercent ?? "") }).eq("id", user.id);
+      }
       if (error) {
         setMessage("Saved on this computer. Cloud save failed: " + error.message);
         setSaved(true);

@@ -5,6 +5,14 @@ import { fetchCloudDocuments, type CloudDoc } from "@/lib/cloud-docs";
 import { flushDeletes } from "@/lib/doc-tombstones";
 
 /** Late fee settings from the profile row; before migration 120000 (no columns) keep this device's values. */
+/** Set-aside % and profit alert margin: the account value when saved there (migration 20261020090000), else this device's value. */
+function moneySettings(row: Record<string, unknown>) {
+  let local: Record<string, unknown> = {};
+  try { local = JSON.parse(window.localStorage.getItem("clientready-profile") || "{}") || {}; } catch { local = {}; }
+  const pick = (cloud: unknown, mine: unknown, fallback: string) => (typeof cloud === "string" && cloud.trim() ? cloud : typeof mine === "string" && mine.trim() ? mine : fallback);
+  return { setAsidePercent: pick(row.set_aside_percent, local.setAsidePercent, "30"), profitAlertMargin: pick(row.profit_alert_margin, local.profitAlertMargin, "20") };
+}
+
 function lateFeeFields(row: Record<string, unknown>) {
   let local: Record<string, unknown> = {};
   try {
@@ -96,8 +104,8 @@ export async function loadAccountIntoCache(): Promise<boolean> {
         taxId: profile.tax_id || "",
         logo: profile.logo || "",
         paymentLink: profile.payment_link || "",
-        setAsidePercent: profile.set_aside_percent || "30",
         ...lateFeeFields(profile),
+        ...moneySettings(profile),
       })
     );
     // Payment methods shown to customers (migration 20261016070000).
