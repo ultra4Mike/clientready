@@ -32,6 +32,14 @@ export function quoteSentOn(doc: Doc): string {
   return dates.sort().at(-1) || "";
 }
 
+/** "Tue Oct 21" for a YYYY-MM-DD day (local date, no time zone shift). */
+export function shortDay(ymd: string) {
+  const [y, m, d] = ymd.split("-").map(Number);
+  if (!y || !m || !d) return ymd;
+  const date = new Date(y, m - 1, d);
+  return `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][date.getDay()]} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m - 1]} ${d}`;
+}
+
 export function followUps(docs: Doc[], today: string, businessName: string, approvalUrl: (doc: Doc) => string = () => ""): FollowUp[] {
   const out: FollowUp[] = [];
   const [y, m, d] = today.split("-").map(Number);
@@ -53,7 +61,7 @@ export function followUps(docs: Doc[], today: string, businessName: string, appr
       const schedule = readSchedule(data);
       if (!schedule || schedule.date !== tomorrow || schedule.status !== "scheduled") continue;
       out.push({ ...base, key: `appt:${doc.id}:${schedule.date}${schedule.startTime || ""}`, kind: "appointment", subject: "Appointment reminder",
-        body: `Hi ${first(clientName)}, this is ${biz(businessName)} with a reminder that we're scheduled for tomorrow${timeText(schedule.startTime)}. Reply here if you need to change it. See you then!` });
+        body: `Hi ${first(clientName)}, this is ${biz(businessName)} with a reminder that we're scheduled for tomorrow, ${shortDay(tomorrow)}${timeText(schedule.startTime)}. Reply here if you need to change it. See you then!` });
     }
   }
   out.push(...seasonalFollowUps(docs, today, businessName));
