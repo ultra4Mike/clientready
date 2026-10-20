@@ -93,6 +93,23 @@ export function keepStripePayments(local: Record<string, unknown>, cloud: Record
  * recurring drafts awaiting review, were never sent, so Collect, the dashboard's Outstanding card,
  * the Documents "Outstanding" filter and Needs review all leave them out.
  */
+/**
+ * Overdue without any manual status change: a sent (non-draft, not marked paid) invoice with money still owed
+ * and a due date before today. Job done status does not matter. A manual "overdue" status with a balance also counts.
+ */
+export function isPastDue(status: unknown, dueDate: unknown, owed: number, today = localToday()) {
+  const s = String(status || "draft");
+  if (s === "draft" || s === "paid" || !(owed > 0.004)) return false;
+  if (s === "overdue") return true;
+  const due = String(dueDate || "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(due) && due < today;
+}
+
+function localToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function isOpenBalance(status: unknown, owed: number) {
   return String(status || "draft") !== "draft" && owed > 0.004;
 }
