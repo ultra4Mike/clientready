@@ -4,7 +4,7 @@
  * record or mark anything paid; the owner does that by hand. A hosted provider (e.g. Stripe Connect) can be
  * added later as another entry with kind "hosted" without changing the views. Existing Stripe code is separate.
  */
-export type ProviderId = "zelle" | "venmo" | "cashapp" | "paypal" | "check" | "bank" | "stripe";
+export type ProviderId = "zelle" | "venmo" | "cashapp" | "paypal" | "check" | "bank" | "stripe" | "card" | "cash" | "other";
 export type MethodConfig = { enabled?: boolean; handle?: string; payTo?: string; address?: string; instructions?: string };
 export type PaymentMethodsConfig = Partial<Record<ProviderId, MethodConfig>>;
 export type PayContext = { amount: number; reference: string };
@@ -14,7 +14,7 @@ type Field = { key: keyof MethodConfig; label: string; placeholder: string; mult
 export type PaymentProvider = {
   id: ProviderId;
   label: string;
-  kind: "manual" | "hosted";
+  kind: "manual" | "hosted" | "inperson";
   /** Name saved on the payment when the owner marks it paid this way (matches paymentMethods). */
   markPaidMethod: string;
   fields: Field[];
@@ -31,7 +31,7 @@ export const PROVIDERS: PaymentProvider[] = [
     // Online card payments through Stripe (the Pay by card button on invoice links/portal, live only when the
     // server's Stripe keys are set: /api/pay/status). Listed so the owner can offer it and record "Card";
     // customers get the card button, not a copy row, so payOptions skips hosted providers.
-    id: "stripe", label: "Card (Stripe)", kind: "hosted", markPaidMethod: "Card",
+    id: "stripe", label: "Stripe", kind: "hosted", markPaidMethod: "Card (Stripe)",
     fields: [],
     ready: () => true,
     option: () => ({ id: "stripe", label: "Card (Stripe)", detail: "Pay online by card", copy: "" }),
@@ -89,6 +89,10 @@ export const PROVIDERS: PaymentProvider[] = [
     ready: (c) => Boolean(clean(c.instructions, 1000)),
     option: (c, ctx) => ({ id: "bank", label: "Bank transfer (ACH)", detail: `${clean(c.instructions, 1000)}${ctx.reference ? `\nReference: ${ctx.reference}` : ""}`, copy: clean(c.instructions, 1000) }),
   },
+  // Taken in person; recorded when marking paid, never shown to customers as a copy row.
+  { id: "card", label: "Credit/debit card", kind: "inperson", markPaidMethod: "Card", fields: [], ready: () => true, option: () => ({ id: "card", label: "Credit/debit card", detail: "", copy: "" }) },
+  { id: "cash", label: "Cash", kind: "inperson", markPaidMethod: "Cash", fields: [], ready: () => true, option: () => ({ id: "cash", label: "Cash", detail: "", copy: "" }) },
+  { id: "other", label: "Other", kind: "inperson", markPaidMethod: "Other", fields: [], ready: () => true, option: () => ({ id: "other", label: "Other", detail: "", copy: "" }) },
 ];
 
 export const providerFor = (id: string) => PROVIDERS.find((provider) => provider.id === id);
