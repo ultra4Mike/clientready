@@ -21,7 +21,7 @@ import { getTrialState } from "@/lib/trial";
 import { priceSummary, PRICES_ARE_PLACEHOLDERS } from "@/lib/plans";
 import { syncClientContact } from "@/lib/client-sync";
 import { noteReviewAsked, reviewAskedAt, reviewMailHref, reviewMessage, reviewSmsHref } from "@/lib/review-request";
-import { crewReportTotal, profitAlerts, readMinMargin } from "@/lib/profit-alerts";
+import { crewReportTotal, profitAlerts, readMinMargin, readSetAside } from "@/lib/profit-alerts";
 import { readLateFeeSettings, suggestedLateFee, type LateFeeSettings } from "@/lib/late-fees";
 import { saveCrewJobs } from "@/lib/crew";
 import { depositInvoice, missingDeposits } from "@/lib/proposal-deposit";
@@ -260,7 +260,7 @@ export default function NewInvoicePage() {
     setBusinessPhone(profile.phone || "");
     setPaymentLink(profile.paymentLink || "");
     setLogo(profile.logo || "");
-    setSetAsidePercent(profile.setAsidePercent || "30");
+    setSetAsidePercent(String(readSetAside(profile.setAsidePercent)));
     setMinMargin(readMinMargin(profile));
     setLateFeeSettings(readLateFeeSettings(profile));
     setReviewLink(profile.reviewLink || "");

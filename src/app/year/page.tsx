@@ -1,4 +1,5 @@
 "use client";
+import { readSetAside } from "@/lib/profit-alerts";
 
 import { crewKindLabel } from "@/lib/cost-categories";
 import { useEffect, useMemo, useState } from "react";
@@ -129,7 +130,7 @@ export default function YearPage() {
       const profile = JSON.parse(profileRaw);
       setBusinessName(profile.businessName || "Your business");
       setTaxId(profile.taxId || "");
-      setSetAsidePercent(Number(profile.setAsidePercent) || 30);
+      setSetAsidePercent(readSetAside(profile.setAsidePercent));
     }
     const raw = window.localStorage.getItem("clientready-documents");
     if (raw) setDocuments(uniqueDocs(JSON.parse(raw)));

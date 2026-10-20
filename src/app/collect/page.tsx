@@ -8,7 +8,7 @@ import PageHeader from "@/components/PageHeader";
 import StuckPayments from "@/components/StuckPayments";
 import { saveCloudDocument } from "@/lib/cloud-docs";
 import { amountOf, documentTotals } from "@/lib/discount";
-import { balanceDue, isOpenBalance, paidTotal, paymentFields, paymentMethods, readPayments } from "@/lib/payments";
+import { balanceDue, invoicePastDue, isOpenBalance, paidTotal, paymentFields, paymentMethods, readPayments } from "@/lib/payments";
 import { uniqueDocs } from "@/lib/change-orders";
 import { isPendingRecurringDraft } from "@/lib/recurring";
 import ReminderPanel from "@/components/ReminderPanel";
@@ -59,12 +59,9 @@ function balance(doc: SavedDocument) {
   return balanceDue(invoiceTotal(doc), amountPaid(doc), doc.data?.status);
 }
 
+/** Same rule as the dashboard and Documents (drafts excluded, balance > 0, per installment on payment plans). */
 function isOverdue(doc: SavedDocument) {
-  const due = doc.data?.dueDate;
-  const status = doc.data?.status || "draft";
-  if (!due || status === "paid") return false;
-  if (status === "overdue") return true;
-  return new Date(`${due}T23:59:59`) < new Date();
+  return invoicePastDue(doc.data as Record<string, unknown>, invoiceTotal(doc), balance(doc));
 }
 
 function today() {

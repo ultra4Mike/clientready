@@ -1,7 +1,8 @@
+import { readStages, stagePlan } from "./stages";
 /** tip: extra the client gave on top of the bill; never counts toward the balance. */
 export type Payment = { id: string; amount: string; method: string; date: string; ref: string; tip?: string };
 
-export const paymentMethods = ["Cash", "Check", "Venmo", "Cash App", "Zelle", "PayPal", "Bank", "Card", "Other"];
+export const paymentMethods = ["Cash", "Check", "Venmo", "Cash App", "Zelle", "PayPal", "Bank", "Card", "Card (Stripe)", "Other"];
 
 type PaymentData = {
   payments?: unknown;
@@ -100,9 +101,24 @@ export function keepStripePayments(local: Record<string, unknown>, cloud: Record
 export function isPastDue(status: unknown, dueDate: unknown, owed: number, today = localToday()) {
   const s = String(status || "draft");
   if (s === "draft" || s === "paid" || !(owed > 0.004)) return false;
-  if (s === "overdue") return true;
   const due = String(dueDate || "").slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(due) && due < today;
+  const hasDue = /^\d{4}-\d{2}-\d{2}$/.test(due);
+  // A manual "overdue" never overrides a due date that hasn't passed yet.
+  if (s === "overdue") return !hasDue || due < today;
+  return hasDue && due < today;
+}
+
+/**
+ * isPastDue for a whole invoice. With a payment plan / stages (data.stages), each installment is judged on its
+ * own due date: overdue only when an unpaid installment's date has passed (later ones not yet due don't count).
+ */
+export function invoicePastDue(data: Record<string, unknown> | undefined, total: number, owed: number, today = localToday()) {
+  const d = data || {};
+  const stages = readStages(d.stages);
+  if (!stages.length) return isPastDue(d.status, d.dueDate, owed, today);
+  const s = String(d.status || "draft");
+  if (s === "draft" || s === "paid" || !(owed > 0.004)) return false;
+  return stagePlan(total, owed, stages, today).rows.some((row) => row.state === "overdue");
 }
 
 function localToday() {

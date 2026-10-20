@@ -15,6 +15,13 @@ type Doc = { id: string; type: string; title?: string; clientName?: string; crea
 const num = (value: unknown) => Number(String(value ?? "").replace(/[^0-9.-]/g, "")) || 0;
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
+/** Set-aside percent: a number 0-100 as saved (0 means 0); blank or invalid uses 30. */
+export function readSetAside(raw: unknown) {
+  const text = String(raw ?? "").trim();
+  const value = Number(text);
+  return text === "" || !Number.isFinite(value) ? 30 : Math.min(100, Math.max(0, value));
+}
+
 export function readMinMargin(profile: Record<string, unknown> | null | undefined) {
   const raw = profile?.profitAlertMargin;
   return raw === undefined || raw === null ? 20 : Math.min(95, Math.max(0, num(raw)));

@@ -13,7 +13,7 @@ import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { documentTotals } from "@/lib/discount";
 import { documentStage, NEXT_LABEL, STAGE_LABEL } from "@/lib/doc-stage";
-import { balanceDue, isOpenBalance, isPastDue, paidTotal, readPayments } from "@/lib/payments";
+import { balanceDue, isOpenBalance, invoicePastDue, paidTotal, readPayments } from "@/lib/payments";
 import { searchWithNumbers } from "@/lib/doc-number";
 
 type SavedDocument = {
@@ -186,7 +186,7 @@ export default function DocumentsPage() {
         if (doc.type !== "invoice" || !isOpenBalance(status, info.owed)) return false;
       } else if (statusFilter === "overdue") {
         // Same rule as the dashboard's Overdue card: past due and unpaid, no manual status needed.
-        if (doc.type !== "invoice" || !isPastDue(status, doc.data?.dueDate, info.owed)) return false;
+        if (doc.type !== "invoice" || !invoicePastDue(doc.data, info.total, info.owed)) return false;
       } else if (statusFilter === "unpaid" ? !(doc.type === "invoice" && info.owed > 0 && status !== "draft") : statusFilter !== "all" && status !== statusFilter) return false;
       if (fromDate && (!info.date || info.date < fromDate)) return false;
       if (toDate && (!info.date || info.date > toDate)) return false;
