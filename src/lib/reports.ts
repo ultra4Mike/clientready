@@ -14,6 +14,13 @@ function money(value: unknown) {
 }
 
 /** "2026-03-05" or a saved local date like "3/5/2026" -> { year, month 0-11 }, or null. */
+/** The scheduled job day (YYYY-MM-DD) saved on the invoice, or "". */
+function scheduledDay(data: Record<string, unknown>) {
+  const schedule = data.schedule as { date?: unknown } | undefined;
+  const day = String(schedule && typeof schedule === "object" ? schedule.date || "" : "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : "";
+}
+
 export function yearMonth(value: unknown): { year: string; month: number } | null {
   const text = String(value || "");
   const iso = text.match(/^(\d{4})-(\d{2})/);
@@ -31,7 +38,7 @@ export function ownerJobCost(data: Record<string, unknown> = {}) {
 }
 
 export type MonthRow = { month: number; billed: number; collected: number; jobCosts: number; crewReceipts: number };
-export type JobRow = { id: string; type: string; number: string; client: string; date: string; month: number; total: number; cost: number; profit: number };
+export type JobRow = { id: string; type: string; number: string; client: string; date: string; month: number; total: number; cost: number; profit: number; jobDate: string };
 
 /**
  * One year by month. Billed: sent invoices by invoice date. Collected: payments by the date received.
@@ -62,7 +69,7 @@ export function buildReport(allDocs: Doc[], crewExpenses: CrewExpense[], year: s
     const cost = ownerJobCost(data);
     months[when.month].billed += total;
     months[when.month].jobCosts += cost;
-    jobs.push({ id: doc.id, type: doc.type, number: String(data.invoiceNumber || doc.title || "Invoice"), client: doc.clientName || "No client", date: String(data.invoiceDate || doc.createdAt || ""), month: when.month, total, cost, profit: total - cost });
+    jobs.push({ id: doc.id, type: doc.type, number: String(data.invoiceNumber || doc.title || "Invoice"), client: doc.clientName || "No client", date: String(data.invoiceDate || doc.createdAt || ""), month: when.month, total, cost, profit: total - cost, jobDate: scheduledDay(data) });
   }
   for (const item of crewExpenses) {
     const when = yearMonth(item.created_at);
