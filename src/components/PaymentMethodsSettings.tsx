@@ -10,6 +10,10 @@ const input = "mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-
 export default function PaymentMethodsSettings() {
   const [config, setConfig] = useState<PaymentMethodsConfig>({});
   const [message, setMessage] = useState("");
+  const [cardLive, setCardLive] = useState<boolean | null>(null);
+  useEffect(() => {
+    fetch("/api/pay/status").then((res) => res.json()).then((body) => setCardLive(Boolean(body?.enabled))).catch(() => setCardLive(false));
+  }, []);
   useEffect(() => {
     Promise.resolve().then(() => setConfig(readLocalPaymentMethods()));
     (async () => {
@@ -56,6 +60,11 @@ export default function PaymentMethodsSettings() {
                   : <input name={`pm-${provider.id}-${field.key}`} className={input} placeholder={field.placeholder} value={cfg[field.key] as string || ""} onChange={(event) => set(provider.id, { [field.key]: event.target.value })} />}
               </label>
             ))}
+            {provider.kind === "hosted" && (
+              <p className="mt-1 text-xs" data-testid="pm-stripe-status" data-live={cardLive ? "true" : "false"}>
+                {cardLive === null ? "Checking card payments…" : cardLive ? <span className="font-semibold text-emerald-700 dark:text-emerald-300">Online card payments: on. Customers see a Pay by card button.</span> : <span className="text-[var(--cr-muted)]">Online card payments aren&apos;t set up yet, so customers won&apos;t see a card button.</span>}
+              </p>
+            )}
             {cfg.enabled && !provider.ready(cfg) && <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-300">Add the details above or customers won&apos;t see this one.</p>}
           </div>
         );

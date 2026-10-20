@@ -4,7 +4,7 @@
  * record or mark anything paid; the owner does that by hand. A hosted provider (e.g. Stripe Connect) can be
  * added later as another entry with kind "hosted" without changing the views. Existing Stripe code is separate.
  */
-export type ProviderId = "zelle" | "venmo" | "cashapp" | "paypal" | "check" | "bank";
+export type ProviderId = "zelle" | "venmo" | "cashapp" | "paypal" | "check" | "bank" | "stripe";
 export type MethodConfig = { enabled?: boolean; handle?: string; payTo?: string; address?: string; instructions?: string };
 export type PaymentMethodsConfig = Partial<Record<ProviderId, MethodConfig>>;
 export type PayContext = { amount: number; reference: string };
@@ -27,6 +27,15 @@ const amountText = (amount: number) => (amount > 0 ? amount.toFixed(2) : "");
 const strip = (handle: string, chars: RegExp) => handle.replace(chars, "").replace(/^https?:\/\/[^/]+\//i, "").replace(/\/.*$/, "");
 
 export const PROVIDERS: PaymentProvider[] = [
+  {
+    // Online card payments through Stripe (the Pay by card button on invoice links/portal, live only when the
+    // server's Stripe keys are set: /api/pay/status). Listed so the owner can offer it and record "Card";
+    // customers get the card button, not a copy row, so payOptions skips hosted providers.
+    id: "stripe", label: "Card (Stripe)", kind: "hosted", markPaidMethod: "Card",
+    fields: [],
+    ready: () => true,
+    option: () => ({ id: "stripe", label: "Card (Stripe)", detail: "Pay online by card", copy: "" }),
+  },
   {
     id: "zelle", label: "Zelle", kind: "manual", markPaidMethod: "Zelle",
     fields: [{ key: "handle", label: "Zelle email or phone", placeholder: "you@example.com or (555) 555-0100" }],
@@ -106,7 +115,7 @@ export function readPaymentMethods(raw: unknown): PaymentMethodsConfig {
 export function payOptions(config: PaymentMethodsConfig, ctx: PayContext, publicCopy = false): PayOption[] {
   return PROVIDERS.filter((provider) => {
     const cfg = config[provider.id];
-    return cfg && (publicCopy || cfg.enabled) && provider.ready(cfg);
+    return provider.kind === "manual" && cfg && (publicCopy || cfg.enabled) && provider.ready(cfg);
   }).map((provider) => provider.option(config[provider.id]!, ctx));
 }
 
