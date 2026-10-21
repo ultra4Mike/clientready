@@ -25,9 +25,9 @@ export default function OverlapBadge({ docs, doc, onMoved }: { docs: Doc[]; doc:
     onMoved?.();
   }
   return (
-    <span data-testid="overlap-badge" data-doc={doc.id} className="inline-flex flex-wrap items-center gap-2 rounded-lg border border-amber-400/60 bg-amber-50 px-2 py-1 text-xs text-amber-900">
+    <span data-testid="overlap-badge" data-doc={doc.id} className="inline-flex flex-wrap items-center gap-2 rounded-lg border border-amber-400/60 bg-amber-50 px-2 py-1 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
       <span>⚠ Overlap: {text}</span>
-      {slot && <button type="button" data-testid="overlap-move" onClick={move} className="min-h-8 rounded-md bg-amber-500 px-2 font-semibold text-slate-950!">Move to next open time</button>}
+      {slot && <button type="button" data-testid="overlap-move" onClick={move} className="min-h-11 rounded-md bg-amber-500 px-3 font-semibold text-slate-950!">Move to next open time</button>}
     </span>
   );
 }

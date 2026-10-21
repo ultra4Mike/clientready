@@ -79,7 +79,7 @@ export default function TimezoneCombobox({ value, onChange, address }: { value: 
       {suggested && suggested !== value && (
         <p className="mt-1 text-xs" data-testid="tz-suggest" data-zone={suggested}>
           Suggested from your address: {zoneLabel(suggested)} —{" "}
-          <button type="button" data-testid="tz-suggest-use" className="font-semibold text-teal-700 underline dark:text-teal-300" onClick={() => onChange(suggested)}>Use this</button>
+          <button type="button" data-testid="tz-suggest-use" className="inline-flex min-h-11 items-center font-semibold text-teal-700 underline dark:text-teal-300" onClick={() => onChange(suggested)}>Use this</button>
         </p>
       )}
       <span className="mt-1 block text-xs text-[var(--cr-muted)]">Used for the date on card payments. Type a state, city or zone (e.g. TN, Chicago, Eastern).</span>

@@ -336,8 +336,8 @@ export default function ClientsPage() {
             </label>
             <textarea name="preferences" aria-label="Client preferences" data-testid="client-preferences-input" className="min-h-16 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2.5 text-base sm:text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Preferences: text or call, gate code, pets, best times…" value={form.preferences} onChange={(event) => setForm({ ...form, preferences: event.target.value })} />
             <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:justify-end">
-              <button type="submit" className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">{editingId ? "Update client" : "Save client"}</button>
-              <button type="button" onClick={cancelEdit} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Cancel</button>
+              <button type="submit" className="min-h-11 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">{editingId ? "Update client" : "Save client"}</button>
+              <button type="button" onClick={cancelEdit} className="min-h-11 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Cancel</button>
             </div>
           </form>
         )}
