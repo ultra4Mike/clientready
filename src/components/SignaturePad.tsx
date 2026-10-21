@@ -95,18 +95,18 @@ export default function SignaturePad({ value, onChange, defaultName = "" }: Prop
     setError("");
   }
 
-  const tab = (active: boolean) => `rounded-lg px-3 py-1.5 text-sm font-semibold transition ${active ? "bg-teal-500 text-slate-950! shadow-sm" : "border border-slate-300 hover:border-teal-500"}`;
+  const tab = (active: boolean) => `min-h-11 rounded-lg px-4 text-sm font-semibold transition ${active ? "bg-teal-500 text-slate-950! shadow-sm" : "border border-slate-300 hover:border-teal-500"}`;
 
   return (
-    <div className="space-y-2 rounded-xl border border-slate-200 p-4" data-testid="signature-pad">
-      <div className="flex items-center justify-between">
+    <div className="cr-panel space-y-3 rounded-xl border border-slate-200 p-3 sm:p-4" data-testid="signature-pad">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-medium">Customer signature</h2>
         <div className="flex gap-2">
           <button type="button" className={tab(mode === "drawn")} onClick={() => setMode("drawn")}>Draw</button>
           <button type="button" className={tab(mode === "typed")} onClick={() => setMode("typed")}>Type</button>
         </div>
       </div>
-      <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder={defaultName ? `Signer name (${defaultName})` : "Signer name"} value={signerName} onChange={(event) => setSignerName(event.target.value)} />
+      <input className="min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder={defaultName ? `Signer name (${defaultName})` : "Signer name"} value={signerName} onChange={(event) => setSignerName(event.target.value)} />
       {mode === "drawn" ? (
         <div className="sig-pad-surface w-full rounded-lg border-2 border-dashed border-teal-500/50 bg-white shadow-inner">
         <canvas
@@ -125,7 +125,7 @@ export default function SignaturePad({ value, onChange, defaultName = "" }: Prop
         </div>
       ) : (
         <input
-          className="sig-typed w-full rounded-lg border border-slate-300 px-3 py-2 text-3xl"
+          className="sig-typed min-h-16 w-full rounded-lg border-2 border-dashed border-teal-500/50 px-3 py-2 text-3xl"
           style={{ fontFamily: scriptFont }}
           placeholder="Type signature"
           value={typed}
@@ -133,9 +133,9 @@ export default function SignaturePad({ value, onChange, defaultName = "" }: Prop
         />
       )}
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" onClick={sign} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Sign</button>
-        <button type="button" onClick={clearAll} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Clear</button>
-        {value && <span className="text-sm text-slate-600">Signed by {value.signerName} · {signedAtLabel(value.signedAt)}</span>}
+        <button type="button" onClick={sign} className="min-h-11 flex-1 rounded-lg sm:flex-none bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Sign</button>
+        <button type="button" onClick={clearAll} className="min-h-11 flex-1 rounded-lg sm:flex-none border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Clear</button>
+        {value && <span className="cr-tone-good w-full rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 sm:w-auto">Signed by {value.signerName} · {signedAtLabel(value.signedAt)}</span>}
       </div>
       {error && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600">{error}</p>}
       <p className="text-xs text-slate-500">{SIGNATURE_DISCLAIMER}</p>

@@ -283,8 +283,8 @@ export default function ClientsPage() {
         />
 
         <div className="mb-3 flex flex-wrap gap-2" data-testid="clients-csv">
-          <button type="button" data-testid="clients-export" onClick={() => downloadCsv("clients.csv", csvText(CLIENT_CSV_HEADER, clients.map((c) => [c.name || "", c.company || "", c.email || "", c.phone || "", c.address || "", c.notes || "", c.preferences || ""])))} className="min-h-11 rounded-lg border border-teal-500/30 px-3 text-sm font-medium">Export CSV</button>
-          <label className="inline-flex min-h-11 cursor-pointer items-center rounded-lg border border-teal-500/30 px-3 text-sm font-medium">Import CSV
+          <button type="button" data-testid="clients-export" onClick={() => downloadCsv("clients.csv", csvText(CLIENT_CSV_HEADER, clients.map((c) => [c.name || "", c.company || "", c.email || "", c.phone || "", c.address || "", c.notes || "", c.preferences || ""])))} className="inline-flex min-h-11 items-center rounded-lg border border-teal-500/50 px-4 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">Export CSV</button>
+          <label className="inline-flex min-h-11 cursor-pointer items-center rounded-lg border border-teal-500/50 px-4 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 focus-within:ring-2 focus-within:ring-teal-400 dark:text-teal-300">Import CSV
             <input type="file" accept=".csv,text/csv" className="sr-only" data-testid="clients-import" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void importClients(file); }} />
           </label>
         </div>
@@ -342,7 +342,7 @@ export default function ClientsPage() {
           </form>
         )}
 
-        {message && <p className="mb-4 rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-slate-600">{message}</p>}
+        {message && <p role="status" className="cr-tone-teal mb-4 rounded-lg border border-teal-400/50 bg-teal-50 px-3 py-2 text-sm text-teal-900">{message}</p>}
 
         <div className="overflow-hidden rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] shadow-sm">
           <div className="hidden gap-4 border-b border-slate-200 bg-teal-500/5 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600 md:grid md:grid-cols-[minmax(0,1.6fr)_minmax(0,1.6fr)_9rem_minmax(0,1.2fr)_max-content]">
