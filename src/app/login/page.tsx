@@ -45,7 +45,6 @@ export default function LoginPage() {
       const { data: person } = await supabase.rpc("is_crew_email");
       const row = Array.isArray(person) ? person[0] : person;
       if (row && row.user_id && row.user_id !== signedIn.id) {
-        await supabase.rpc("crew_fix_owner_profile").then(() => undefined, () => undefined); // R94
         window.location.href = "/crew";
         return;
       }
