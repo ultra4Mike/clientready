@@ -1,4 +1,5 @@
 "use client";
+import { overtimePremium, readPaySettings, rowHours, rowPayMoney, type PayType } from "@/lib/pay-types";
 import { readSetAside } from "@/lib/profit-alerts";
 import { buildReport } from "@/lib/reports";
 
@@ -41,9 +42,13 @@ type CrewRow = {
   note?: string;
   hoursFromClock?: boolean;
   clockMinutes?: number;
+  payType?: PayType;
+  fixedPay?: string;
+  payOverride?: string;
+  dayCounted?: boolean;
 };
 
-type Employee = { id: string; name: string; kind?: "employee" | "contractor" };
+type Employee = { id: string; name: string; kind?: "employee" | "contractor"; paySettings?: unknown };
 
 type SavedDocument = {
   id: string;
@@ -110,9 +115,8 @@ function invoiceTotal(doc: SavedDocument) {
 }
 
 function crewPay(row: CrewRow) {
-  // R55: same rule as the invoice: exact clocked minutes, money rounded once.
-  const hours = row.hoursFromClock && row.clockMinutes ? row.clockMinutes / 60 : money(row.hours);
-  return Math.round((hours * money(row.rate) + money(row.bonus)) * 100) / 100;
+  // Same rule as the invoice (lib/pay-types): hourly on exact minutes, fixed day, per job or owner override.
+  return rowPayMoney(row);
 }
 
 export default function YearPage() {
@@ -156,6 +160,8 @@ export default function YearPage() {
   }
 
   const rows = useMemo(() => {
+    const dayKeys = new Set<string>();
+    const hourly = new Map<string, { date: string; hours: number; rate: number; name: string }[]>();
     const list: Row[] = [];
     documents.forEach((doc) => {
       const crew = doc.data?.crew || [];
@@ -249,7 +255,19 @@ export default function YearPage() {
           });
         }
       }
-      crew.forEach((row, index) => {
+      crew.forEach((rawRow, index) => {
+        const rowDate = rawRow.workDate || doc.data?.invoiceDate || doc.createdAt || "";
+        // A fixed day is paid once per worker per day, even across two jobs that day.
+        let row = rawRow;
+        if (rawRow.payType === "day" && !String(rawRow.payOverride ?? "").trim()) {
+          const key = `${rawRow.employeeId || rawRow.name}|${String(rowDate).slice(0, 10)}`;
+          row = { ...rawRow, dayCounted: dayKeys.has(key) };
+          dayKeys.add(key);
+        }
+        if ((!row.payType || row.payType === "hourly") && !String(row.payOverride ?? "").trim() && String(rowDate).includes(year)) {
+          const id = row.employeeId || row.name || "";
+          hourly.set(id, [...(hourly.get(id) || []), { date: String(rowDate).slice(0, 10), hours: rowHours(row), rate: Number(row.rate) || 0, name: row.name || "Worker" }]);
+        }
         const amount = crewPay(row);
         if (!amount) return;
         const date = row.workDate || doc.data?.invoiceDate || doc.createdAt || "";
@@ -275,6 +293,14 @@ export default function YearPage() {
         });
       });
     });
+    // Overtime premium (only for people whose owner switched overtime on; off by default).
+    for (const [id, entries] of hourly) {
+      const person = employees.find((item) => item.id === id || item.name === id);
+      const { hours, premium } = overtimePremium(entries, readPaySettings(person?.paySettings));
+      if (!premium) continue;
+      const name = entries[0].name;
+      list.push({ id: `ot-${id}`, docId: "", docType: "invoice", kind: "pay", date: `${year}-12-31`, client: "", number: "", category: "Labor", amount: premium, method: "", ref: "", note: `Overtime premium (${hours.toFixed(2)} h)`, hours: String(hours), rate: "", worker: name, workerKind: kindFor(name, id) });
+    }
     return list;
   }, [documents, employees, year]);
 
@@ -358,6 +384,7 @@ export default function YearPage() {
   }, [rows]);
 
   function openRow(row: Row) {
+    if (!row.docId) return; // overtime premium rows span several jobs
     window.localStorage.setItem("clientready-open-document", row.docId);
     window.location.href = `/invoice?id=${encodeURIComponent(row.docId)}`;
   }
