@@ -428,6 +428,13 @@ export async function syncScheduleCrewJobs(doc: CloudDoc) {
   await stale;
   if (!schedule || !keep.length) return;
   const workers = new Map(allEmployees().map((person) => [person.id, person]));
+  // B1 (live): the crew app only shows rows addressed to the worker's login email. The local team cache can lack
+  // emails (the cloud cache didn't carry them), so read them from the team table like the pay rows do.
+  const { data: people } = await supabase.from("employees").select("id, name, email").eq("user_id", user.id);
+  for (const person of (people || []) as { id: string; name?: string; email?: string }[]) {
+    const known = workers.get(person.id);
+    workers.set(person.id, { ...(known || { id: person.id, name: person.name || "" }), name: known?.name || person.name || "", email: person.email || known?.email || "" });
+  }
   const data = doc.data || {};
   const rows = dedupeWorkerIds(schedule.workerIds).map((workerId) => ({
       id: `${doc.id}-sched-${workerId}`,

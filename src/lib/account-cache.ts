@@ -144,6 +144,7 @@ export async function loadAccountIntoCache(): Promise<boolean> {
       people.map((row) => ({
         id: row.id,
         name: row.name || "",
+        email: row.email || "",
         phone: row.phone || "",
         role: row.role || "",
         kind: row.kind === "contractor" ? "contractor" : "employee",
