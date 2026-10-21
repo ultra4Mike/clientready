@@ -1497,7 +1497,8 @@ export default function NewInvoicePage() {
               />
             </div>
           )}
-          <div id="preview" className={previewClass}>
+          <div id="preview" className={`${previewClass} relative`}>
+            {!isProposal && totals.total > 0 && totals.balance <= 0.004 && status !== "draft" && <div aria-label="Paid" data-testid="paid-stamp" className="pointer-events-none absolute right-6 top-24 rotate-[-12deg] rounded-lg border-4 border-emerald-600 px-4 py-1 text-3xl font-black tracking-widest text-emerald-600 opacity-80">PAID</div>}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
               <div className={`min-w-0 text-sm ${mutedClass}`}>
                 {logo && <img src={logo} alt="Business logo" className="mb-2 h-10 w-auto" />}

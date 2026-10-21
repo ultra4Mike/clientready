@@ -235,8 +235,21 @@ export default function DashboardPage() {
             placeholder="Search invoices, clients, items…"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
+            data-testid="dashboard-search"
           />
         </form>
+        {search.trim().length >= 2 && (() => {
+          // R107: results right here (fuzzy: every word must appear somewhere), Enter opens all matches.
+          const words = search.trim().toLowerCase().split(/\s+/);
+          const hay = (doc: (typeof documents)[number]) => [doc.title, doc.clientName, (doc.data as Record<string, unknown> | undefined)?.invoiceNumber, (doc.data as Record<string, unknown> | undefined)?.clientName, ...(((doc.data as { items?: { description?: string }[] } | undefined)?.items) || []).map((item) => item.description)].join(" ").toLowerCase();
+          const hits = documents.filter((doc) => words.every((word) => hay(doc).includes(word))).slice(0, 6);
+          return (
+            <ul className="mt-2 divide-y divide-teal-500/10 rounded-xl border border-teal-500/20 bg-[var(--cr-card)] text-sm" data-testid="dashboard-search-results">
+              {hits.length === 0 && <li className="px-4 py-3 text-[var(--cr-muted)]">No matches. Press Enter to search everything.</li>}
+              {hits.map((doc) => <li key={doc.id}><a className="flex min-h-11 items-center justify-between gap-3 px-4 py-2 hover:bg-teal-500/5" href={`/invoice?id=${encodeURIComponent(doc.id)}`} data-testid="dashboard-search-hit"><span className="truncate">{String((doc.data as Record<string, unknown> | undefined)?.invoiceNumber || doc.title)} · {doc.clientName || "No client"}</span><span className="text-xs text-[var(--cr-muted)]">{doc.type}</span></a></li>)}
+            </ul>
+          );
+        })()}
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">

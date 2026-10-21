@@ -56,13 +56,15 @@ export function buildReport(allDocs: Doc[], crewExpenses: CrewExpense[], year: s
     const { total } = docAmounts(doc);
     if (String(data.status || "draft") === "draft") continue;
     const when = yearMonth(data.invoiceDate || doc.createdAt);
-    if (when?.year !== year) continue;
+    // R107: profit by job is filed under the job date (when it was done); billing stays on the invoice date.
+    const jobDay = scheduledDay(data);
+    const jobAt = yearMonth(jobDay || data.invoiceDate || doc.createdAt);
     const cost = ownerJobCost(data);
-    // Profit by job uses the one breakdown (adds card fees and mileage); month job costs stay the owner's entered costs.
     const all = jobProfit({ total, data });
+    if (jobAt?.year === year) jobs.push({ id: doc.id, type: doc.type, number: String(data.invoiceNumber || doc.title || "Invoice"), client: doc.clientName || "No client", date: jobDay || String(data.invoiceDate || doc.createdAt || ""), month: jobAt.month, total, cost: all.cost, profit: all.profit, jobDate: jobDay, lines: all.lines });
+    if (when?.year !== year) continue;
     months[when.month].billed += total;
     months[when.month].jobCosts += cost;
-    jobs.push({ id: doc.id, type: doc.type, number: String(data.invoiceNumber || doc.title || "Invoice"), client: doc.clientName || "No client", date: String(data.invoiceDate || doc.createdAt || ""), month: when.month, total, cost: all.cost, profit: all.profit, jobDate: scheduledDay(data), lines: all.lines });
   }
   // R104: collected = the shared cash-basis entries (refunds, deposits, legacy paid), by payment date.
   for (const entry of cashEntries(docs)) {
