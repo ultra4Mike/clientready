@@ -34,6 +34,15 @@ export default function ClientRecordPage() {
       setDocs(rawDocs ? uniqueDocs(JSON.parse(rawDocs) as Doc[]) : []);
     };
     read();
+    // R102: a bad id says "not found" right away (one small lookup) instead of after the full account load.
+    void (async () => {
+      const cached = (JSON.parse(window.localStorage.getItem("clientready-clients") || "[]") as Client[]).some((client) => client.id === id);
+      if (cached) return;
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) return setLoaded(true);
+      const { data: row, error } = await supabase.from("clients").select("id").eq("id", id).eq("user_id", data.user.id).maybeSingle();
+      if (!row && !error) setLoaded(true);
+    })().catch(() => undefined);
     (async () => {
       await loadAccountIntoCache().catch(() => false);
       const { data } = await supabase.auth.getUser();

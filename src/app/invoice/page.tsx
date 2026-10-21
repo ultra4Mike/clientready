@@ -229,6 +229,7 @@ export default function NewInvoicePage() {
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [scheduleKey, setScheduleKey] = useState(0);
   const [workers, setWorkers] = useState<Worker[]>([]);
+  const [notFound, setNotFound] = useState<"" | "checking" | "missing">(""); // R102
   // R101: a new doc whose number was already used gets the next free number from the server.
   useEffect(() => {
     const onRenumber = (event: Event) => { const { from, to } = (event as CustomEvent<{ from: string; to: string }>).detail || {}; if (!to) return; setInvoiceNumber((current) => (current === from ? to : current)); setSaveMessage(`${from} was already used, so this one is ${to}.`); };
@@ -412,11 +413,20 @@ export default function NewInvoicePage() {
       window.localStorage.removeItem("clientready-open-document");
       window.localStorage.removeItem("clientready-new-type");
       if (!doc) {
-        window.history.replaceState(null, "", "/invoice");
-        setInvoiceNumber(nextNumber("invoice"));
-        setInvoiceDate(ymd(new Date()));
-        setDueDate(plusDays(14));
-        setSaveMessage("That document was not found on this device, so a new invoice was started.");
+        // R102: never start (or number) a new invoice from a bad link. Look in the account once, else "not found".
+        setNotFound("checking");
+        void (async () => {
+          const { data: auth } = await supabase.auth.getUser();
+          const isId = /^[0-9a-f-]{36}$/i.test(openId);
+          const { data: row } = auth.user && isId ? await supabase.from("documents").select("id, type, title, client_name, created_at, data").eq("id", openId).eq("user_id", auth.user.id).in("type", ["invoice", "proposal"]).maybeSingle() : { data: null };
+          if (row) {
+            const list = raw ? (JSON.parse(raw) as SavedDocument[]) : [];
+            window.localStorage.setItem("clientready-documents", JSON.stringify([...list.filter((item) => item.id !== row.id), { id: row.id, type: row.type, title: row.title || "", clientName: row.client_name || "", createdAt: row.created_at ? new Date(row.created_at).toLocaleDateString() : "", data: row.data || {} }]));
+            window.location.reload();
+            return;
+          }
+          setNotFound("missing");
+        })();
         return;
       }
       window.history.replaceState(null, "", `/invoice?id=${encodeURIComponent(doc.id)}`);
@@ -966,6 +976,21 @@ export default function NewInvoicePage() {
   const mutedClass = style === "bold" ? "text-slate-300" : "text-slate-600";
   const labelClass = style === "bold" ? "text-slate-400" : "text-slate-500";
 
+  if (notFound) {
+    return (
+      <AppShell title="Invoice">
+        <div className="mx-auto max-w-md rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-6 text-center" data-testid="doc-not-found" data-state={notFound}>
+          {notFound === "checking" ? <p role="status">Looking for this document…</p> : (
+            <>
+              <h2 className="text-xl font-bold">Invoice not found</h2>
+              <p className="mt-2 text-sm text-[var(--cr-muted)]">This link doesn&apos;t match a document in your account. Nothing was created.</p>
+              <div className="mt-4 flex justify-center gap-2"><a href="/documents" className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 px-4 font-medium">All documents</a><a href="/invoice" className="inline-flex min-h-11 items-center rounded-lg bg-teal-500 px-4 font-semibold text-slate-950!">New invoice</a></div>
+            </>
+          )}
+        </div>
+      </AppShell>
+    );
+  }
   return (
     <SectionDefaults.Provider value={sectionDefaults}>
     <AppShell title={isProposal ? "New proposal" : "New invoice"}>
