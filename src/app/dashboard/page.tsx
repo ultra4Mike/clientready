@@ -354,10 +354,10 @@ export default function DashboardPage() {
         <aside className="min-w-0 space-y-4">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Needs attention</h2>
           {(auto.sent.length > 0 || auto.errors.length > 0) && (
-            <div className="rounded-xl border border-teal-500/30 px-4 py-3 text-sm" data-testid="auto-sent" data-count={auto.sent.length}>
-              {auto.sent.length > 0 && <p className="font-medium">Sent automatically: {auto.sent.map((item) => `${item.kind === "done" ? "invoice" : "reminder"} to ${item.to}`).join("; ")}</p>}
-              {auto.errors.map((error) => <p key={error} className="text-xs text-rose-700 dark:text-rose-300" data-testid="auto-error">{error}</p>)}
-              <a href="/profile" className="text-xs underline">Automation settings</a>
+            <div className={`space-y-2 rounded-xl border px-4 py-3 text-sm ${auto.errors.length ? "border-rose-300/70" : "cr-tone-good border-emerald-300 bg-emerald-50 text-emerald-800"}`} data-testid="auto-sent" data-count={auto.sent.length}>
+              {auto.sent.length > 0 && <p className="flex items-start gap-2 font-medium text-emerald-800 dark:text-emerald-200"><span aria-hidden="true">✓</span><span className="min-w-0 break-words">Sent automatically: {auto.sent.map((item) => `${item.kind === "done" ? "invoice" : "reminder"} to ${item.to}`).join("; ")}</span></p>}
+              {auto.errors.map((error) => <p key={error} className="cr-tone-bad rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-800" data-testid="auto-error">{error}</p>)}
+              <a href="/profile" className="inline-flex min-h-11 items-center text-xs font-medium underline">Automation settings</a>
             </div>
           )}
           {loaded && <FollowUps docs={documents as never} today={todayYmd()} limit={5} testid="dashboard-reminders" />}
