@@ -24,6 +24,7 @@ type Client = {
   notes: string;
   preferences?: string;
   contactMethod?: ContactMethod;
+  reviewOptOut?: boolean;
   updated_at?: string; // cloud baseline for the contact retry queue (absent before migration 20261016000000)
 };
 
@@ -38,7 +39,14 @@ const emptyClient = {
   notes: "",
   preferences: "",
   contactMethod: "" as ContactMethod,
+  reviewOptOut: false,
 };
+
+/** R32: its own update so a database without migration 20261021110000 still saves the rest. */
+async function saveReviewOptOut(id: string, optOut: boolean | undefined) {
+  if (!id) return;
+  await supabase.from("clients").update({ review_opt_out: Boolean(optOut) }).eq("id", id);
+}
 
 function fromRow(row: Record<string, string>) {
   return clientFromRow(row, readCachedClients());
@@ -132,6 +140,7 @@ export default function ClientsPage() {
           void _p; void _c;
           ({ data: saved, error } = await supabase.from("clients").update(rest).eq("id", editingId).eq("user_id", userId).select("*"));
         }
+        await saveReviewOptOut(editingId, form.reviewOptOut);
         // Carry the server's new updated_at into the cache (baseline for later queued contact changes).
         const savedAt = !error && Array.isArray(saved) ? (saved[0] as { updated_at?: unknown } | undefined)?.updated_at : undefined;
         if (typeof savedAt === "string" && savedAt) {
@@ -176,7 +185,8 @@ export default function ClientsPage() {
         setShowForm(false);
         return;
       }
-      saveLocal([fromRow(data as Record<string, string>), ...clients]);
+      await saveReviewOptOut(String((data as { id?: unknown }).id || ""), form.reviewOptOut);
+      saveLocal([{ ...fromRow(data as Record<string, string>), reviewOptOut: form.reviewOptOut }, ...clients]);
       setMessage("Client saved to your account.");
       setForm(emptyClient);
       setShowForm(false);
@@ -203,6 +213,7 @@ export default function ClientsPage() {
       notes: client.notes || "",
       preferences: client.preferences || "",
       contactMethod: readContactMethod(client.contactMethod),
+      reviewOptOut: Boolean(client.reviewOptOut),
     });
   }
 
@@ -277,6 +288,10 @@ export default function ClientsPage() {
                 <option value="">No preference</option>
                 {CONTACT_METHODS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
               </select>
+            </label>
+            <label className="flex min-h-11 items-center gap-2 text-sm text-slate-600">
+              <input type="checkbox" data-testid="client-review-optout" className="h-5 w-5 accent-teal-600" checked={Boolean(form.reviewOptOut)} onChange={(event) => setForm({ ...form, reviewOptOut: event.target.checked })} />
+              Don&apos;t ask this client for reviews
             </label>
             <textarea name="preferences" aria-label="Client preferences" data-testid="client-preferences-input" className="min-h-16 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2.5 text-base sm:text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Preferences: text or call, gate code, pets, best times…" value={form.preferences} onChange={(event) => setForm({ ...form, preferences: event.target.value })} />
             <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:justify-end">

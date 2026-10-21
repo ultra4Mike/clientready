@@ -20,7 +20,7 @@ import AppShell from "@/components/AppShell";
 import { getTrialState } from "@/lib/trial";
 import { priceSummary, PRICES_ARE_PLACEHOLDERS } from "@/lib/plans";
 import { syncClientContact } from "@/lib/client-sync";
-import { noteReviewAsked, reviewAskedAt, reviewMailHref, reviewMessage, reviewSmsHref } from "@/lib/review-request";
+import { clientOptedOut, noteReviewAsked, reviewAskedAt, reviewMailHref, reviewMessage, reviewSmsHref } from "@/lib/review-request";
 import { jobProfit } from "@/lib/job-profit";
 import { CARD_FEE_PASS_THROUGH } from "@/lib/flags";
 import { JobProfitBreakdown } from "@/components/JobProfitBreakdown";
@@ -676,7 +676,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(stored?.data?.schedule ? { schedule: stored.data.schedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew, ...(crewReport ? { crewReport } : {}) },
+      data: { clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(stored?.data?.schedule ? { schedule: stored.data.schedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviewAskedAt ? { reviewAskedAt: (stored?.data as Record<string, unknown>).reviewAskedAt } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew, ...(crewReport ? { crewReport } : {}) },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -1296,8 +1296,9 @@ export default function NewInvoicePage() {
             {!isProposal && docId && (status === "paid" || schedule?.status === "done") && (() => {
               const asked = reviewAsked || reviewAskedAt(docId);
               const why = status === "paid" ? "Paid." : "Job done.";
+              if (clientOptedOut(docClientId, clientName)) return <p className="w-full text-xs text-[var(--cr-muted)]" data-testid="review-optout">{clientName.trim() || "This client"} asked not to get review requests.</p>;
               if (!reviewLink.trim()) return <p className="w-full text-xs text-[var(--cr-muted)]" data-testid="review-request-setup">{why} Add a review link in <Link href="/profile" className="underline">Settings</Link> to ask {clientName.trim() || "this client"} for a review.</p>;
-              const body = reviewMessage(clientName, businessName, reviewLink);
+              const body = reviewMessage(clientName, businessName, reviewLink, status === "paid");
               const sms = reviewSmsHref(clientPhone, body);
               const mail = reviewMailHref(clientEmail, businessName, body);
               const opened = () => setReviewAsked(noteReviewAsked(docId));

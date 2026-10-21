@@ -8,7 +8,7 @@ import { readContactMethod, type ContactMethod } from "./contact-method";
 
 export type CachedClient = {
   id: string; name: string; company: string; email: string; phone: string; address: string;
-  nextVisit: string; visitTime: string; notes: string; preferences: string; contactMethod: ContactMethod; updated_at?: string;
+  nextVisit: string; visitTime: string; notes: string; preferences: string; contactMethod: ContactMethod; reviewOptOut?: boolean; updated_at?: string;
 };
 
 export function readCachedClients(): Partial<CachedClient>[] {
@@ -37,6 +37,8 @@ export function clientFromRow(row: Record<string, unknown>, cached: Partial<Cach
     preferences: "preferences" in row ? s(row.preferences) : s(local?.preferences),
     // Before migration 20261016150000 there is no preferred_contact column: keep this device's value.
     contactMethod: readContactMethod("preferred_contact" in row ? row.preferred_contact : local?.contactMethod),
+    // R32: client opted out of review requests (migration 20261021110000; before it, this device's value).
+    reviewOptOut: "review_opt_out" in row ? row.review_opt_out === true : Boolean(local?.reviewOptOut),
     ...(typeof row.updated_at === "string" && row.updated_at ? { updated_at: row.updated_at } : {}),
   };
 }
