@@ -133,29 +133,7 @@ export async function loadAccountIntoCache(): Promise<boolean> {
     )
   );
 
-  const { data: people, error: peopleError } = await supabase
-    .from("employees")
-    .select("*")
-    .eq("user_id", user.id);
-
-  if (!peopleError && people) window.localStorage.setItem(
-    "clientready-employees",
-    JSON.stringify(
-      people.map((row) => ({
-        id: row.id,
-        name: row.name || "",
-        email: row.email || "",
-        phone: row.phone || "",
-        role: row.role || "",
-        kind: row.kind === "contractor" ? "contractor" : "employee",
-        rate: row.rate || "",
-        hireDate: row.hire_date || "",
-        active: row.active !== false,
-        rateHistory: row.rate_history || [],
-        paySettings: row.pay_settings || {},
-      }))
-    )
-  );
+  await refreshEmployeesCache(user.id);
 
   // Deletes made offline go first, then nothing deleted (here or on another device) is merged back in.
   // (fetchCloudDocuments drops tombstoned rows and mergeDocs drops tombstoned local copies.)
@@ -180,4 +158,36 @@ export async function loadAccountIntoCache(): Promise<boolean> {
   const synced = await syncLocalDocs(merged, pushUp);
   window.localStorage.setItem(DOCS_KEY, JSON.stringify(synced));
   return true;
+}
+
+/** R81: re-read the team from the cloud into this device's cache (the crew picker must never miss an Active person). */
+export async function refreshEmployeesCache(userId?: string): Promise<boolean> {
+  let uid = userId;
+  if (!uid) { const { data } = await supabase.auth.getUser(); uid = data.user?.id; }
+  if (!uid) return false;
+  const user = { id: uid };
+  const { data: people, error: peopleError } = await supabase
+    .from("employees")
+    .select("*")
+    .eq("user_id", user.id);
+
+  if (!peopleError && people) window.localStorage.setItem(
+    "clientready-employees",
+    JSON.stringify(
+      people.map((row) => ({
+        id: row.id,
+        name: row.name || "",
+        email: row.email || "",
+        phone: row.phone || "",
+        role: row.role || "",
+        kind: row.kind === "contractor" ? "contractor" : "employee",
+        rate: row.rate || "",
+        hireDate: row.hire_date || "",
+        active: row.active !== false,
+        rateHistory: row.rate_history || [],
+        paySettings: row.pay_settings || {},
+      }))
+    )
+  );
+  return !peopleError && Boolean(people);
 }
