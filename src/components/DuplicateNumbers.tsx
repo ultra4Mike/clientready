@@ -36,7 +36,7 @@ export default function DuplicateNumbers({ documents, onChanged }: { documents: 
               <li key={doc.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                 <span className="min-w-0 flex-1 basis-40">{doc.clientName || "No client"} · {String(doc.data?.status || "draft")}{doc.createdAt ? ` · ${doc.createdAt}` : ""}</span>
                 <button type="button" data-testid="dup-renumber" data-doc-id={doc.id} onClick={() => renumber(doc)} className={`cr-dup-btn min-h-11 rounded-lg px-4 font-semibold transition max-sm:w-full ${doc.id === group.suggest.id ? "cr-dup-primary bg-teal-500 text-slate-950! shadow-sm hover:bg-teal-400" : "border border-slate-400/60 hover:border-teal-500"}`}>
-                  Give it a new number{doc.id === group.suggest.id ? " (suggested)" : ""}
+                  Change to <span data-testid="dup-proposed" className="tabular-nums">{nextFreeNumber(documents, doc.type, String(doc.data?.invoiceNumber || ""))}</span>{doc.id === group.suggest.id ? " (suggested)" : ""}
                 </button>
               </li>
             ))}
