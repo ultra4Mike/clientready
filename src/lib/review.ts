@@ -14,7 +14,7 @@ import { saveCloudDocument, type CloudDoc } from "@/lib/cloud-docs";
  * (e.g. the balance changes, a new approval link is sent, the expense amount is edited).
  * Reviewing never touches status, payments or any money field.
  */
-export type ReviewKind = "expense" | "done" | "balance" | "approval" | "recurring" | "change";
+export type ReviewKind = "expense" | "done" | "balance" | "approval" | "recurring" | "change" | "missing";
 export type ReviewItem = { key: string; version: string; kind: ReviewKind; docId: string; title: string; detail: string; href: string };
 export type ExpenseRow = { id: string; doc_id: string; worker_name?: string; kind?: string; amount?: string; note?: string; created_at?: string };
 
@@ -36,6 +36,30 @@ export function readReviews(data: Record<string, unknown> | undefined): Record<s
 
 function numberOf(doc: Doc) {
   return String(doc.data?.invoiceNumber || doc.title || (doc.type === "proposal" ? "Proposal" : "Invoice"));
+}
+
+export type MissingField = "address" | "contact" | "due-date" | "signature" | "payment-method";
+export const MISSING_LABEL: Record<MissingField, string> = {
+  address: "client address", contact: "client email or phone", "due-date": "due date", signature: "client signature", "payment-method": "payment method",
+};
+
+/**
+ * What a sent invoice still lacks (drafts are skipped): client address, a way to reach the client, a due date,
+ * the client signature once the job is done or paid, and a method on every recorded payment.
+ */
+export function missingFields(doc: Doc): MissingField[] {
+  const data = doc.data || {};
+  const status = String(data.status || "draft");
+  if (doc.type !== "invoice" || status === "draft") return [];
+  const text = (value: unknown) => String(value ?? "").trim();
+  const out: MissingField[] = [];
+  if (!text(data.clientAddress)) out.push("address");
+  if (!text(data.clientEmail) && !text(data.clientPhone)) out.push("contact");
+  if (!text(data.dueDate) && status !== "paid") out.push("due-date");
+  const done = readSchedule(data)?.status === "done" || status === "paid";
+  if (done && !data.signature) out.push("signature");
+  if (readPayments(data as never).some((payment) => (Number(payment.amount) || 0) > 0 && !text(payment.method))) out.push("payment-method");
+  return out;
 }
 
 export function reviewItems(docs: Doc[], expenses: ExpenseRow[], today = ymd(new Date())): ReviewItem[] {
@@ -84,6 +108,11 @@ export function reviewItems(docs: Doc[], expenses: ExpenseRow[], today = ymd(new
     if (recurring?.active && recurring.nextRunDate && recurring.nextRunDate <= today) {
       all.push({ key: "recurring-due", version: recurring.nextRunDate, kind: "recurring", docId: doc.id,
         title: `${numberOf(doc)} recurring invoice due`, detail: `Next run ${recurring.nextRunDate}${who(doc)}`, href: open(doc) });
+    }
+    const gaps = missingFields(doc);
+    if (gaps.length) {
+      all.push({ key: "missing", version: gaps.join(","), kind: "missing", docId: doc.id,
+        title: `${numberOf(doc)} is missing ${gaps.map((gap) => MISSING_LABEL[gap]).join(", ")}`, detail: `${status}${who(doc)}`, href: open(doc) });
     }
     const owed = balanceDue(docTotal(doc), paidTotal(readPayments(data as never)), data.status);
     if (isOpenBalance(status, owed)) {

@@ -6,7 +6,7 @@ import { confirmJobDone } from "@/lib/schedule";
 import { markReviewed, reviewItems, type ExpenseRow, type ReviewItem, type ReviewKind } from "@/lib/review";
 
 const LABEL: Record<ReviewKind, string> = {
-  expense: "Crew expense", done: "Job done", balance: "Balance owed", approval: "Awaiting approval", recurring: "Recurring", change: "Change order",
+  expense: "Crew expense", done: "Job done", balance: "Balance owed", approval: "Awaiting approval", recurring: "Recurring", change: "Change order", missing: "Missing details",
 };
 
 type Doc = { id: string; type: string; title: string; clientName?: string; data?: Record<string, unknown> };
@@ -53,7 +53,7 @@ export default function NeedsReview({ documents, onDocuments, loading = false, o
       ) : (
         <ul className="divide-y divide-teal-500/10">
           {items.map((item) => (
-            <li key={`${item.docId}:${item.key}`} data-testid={`review-${item.kind}`} data-key={item.key} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:gap-3 sm:py-2.5">
+            <li key={`${item.docId}:${item.key}`} data-testid={`review-${item.kind}`} data-kind={item.kind} data-key={item.key} data-missing={item.kind === "missing" ? item.version : undefined} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:gap-3 sm:py-2.5">
               <a href={item.href} className="min-w-0 flex-1">
                 <span className="text-xs font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-300">{LABEL[item.kind]}</span>
                 <span className="block text-sm font-medium break-words sm:truncate">{item.title}</span>
