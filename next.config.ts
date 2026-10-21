@@ -20,7 +20,7 @@ const nextConfig: NextConfig = {
     ];
     // Customer token links and signed-in app screens must never show up in search results.
     const noindex = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
-    const privatePaths = ["approve", "portal", "invoice-view", "receipt", "collect", "proposal", "crew", "dashboard", "documents", "clients", "backup", "calendar", "drafts", "employees", "history", "inventory", "invoice", "mileage", "profile", "report", "reports", "schedule", "today", "upcoming", "year", "reset-password", "api"];
+    const privatePaths = ["approve", "portal", "invoice-view", "receipt", "collect", "proposal", "crew", "dashboard", "documents", "clients", "backup", "calendar", "drafts", "employees", "history", "inventory", "invoice", "job", "mileage", "profile", "report", "reports", "schedule", "today", "upcoming", "year", "reset-password", "api"];
     return [
       { source: "/:path*", headers: security },
       ...privatePaths.map((p) => ({ source: `/${p}/:path*`, headers: noindex })),
