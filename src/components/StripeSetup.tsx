@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 type Readiness = {
   secretKey: boolean;
@@ -21,7 +22,9 @@ export default function StripeSetup() {
 
   useEffect(() => {
     const url = `${window.location.origin}/api/stripe/webhook`;
-    fetch("/api/stripe/readiness", { cache: "no-store" })
+    // Readiness details need the owner's session (unauthenticated callers only get {enabled}).
+    supabase.auth.getSession()
+      .then(({ data }) => fetch("/api/stripe/readiness", { cache: "no-store", headers: data.session?.access_token ? { authorization: `Bearer ${data.session.access_token}` } : {} }))
       .then((response) => (response.ok ? response.json() : Promise.reject()))
       .then((data: Readiness) => setState(data))
       .catch(() => setState("error"))

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { saveCloudDocument, type CloudDoc } from "@/lib/cloud-docs";
+import { patchStoredDoc } from "@/lib/patch-docs";
 import { duplicateGroups, isSentDoc, nextFreeNumber } from "@/lib/doc-numbers";
 
 type Doc = CloudDoc & { clientName?: string; createdAt?: string };
@@ -19,7 +20,7 @@ export default function DuplicateNumbers({ documents, onChanged }: { documents: 
     if (!window.confirm(`Change ${from} (${doc.clientName || "no client"}) to ${to}?${warn}`)) return;
     const next: Doc = { ...doc, title: doc.title === from ? to : doc.title, data: { ...(doc.data || {}), invoiceNumber: to, renumberedFrom: from } };
     await saveCloudDocument(next);
-    const list = documents.map((item) => (item.id === doc.id ? next : item));
+    const list = patchStoredDoc<Doc>(window.localStorage.getItem("clientready-documents"), next, documents);
     window.localStorage.setItem("clientready-documents", JSON.stringify(list));
     onChanged(list);
     setMessage(`${from} (${doc.clientName || "no client"}) is now ${to}.`);

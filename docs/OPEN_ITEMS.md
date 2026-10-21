@@ -176,4 +176,18 @@ Shared by the three ClientReady bots. Update the **Status** column when you pick
 - R111 payment note (payment-note), form closes on save, receipt auto-prints (/receipt?print=1); /settings→/profile; jobs CSV uses job date; crew dark contrast; crew report date required. Done.
 - R112 conflicts: crew rows count as assigned; start-only = DEFAULT_JOB_MINUTES (60); overlap-badge + overlap-move on Today/Calendar/invoice; + Add crew warns (crew-clash, crew-clash-anyway, crew-clash-other). Non-interactive paths (recurring, API, draft convert, duplicate) are caught after save by the badge and Needs review, not blocked.
 - R113 Crew dates check: derived jobs no longer listed as "Unscheduled"; idempotent; invoice dates untouched.
+- R114 (b2852d0) fully paid = Paid even if draft; paid preview "Paid in full"; new invoices use Settings payment terms.
+- R115 (cb1cd97) new payment row defaults to remaining balance.
+- R116 (c7be671) client typed on invoice saved to Clients (cloud) and linked.
+- R117 (08142fe) Fix duplicate numbers buttons show proposed number. A3 follow-up: renumber patches latest stored docs, not a stale snapshot.
+- R118/R120 (f1172f3) trial banner floats (no layout jump), cached state shown at once.
+- R119 (cc668a4) review request / on-my-way / email page use greetingName.
+- R120 (b3d5da6) Reports crew receipts show … until loaded.
+- R121 (7255921) undated reports show sent date; 0-minute entries warned; crew Save as draft; report date required.
+- Trial exemption (0bc1658, 05f7c00) migration 20261024140000_trial_exempt; set by owner email at deploy (placeholder in pending-deploy.md).
+- R122 (fd21ff2) Create change order guarded, no duplicates.
+- R123 (72f4584) schedule editor not re-keyed by invoice saves; half-typed dates not saved; start-only gets default end.
+- R124 (dcb48a8) mobile + in tab bar; slimmer trial strip.
+- R125 (ce53bff) crew Job photo button (migration 20261024150000_crew_job_photo).
+- Open: browser tests for R121 draft, R122, R123, R124 not written yet. Test scripts live in /workspace/cr-tests (no tests folder in repo).
 - Perf (Outstanding card nav, Today): not done.
