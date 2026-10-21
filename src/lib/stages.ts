@@ -15,12 +15,13 @@ export function balanceLabel(paid: number, balance: number) {
   return paid > 0.004 && balance > 0.004 ? "Remaining balance" : "Still owed";
 }
 
-/** One-tap progress billing: a deposit due today, the rest due when the job is done (no date). */
-export function depositRemainderStages(percent = 30, today = ""): Stage[] {
+/** One-tap progress billing: a deposit due today, the rest due on the invoice due date. */
+export function depositRemainderStages(percent = 30, today = "", dueDate = ""): Stage[] {
   const id = `${Date.now()}`;
   return [
     { id: `${id}-d`, label: "Deposit", kind: "deposit", mode: "percent", value: String(percent), dueDate: today },
-    { id: `${id}-f`, label: "Remaining balance", kind: "final", mode: "percent", value: "", dueDate: "" },
+    // R33: the remainder is due on the invoice due date, so it can go overdue.
+    { id: `${id}-f`, label: "Remaining balance", kind: "final", mode: "percent", value: "", dueDate: dueDate || "" },
   ];
 }
 

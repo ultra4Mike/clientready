@@ -1054,7 +1054,7 @@ export default function NewInvoicePage() {
                 <p className="text-right"><span className="block text-sm font-medium text-slate-600">{isProposal && totals.paid > 0 ? "Balance after deposit" : balanceLabel(totals.paid, totals.balance)}</span><span data-testid="still-owed" className={`text-2xl font-bold tabular-nums ${totals.balance <= 0.004 && totals.paid > 0 ? "text-emerald-700 dark:text-emerald-300" : ""}`}>${totals.balance.toFixed(2)}</span></p>
               </div>
             </Section>
-            {!isProposal && <StageEditor stages={stages} onChange={setStages} total={totals.total} balance={totals.balance} />}
+            {!isProposal && <StageEditor stages={stages} onChange={setStages} total={totals.total} balance={totals.balance} dueDate={dueDate} />}
             </Section>
             <Section id="pay-photos" label="Payment, photos and notes" className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Payment, photos & notes</h2>
