@@ -254,53 +254,133 @@ export default function DashboardPage() {
         })()}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <a href="/documents?filter=outstanding" data-testid="stat-outstanding" data-loading={loaded ? undefined : "true"} className="group block data-[loading=true]:pointer-events-none data-[loading=true]:animate-pulse rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
+      <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-6">
+          <section className="space-y-4" aria-label="Needs attention">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Needs attention</h2>
+          {(auto.sent.length > 0 || auto.errors.length > 0) && (
+            <div className={`space-y-2 rounded-xl border px-4 py-3 text-sm ${auto.errors.length ? "border-rose-300/70" : "cr-tone-good border-emerald-300 bg-emerald-50 text-emerald-800"}`} data-testid="auto-sent" data-count={auto.sent.length}>
+              {auto.sent.length > 0 && <p className="flex items-start gap-2 font-medium text-emerald-800 dark:text-emerald-200"><span aria-hidden="true">✓</span><span className="min-w-0 break-words">Sent automatically: {auto.sent.map((item) => `${item.kind === "done" ? "invoice" : "reminder"} to ${item.to}`).join("; ")}</span></p>}
+              {auto.errors.map((error) => <p key={error} className="cr-tone-bad rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-800" data-testid="auto-error">{error}</p>)}
+              <a href="/profile" className="inline-flex min-h-11 items-center text-xs font-medium underline">Automation settings</a>
+            </div>
+          )}
+          {loaded && <FollowUps docs={documents as never} today={todayYmd()} limit={5} testid="dashboard-reminders" />}
+      {recurringReady > 0 && (
+        <a href="/documents?q=draft" data-testid="recurring-ready" className="flex items-center justify-between rounded-xl border border-teal-500/40 bg-teal-500/10 px-4 py-3 text-sm font-medium text-teal-700 dark:text-teal-200 transition hover:bg-teal-500/15">
+          {recurringReady} recurring draft{recurringReady === 1 ? "" : "s"} ready for review
+        </a>
+      )}
+      <ProfitAlertsCard loaded={loaded} documents={documents} />
+      <GettingStarted loading={!loaded} documents={documents} />
+      <NeedsReview loading={!loaded} onCount={setReviewCount} documents={documents} onDocuments={(docs) => setDocuments(uniqueDocs(docs as SavedDocument[]))} />
+          {loaded && reviewCount === 0 && recurringReady === 0 && stats.overdueCount === 0 && (
+            <div data-testid="all-caught-up" className="flex items-center gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm">
+              <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">✓</span>
+              <span><span className="font-semibold">All caught up.</span> <span className="text-[var(--cr-muted)]">Nothing overdue or waiting on you.</span></span>
+            </div>
+          )}
+          </section>
+          <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] shadow-sm" data-testid="recent-docs">
+            <div className="flex items-center gap-3 border-b border-teal-500/15 px-5 py-4 min-[900px]:justify-between">
+              <h2 className="text-base font-semibold">Recent documents</h2>
+              <a href="/documents" className="inline-flex min-h-11 items-center text-sm font-medium text-teal-600 hover:underline dark:text-teal-300">View all</a>
+            </div>
+            {documents.length === 0 && !loaded && (
+              <div className="space-y-3 px-5 py-4" aria-busy="true" aria-label="Loading">
+                {[0, 1, 2].map((n) => <div key={n} className="flex items-center justify-between gap-3"><div className="h-4 w-2/5 animate-pulse rounded bg-teal-500/10" /><div className="h-4 w-16 animate-pulse rounded bg-teal-500/10" /></div>)}
+              </div>
+            )}
+            {documents.length === 0 && loaded && <EmptyState icon="📄" title="No documents yet." line="Your recent invoices and proposals will show here." actionHref="/invoice" actionLabel="New invoice" />}
+            {documents.slice(0, 5).map((doc) => (
+              <a key={doc.id} href={`/documents?q=${encodeURIComponent(doc.title || "")}`} className="flex items-start justify-between gap-3 border-b border-teal-500/10 px-4 py-3.5 text-sm transition last:border-b-0 hover:bg-teal-500/5 sm:px-5">
+                <span className="min-w-0 space-y-0.5" data-testid="recent-doc" data-doc-id={doc.id}>
+                  <span className="block truncate font-medium">{doc.title || "Untitled"}{doc.clientName && doc.clientName !== "No client" ? <span data-testid="recent-client"> · {doc.clientName}</span> : null}</span>
+                  {(() => {
+                    const first = (doc.data?.items || []).find((item) => String(item.description || "").trim()) || (doc.data?.items || [])[0];
+                    const crew = crewNames(doc);
+                    return (<>
+                      {first && <span className="block truncate text-xs tabular-nums text-slate-700 dark:text-slate-200" data-testid="recent-line">{String(first.description || "Item")}{first.rate ? ` · $${amountOf(first.rate).toFixed(2)}${amountOf(first.qty) !== 1 ? ` × ${first.qty}` : ""}` : ""}</span>}
+                      <span className={`block truncate text-xs ${crew.length ? "text-teal-700 dark:text-teal-300" : "italic text-[var(--cr-muted)]"}`} data-testid="recent-crew" data-crew-count={crew.length}>{crew.length ? `Crew: ${crew.join(", ")}` : "No employees scheduled"}</span>
+                    </>);
+                  })()}
+                  {doc.type === "invoice" && (() => {
+                    const total = invoiceTotal(doc); const owed = balance(doc); const paid = total - owed;
+                    return paid > 0.004 && owed > 0.004 ? <span className="block text-xs font-medium tabular-nums text-amber-700 dark:text-amber-300" data-testid="recent-remaining">${paid.toFixed(2)} paid · Remaining balance ${owed.toFixed(2)}</span> : null;
+                  })()}
+                  <span className="block text-xs capitalize text-[var(--cr-muted)]">{doc.type} · {doc.createdAt}</span>
+                </span>
+                <span className="shrink-0 rounded-full border border-teal-500/30 px-2.5 py-0.5 text-xs font-semibold capitalize">{String(doc.data?.status || "draft")}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+
+        <aside className="min-w-0 space-y-4 lg:sticky lg:top-20">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Quick actions</h2>
+      <div className="grid gap-2">
+        <a href="/invoice" className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] flex items-center gap-3 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md">
+          <IconWrap>+</IconWrap>
+          <span className="min-w-0"><p className="font-semibold">New invoice</p>
+          <p className="mt-1 text-sm text-[var(--cr-muted)]">Create an invoice and send it to a client.</p></span>
+        </a>
+        <button type="button" onClick={newProposal} className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] flex items-center gap-3 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md text-left">
+          <IconWrap>✎</IconWrap>
+          <span className="min-w-0"><p className="font-semibold">New proposal</p>
+          <p className="mt-1 text-sm text-[var(--cr-muted)]">Create a proposal and share it with a prospect.</p></span>
+        </button>
+        <a href={thirdAction.href} className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] flex items-center gap-3 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md">
+          <IconWrap>{thirdAction.icon}</IconWrap>
+          <span className="min-w-0"><p className="font-semibold">{thirdAction.title}</p>
+          <p className="mt-1 text-sm text-[var(--cr-muted)]">{thirdAction.text}</p></span>
+        </a>
+      </div>
+        </aside>
+      </div>
+      <div className="cr-stat-row mt-6" data-layout="stat-row">
+        <a href="/documents?filter=outstanding" data-testid="stat-outstanding" data-loading={loaded ? undefined : "true"} className="group block data-[loading=true]:pointer-events-none data-[loading=true]:animate-pulse rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-3 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400">
           <div className="flex items-start justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Total outstanding</p>
             <IconWrap>$</IconWrap>
           </div>
-          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight group-data-[loading=true]:w-24 group-data-[loading=true]:rounded-md group-data-[loading=true]:bg-teal-500/15 group-data-[loading=true]:text-transparent sm:text-3xl">{loaded ? `$${stats.outstanding.toFixed(2)}` : "—"}</p>
-          <p className="mt-2 text-xs text-[var(--cr-muted)]">
+          <p className="mt-1.5 text-lg font-bold tabular-nums tracking-tight group-data-[loading=true]:w-24 group-data-[loading=true]:rounded-md group-data-[loading=true]:bg-teal-500/15 group-data-[loading=true]:text-transparent sm:text-2xl">{loaded ? `$${stats.outstanding.toFixed(2)}` : "—"}</p>
+          <p className="mt-1 text-xs text-[var(--cr-muted)]">
             {!loaded ? "Loading…" : stats.outstanding === 0 ? "No outstanding invoices" : "Not marked paid"}
           </p>
         </a>
-        <a href="/documents?filter=paid" data-testid="stat-paid" data-loading={loaded ? undefined : "true"} className="group block data-[loading=true]:pointer-events-none data-[loading=true]:animate-pulse rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
+        <a href="/documents?filter=paid" data-testid="stat-paid" data-loading={loaded ? undefined : "true"} className="group block data-[loading=true]:pointer-events-none data-[loading=true]:animate-pulse rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-3 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400">
           <div className="flex items-start justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Paid</p>
             <IconWrap>✓</IconWrap>
           </div>
-          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight group-data-[loading=true]:w-24 group-data-[loading=true]:rounded-md group-data-[loading=true]:bg-teal-500/15 group-data-[loading=true]:text-transparent sm:text-3xl">{loaded ? `$${stats.paid.toFixed(2)}` : "—"}</p>
-          <p className="mt-2 text-xs text-[var(--cr-muted)]">
+          <p className="mt-1.5 text-lg font-bold tabular-nums tracking-tight group-data-[loading=true]:w-24 group-data-[loading=true]:rounded-md group-data-[loading=true]:bg-teal-500/15 group-data-[loading=true]:text-transparent sm:text-2xl">{loaded ? `$${stats.paid.toFixed(2)}` : "—"}</p>
+          <p className="mt-1 text-xs text-[var(--cr-muted)]">
             {!loaded ? "Loading…" : stats.paid === 0 ? "No payments yet" : `${stats.paidRate}% marked paid`}
           </p>
         </a>
-        <a href="/documents?filter=overdue" data-testid="stat-overdue" data-loading={loaded ? undefined : "true"} className={`group block data-[loading=true]:pointer-events-none data-[loading=true]:animate-pulse rounded-2xl border ${stats.overdue > 0 ? "cr-stat-bad border-rose-400/50 bg-rose-50/60 dark:bg-rose-950/30" : "border-teal-500/15 bg-[var(--cr-card)]"} p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5`}>
+        <a href="/documents?filter=overdue" data-testid="stat-overdue" data-loading={loaded ? undefined : "true"} className={`group block data-[loading=true]:pointer-events-none data-[loading=true]:animate-pulse rounded-2xl border ${stats.overdue > 0 ? "cr-stat-bad border-rose-400/50 bg-rose-50/60 dark:bg-rose-950/30" : "border-teal-500/15 bg-[var(--cr-card)]"} p-3 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400`}>
           <div className="flex items-start justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Overdue</p>
             <IconWrap>!</IconWrap>
           </div>
-          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight group-data-[loading=true]:w-24 group-data-[loading=true]:rounded-md group-data-[loading=true]:bg-teal-500/15 group-data-[loading=true]:text-transparent sm:text-3xl">{loaded ? `$${stats.overdue.toFixed(2)}` : "—"}</p>
-          <p className="mt-2 text-xs text-[var(--cr-muted)]">
+          <p className="mt-1.5 text-lg font-bold tabular-nums tracking-tight group-data-[loading=true]:w-24 group-data-[loading=true]:rounded-md group-data-[loading=true]:bg-teal-500/15 group-data-[loading=true]:text-transparent sm:text-2xl">{loaded ? `$${stats.overdue.toFixed(2)}` : "—"}</p>
+          <p className="mt-1 text-xs text-[var(--cr-muted)]">
             {!loaded ? "Loading…" : stats.overdueCount === 0 ? "No overdue invoices" : `${stats.overdueCount} overdue`}
           </p>
         </a>
-        <Link href="/clients" data-testid="stat-clients" data-loading={loaded ? undefined : "true"} className="group block data-[loading=true]:pointer-events-none data-[loading=true]:animate-pulse rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
+        <Link href="/clients" data-testid="stat-clients" data-loading={loaded ? undefined : "true"} className="group block data-[loading=true]:pointer-events-none data-[loading=true]:animate-pulse rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-3 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400">
           <div className="flex items-start justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Clients</p>
             <IconWrap>☺</IconWrap>
           </div>
-          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight group-data-[loading=true]:w-24 group-data-[loading=true]:rounded-md group-data-[loading=true]:bg-teal-500/15 group-data-[loading=true]:text-transparent sm:text-3xl">{loaded ? clientCount : "—"}</p>
-          <p className="mt-2 text-xs text-[var(--cr-muted)]">
+          <p className="mt-1.5 text-lg font-bold tabular-nums tracking-tight group-data-[loading=true]:w-24 group-data-[loading=true]:rounded-md group-data-[loading=true]:bg-teal-500/15 group-data-[loading=true]:text-transparent sm:text-2xl">{loaded ? clientCount : "—"}</p>
+          <p className="mt-1 text-xs text-[var(--cr-muted)]">
             {!loaded ? "Loading…" : clientCount === 0 ? "No clients added" : clientCount > clients.length ? "Saved + on invoices" : "Saved clients"}
           </p>
         </Link>
       </div>
-
-      <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <div className="min-w-0 space-y-6">
       {stats.invoiceCount > 0 && (
-        <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
+        <div className="mt-6 rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 sm:mb-4">
             <h2 className="text-base font-semibold">Invoice overview</h2>
             <span className="text-xs text-[var(--cr-muted)]">Last 6 months · {stats.paidRate}% of invoices marked paid</span>
@@ -342,86 +422,6 @@ export default function DashboardPage() {
           </svg>
         </div>
       )}
-
-          <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] shadow-sm" data-testid="recent-docs">
-            <div className="flex items-center gap-3 border-b border-teal-500/15 px-5 py-4 min-[900px]:justify-between">
-              <h2 className="text-base font-semibold">Recent documents</h2>
-              <a href="/documents" className="inline-flex min-h-11 items-center text-sm font-medium text-teal-600 hover:underline dark:text-teal-300">View all</a>
-            </div>
-            {documents.length === 0 && !loaded && (
-              <div className="space-y-3 px-5 py-4" aria-busy="true" aria-label="Loading">
-                {[0, 1, 2].map((n) => <div key={n} className="flex items-center justify-between gap-3"><div className="h-4 w-2/5 animate-pulse rounded bg-teal-500/10" /><div className="h-4 w-16 animate-pulse rounded bg-teal-500/10" /></div>)}
-              </div>
-            )}
-            {documents.length === 0 && loaded && <EmptyState icon="📄" title="No documents yet." line="Your recent invoices and proposals will show here." actionHref="/invoice" actionLabel="New invoice" />}
-            {documents.slice(0, 5).map((doc) => (
-              <a key={doc.id} href={`/documents?q=${encodeURIComponent(doc.title || "")}`} className="flex items-start justify-between gap-3 border-b border-teal-500/10 px-4 py-3.5 text-sm transition last:border-b-0 hover:bg-teal-500/5 sm:px-5">
-                <span className="min-w-0 space-y-0.5" data-testid="recent-doc" data-doc-id={doc.id}>
-                  <span className="block truncate font-medium">{doc.title || "Untitled"}{doc.clientName && doc.clientName !== "No client" ? <span data-testid="recent-client"> · {doc.clientName}</span> : null}</span>
-                  {(() => {
-                    const first = (doc.data?.items || []).find((item) => String(item.description || "").trim()) || (doc.data?.items || [])[0];
-                    const crew = crewNames(doc);
-                    return (<>
-                      {first && <span className="block truncate text-xs tabular-nums text-slate-700 dark:text-slate-200" data-testid="recent-line">{String(first.description || "Item")}{first.rate ? ` · $${amountOf(first.rate).toFixed(2)}${amountOf(first.qty) !== 1 ? ` × ${first.qty}` : ""}` : ""}</span>}
-                      <span className={`block truncate text-xs ${crew.length ? "text-teal-700 dark:text-teal-300" : "italic text-[var(--cr-muted)]"}`} data-testid="recent-crew" data-crew-count={crew.length}>{crew.length ? `Crew: ${crew.join(", ")}` : "No employees scheduled"}</span>
-                    </>);
-                  })()}
-                  {doc.type === "invoice" && (() => {
-                    const total = invoiceTotal(doc); const owed = balance(doc); const paid = total - owed;
-                    return paid > 0.004 && owed > 0.004 ? <span className="block text-xs font-medium tabular-nums text-amber-700 dark:text-amber-300" data-testid="recent-remaining">${paid.toFixed(2)} paid · Remaining balance ${owed.toFixed(2)}</span> : null;
-                  })()}
-                  <span className="block text-xs capitalize text-[var(--cr-muted)]">{doc.type} · {doc.createdAt}</span>
-                </span>
-                <span className="shrink-0 rounded-full border border-teal-500/30 px-2.5 py-0.5 text-xs font-semibold capitalize">{String(doc.data?.status || "draft")}</span>
-              </a>
-            ))}
-          </div>
-        </div>
-
-        <aside className="min-w-0 space-y-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Needs attention</h2>
-          {(auto.sent.length > 0 || auto.errors.length > 0) && (
-            <div className={`space-y-2 rounded-xl border px-4 py-3 text-sm ${auto.errors.length ? "border-rose-300/70" : "cr-tone-good border-emerald-300 bg-emerald-50 text-emerald-800"}`} data-testid="auto-sent" data-count={auto.sent.length}>
-              {auto.sent.length > 0 && <p className="flex items-start gap-2 font-medium text-emerald-800 dark:text-emerald-200"><span aria-hidden="true">✓</span><span className="min-w-0 break-words">Sent automatically: {auto.sent.map((item) => `${item.kind === "done" ? "invoice" : "reminder"} to ${item.to}`).join("; ")}</span></p>}
-              {auto.errors.map((error) => <p key={error} className="cr-tone-bad rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-800" data-testid="auto-error">{error}</p>)}
-              <a href="/profile" className="inline-flex min-h-11 items-center text-xs font-medium underline">Automation settings</a>
-            </div>
-          )}
-          {loaded && <FollowUps docs={documents as never} today={todayYmd()} limit={5} testid="dashboard-reminders" />}
-      {recurringReady > 0 && (
-        <a href="/documents?q=draft" data-testid="recurring-ready" className="flex items-center justify-between rounded-xl border border-teal-500/40 bg-teal-500/10 px-4 py-3 text-sm font-medium text-teal-700 dark:text-teal-200 transition hover:bg-teal-500/15">
-          {recurringReady} recurring draft{recurringReady === 1 ? "" : "s"} ready for review
-        </a>
-      )}
-      <ProfitAlertsCard loaded={loaded} documents={documents} />
-      <GettingStarted loading={!loaded} documents={documents} />
-      <NeedsReview loading={!loaded} onCount={setReviewCount} documents={documents} onDocuments={(docs) => setDocuments(uniqueDocs(docs as SavedDocument[]))} />
-          {loaded && reviewCount === 0 && recurringReady === 0 && stats.overdueCount === 0 && (
-            <div data-testid="all-caught-up" className="flex items-center gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm">
-              <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">✓</span>
-              <span><span className="font-semibold">All caught up.</span> <span className="text-[var(--cr-muted)]">Nothing overdue or waiting on you.</span></span>
-            </div>
-          )}
-          <h2 className="pt-2 text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Quick actions</h2>
-      <div className="grid gap-2">
-        <a href="/invoice" className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] flex items-center gap-3 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md">
-          <IconWrap>+</IconWrap>
-          <span className="min-w-0"><p className="font-semibold">New invoice</p>
-          <p className="mt-1 text-sm text-[var(--cr-muted)]">Create an invoice and send it to a client.</p></span>
-        </a>
-        <button type="button" onClick={newProposal} className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] flex items-center gap-3 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md text-left">
-          <IconWrap>✎</IconWrap>
-          <span className="min-w-0"><p className="font-semibold">New proposal</p>
-          <p className="mt-1 text-sm text-[var(--cr-muted)]">Create a proposal and share it with a prospect.</p></span>
-        </button>
-        <a href={thirdAction.href} className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] flex items-center gap-3 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md">
-          <IconWrap>{thirdAction.icon}</IconWrap>
-          <span className="min-w-0"><p className="font-semibold">{thirdAction.title}</p>
-          <p className="mt-1 text-sm text-[var(--cr-muted)]">{thirdAction.text}</p></span>
-        </a>
-      </div>
-        </aside>
-      </div>
     </AppShell>
   );
 }
