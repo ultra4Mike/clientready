@@ -178,9 +178,19 @@ export function crewIds(crew: unknown) {
  * (hours, pay, notes intact); people newly assigned get an empty row at their saved rate;
  * rows of people no longer assigned are dropped.
  */
+/**
+ * One source of truth for when a job happens: the schedule. Crew pay rows copy its date and times
+ * (so the crew page, timesheets and the owner calendar agree after a reschedule); a row already
+ * paid to the worker keeps its recorded date as history.
+ */
+export function followSchedule<R extends { workDate?: string; startTime?: string; endTime?: string; paidToWorker?: boolean }>(row: R, schedule: Pick<Schedule, "date" | "startTime" | "endTime"> | null): R {
+  if (!schedule?.date || row.paidToWorker) return row;
+  return { ...row, workDate: schedule.date, startTime: schedule.startTime || row.startTime || "", endTime: schedule.endTime || row.endTime || "" };
+}
+
 export function crewForWorkers(crew: CrewRow[], workerIds: string[], schedule: Pick<Schedule, "date" | "startTime" | "endTime"> | null, people: Worker[] = allEmployees()) {
   const keep = new Set(workerIds);
-  const kept = crew.filter((row) => keep.has(row.employeeId));
+  const kept = crew.filter((row) => keep.has(row.employeeId)).map((row) => followSchedule(row, schedule));
   const have = new Set(kept.map((row) => row.employeeId));
   const byId = new Map(people.map((person) => [person.id, person]));
   const added = workerIds.filter((id) => !have.has(id)).map((id) => ({
@@ -342,15 +352,17 @@ async function syncCrewPayRows(doc: CloudDoc) {
   if (!isUuid(doc.id)) return;
   const data = doc.data || {};
   const { saveCrewJobs } = await import("@/lib/crew");
+  const schedule = data.schedule ? readSchedule(data) : null;
   await saveCrewJobs(doc.id, {
+    date: schedule?.date || "",
     invoiceNumber: String(data.invoiceNumber || doc.title || ""),
     clientName: String(data.clientName || ""),
     clientPhone: String(data.clientPhone || ""),
     clientAddress: String(data.clientAddress || ""),
     status: String(data.status || ""),
-    startTime: String(data.jobStart || ""),
-    endTime: String(data.jobEnd || ""),
-  }, (Array.isArray(data.crew) ? data.crew : []) as CrewRow[]);
+    startTime: schedule?.startTime || String(data.jobStart || ""),
+    endTime: schedule ? schedule.endTime || "" : String(data.jobEnd || ""),
+  }, ((Array.isArray(data.crew) ? data.crew : []) as CrewRow[]).map((row) => followSchedule(row, schedule)));
 }
 
 export async function saveSchedule(docId: string, schedule: Schedule | null, confirmed: string[] = []) {

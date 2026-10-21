@@ -346,6 +346,9 @@ export default function CrewPage() {
   const todayCards = cards.filter((card) => card.job_date === today);
   const weekCards = cards.filter((card) => weekDays.includes(card.job_date));
   const undated = cards.filter((card) => !card.job_date);
+  // Past jobs from the two weeks before this one (date, time, client, status only; no prices).
+  const recent = weekStart ? cards.filter((card) => card.job_date && card.job_date < weekStart && card.job_date >= addDays(weekStart, -14)).sort((a, b) => `${b.job_date}${b.start_time}`.localeCompare(`${a.job_date}${a.start_time}`)) : [];
+  const lastWeekStart = weekStart ? addDays(weekStart, -7) : "";
   const later = cards.filter((card) => card.job_date && weekDays.length > 0 && card.job_date > weekDays[6]).sort((a, b) => a.job_date.localeCompare(b.job_date));
 
   const hoursByDay = weekDays.map((day) => {
@@ -775,6 +778,22 @@ export default function CrewPage() {
                 {later.map(jobCard)}
               </div>
             )}
+            <details className="space-y-2" data-testid="crew-recent" data-count={recent.length}>
+              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)] [&::-webkit-details-marker]:hidden">Recent jobs (last 2 weeks)<span className="tabular-nums">{recent.length}</span><span aria-hidden="true" className="h-px flex-1 bg-teal-500/15" /></summary>
+              {recent.length === 0 && <p className="text-sm text-[var(--cr-muted)]">No jobs in the last two weeks.</p>}
+              <ul className="divide-y divide-teal-500/10">
+                {recent.map((card) => (
+                  <li key={`recent-${card.id}`} data-testid="crew-recent-job" data-date={card.job_date} className="flex items-center justify-between gap-3 py-2 text-sm">
+                    <span className="min-w-0">
+                      <span className="text-xs font-semibold uppercase text-[var(--cr-muted)]" data-testid="crew-recent-week">{card.job_date >= lastWeekStart ? "Last week" : "Earlier"}</span>
+                      <span className="block font-medium">{dayLabel(card.job_date)}{card.start_time ? ` · ${card.start_time}` : ""}</span>
+                      <span className="block truncate text-[var(--cr-muted)]">{card.client_name || "Job"}{card.invoice_number ? ` · ${card.invoice_number}` : ""}{card.client_address ? ` · ${card.client_address}` : ""}</span>
+                    </span>
+                    <span className="shrink-0 rounded-full border border-teal-500/30 px-2 py-0.5 text-xs" data-testid="crew-recent-status">{card.schedule_status === "done" ? "Done" : card.schedule_status === "in_progress" ? "In progress" : "Scheduled"}</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
             {undated.length > 0 && (
               <div className="space-y-2">
                 <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Not scheduled yet<span aria-hidden="true" className="h-px flex-1 bg-teal-500/15" /></h2>

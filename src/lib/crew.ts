@@ -9,6 +9,7 @@ type CrewRow = {
   note?: string;
   bonus?: string;
   workDate?: string;
+  paidToWorker?: boolean;
   startTime?: string;
   endTime?: string;
 };
@@ -20,6 +21,8 @@ function money(value: string) {
 export async function saveCrewJobs(
   docId: string,
   job: {
+    /** The schedule's date: crew rows follow it (rows already paid to the worker keep their date). */
+    date?: string;
     invoiceNumber: string;
     clientName?: string;
     clientPhone?: string;
@@ -46,7 +49,7 @@ export async function saveCrewJobs(
       worker_name: row.name,
       worker_email: emailById.get(row.employeeId) || "",
       doc_id: docId,
-      job_date: row.workDate || "",
+      job_date: (job.date && !row.paidToWorker ? job.date : row.workDate) || "",
       invoice_number: job.invoiceNumber,
       hours: row.hours,
       rate: row.rate,
@@ -56,8 +59,8 @@ export async function saveCrewJobs(
       client_phone: job.clientPhone || "",
       client_address: job.clientAddress || "",
       status: job.status || "draft",
-      start_time: job.startTime || row.startTime || "",
-      end_time: job.endTime || row.endTime || "",
+      start_time: (row.paidToWorker ? row.startTime : job.startTime) || row.startTime || "",
+      end_time: (row.paidToWorker ? row.endTime : job.endTime) || row.endTime || "",
     }))
   );
 }

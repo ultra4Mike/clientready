@@ -50,7 +50,7 @@ import ChangeOrderNotes from "@/components/ChangeOrderNotes";
 import { ApprovalBadge, ApprovalShare } from "@/components/Approval";
 import ScheduleEditor from "@/components/ScheduleEditor";
 import { entryHours, fmtHours, hoursByWorker, ownerEditClock, refreshOwnerClock, type ClockEntry } from "@/lib/clock";
-import { confirmRemoval, crewForWorkers, crewIds, workLogged, clockHoursFor, dedupeWorkerIds, readSchedule, readWorkers, saveAssignment, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
+import { confirmRemoval, crewForWorkers, followSchedule, crewIds, workLogged, clockHoursFor, dedupeWorkerIds, readSchedule, readWorkers, saveAssignment, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
 import { readApproval, refreshApproval, type Approval } from "@/lib/approval";
 import { generateNextNow, readRecurring, readRecurringFrom, scheduleFromForm, type Frequency, type RecurringFrom } from "@/lib/recurring";
 import PayQr from "@/components/PayQr";
@@ -433,7 +433,7 @@ export default function NewInvoicePage() {
       setCosts({ ...emptyCosts, ...(data.jobCosts || {}), otherFees: loadedFees });
       setOtherFees(loadedFees);
       setCrewReport(readCrewReport((data as Record<string, unknown>).crewReport));
-      setCrew(loadedCrew.map((row) => ({ ...row, bonus: row.bonus || "" })));
+      setCrew(loadedCrew.map((row) => followSchedule({ ...row, bonus: row.bonus || "" }, (data as Record<string, unknown>).schedule ? readSchedule(data as Record<string, unknown>) : null)));
       // Clock entries from the crew app feed each worker's hours (see feedClockHours).
       refreshOwnerClock().then((entries) => {
         setClockEntries(entries);
@@ -558,7 +558,7 @@ export default function NewInvoicePage() {
     if (!allowCrewChange()) return;
     const nextCrew = [...crew, {
       id: `crew-${person.id}`, employeeId: person.id, name: person.name, rate: person.rate,
-      hours: "", startTime: jobStart, endTime: jobEnd, workDate: invoiceDate, note: "", bonus: "", paidToWorker: false, paidDate: "",
+      hours: "", startTime: schedule?.startTime || jobStart, endTime: schedule?.endTime || jobEnd, workDate: schedule?.date || invoiceDate, note: "", bonus: "", paidToWorker: false, paidDate: "",
     }];
     setCrew(nextCrew);
     setCosts((current) => ({ ...current, labor: nextCrew.reduce((sum, row) => sum + rowPay(row), 0).toFixed(2) }));
@@ -668,6 +668,9 @@ export default function NewInvoicePage() {
     const labor = crew.length ? crew.reduce((sum, row) => sum + rowPay(row), 0).toFixed(2) : costs.labor;
     // Change-order notes are append-only: keep whatever is stored, plus what this form loaded.
     const stored = (docs as SavedDocument[]).find((item) => item.id === localId);
+    // One source of truth: crew rows take the schedule's date/times (rows paid to the worker keep theirs).
+    const storedSchedule = stored?.data?.schedule ? readSchedule(stored.data) : null;
+    const savedCrew = crew.map((row) => followSchedule(row, storedSchedule));
     const keptNotes = mergeChangeOrderNotes(readChangeOrderNotes(stored?.data?.changeOrderNotes), changeOrderNotes);
     const recurring = isProposal ? null : scheduleFromForm(readRecurring(stored?.data?.recurring), { frequency: recFreq, intervalDays: recInterval, nextRunDate: recNext, loadedNextRunDate: recLoadedNext, today: ymd(new Date()) });
     const nextDoc = {
@@ -676,7 +679,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(stored?.data?.schedule ? { schedule: stored.data.schedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.autoSent ? { autoSent: (stored?.data as Record<string, unknown>).autoSent } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviewAskedAt ? { reviewAskedAt: (stored?.data as Record<string, unknown>).reviewAskedAt } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew, ...(crewReport ? { crewReport } : {}) },
+      data: { clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(stored?.data?.schedule ? { schedule: stored.data.schedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.autoSent ? { autoSent: (stored?.data as Record<string, unknown>).autoSent } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviewAskedAt ? { reviewAskedAt: (stored?.data as Record<string, unknown>).reviewAskedAt } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew: savedCrew, ...(crewReport ? { crewReport } : {}) },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -703,9 +706,10 @@ export default function NewInvoicePage() {
       clientPhone,
       clientAddress,
       status: saveStatus,
-      startTime: jobStart,
-      endTime: jobEnd,
-    }, crew);
+      date: storedSchedule?.date || "",
+      startTime: storedSchedule?.startTime || jobStart,
+      endTime: storedSchedule ? storedSchedule.endTime || "" : jobEnd,
+    }, savedCrew);
     await syncScheduleCrewJobs(nextDoc);
     const carried = isProposal ? await carryDepositToInvoice(cloudId, savePayments) : "";
     // R18: remember which invoice this crew report became, so opening the report again goes here.
