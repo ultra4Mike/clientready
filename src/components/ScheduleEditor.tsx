@@ -162,7 +162,7 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
           </p>
         )}
         {overtime.length > 0 && (
-          <p role="status" data-testid="overtime-warning" data-workers={overtime.map((row) => row.id).join(",")} className="mt-2 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-900 dark:text-amber-200">
+          <p role="status" data-testid="overtime-warning" data-workers={overtime.map((row) => row.id).join(",")} className="cr-tone-warn mt-2 rounded-xl border border-amber-400 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-900 dark:text-amber-200">
             Over {overtimeLimit} scheduled hours this week: {overtime.map((row) => `${names.get(row.id) || "Worker"} ${row.hours} hrs`).join("; ")}. You can still save.
           </p>
         )}

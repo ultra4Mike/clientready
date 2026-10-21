@@ -169,8 +169,8 @@ export default function ApprovePage() {
               <button type="button" data-testid="approve-one-tap" disabled={busy} onClick={approve} className="min-h-14 w-full rounded-xl bg-emerald-600 px-5 text-lg font-semibold text-white shadow-md transition hover:bg-emerald-500 disabled:opacity-60">
                 {busy ? "Approving…" : `Approve ${isProposal ? "proposal" : "invoice"}`}
               </button>
-              <details className="rounded-lg border border-slate-200 p-3" data-testid="approve-extras">
-                <summary className="cursor-pointer font-medium text-slate-600">Add your name{portal ? " or signature" : ""} (optional)</summary>
+              <details className="cr-panel rounded-xl border border-slate-200 p-3 sm:p-4" data-testid="approve-extras">
+                <summary className="flex min-h-11 cursor-pointer items-center font-medium text-slate-600">Add your name{portal ? " or signature" : ""} (optional)</summary>
                 <div className="mt-2 space-y-3">
                   <label className="flex flex-col gap-1.5 font-medium text-slate-600">
                     Your name

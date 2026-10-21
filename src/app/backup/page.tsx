@@ -93,7 +93,7 @@ export default function BackupPage() {
         <div className="mt-6 divide-y divide-teal-500/20 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] shadow-sm">
           <div className="space-y-3 p-5 sm:p-6">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Download</h2>
-          <button type="button" data-testid="account-export" disabled={exporting} onClick={downloadAccountZip} className="min-h-11 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">
+          <button type="button" data-testid="account-export" disabled={exporting} onClick={downloadAccountZip} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-teal-500/60 px-4 py-2.5 text-sm font-semibold text-teal-700 transition hover:bg-teal-500/10 disabled:opacity-50 sm:w-auto dark:text-teal-300">
             {exporting ? "Preparing…" : "Download everything (ZIP of spreadsheets)"}
           </button>
           <p className="text-xs text-[var(--cr-muted)]">Clients, documents, line items, payments and employees from your account as CSV files, plus a full backup file. Opens in Excel, Google Sheets or Numbers.</p>

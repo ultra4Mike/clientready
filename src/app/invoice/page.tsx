@@ -1264,7 +1264,7 @@ export default function NewInvoicePage() {
                 <div className="w-full rounded-xl border border-teal-500/30 bg-teal-500/5 p-3 text-sm sm:p-4" data-testid="job-message" data-kind={kind}>
                   <p className="font-medium">{kind === "complete" ? "Draft: job complete" : "Draft: you're scheduled"} <span className="text-xs font-normal text-[var(--cr-muted)]">You send it yourself.</span></p>
                   <textarea aria-label="Message to client" name="jobMessage" data-testid="job-message-text" rows={3} className="mt-2 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2.5 text-base leading-relaxed outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 sm:text-sm" value={body} onChange={(event) => { setJobMsg({ kind: `${kind}:${draft}`, text: event.target.value }); setJobMsgCopied(false); }} />
-                  <div className="mt-2 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+                  <div className="mt-3 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
                     {sms && <a href={sms} data-testid="job-message-sms" className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-teal-500 px-4 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400"><span aria-hidden="true">💬</span>Text</a>}
                     {mail && <a href={mail} data-testid="job-message-email" className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-teal-500/40 px-4 font-medium transition hover:border-teal-400"><span aria-hidden="true">✉️</span>Email</a>}
                     <button type="button" data-testid="job-message-copy" className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 px-4 font-medium transition hover:border-teal-500" onClick={() => { void navigator.clipboard?.writeText(body).catch(() => {}); setJobMsgCopied(true); }}>{jobMsgCopied ? "Copied" : "Copy"}</button>
@@ -1281,13 +1281,13 @@ export default function NewInvoicePage() {
               const mail = reviewMailHref(clientEmail, businessName, body);
               const opened = () => setReviewAsked(noteReviewAsked(docId));
               return (
-                <div id="review-request" className="w-full rounded-lg border border-teal-500/30 px-3 py-2 text-sm" data-testid="review-request" data-why={status === "paid" ? "paid" : "done"} data-asked={asked ? "1" : "0"}>
+                <div id="review-request" className="cr-panel w-full rounded-xl border border-teal-500/30 p-3 text-sm sm:p-4" data-testid="review-request" data-why={status === "paid" ? "paid" : "done"} data-asked={asked ? "1" : "0"}>
                   <p className="font-medium">Ask {clientName.trim() || "your client"} for a review</p>
-                  <p className="mt-1 text-xs text-[var(--cr-muted)]" data-testid="review-message">{body}</p>
-                  <div className="mt-2 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
-                    {sms && <a href={sms} onClick={opened} data-testid="review-sms" className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium max-sm:min-h-11">Text</a>}
-                    {mail && <a href={mail} onClick={opened} data-testid="review-email" className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium max-sm:min-h-11">Email</a>}
-                    <button type="button" data-testid="review-copy" className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium max-sm:min-h-11" onClick={() => { void navigator.clipboard?.writeText(body).catch(() => {}); setReviewCopied(true); opened(); }}>{reviewCopied ? "Copied" : "Copy"}</button>
+                  <p className="mt-2 rounded-lg bg-teal-500/5 px-3 py-2 text-xs leading-relaxed text-[var(--cr-muted)]" data-testid="review-message">{body}</p>
+                  <div className="mt-3 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+                    {sms && <a href={sms} onClick={opened} data-testid="review-sms" className="inline-flex min-h-11 items-center justify-center rounded-lg border border-teal-500/40 px-4 font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">Text</a>}
+                    {mail && <a href={mail} onClick={opened} data-testid="review-email" className="inline-flex min-h-11 items-center justify-center rounded-lg border border-teal-500/40 px-4 font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">Email</a>}
+                    <button type="button" data-testid="review-copy" className="inline-flex min-h-11 items-center justify-center rounded-lg border border-teal-500/40 px-4 font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300" onClick={() => { void navigator.clipboard?.writeText(body).catch(() => {}); setReviewCopied(true); opened(); }}>{reviewCopied ? "Copied" : "Copy"}</button>
                   </div>
                   {asked && <p className="mt-1 text-xs text-[var(--cr-muted)]" data-testid="review-asked">Opened {new Date(asked).toLocaleDateString("en-US", { month: "short", day: "numeric" })}. You send it yourself.</p>}
                 </div>

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { depositRemainderStages, installmentStages, STAGE_KIND_LABEL, stagePlan, todayYmd, type PlanEvery, type Stage } from "@/lib/stages";
 
 const STATE_LABEL = { paid: "Paid", due: "Due now", overdue: "Overdue", upcoming: "Upcoming" } as const;
-const STATE_CLASS = { paid: "text-emerald-700", due: "font-semibold text-teal-700", overdue: "font-semibold text-red-600", upcoming: "text-slate-500" } as const;
+const STATE_CLASS = { paid: "cr-tone-good border-emerald-300 bg-emerald-50 text-emerald-700", due: "cr-tone-teal border-teal-300 bg-teal-50 font-semibold text-teal-700", overdue: "cr-tone-bad border-rose-300 bg-rose-50 font-semibold text-red-600", upcoming: "border-slate-300 text-slate-500" } as const;
 
 /** Customer-facing payment schedule (also on the owner's preview/print). */
 export function StageSchedule({ stages, total, balance, muted = "text-slate-600" }: { stages: Stage[]; total: number; balance: number; muted?: string }) {
@@ -17,12 +17,12 @@ export function StageSchedule({ stages, total, balance, muted = "text-slate-600"
         <tbody>
           {plan.rows.map((row) => (
             <tr key={row.id} data-testid="stage-row" data-state={row.state} className="border-t border-slate-200 first:border-0">
-              <td className="py-1 pr-2">
+              <td className="py-2 pr-2">
                 {row.label || STAGE_KIND_LABEL[row.kind]}
                 <span className={`block text-xs ${muted}`}>{row.mode === "percent" && row.value ? `${row.value}% · ` : ""}{row.dueDate ? `due ${row.dueDate}` : "no due date"}</span>
               </td>
-              <td className="py-1 pr-2 text-right">${row.amount.toFixed(2)}{row.paid > 0 && row.remaining > 0 && <span className={`block text-xs ${muted}`}>${row.paid.toFixed(2)} paid</span>}</td>
-              <td className={`py-1 text-right text-xs ${STATE_CLASS[row.state]}`}>{STATE_LABEL[row.state]}</td>
+              <td className="py-2 pr-2 text-right tabular-nums">${row.amount.toFixed(2)}{row.paid > 0 && row.remaining > 0 && <span className={`block text-xs ${muted}`}>${row.paid.toFixed(2)} paid</span>}</td>
+              <td className="py-2 text-right"><span className={`inline-flex whitespace-nowrap rounded-full border px-2 py-0.5 text-xs ${STATE_CLASS[row.state]}`}>{STATE_LABEL[row.state]}</span></td>
             </tr>
           ))}
         </tbody>
@@ -54,7 +54,7 @@ export function StageEditor({ stages, onChange, total, balance }: { stages: Stag
       </div>
       <PlanMaker total={total} balance={balance} hasStages={stages.length > 0} onMake={onChange} />
       {stages.length === 0 && balance > 0.004 && (
-        <button type="button" data-testid="stage-preset-deposit" onClick={() => onChange(depositRemainderStages(30, todayYmd()))} className="tap min-h-11 w-full rounded-lg border border-teal-500/40 px-3 text-left text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">
+        <button type="button" data-testid="stage-preset-deposit" onClick={() => onChange(depositRemainderStages(30, todayYmd()))} className="tap min-h-11 w-full rounded-lg border border-dashed border-teal-500/50 bg-teal-500/5 px-3 py-2 text-left text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">
           Deposit now + remaining balance when done <span className="font-normal text-slate-500">(30% / 70%, edit below)</span>
         </button>
       )}

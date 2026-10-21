@@ -473,9 +473,9 @@ export default function YearPage() {
             <tbody>{profitJobs.jobs.map((job) => (
               <tr key={job.id} data-testid="year-job" data-cost={job.cost.toFixed(2)} data-profit={job.profit.toFixed(2)} className="border-t border-slate-200 align-top">
                 <td className="py-1">{job.number} · {job.client}{job.lines.length > 0 && <span className="block text-xs text-slate-500">{job.lines.map((line) => `${line.label} $${line.amount.toFixed(2)}`).join(" · ")}</span>}</td>
-                <td className="py-1 text-right">${job.total.toFixed(2)}</td><td className="py-1 text-right">${job.cost.toFixed(2)}</td><td className="py-1 text-right font-semibold">${job.profit.toFixed(2)}</td>
+                <td className="py-1 text-right">${job.total.toFixed(2)}</td><td className="py-1 text-right">${job.cost.toFixed(2)}</td><td className={`py-1 text-right font-semibold ${job.profit < 0 ? "text-rose-700 dark:text-rose-300" : ""}`}>${job.profit.toFixed(2)}</td>
               </tr>))}</tbody>
-            <tfoot><tr className="border-t border-slate-300 font-semibold"><td className="py-1" colSpan={3}>Total profit after all costs</td><td className="py-1 text-right">${profitJobs.totals.profit.toFixed(2)}</td></tr></tfoot>
+            <tfoot><tr className="border-t border-slate-300 font-semibold"><td className="py-1" colSpan={3}>Total profit after all costs</td><td className={`py-1 text-right ${profitJobs.totals.profit < 0 ? "text-rose-700 dark:text-rose-300" : "text-emerald-700 dark:text-emerald-300"}`}>${profitJobs.totals.profit.toFixed(2)}</td></tr></tfoot>
           </table>
         )}
         <h2 className="mt-8 border-b border-slate-200 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-700">Billed labor and materials</h2>
