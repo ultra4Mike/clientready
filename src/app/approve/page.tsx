@@ -252,6 +252,7 @@ export default function ApprovePage() {
               {totals.discount > 0 && <div className="flex justify-between"><span>{discountLabel(text(data.discountType), text(data.discountValue))}</span><span>-${totals.discount.toFixed(2)}</span></div>}
               <div className="flex justify-between"><span>Tax</span><span>${totals.tax.toFixed(2)}</span></div>
               <div className="flex justify-between font-semibold"><span>Total</span><span>${totals.total.toFixed(2)}</span></div>
+              {doc?.type === "proposal" && Number(text(data.depositPercent)) > 0 && <div className="flex justify-between" data-testid="approve-deposit-request"><span>Deposit requested ({text(data.depositPercent)}%)</span><span>${(totals.total * Number(text(data.depositPercent)) / 100).toFixed(2)}</span></div>}
               {/* R59: payments (e.g. a deposit) under Total, then the balance. */}
               {payments.filter((payment) => amountOf(payment.amount) > 0).map((payment, index) => (
                 <div key={payment.id} className="flex items-start justify-between gap-3 py-0.5 text-emerald-700 dark:text-emerald-300" data-testid="approve-payment">

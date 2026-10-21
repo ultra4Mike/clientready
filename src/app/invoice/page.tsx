@@ -190,6 +190,7 @@ export default function NewInvoicePage() {
   const [clientId, setClientId] = useState("");
   const [clientCompany, setClientCompany] = useState("");
   const [stockUsed, setStockUsed] = useState<StockUse[]>([]); // R88
+  const [depositPercent, setDepositPercent] = useState(""); // R90: proposal asks for this % on approval
   const [contactName, setContactName] = useState(""); // R85: optional, who reminders greet
   const [clientEmail, setClientEmail] = useState("");
   const [clientPhone, setClientPhone] = useState("");
@@ -428,6 +429,7 @@ export default function NewInvoicePage() {
       setClientId(typeof (data as Record<string, unknown>).clientId === "string" ? String((data as Record<string, unknown>).clientId) : "");
       setClientCompany(data.clientCompany || "");
       setContactName(String((data as Record<string, unknown>).contactName || ""));
+      setDepositPercent(String((data as Record<string, unknown>).depositPercent || ""));
       setStockUsed(Array.isArray((data as Record<string, unknown>).stockUsed) ? ((data as Record<string, unknown>).stockUsed as StockUse[]) : []);
       setClientEmail(data.clientEmail || "");
       setClientPhone(data.clientPhone || "");
@@ -694,7 +696,7 @@ export default function NewInvoicePage() {
   function clearForm() {
     if (locked) return;
     window.history.replaceState(null, "", "/invoice");
-    setDocId(""); setClientSearch(""); setClientName(""); setClientId(""); setClientCompany(""); setContactName(""); setStockUsed([]); setClientEmail(""); setClientPhone(""); setClientAddress("");
+    setDocId(""); setClientSearch(""); setClientName(""); setClientId(""); setClientCompany(""); setContactName(""); setStockUsed([]); setDepositPercent(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
     setInvoiceNumber(nextNumber(docKind)); setInvoiceDate(ymd(new Date())); setDueDate(plusDays(14)); setJobStart(""); setJobEnd("");
     setNotes(isProposal ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
     setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setLegacyPaymentIds([]); setSignature(null); setProposalSignature(null); setPadKey((key) => key + 1); setDocPayLink(""); setPhotos([]); setShowPhotos(false); setChangeOrderOf(null); setFromProposal(null); setMadeInvoices([]); setChangeOrderNotes([]); setRecFreq("off"); setRecNext(""); setRecLoadedNext(""); setRecurringFrom(null); setApproval(null); setEmailLog([]); setEmailOpen(false); setSchedule(null); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
@@ -740,7 +742,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, ...(contactName.trim() ? { contactName: contactName.trim() } : {}), ...(stockUsed.length ? { stockUsed } : {}), clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(storedSchedule && (stored?.data?.schedule || !isProposal) ? { schedule: storedSchedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.autoSent ? { autoSent: (stored?.data as Record<string, unknown>).autoSent } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviewAskedAt ? { reviewAskedAt: (stored?.data as Record<string, unknown>).reviewAskedAt } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew: savedCrew, ...(crewReport ? { crewReport } : {}) },
+      data: { clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, ...(contactName.trim() ? { contactName: contactName.trim() } : {}), ...(stockUsed.length ? { stockUsed } : {}), ...(isProposal && Number(depositPercent) > 0 ? { depositPercent: String(Math.min(Number(depositPercent), 100)) } : {}), clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(storedSchedule && (stored?.data?.schedule || !isProposal) ? { schedule: storedSchedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.autoSent ? { autoSent: (stored?.data as Record<string, unknown>).autoSent } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviewAskedAt ? { reviewAskedAt: (stored?.data as Record<string, unknown>).reviewAskedAt } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew: savedCrew, ...(crewReport ? { crewReport } : {}) },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -1110,6 +1112,16 @@ export default function NewInvoicePage() {
               <div className="flex justify-between"><span className="text-slate-600">Tax</span><span className="tabular-nums">${totals.tax.toFixed(2)}</span></div>
               <div className="flex justify-between border-t border-teal-500/30 pt-2 text-base font-bold"><span>Total</span><span className="tabular-nums">${totals.total.toFixed(2)}</span></div>
             </div>
+            {isProposal && (
+              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 p-4 text-sm" data-testid="deposit-request">
+                <label htmlFor="deposit-percent" className="font-medium">Ask for a deposit</label>
+                <select id="deposit-percent" data-testid="deposit-percent" disabled={locked} value={depositPercent} onChange={(event) => setDepositPercent(event.target.value)} className="min-h-11 rounded-lg border border-slate-300 px-2">
+                  <option value="">No deposit</option>
+                  {["10", "25", "30", "50", "100"].map((value) => <option key={value} value={value}>{value}%</option>)}
+                </select>
+                {Number(depositPercent) > 0 && <span className="tabular-nums" data-testid="deposit-request-amount">${(totals.total * Number(depositPercent) / 100).toFixed(2)} due when approved</span>}
+              </div>
+            )}
             <Section id="payments" label="Payments" className="cr-panel space-y-3 rounded-xl border border-slate-200 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3 pr-10 max-sm:pr-12">
                 <h2 className="min-w-0 text-xs font-semibold uppercase tracking-wide text-teal-600 dark:text-teal-300">{isProposal ? "Deposit received" : "Payments received"}</h2>
@@ -1496,6 +1508,7 @@ export default function NewInvoicePage() {
                 {totals.discount > 0 && <div className="flex justify-between" data-testid="preview-discount" data-amount={totals.discount.toFixed(2)}><span>{discountLabel(discountType, discountValue)}</span><span>-${totals.discount.toFixed(2)}</span></div>}
                 <div className="flex justify-between"><span>Tax</span><span>${totals.tax.toFixed(2)}</span></div>
                 <div className="flex justify-between font-semibold"><span>Total</span><span>${totals.total.toFixed(2)}</span></div>
+                {isProposal && Number(depositPercent) > 0 && <div className="flex justify-between" data-testid="preview-deposit-request"><span>Deposit requested ({depositPercent}%)</span><span>${(totals.total * Number(depositPercent) / 100).toFixed(2)}</span></div>}
                 {totals.paid > 0 && <div className="flex justify-between text-emerald-700"><span>{isProposal ? "Deposit paid ✓" : "Paid"}</span><span>-${totals.paid.toFixed(2)}</span></div>}
                 {tipTotal(payments) > 0 && <div className="flex justify-between" data-testid="tip-line"><span>Tip received, thank you</span><span>${tipTotal(payments).toFixed(2)}</span></div>}
                 {(!isProposal || totals.paid > 0) && <div className="mt-1 flex justify-between border-t border-slate-500 pt-1 text-lg font-bold"><span data-testid="preview-balance-label">{isProposal ? "Balance after deposit" : balanceLabel(totals.paid, totals.balance)}</span><span data-testid="preview-still-owed">${totals.balance.toFixed(2)}</span></div>}
