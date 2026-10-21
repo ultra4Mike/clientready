@@ -13,6 +13,7 @@ import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import DuplicateNumbers from "@/components/DuplicateNumbers";
 import { copyDocData } from "@/lib/doc-copy";
+import { saveCloudDocument } from "@/lib/cloud-docs";
 import { nextFreeNumber } from "@/lib/doc-numbers";
 import { documentTotals } from "@/lib/discount";
 import { cashCollected } from "@/lib/money";
@@ -125,7 +126,7 @@ export default function DocumentsPage() {
     window.location.href = `/invoice?id=${encodeURIComponent(doc.id)}`;
   }
 
-  function duplicateDocument(doc: SavedDocument) {
+  async function duplicateDocument(doc: SavedDocument) {
     // R103: a fresh draft — no payments, deposit, schedule, status, approval link or old number.
     const number = nextFreeNumber(documents as never, doc.type, String(doc.data?.invoiceNumber || ""));
     const today = new Date();
@@ -137,6 +138,8 @@ export default function DocumentsPage() {
       createdAt: today.toLocaleDateString(),
       data: copyDocData(doc.data, number, ymdOf(today), ymdOf(new Date(today.getTime() + 14 * 86400000))),
     };
+    // Saved to the account first so it opens by its real id (an upload later would change a local id).
+    copy.id = await saveCloudDocument(copy as never).catch(() => copy.id);
     saveList([copy, ...documents]);
     window.localStorage.setItem("clientready-flash", `Copied ${String(doc.data?.invoiceNumber || doc.title)} as ${number} (draft, nothing paid, not scheduled).`);
     openDocument(copy);
