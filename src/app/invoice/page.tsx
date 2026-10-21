@@ -393,7 +393,20 @@ export default function NewInvoicePage() {
           }
           if (text("work_date")) setInvoiceDate(text("work_date"));
           setJobStart(text("start_time")); setJobEnd(text("end_time"));
-          setItems([{ ...emptyItem, description: text("work_done") || "Job", qty: "1", rate: "" }]);
+          // R109: assign the crew member who filed it; their hours become qty at their rate, labor goes to job costs.
+          const staff = JSON.parse(window.localStorage.getItem("clientready-employees") || "[]") as Employee[];
+          const person = staff.find((item) => item.id && item.id === text("employee_id")) || staff.find((item) => key((item as { email?: string }).email) && key((item as { email?: string }).email) === key(text("worker_email"))) || staff.find((item) => key(item.name) && key(item.name) === key(text("worker_name")));
+          const crewHours = Number(text("hours")) > 0 ? String(Number(text("hours"))) : "";
+          let crewLabor = 0;
+          if (person) {
+            const row = {
+              id: `crew-${person.id}`, employeeId: person.id, name: person.name, rate: person.rate,
+              ...paySnapshot(readPaySettings((person as { paySettings?: unknown }).paySettings), person.rate),
+              hours: crewHours, startTime: text("start_time"), endTime: text("end_time"), workDate: text("work_date"), note: "", bonus: "", paidToWorker: false, paidDate: "",
+            } as CrewRow;
+            setCrew([row]); crewLabor = rowPay(row);
+          }
+          setItems([{ ...emptyItem, description: text("work_done") || "Job", qty: crewHours || "1", rate: crewHours && person?.rate ? String(person.rate) : "" }]);
           const lines = readCostLines(draft);
           // R82: crew-reported costs go straight into Job costs (same math as "Use crew amounts").
           const byKind = new Map<CrewKind, number>();
@@ -402,7 +415,7 @@ export default function NewInvoicePage() {
           let applied: CostFields & { otherFees: OtherFee[] } = { ...emptyCosts, otherFees: [] };
           for (const [kind, amount] of byKind) if (amount > 0) applied = applyCrewAmount(applied, kind, amount, () => `${Date.now()}-${n++}`) as typeof applied;
           const { otherFees: crewFees, ...crewCosts } = applied;
-          setCosts((current) => ({ ...current, ...crewCosts, driveHours: text("drive_hours"), driveMinutes: text("drive_minutes"), notes: [text("notes"), text("collected_amount") ? `Collected ${text("collected_amount")} ${text("collected_method")}` : ""].filter(Boolean).join("\n") }));
+          setCosts((current) => ({ ...current, ...crewCosts, ...(crewLabor > 0 ? { labor: crewLabor.toFixed(2) } : {}), driveHours: text("drive_hours"), driveMinutes: text("drive_minutes"), notes: [text("notes"), text("collected_amount") ? `Collected ${text("collected_amount")} ${text("collected_method")}` : ""].filter(Boolean).join("\n") }));
           if (crewFees.length) setOtherFees(crewFees as OtherFee[]);
           // Always remember the report (even with no costs), so saving links it and a retry can't duplicate it.
           setCrewReport({ draftId: text("id"), worker: text("worker_name"), lines: lines.map(({ receipt, ...line }) => ({ ...line, ...(receipt ? { hasReceipt: true } : {}) })) });

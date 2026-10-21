@@ -157,6 +157,15 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
       <label className="flex flex-col gap-1">Job-complete checklist <span className="text-xs opacity-60">(one per line; crew tick these before marking the job done)</span>
         <textarea aria-label="Job-complete checklist" data-testid="checklist-input" rows={3} value={checklistText} onChange={(event) => setChecklistText(event.target.value)} placeholder={"Blow off driveway\nClose the gate\nPhoto of the back yard"} className="min-h-20 rounded-md border border-slate-300 bg-transparent px-2.5 py-2 leading-relaxed text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" />
       </label>
+      {(value?.checklist || []).length > 0 && (
+        <ul className="space-y-1 text-sm" data-testid="checklist-ticks" aria-label="Crew checklist progress">
+          {(value?.checklist || []).map((item) => (
+            <li key={item.id} data-testid="checklist-tick" data-done={item.done ? "1" : "0"} className={item.done ? "text-emerald-700" : "text-slate-600"}>
+              {item.done ? "✓" : "○"} {item.text}{item.done && item.doneBy ? <span className="text-xs opacity-70"> · {item.doneBy}{item.doneAt ? ` ${new Date(item.doneAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}</span> : null}
+            </li>
+          ))}
+        </ul>
+      )}
       <div data-testid="crew-chips">
         <div className="mb-1 flex flex-wrap items-center gap-2">
           <span>Crew</span>
