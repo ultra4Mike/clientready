@@ -52,7 +52,7 @@ export default function PaymentMethodsSettings() {
           <span className="min-w-0 truncate">{selected.length ? `${selected.length} selected` : "Choose payment methods"}</span><svg aria-hidden="true" viewBox="0 0 20 20" className={`h-4 w-4 shrink-0 text-teal-500 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
         {open && (
-          <div role="listbox" aria-multiselectable="true" data-testid="pm-options" className="cr-panel absolute inset-x-0 z-30 mt-1 max-h-80 overflow-auto rounded-xl border border-teal-500/40 bg-[var(--cr-panel)] p-1.5 shadow-xl">
+          <div role="listbox" aria-multiselectable="true" data-testid="pm-options" className="cr-panel absolute inset-x-0 z-30 mt-1 max-h-80 scroll-pb-16 overflow-auto rounded-xl border border-teal-500/40 bg-[var(--cr-panel)] p-1.5 pb-0 shadow-xl">
             {PROVIDERS.map((provider) => {
               const on = Boolean(config[provider.id]?.enabled);
               return (
@@ -63,7 +63,7 @@ export default function PaymentMethodsSettings() {
                 </label>
               );
             })}
-            <button type="button" data-testid="pm-done" onClick={() => setOpen(false)} className="sticky bottom-0 mt-1.5 min-h-11 w-full rounded-lg bg-teal-500 shadow-sm transition hover:bg-teal-400 text-sm font-semibold text-slate-950!">Done</button>
+            <button type="button" data-testid="pm-done" onClick={() => setOpen(false)} className="sticky bottom-0 mt-1.5 mb-1.5 min-h-11 ring-4 ring-[var(--cr-panel)] w-full rounded-lg bg-teal-500 shadow-sm transition hover:bg-teal-400 text-sm font-semibold text-slate-950!">Done</button>
           </div>
         )}
       </div>

@@ -1035,7 +1035,7 @@ export default function NewInvoicePage() {
               <div className="flex justify-between border-t border-teal-500/30 pt-2 text-base font-bold"><span>Total</span><span className="tabular-nums">${totals.total.toFixed(2)}</span></div>
             </div>
             <Section id="payments" label="Payments" className="cr-panel space-y-3 rounded-xl border border-slate-200 p-4">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 pr-10 max-sm:pr-12">
                 <h2 className="min-w-0 text-xs font-semibold uppercase tracking-wide text-teal-600 dark:text-teal-300">{isProposal ? "Deposit received" : "Payments received"}</h2>
                 <button type="button" className="min-h-11 shrink-0 whitespace-nowrap rounded-lg border border-teal-500/40 px-3 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 sm:min-h-9 dark:text-teal-300" onClick={addPayment}>{payments.length ? "Add another payment" : isProposal ? "Add deposit" : "Add payment"}</button>
               </div>
@@ -1044,7 +1044,7 @@ export default function NewInvoicePage() {
                   <label className="text-sm font-medium text-slate-600">Amount paid<input className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 text-right tabular-nums" inputMode="decimal" placeholder="300" value={payment.amount} onChange={(event) => updatePayment(payment.id, { amount: event.target.value })} /></label>
                   <label className="text-sm font-medium text-slate-600">Method<select className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" data-testid="payment-method" data-missing={!payment.method && Number(payment.amount) > 0 ? "true" : undefined} title={!payment.method && Number(payment.amount) > 0 ? "Saved before methods were required. Pick one if you know it." : undefined} value={payment.method} onChange={(event) => updatePayment(payment.id, { method: event.target.value })}><option value="">Choose…</option>{(payment.method && !paymentMethods.includes(payment.method) ? [payment.method, ...paymentMethods] : paymentMethods).map((method) => <option key={method} value={method}>{methodLabel(method)}</option>)}</select></label>
                   <label className="text-sm font-medium text-slate-600">Date paid<input type="date" className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={payment.date} onChange={(event) => updatePayment(payment.id, { date: event.target.value })} /></label>
-                  <label className="text-sm font-medium text-slate-600">Reference / note<input className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Check number, confirmation, last 4" value={payment.ref} onChange={(event) => updatePayment(payment.id, { ref: event.target.value })} /></label>
+                  <label className="text-sm font-medium text-slate-600 sm:col-span-2">Reference / note<input className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Check number, confirmation, last 4" value={payment.ref} onChange={(event) => updatePayment(payment.id, { ref: event.target.value })} /></label>
                   <label className="text-sm font-medium text-slate-600">Tip (optional, not part of the bill)<input name="paymentTip" data-testid="payment-tip" className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 text-right tabular-nums" inputMode="decimal" placeholder="0.00" value={payment.tip || ""} onChange={(event) => updatePayment(payment.id, { tip: event.target.value })} /></label>
                   <button type="button" className="min-h-11 justify-self-start rounded-lg px-3 text-sm font-medium text-rose-700 transition hover:bg-rose-500/10 dark:text-rose-300 sm:col-span-2" onClick={() => setPayments((current) => current.filter((item) => item.id !== payment.id))}>Remove payment</button>
                 </div>
@@ -1179,7 +1179,7 @@ export default function NewInvoicePage() {
                       );
                     })()}
                     <p className="text-sm text-slate-900">Paid this job: ${rowPay(row).toFixed(2)}</p>
-                    <button type="button" onClick={() => removeCrewRow(row.id)} className="text-sm text-slate-700">Remove from job</button>
+                    <button type="button" onClick={() => removeCrewRow(row.id)} className="cr-link-danger inline-flex min-h-11 items-center bg-transparent px-1 text-sm font-medium text-rose-700 underline-offset-2 hover:underline dark:text-rose-300">Remove from job</button>
                   </div>
                 ))}
               </Section>

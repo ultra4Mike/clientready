@@ -258,7 +258,7 @@ export default function ProfilePage() {
         </label>
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
           Set aside % of profit
-          <input name="setAsidePercent" data-testid="set-aside-percent" type="number" min={0} max={100} step="any" inputMode="decimal" className="mt-1.5 min-h-11 w-full max-w-[10rem] tabular-nums rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="30" value={profile.setAsidePercent} onChange={(event) => update("setAsidePercent", event.target.value)} />
+          <input name="setAsidePercent" data-testid="set-aside-percent" type="number" min={0} max={100} step="any" inputMode="decimal" className="mt-1.5 block min-h-11 w-full max-w-[10rem] tabular-nums rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="30" value={profile.setAsidePercent} onChange={(event) => update("setAsidePercent", event.target.value)} />
         </label>
         <p className="-mt-1 text-xs text-[var(--cr-muted)]">Default is 30%. This is a cushion for taxes. It is not a tax return.</p>
         <fieldset className="cr-panel space-y-1 rounded-xl border border-teal-500/25 p-3 sm:p-4" data-testid="automations">
@@ -279,7 +279,7 @@ export default function ProfilePage() {
         <p className="-mt-1 text-xs text-[var(--cr-muted)]">Jobs under this margin, jobs that lose money, and jobs where the crew spent more than your costs are flagged on the invoice and dashboard. 0 turns off the margin alert (losses are always flagged). Only you see this.</p>
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
           Overtime warning above hours per week
-          <input name="overtimeHours" data-testid="overtime-hours" type="number" min={0} max={168} inputMode="numeric" className="mt-1.5 min-h-11 w-full max-w-[10rem] tabular-nums rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="40" value={profile.overtimeHours} onChange={(event) => update("overtimeHours", event.target.value)} />
+          <input name="overtimeHours" data-testid="overtime-hours" type="number" min={0} max={168} inputMode="numeric" className="mt-1.5 block min-h-11 w-full max-w-[10rem] tabular-nums rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="40" value={profile.overtimeHours} onChange={(event) => update("overtimeHours", event.target.value)} />
         </label>
         <p className="-mt-1 text-xs text-[var(--cr-muted)]">A warning only, per worker, Monday to Sunday, when scheduling and on Timesheets. Pay is never changed. 0 turns it off.</p>
         <fieldset className="space-y-2" data-testid="late-fee-settings">

@@ -133,7 +133,7 @@ export default function CalendarPage() {
         data-done={doneState(job.schedule) || undefined}
         onDragStart={(event) => event.dataTransfer.setData("text/plain", job.doc.id)}
         onClick={(event) => { event.stopPropagation(); setEditing({ docId: job.doc.id }); }}
-        className={agenda ? `flex min-h-11 cursor-pointer flex-col justify-center rounded-lg border border-l-4 px-3 py-2 text-left text-sm font-medium leading-snug shadow-sm ${statusClass(job.schedule)}` : `cursor-grab truncate rounded-md border border-l-4 px-2 py-1 text-left text-xs font-medium leading-snug shadow-sm ${statusClass(job.schedule)}`}
+        className={agenda ? `flex min-h-11 cursor-pointer flex-col justify-center rounded-lg border border-l-4 px-3 py-2 text-left text-sm font-medium leading-snug shadow-sm ${statusClass(job.schedule)}` : `cursor-grab line-clamp-2 min-w-0 overflow-hidden break-words rounded-md border border-l-4 px-1.5 py-1 text-left text-xs font-medium leading-snug shadow-sm ${statusClass(job.schedule)}`}
         title={`${job.doc.title} · ${job.doc.clientName} · ${statusLabel(job.schedule)}${job.schedule.onMyWayAt && job.schedule.status !== "done" ? ` · ${job.schedule.onMyWayBy || "Crew"} on the way` : ""}${people ? ` · ${people}` : ""}`}
       >
         {agenda ? (
@@ -241,7 +241,7 @@ export default function CalendarPage() {
         <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_14rem]">
           <div className="min-w-0 rounded-2xl border border-slate-500/25 bg-[var(--cr-card)] p-2 shadow-sm sm:p-3 min-[900px]:overflow-x-auto">
             {view === "week" && (
-              <div className="hidden min-w-[44rem] grid-cols-[3.5rem_repeat(7,minmax(0,1fr))] text-xs min-[900px]:grid" data-testid="week-grid">
+              <div className="hidden min-w-0 grid-cols-[3rem_repeat(7,minmax(0,1fr))] text-xs min-[900px]:grid" data-testid="week-grid">
                 <div />
                 {weekDays.map((day) => (
                   <div key={day} className={`border-b border-slate-500/30 px-2 py-2.5 text-center text-sm font-semibold ${day === today ? "rounded-t-lg bg-teal-500/15 text-teal-600 dark:text-teal-300" : ""}`}>
