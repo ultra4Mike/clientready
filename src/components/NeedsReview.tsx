@@ -56,8 +56,8 @@ export default function NeedsReview({ documents, onDocuments, loading = false, o
             <li key={`${item.docId}:${item.key}`} data-testid={`review-${item.kind}`} data-kind={item.kind} data-key={item.key} data-missing={item.kind === "missing" ? item.version : undefined} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:gap-3 sm:py-2.5">
               <a href={item.href} className="min-w-0 flex-1">
                 <span className="text-xs font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-300">{LABEL[item.kind]}</span>
-                <span className="block text-sm font-medium break-words sm:truncate">{item.title}</span>
-                <span className="block text-xs text-[var(--cr-muted)] break-words sm:truncate">{item.detail}</span>
+                <span className="block text-sm font-medium break-words sm:line-clamp-2">{item.title}</span>
+                <span className="block text-xs text-[var(--cr-muted)] break-words sm:line-clamp-2">{item.detail}</span>
                 {item.kind === "missing" && String(item.title).includes(" is missing ") && <span aria-hidden="true" className="mt-1.5 flex flex-wrap gap-1.5">{String(item.title).split(" is missing ")[1].split(/,\s*/).filter(Boolean).map((part) => <span key={part} className="cr-tone-warn inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">{part}</span>)}</span>}
               </a>
               <button type="button" disabled={Boolean(busy)} onClick={() => review(item)} data-testid="mark-reviewed"

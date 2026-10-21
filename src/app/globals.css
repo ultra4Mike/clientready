@@ -503,3 +503,6 @@ html.dark [data-testid="crew-sync"] [data-testid="crew-queue-item-retry"] { back
 html.dark .cr-switch { background-color: #334155 !important; }
 html.dark .cr-switch:checked { background-color: #14b8a6 !important; }
 html.dark [data-testid="auto-sent"] .cr-tone-bad { background-color: rgba(127, 29, 29, 0.45) !important; }
+/* Plain red text link (e.g. Remove from job) — never a filled button, even inside dark panels */
+html.dark .cr-link-danger, html.dark #crew-spend .cr-link-danger { background-color: transparent !important; background-image: none !important; border-color: transparent !important; box-shadow: none !important; color: #fda4af !important; }
+.cr-link-danger { background-color: transparent !important; }

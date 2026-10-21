@@ -147,7 +147,7 @@ export default function AppShell({
               {actions}
             </div>
           </header>
-          <div className="app-main p-4 pb-[calc(10rem+env(safe-area-inset-bottom))] min-[900px]:p-6 print:pb-4">
+          <div className="app-main p-4 pb-[calc(11.5rem+env(safe-area-inset-bottom))] min-[900px]:p-6 print:pb-4">
             <div className="mx-auto w-full max-w-6xl"><TrialBanner />{children}</div>
           </div>
         </div>
