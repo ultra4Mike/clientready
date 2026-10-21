@@ -742,7 +742,7 @@ export default function CrewPage() {
         </div>
         <nav className="mx-auto mt-3 grid max-w-3xl grid-cols-4 gap-1 rounded-xl border border-teal-700/30 bg-[var(--cr-card)] dark:border-teal-500/20 p-1 text-xs sm:text-sm" role="tablist">
           {tabs.map(([key, label]) => (
-            <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => { setTab(key); window.scrollTo({ top: 0 }); }} className={`min-h-11 rounded-lg px-1 py-2 font-medium leading-tight transition ${tab === key ? "bg-teal-500 font-semibold text-slate-950! shadow-sm" : "crew-tab-idle hover:bg-teal-500/10"}`}>{label}</button>
+            <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => { setTab(key); window.scrollTo({ top: 0 }); }} className={`crew-tab min-h-11 rounded-lg px-1 py-2 font-medium leading-tight transition ${tab === key ? "crew-tab-active bg-teal-500 font-semibold text-slate-950! shadow-sm" : "crew-tab-idle bg-transparent hover:bg-teal-500/10"}`}>{label}</button>
           ))}
         </nav>
       </header>
@@ -817,7 +817,7 @@ export default function CrewPage() {
                     {next ? (
                       <a href={`/crew/job?id=${encodeURIComponent(next.doc_id)}`} data-testid="crew-next-open" className="mt-1 flex min-h-11 flex-wrap items-center justify-between gap-2 text-sm">
                         <span>{dayLabel(next.job_date)}{next.start_time ? ` · ${timeLabel(next.start_time)}` : ""} · {next.client_name}</span>
-                        <span className="font-semibold underline">Open</span>
+                        <span className="cr-btn cr-btn-secondary">Open</span>
                       </a>
                     ) : <p className="mt-1 text-sm text-[var(--cr-muted)]" data-testid="crew-next-none">No upcoming jobs.</p>}
                   </div>
@@ -847,7 +847,7 @@ export default function CrewPage() {
                 </div>
               );
             })}
-            {weekCards.length === 0 && <p className={`${cardClass} border-dashed py-10 text-center text-sm text-[var(--cr-muted)]`}>No jobs for you this week.</p>}
+            {weekCards.length === 0 && <EmptyState icon={<Icon name="sun" className="h-6 w-6" />} title="No jobs for you this week." className={`${cardClass} border-dashed`} />}
             {later.length > 0 && (
               <div className="space-y-2" data-testid="coming-up" data-group="upcoming">
                 <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Coming up<span aria-hidden="true" className="h-px flex-1 bg-teal-500/15" /></h2>
@@ -856,7 +856,7 @@ export default function CrewPage() {
             )}
             <details className="space-y-2" data-testid="crew-recent" data-count={recent.length}>
               <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)] [&::-webkit-details-marker]:hidden">Recent jobs (last 2 weeks)<span className="tabular-nums">{recent.length}</span><span aria-hidden="true" className="h-px flex-1 bg-teal-500/15" /></summary>
-              {recent.length === 0 && <p className="text-sm text-[var(--cr-muted)]">No jobs in the last two weeks.</p>}
+              {recent.length === 0 && <p className="rounded-xl border border-dashed border-teal-500/25 px-4 py-6 text-center text-sm text-[var(--cr-muted)]">No jobs in the last two weeks.</p>}
               <ul className="divide-y divide-teal-500/10">
                 {recent.map((card) => (
                   <li key={`recent-${card.id}`} data-testid="crew-recent-job" data-date={card.job_date} className="flex items-center justify-between gap-3 py-2 text-sm">
@@ -969,11 +969,15 @@ export default function CrewPage() {
           </section>
         )}
         {userId && <p className="pt-4 text-center text-xs text-[var(--cr-muted)]">You only see your own jobs, time and expenses. Prices and company costs are not shown.</p>}
-        <details className={cardClass} data-testid="crew-profile">
-          <summary className="flex min-h-11 cursor-pointer items-center font-semibold">Profile</summary>
-          <p className="mt-1 text-sm" data-testid="crew-profile-name">{name}</p>
-          <div className="mt-3 border-t border-teal-500/15 pt-3"><a href="/account/delete" className="crew-delete-link tap inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-3 py-2 text-xs text-rose-700 underline-offset-2 transition hover:bg-rose-500/10 hover:underline dark:text-rose-300" data-testid="crew-delete-account">Delete my account</a></div>
-        </details>
+        <footer className="crew-account mt-10 border-t border-teal-500/15 pt-4 pb-6" aria-label="Profile">
+          <details className="cr-collapse" data-testid="crew-profile">
+            <summary>Profile</summary>
+            <div className="px-4 pb-3 text-sm">
+              <p data-testid="crew-profile-name">{name}</p>
+              <div className="mt-3 flex justify-center border-t border-teal-500/15 pt-3"><a href="/account/delete" className="crew-delete-link tap inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-3 py-2 text-xs text-rose-700/80 underline-offset-2 transition hover:bg-rose-500/10 hover:underline dark:text-rose-300" data-testid="crew-delete-account">Delete my account</a></div>
+            </div>
+          </details>
+        </footer>
       </div>
     </main>
   );

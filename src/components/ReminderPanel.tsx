@@ -37,11 +37,11 @@ export default function ReminderPanel({ input, phone, email, prefer = "", onClos
       </div>
       <textarea aria-label="Reminder text" data-testid="reminder-text" className="min-h-32 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={text} onChange={(event) => setEdited((current) => ({ ...current, [tone]: event.target.value }))} />
       <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-        <button type="button" onClick={copy} data-testid="reminder-copy" className="rounded-lg bg-teal-500 px-3 py-2 text-sm font-semibold text-slate-950! transition hover:bg-teal-400">{copied ? "Copied" : "Copy text"}</button>
+        <button type="button" onClick={copy} data-testid="reminder-copy" className="min-h-11 rounded-lg bg-teal-500 px-3 py-2 text-sm font-semibold text-slate-950! transition hover:bg-teal-400">{copied ? "Copied" : "Copy text"}</button>
         {prefer === "call" && phone && <a className={`${button} order-first border-teal-500 font-semibold`} data-testid="reminder-call" data-preferred="true" href={`tel:${phone.replace(/[^0-9+]/g, "")}`}>📞 Call (preferred)</a>}
         {phone ? <a className={`${button}${prefer === "text" ? " order-first border-teal-500 font-semibold" : ""}`} data-testid="reminder-sms" data-preferred={prefer === "text" ? "true" : undefined} href={smsHref(phone, text)}>Open in Messages{prefer === "text" && <span data-testid="contact-preferred"> (preferred)</span>}</a> : <span className={`${button} opacity-50`}>No phone on file</span>}
         {email ? <a className={`${button}${prefer === "email" ? " order-first border-teal-500 font-semibold" : ""}`} data-testid="reminder-email" data-preferred={prefer === "email" ? "true" : undefined} href={mailtoHref(email, subject, text)}>Open in email{prefer === "email" && <span data-testid="contact-preferred"> (preferred)</span>}</a> : <span className={`${button} opacity-50`}>No email on file</span>}
-        {onClose && <button type="button" className="text-sm text-[var(--cr-muted)]" onClick={onClose}>Close</button>}
+        {onClose && <button type="button" className="min-h-11 rounded-lg px-3 text-sm text-[var(--cr-muted)] transition hover:text-teal-500" onClick={onClose}>Close</button>}
       </div>
       <p className="text-xs text-[var(--cr-muted)]">Nothing is sent automatically. You review and send it from your phone or email app.</p>
     </div>

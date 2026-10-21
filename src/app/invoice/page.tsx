@@ -1035,7 +1035,7 @@ export default function NewInvoicePage() {
   // Collapsible sections: a new document opens with everything open; an existing one opens with the
   // client details folded to a one-line summary. The user's own open/closed choices are kept per device.
   const openedExisting = useOpenedExisting();
-  const sectionDefaults = useMemo(() => ({ collapsed: openedExisting ? ["client"] : [], scope: openedExisting ? "existing" : "new", scoped: ["client"] }), [openedExisting]);
+  const sectionDefaults = useMemo(() => ({ collapsed: openedExisting ? ["client", "costs", "recurring"] : ["costs", "recurring"], scope: openedExisting ? "existing" : "new", scoped: ["client"] }), [openedExisting]);
   const clientSummary = [clientName, clientPhone, clientAddress].map((part) => part.trim()).filter(Boolean).join(" · ") || "No client yet";
 
   const previewClass = style === "bold" ? "rounded-2xl border border-slate-900 bg-slate-900 p-6 text-white shadow-sm" : "rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm";
@@ -1070,16 +1070,6 @@ export default function NewInvoicePage() {
           </div>
           <p className="mt-1 text-sm text-[var(--cr-muted)]">{clientName || "No client yet"} · Total ${totals.total.toFixed(2)}</p>
         </div>
-        <div className="hidden flex-wrap gap-2 lg:flex">
-              {!locked && <button type="button" onClick={saveDocument} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Save document</button>}
-              {isProposal && !locked && (
-                <button type="button" onClick={createInvoiceFromProposal} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Create invoice</button>
-              )}
-              {!isProposal && !locked && docId && (
-                <button type="button" data-testid="create-change-order" disabled={creatingChangeOrder} onClick={createChangeOrder} className="disabled:opacity-50 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">{creatingChangeOrder ? "Creating…" : "Create change order"}</button>
-              )}
-              {!locked && <button type="button" onClick={clearForm} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Clear form</button>}
-        </div>
       </div>
       {docId && (
         <div className="print-hide mt-4 border-t border-teal-500/15 pt-4" data-testid="stage-bar" data-stage={docStage.stage} data-next-action={docStage.next}>
@@ -1111,6 +1101,7 @@ export default function NewInvoicePage() {
               <button type="button" onClick={() => chooseKind("proposal")} className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${isProposal ? "bg-teal-500 text-slate-950! shadow-sm" : "border border-slate-300 hover:border-teal-500"}`}>Proposal</button>
             </div>
             <h1 className="text-xl font-bold tracking-tight">{isProposal ? "Proposal details" : "Invoice details"}</h1>
+            <p className="cr-group-heading !mt-2">Client &amp; schedule</p>
             <Section id="client" label="Client details" className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5" summary={clientSummary}>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Client</h2>
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Search clients by name" value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} />
@@ -1153,6 +1144,19 @@ export default function NewInvoicePage() {
               <label className="text-sm text-slate-600">Job end<input type="time" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={jobEnd} onChange={(event) => setJobEnd(event.target.value)} /></label>
             </div>
             </Section>
+            <Section id="schedule" label="Schedule" className="print-hide space-y-3 rounded-xl border border-slate-200 p-4 text-sm sm:p-5" testId="schedule-section">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold">Schedule</p>
+                {schedule && <span className="text-xs" data-testid="schedule-summary">{schedule.date}{schedule.startTime ? ` ${schedule.startTime}` : ""}{schedule.endTime ? `–${schedule.endTime}` : ""} · {STATUS_LABEL[schedule.status]}</span>}
+              </div>
+              {!locked
+                ? <ScheduleEditor key={scheduleKey} autoSave docId={docId} value={schedule} workers={workers} onSave={saveJobSchedule} confirmRemove={(ids) => confirmRemoval(workLogged(crew, ids, clockHoursFor(docId)))} />
+                : <p className="text-xs text-slate-600">Save the document first, then schedule the job here or on the Calendar.</p>}
+              {!isProposal && <VisitNotes notes={visitNotes} onChange={setVisitNotes} today={ymd(new Date())} disabled={locked} />}
+              {docId && <OwnerVisitNotes docId={docId} />}
+              {docId && <JobDonePanel docId={docId} schedule={schedule} onConfirmed={(next) => { setSchedule(next); setScheduleKey((key) => key + 1); }} />}
+            </Section>
+            <p className="cr-group-heading">Line items</p>
             <Section id="items" label="Line items" className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Line items & pricing</h2>
             <div className="space-y-3">
@@ -1241,6 +1245,7 @@ export default function NewInvoicePage() {
             </Section>
             {!isProposal && <StageEditor stages={stages} onChange={setStages} total={totals.total} balance={totals.balance} dueDate={dueDate} />}
             </Section>
+            <p className="cr-group-heading">Payments</p>
             <Section id="pay-photos" label="Payment, photos and notes" className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Payment, photos & notes</h2>
             {!isProposal && (
@@ -1256,6 +1261,7 @@ export default function NewInvoicePage() {
             <SignaturePad key={padKey} value={signature} onChange={setSignature} defaultName={clientName} />
             <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
             </Section>
+            <p className="cr-group-heading">Job extras</p>
             <Section id="costs" label="Your costs" className="owner-costs space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-slate-900 sm:p-5">
               <h2 className="font-medium">Your costs only</h2>
               <p className="text-sm text-slate-600">Wages fill from hours times the saved rate, plus any extra pay.</p>
@@ -1399,18 +1405,6 @@ export default function NewInvoicePage() {
                 <CrewSpend docId={docId} estimate={{ ...costs, otherFees }} report={crewReport?.lines.length ? crewReport : null} locked={locked} onUse={useCrewAmounts} />
               </div>
             </Section>
-            <Section id="schedule" label="Schedule" className="print-hide space-y-3 rounded-xl border border-slate-200 p-4 text-sm sm:p-5" testId="schedule-section">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="font-semibold">Schedule</p>
-                {schedule && <span className="text-xs" data-testid="schedule-summary">{schedule.date}{schedule.startTime ? ` ${schedule.startTime}` : ""}{schedule.endTime ? `–${schedule.endTime}` : ""} · {STATUS_LABEL[schedule.status]}</span>}
-              </div>
-              {!locked
-                ? <ScheduleEditor key={scheduleKey} autoSave docId={docId} value={schedule} workers={workers} onSave={saveJobSchedule} confirmRemove={(ids) => confirmRemoval(workLogged(crew, ids, clockHoursFor(docId)))} />
-                : <p className="text-xs text-slate-600">Save the document first, then schedule the job here or on the Calendar.</p>}
-              {!isProposal && <VisitNotes notes={visitNotes} onChange={setVisitNotes} today={ymd(new Date())} disabled={locked} />}
-              {docId && <OwnerVisitNotes docId={docId} />}
-              {docId && <JobDonePanel docId={docId} schedule={schedule} onConfirmed={(next) => { setSchedule(next); setScheduleKey((key) => key + 1); }} />}
-            </Section>
             {docId && !locked && <Section id="approval" label="Approval" headerFirst={false}><ApprovalShare docId={docId} approval={approval} onChange={setApproval} /></Section>}
             {docId && !locked && <Section id="portal" label="Client portal" headerFirst={false}><PortalShare clientName={clientName} clientId={docClientId} /></Section>}
             {!isProposal && docId && (
@@ -1445,15 +1439,16 @@ export default function NewInvoicePage() {
                 {fromProposal ? <>Made from proposal <a className="font-medium text-teal-600 underline" href={`/invoice?id=${encodeURIComponent(fromProposal.id)}`}>{fromProposal.number}</a></> : <>Invoice made from this proposal: {madeInvoices.map((item, index) => <span key={item.id}>{index ? ", " : ""}<a className="font-medium text-teal-600 underline" href={`/invoice?id=${encodeURIComponent(item.id)}`}>{item.number}</a></span>)}</>}
               </p>
             )}
-            <div className="mobile-savebar print-hide sticky bottom-0 lg:hidden z-10 -mx-4 grid grid-cols-2 gap-2 border-t border-slate-200 bg-[var(--cr-card)] px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:-mx-6 sm:flex sm:flex-wrap sm:gap-3 sm:px-6">
-              {!locked && <button type="button" onClick={saveDocument} className="col-span-2 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Save document</button>}
+            <div className="cr-actionbar hide-fab print-hide -mx-4 flex flex-wrap items-center gap-2 border-t border-slate-200 bg-[var(--cr-card)]/95 px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] backdrop-blur sm:-mx-6 sm:gap-3 sm:px-6 max-sm:mx-0 max-sm:rounded-xl max-sm:border">
+              <p className="mr-auto min-w-0 text-right tabular-nums max-sm:w-full max-sm:flex max-sm:items-baseline max-sm:justify-between sm:text-left" aria-live="polite"><span className="block text-xs font-medium text-[var(--cr-muted)]">{isProposal && totals.paid > 0 ? "Balance after deposit" : balanceLabel(totals.paid, totals.balance)}</span><span className="text-lg font-bold">${totals.balance.toFixed(2)}</span></p>
+              {!locked && <button type="button" onClick={saveDocument} className="cr-btn cr-btn-primary px-6 max-sm:flex-1">Save document</button>}
               {isProposal && !locked && (
-                <button type="button" onClick={createInvoiceFromProposal} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Create invoice</button>
+                <button type="button" onClick={createInvoiceFromProposal} className="cr-btn cr-btn-secondary">Create invoice</button>
               )}
               {!isProposal && !locked && docId && (
-                <button type="button" data-testid="create-change-order" disabled={creatingChangeOrder} onClick={createChangeOrder} className="disabled:opacity-50 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">{creatingChangeOrder ? "Creating…" : "Create change order"}</button>
+                <button type="button" data-testid="create-change-order" disabled={creatingChangeOrder} onClick={createChangeOrder} className="cr-btn cr-btn-secondary">{creatingChangeOrder ? "Creating…" : "Create change order"}</button>
               )}
-              {!locked && <button type="button" onClick={clearForm} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Clear form</button>}
+              {!locked && <button type="button" onClick={clearForm} className="cr-btn cr-btn-text">Clear form</button>}
             </div>
             {saveMessage && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-slate-600" data-testid="save-message" data-kind={paymentProblem && saveMessage === paymentProblem ? "payment-required" : undefined}>{saveMessage}</p>}
           </fieldset>

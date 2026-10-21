@@ -15,7 +15,7 @@ export default function TodayJobsBlock({ docs, loaded }: { docs: { id: string; t
     <section data-testid="dash-today" data-count={jobs.length} className="cr-panel rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 text-sm">
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-semibold">Today</h2>
-        <a href="/calendar?view=day" data-testid="dash-today-all" className="inline-flex min-h-11 items-center text-xs font-medium underline">Open day view</a>
+        <a href="/calendar?view=day" data-testid="dash-today-all" className="cr-btn cr-btn-text">Open day view</a>
       </div>
       {!loaded ? <p className="mt-2 text-[var(--cr-muted)]">…</p> : jobs.length === 0 ? <p data-testid="dash-today-empty" className="mt-2 text-[var(--cr-muted)]">No jobs scheduled today.</p> : (
         <ul className="mt-2 divide-y divide-teal-500/10">
