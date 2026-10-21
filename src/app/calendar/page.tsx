@@ -258,7 +258,7 @@ export default function CalendarPage() {
         )}
 
         <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_14rem]">
-          <div className="min-w-0 rounded-2xl border border-slate-500/25 bg-[var(--cr-card)] p-2 shadow-sm sm:p-3 min-[900px]:overflow-x-auto">
+          <div className="min-w-0 rounded-2xl border border-slate-500/25 bg-[var(--cr-card)] p-2 shadow-sm sm:p-3 min-[900px]:overflow-x-auto max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none">
             {view === "week" && (
               <div className="hidden min-w-0 grid-cols-[3rem_repeat(7,minmax(0,1fr))] text-xs min-[900px]:grid" data-testid="week-grid">
                 <div />
@@ -313,7 +313,7 @@ export default function CalendarPage() {
                     const due = view === "month" ? docs.filter((doc) => doc.type === "invoice" && doc.data?.dueDate === day && text(doc.data?.status) !== "paid") : [];
                     return (
                       <section key={day} data-testid={`agenda-day-${day}`}>
-                        <h2 className={`sticky top-[env(safe-area-inset-top)] z-10 -mx-2 mb-1.5 flex items-center gap-2 px-3 py-2 text-sm font-semibold backdrop-blur sm:-mx-3 ${day === today ? "bg-teal-500/15 text-teal-700 dark:text-teal-300" : "bg-[var(--cr-card)]/95"}`}>
+                        <h2 className={`sticky top-[env(safe-area-inset-top)] z-10 -mx-2 mb-1.5 max-sm:mx-0 max-sm:rounded-lg max-sm:border max-sm:border-teal-500/15 flex items-center gap-2 px-3 py-2 text-sm font-semibold backdrop-blur sm:-mx-3 ${day === today ? "bg-teal-500/15 text-teal-700 dark:text-teal-300" : "bg-[var(--cr-card)]/95"}`}>
                           <span className={`inline-flex h-7 min-w-7 items-center justify-center rounded-full px-1.5 text-xs tabular-nums ${day === today ? "bg-teal-500 text-slate-950!" : "bg-slate-500/10"}`}>{parse(day).getDate()}</span>
                           {parse(day).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
                           {day === today && <span className="ml-auto text-xs font-semibold uppercase tracking-wide">Today</span>}

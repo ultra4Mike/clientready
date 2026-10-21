@@ -26,8 +26,10 @@ const moreLinks = [
 const ALL_LINKS = [...mainLinks, ...moreLinks];
 const byHref = (href: string) => ALL_LINKS.find((link) => link.href === href)!;
 export const NAV_GROUPS = [
-  { label: "Work", links: ["/dashboard", "/today", "/calendar", "/upcoming", "/drafts", "/inventory"].map(byHref) },
+  { label: "Home", links: ["/dashboard", "/today"].map(byHref) },
+  { label: "Schedule", links: ["/calendar", "/upcoming"].map(byHref) },
   { label: "Clients", links: ["/clients", "/history"].map(byHref) },
+  { label: "Work", links: ["/drafts", "/inventory"].map(byHref) },
   { label: "Money", links: ["/documents", "/collect", "/reports", "/mileage", "/year"].map(byHref) },
   { label: "Team", links: ["/employees"].map(byHref) },
 ];

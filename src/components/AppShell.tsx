@@ -79,7 +79,7 @@ export default function AppShell({
 
   const nav = (
     <nav className="flex h-full flex-col">
-      <div className="space-y-5">
+      <div className="space-y-4">
         {NAV_GROUPS.map((group) => (
           <div key={group.label}>
             <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)]">{group.label}</p>
@@ -94,6 +94,7 @@ export default function AppShell({
         ))}
       </div>
       <div className="mt-auto space-y-0.5 border-t border-teal-500/15 pt-3">
+        <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Settings</p>
         {BOTTOM_LINKS.map((link) => (
           <a key={link.href} href={link.href} className={linkClass(link.href)}>
             {link.label}
