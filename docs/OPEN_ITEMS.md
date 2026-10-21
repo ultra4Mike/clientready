@@ -146,3 +146,16 @@ Shared by the three ClientReady bots. Update the **Status** column when you pick
 | S5 | Onboarding tour `docs/onboarding-tour.md` (coach marks not built); upcoming-feature help drafts in `src/lib/help/upcoming.ts` (not rendered) — move into articles.ts as features ship. | Visual + Help | In progress 2026-10-16 — manual payment articles moved into articles.ts; remaining drafts (card Connect, auto reminders, SMS) wait on unbuilt features | 2026-10-16 |
 | S2 | User could not edit the address on a paid invoice; suspected trial read-only lock, unconfirmed. | Dev | Waiting on user | 2026-10-16 |
 | S6 | Apple Guideline 4.2 risk (WebView wrapper). Add native touches before iOS submission: camera/photo picker (done 5fbf887 + offline queue fa211eb), native push, offline, deep links; demo login for review. See docs/store-listing.md. | Dev + Owner | In progress 2026-10-16 — camera done | 2026-10-16 |
+| R80 | Approved proposal read Draft: one status (stage + Overdue) on invoice header and Documents; approved proposal status -> accepted. | Dev | Done local 193bb63 | 2026-10-21 |
+| R81 | "+ Add crew" said No active employees: invoice page re-reads the team from the cloud. | Dev | Done local 6c082a1 | 2026-10-21 |
+| R82 | Crew draft -> invoice: one invoice per report (reopen, no duplicate), client carried, crew costs into Job costs. | Dev | Done local ae0e48d | 2026-10-21 |
+| R83 | Job photos count ignored crew done photo: shows "N from crew" + Add to invoice. | Dev | Done local 10d9643 | 2026-10-21 |
+| R84 | Paid mismatch: Dashboard and Documents both = money collected on sent invoices (part payments included). | Dev | Done local fb17ea6 | 2026-10-21 |
+| R85 | Greeting used company first word: optional Contact name; company-looking names -> "Hi there". | Dev | Done local ccad30e | 2026-10-21 |
+| R86 | Staged invoice past due date not overdue: due date passed with money owed OR an unpaid stage overdue = Overdue. | Dev | Done local 193bb63 | 2026-10-21 |
+| R87 | Recurring drafts always get a calendar visit; change orders labelled/linked on Documents. | Dev | Done local 16d4d15 | 2026-10-21 |
+| R88/R89 | Parts from stock on invoices; preferences in backup CSV; crew card hides client email when phone exists; crew visit notes (migration 20261024100000). | Dev | Done local 46adb75 | 2026-10-21 |
+| R90 | Proposal deposit request %. | Dev | Done local | 2026-10-21 |
+| R91 | Resend setup guide when app email is off. | Dev | Done local 3425fa3 | 2026-10-21 |
+| R92 | Invite to crew app button (+ /api/email/invite, mailto fallback). Fix time tap target; report Send bar not sticky. | Dev | Done local 67d3a25 | 2026-10-21 |
+| R94 | Crew email signed up as owner: pre-signup anon check, lower/trim is_crew_email, DB guard on profiles, recovery (migration 20261024110000). Live root cause unconfirmed (likely older live is_crew_email). | Dev | Done local b9ac932 | 2026-10-21 |
