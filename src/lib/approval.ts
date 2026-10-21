@@ -134,3 +134,22 @@ export async function approveByToken(token: string, name: string) {
   if (error) throw error;
   return readApproval(data);
 }
+
+/** Backlog 14: the visit behind a customer link (date/time/status only), or null. Before migration 20261021120000: null. */
+export type PublicVisit = { date: string; startTime: string; endTime: string; status: string };
+export async function fetchVisitByToken(token: string): Promise<PublicVisit | null> {
+  const { data, error } = await supabase.rpc("get_visit_by_approval_token", { p_token: token });
+  if (error || !data || typeof data !== "object") return null;
+  const v = data as Record<string, unknown>;
+  return { date: String(v.date || ""), startTime: String(v.startTime || ""), endTime: String(v.endTime || ""), status: String(v.status || "scheduled") };
+}
+
+/** Approve from the customer link with an optional signature; falls back to the plain approval before the migration. */
+export async function approveByTokenSigned(token: string, name: string, signature: unknown) {
+  if (signature) {
+    const { data, error } = await supabase.rpc("approve_document_signed", { p_token: token, p_name: name, p_signature: signature });
+    if (!error) return { approval: readApproval(data), raw: data as Record<string, unknown> | null };
+    if (!/approve_document_signed|function/i.test(error.message || "")) throw error;
+  }
+  return { approval: await approveByToken(token, name), raw: null };
+}

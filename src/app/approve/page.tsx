@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import LegalLinks from "@/components/LegalLinks";
-import { approveByToken, fetchApprovalDoc, readApproval, type Approval } from "@/lib/approval";
+import { approveByTokenSigned, fetchApprovalDoc, fetchVisitByToken, readApproval, type Approval, type PublicVisit } from "@/lib/approval";
 import { amountOf, documentTotals, discountLabel } from "@/lib/discount";
 import { balanceDue, paidTotal, readPayments } from "@/lib/payments";
 import { readPhotos } from "@/lib/photos";
@@ -46,11 +46,13 @@ export default function ApprovePage() {
   const [mySignature, setMySignature] = useState<Signature | null>(null);
   const [approvalSignature, setApprovalSignature] = useState<Signature | null>(null);
   const [payMethods, setPayMethods] = useState<PaymentMethodsConfig>({});
+  const [visit, setVisit] = useState<PublicVisit | null>(null);
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
     const t = query.get("t") || "";
     const viaPortal = query.get("p") && query.get("d") ? { p: query.get("p") || "", d: query.get("d") || "" } : null;
+    if (t && !viaPortal) fetchVisitByToken(t).then(setVisit).catch(() => {});
     if (viaPortal || t) fetchPublicPaymentMethods(viaPortal ? { portal: viaPortal.p } : { token: t }).then(setPayMethods).catch(() => {});
     // Keep the token out of logs/analytics referrers on outbound links.
     const meta = document.createElement("meta");
@@ -110,10 +112,12 @@ export default function ApprovePage() {
     setMessage("");
     try {
       const raw = portal ? await portalApprove(portal.p, portal.d, name || mySignature?.signerName || "", mySignature) : null;
-      const result = portal ? readApproval(raw) : await approveByToken(token, name);
+      let result = portal ? readApproval(raw) : null;
+      let signedRaw: Record<string, unknown> | null = null;
+      if (!portal) ({ approval: result, raw: signedRaw } = await approveByTokenSigned(token, name || mySignature?.signerName || "", mySignature));
       if (result) {
         setApproval(result);
-        if (raw) setApprovalSignature(readSignature(raw.signature));
+        if (raw || signedRaw) setApprovalSignature(readSignature((raw || signedRaw)?.signature));
       } else {
         // Already approved, or the link was turned off meanwhile: show what is stored now.
         const latest = portal ? await fetchPortalDoc(portal.p, portal.d) : await fetchApprovalDoc(token);
@@ -170,13 +174,13 @@ export default function ApprovePage() {
                 {busy ? "Approving…" : `Approve ${isProposal ? "proposal" : "invoice"}`}
               </button>
               <details className="cr-panel rounded-xl border border-slate-200 p-3 sm:p-4" data-testid="approve-extras">
-                <summary className="flex min-h-11 cursor-pointer items-center font-medium text-slate-600">Add your name{portal ? " or signature" : ""} (optional)</summary>
+                <summary className="flex min-h-11 cursor-pointer items-center font-medium text-slate-600">Add your name or signature (optional)</summary>
                 <div className="mt-2 space-y-3">
                   <label className="flex flex-col gap-1.5 font-medium text-slate-600">
                     Your name
                     <input aria-label="Your name" value={name} maxLength={100} onChange={(event) => setName(event.target.value)} className="min-h-11 rounded-lg border border-slate-300 px-3 py-2.5 text-base font-normal text-slate-900 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 sm:text-sm" />
                   </label>
-                  {portal && (
+                  {(
                     <div data-testid="portal-sign">
                       <p className="mb-1 font-medium text-slate-600">Sign</p>
                       <SignaturePad value={mySignature} onChange={setMySignature} />
@@ -217,6 +221,11 @@ export default function ApprovePage() {
             {text(data.clientAddress) && <p className="text-slate-600">{text(data.clientAddress)}</p>}
           </div>
 
+          {visit && visit.date && (
+            <p data-testid="link-visit" data-status={visit.status} className="mt-4 rounded-lg border border-teal-500/30 bg-teal-50 px-3 py-2 text-sm text-slate-800">
+              <span className="font-semibold">{visit.status === "done" ? "Visit done" : "Your visit"}:</span> {new Date(`${visit.date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}{visit.startTime ? ` · ${visit.startTime}${visit.endTime ? `–${visit.endTime}` : ""}` : ""}
+            </p>
+          )}
           <div className="mt-6 divide-y divide-slate-100 border-t border-slate-200" data-testid="approve-items">
             {items.map((item, index) => (
               <div key={index} className="flex justify-between gap-4 py-2.5 text-sm">
