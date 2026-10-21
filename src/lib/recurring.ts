@@ -131,12 +131,13 @@ export function recurringDraftData(template: Doc, number: string, period: string
 }
 
 /**
- * When the template is a scheduled job, the draft gets the same job (time, crew, crew note)
- * on its period date, status "scheduled". Past periods (catch-up) get no job.
+ * The draft gets a job on its period date, status "scheduled": the template's time/crew/note when it
+ * has a job, else a plain visit (R87). Past periods (catch-up) get no job.
  */
 function nextJob(template: Doc, period: string) {
-  const schedule = readSchedule(template.data);
-  if (!schedule || period < ymd(new Date())) return {};
+  if (period < ymd(new Date())) return {};
+  // R87: every recurring visit shows on the calendar. No job on the template -> a visit on the period date, no time, no crew yet.
+  const schedule = readSchedule(template.data) || { date: period, startTime: "", workerIds: [] as string[] };
   return { schedule: { ...schedule, date: period, status: "scheduled", updatedAt: new Date().toISOString() } };
 }
 

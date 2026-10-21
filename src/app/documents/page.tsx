@@ -362,6 +362,7 @@ export default function DocumentsPage() {
             {selecting && <input type="checkbox" className="hidden h-5 w-5 shrink-0 cursor-pointer accent-teal-500 md:block" data-testid="doc-select-wide" checked={selected.has(doc.id)} onChange={() => toggleSelected(doc.id)} aria-label={`Select ${doc.title || "document"}`} />}
             <button type="button" onClick={() => openDocument(doc)} className="min-w-0 flex-1 text-left">
               <p className="truncate text-base font-semibold md:text-sm">{doc.title || "Untitled"}</p>
+              {(() => { const of = doc.data?.changeOrderOf as { id?: string; number?: string } | undefined; return of?.id ? <a href={`/invoice?id=${encodeURIComponent(of.id)}`} onClick={(event) => event.stopPropagation()} data-testid="doc-change-order-of" className="block truncate text-xs text-teal-700 underline dark:text-teal-300">Change order to {of.number || "the original"}</a> : null; })()}
               <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-[var(--cr-muted)]">
                 <span className="capitalize">{doc.type}</span>
                 <span aria-hidden="true">·</span>
