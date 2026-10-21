@@ -1,5 +1,8 @@
 "use client";
 
+import { CLIENT_CSV_HEADER, clientsFromCsv } from "@/lib/client-csv";
+import { csvText, downloadCsv } from "@/lib/csv";
+
 import { CONTACT_METHODS, contactMethodLabel, readContactMethod, type ContactMethod } from "@/lib/contact-method";
 import { clientFromRow, readCachedClients } from "@/lib/client-rows";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -93,6 +96,10 @@ export default function ClientsPage() {
       const next = rows.map((row) => fromRow(row as Record<string, string>));
       setClients(next);
       window.localStorage.setItem("clientready-clients", JSON.stringify(next));
+      // R106: /clients?edit=<id> (from a client's page) opens that client's edit form.
+      const editId = new URLSearchParams(window.location.search).get("edit");
+      const target = editId ? next.find((client) => client.id === editId) : null;
+      if (target) editClient(target);
       // Once per account: tie older documents to these clients by id (unique name matches only).
       await backfillClientIds(next);
     }
@@ -117,7 +124,7 @@ export default function ClientsPage() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!form.name.trim()) return;
+    if (!form.name.trim()) { setMessage("Add the client's name before saving."); return; } // R107
 
     if (editingId) {
       const next = clients.map((client) =>
@@ -203,9 +210,27 @@ export default function ClientsPage() {
     setShowForm(false);
   }
 
+  /** R106: add clients from a CSV (Name required; names already saved are skipped). Owner confirms first. */
+  async function importClients(file: File) {
+    const { added, skipped, missingName } = clientsFromCsv(await file.text(), clients.map((c) => c.name || ""));
+    if (missingName) { setMessage("That CSV has no Name column. Use Export CSV to see the format."); return; }
+    if (!added.length) { setMessage(`Nothing to import (${skipped} row${skipped === 1 ? "" : "s"} skipped: no name or already saved).`); return; }
+    if (!window.confirm(`Add ${added.length} client${added.length === 1 ? "" : "s"}${skipped ? ` (${skipped} skipped)` : ""}?`)) return;
+    const { data: auth } = await supabase.auth.getUser();
+    let next = [...clients];
+    for (const item of added) {
+      const { data } = auth.user ? await supabase.from("clients").insert({ user_id: auth.user.id, ...item }).select("*").single() : { data: null };
+      next = [data ? fromRow(data as Record<string, string>) : ({ id: `${Date.now()}-${next.length}`, ...emptyClient, ...item } as Client), ...next];
+    }
+    saveLocal(next);
+    setMessage(`Imported ${added.length} client${added.length === 1 ? "" : "s"}${skipped ? `, ${skipped} skipped` : ""}.`);
+  }
+
   function editClient(client: Client) {
     setEditingId(client.id);
     setShowForm(true);
+    // R106: bring the edit form to the person you clicked.
+    window.setTimeout(() => document.getElementById("client-form")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     setForm({
       name: client.name || "",
       company: client.company || "",
@@ -257,6 +282,12 @@ export default function ClientsPage() {
             </button>}
         />
 
+        <div className="mb-3 flex flex-wrap gap-2" data-testid="clients-csv">
+          <button type="button" data-testid="clients-export" onClick={() => downloadCsv("clients.csv", csvText(CLIENT_CSV_HEADER, clients.map((c) => [c.name || "", c.company || "", c.email || "", c.phone || "", c.address || "", c.notes || "", c.preferences || ""])))} className="min-h-11 rounded-lg border border-teal-500/30 px-3 text-sm font-medium">Export CSV</button>
+          <label className="inline-flex min-h-11 cursor-pointer items-center rounded-lg border border-teal-500/30 px-3 text-sm font-medium">Import CSV
+            <input type="file" accept=".csv,text/csv" className="sr-only" data-testid="clients-import" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void importClients(file); }} />
+          </label>
+        </div>
         <input
           className="mb-6 min-h-11 w-full rounded-xl border border-teal-500/30 bg-[var(--cr-card)] px-4 py-3 text-base shadow-sm sm:text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
           placeholder="Search name, company, email, or phone"
@@ -266,6 +297,7 @@ export default function ClientsPage() {
 
         {showForm && (
           <form
+            id="client-form"
             onSubmit={handleSubmit}
             className="mb-8 max-w-2xl space-y-4 rounded-2xl border border-teal-500/30 bg-white p-4 shadow-md sm:p-6"
           >
