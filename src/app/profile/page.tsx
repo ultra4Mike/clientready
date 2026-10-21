@@ -251,6 +251,10 @@ export default function ProfilePage() {
           <input name="setAsidePercent" data-testid="set-aside-percent" type="number" min={0} max={100} step="any" inputMode="decimal" className="mt-1.5 min-h-11 w-full max-w-[10rem] tabular-nums rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="30" value={profile.setAsidePercent} onChange={(event) => update("setAsidePercent", event.target.value)} />
         </label>
         <p className="-mt-1 text-xs text-[var(--cr-muted)]">Default is 30%. This is a cushion for taxes. It is not a tax return.</p>
+        {/* Backlog 10: less-used settings live under one fold so the main settings stay short. */}
+        <details className="rounded-xl border border-teal-500/20 p-3" data-testid="more-settings">
+          <summary className="cursor-pointer text-sm font-semibold">More settings <span className="font-normal text-xs text-[var(--cr-muted)]">profit alerts, overtime warning, late fees</span></summary>
+        <div className="mt-3 space-y-4">
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
           Profit alert below % left after job costs
           <input name="profitAlertMargin" data-testid="profit-alert-margin" inputMode="numeric" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="20" value={profile.profitAlertMargin} onChange={(event) => update("profitAlertMargin", event.target.value)} />
@@ -281,6 +285,8 @@ export default function ProfilePage() {
           )}
           <p className="text-xs text-[var(--cr-muted)]">After the due date plus grace days, an unpaid invoice shows a suggested late fee. Nothing is added or sent unless you tap it.</p>
         </fieldset>
+        </div>
+        </details>
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
           Review link
           <input name="reviewLink" type="url" inputMode="url" autoComplete="url" data-testid="review-link" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="https://g.page/r/your-business/review" value={profile.reviewLink} onChange={(event) => update("reviewLink", event.target.value)} />
