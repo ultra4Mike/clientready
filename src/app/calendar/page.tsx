@@ -150,7 +150,7 @@ export default function CalendarPage() {
         data-done={doneState(job.schedule) || undefined}
         onDragStart={(event) => event.dataTransfer.setData("text/plain", job.doc.id)}
         onClick={(event) => { event.stopPropagation(); setEditing({ docId: job.doc.id }); }}
-        className={agenda ? `flex min-h-11 cursor-pointer flex-col justify-center rounded-lg border border-l-4 px-3 py-2 text-left text-sm font-medium leading-snug shadow-sm ${statusClass(job.schedule)}` : `cursor-grab line-clamp-2 min-w-0 overflow-hidden break-words rounded-md border border-l-4 px-1.5 py-1 text-left text-xs font-medium leading-snug shadow-sm ${statusClass(job.schedule)}`}
+        className={agenda ? `flex min-h-11 cursor-pointer flex-col justify-center rounded-lg border border-l-4 px-3 py-2 text-left text-sm font-medium leading-snug shadow-sm ${statusClass(job.schedule)}` : `cr-chip2 cursor-grab min-w-0 break-words rounded-md border border-l-4 px-1.5 py-1 text-left text-xs font-medium leading-snug shadow-sm ${statusClass(job.schedule)}`}
         title={`${job.doc.title} · ${job.doc.clientName} · ${statusLabel(job.schedule)}${job.schedule.onMyWayAt && job.schedule.status !== "done" ? ` · ${job.schedule.onMyWayBy || "Crew"} on the way` : ""}${people ? ` · ${people}` : ""}`}
       >
         {agenda ? (
