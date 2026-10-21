@@ -84,7 +84,7 @@ export default function ApiSettings() {
             Worker key: only that worker&apos;s own jobs, no prices, no other clients
           </label>
           {worker && (
-            <select aria-label="Worker for this key" data-testid="api-worker-employee" value={workerId} onChange={(e) => setWorkerId(e.target.value)} className="min-h-11 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 text-sm">
+            <select aria-label="Worker for this key" data-testid="api-worker-employee" value={workerId} onChange={(e) => setWorkerId(e.target.value)} className="ml-7 block min-h-11 w-[calc(100%-1.75rem)] max-w-sm rounded-lg border border-teal-500/40 bg-[var(--cr-card)] px-3 text-sm shadow-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30 dark:bg-[#10262c]">
               <option value="">Which worker?</option>
               {people.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
             </select>

@@ -254,9 +254,9 @@ export default function ApprovePage() {
               <div className="flex justify-between font-semibold"><span>Total</span><span>${totals.total.toFixed(2)}</span></div>
               {/* R59: payments (e.g. a deposit) under Total, then the balance. */}
               {payments.filter((payment) => amountOf(payment.amount) > 0).map((payment, index) => (
-                <div key={payment.id} className="flex justify-between gap-2 text-slate-600" data-testid="approve-payment">
+                <div key={payment.id} className="flex items-start justify-between gap-3 py-0.5 text-emerald-700 dark:text-emerald-300" data-testid="approve-payment">
                   <span>{index === 0 && (isProposal || data.fromProposal) ? "Deposit paid" : "Paid"}{payment.date ? ` ${payment.date}` : ""}{payment.method ? ` · ${payment.method}` : ""}</span>
-                  <span className="tabular-nums">-${amountOf(payment.amount).toFixed(2)}</span>
+                  <span className="shrink-0 text-right font-medium tabular-nums">-${amountOf(payment.amount).toFixed(2)}</span>
                 </div>
               ))}
               {!isProposal && (

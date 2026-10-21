@@ -1195,7 +1195,7 @@ export default function NewInvoicePage() {
                             <tr><td>Scheduled</td><td className="text-right tabular-nums" data-testid="hours-scheduled">{scheduled ? `${scheduled.toFixed(2)} h` : "—"}</td></tr>
                             <tr><td>Clocked</td><td className="text-right tabular-nums" data-testid="hours-clocked">{mine.length ? `${clocked.toFixed(2)} h` : "—"}</td></tr>
                             {mine.filter((entry) => crewFixReason(entry)).map((entry) => (
-                              <tr key={`why-${entry.id}`} data-testid="hours-fix-reason"><td colSpan={2} className="text-xs"><span className="font-semibold">Crew fixed the time:</span> “{crewFixReason(entry)}”</td></tr>
+                              <tr key={`why-${entry.id}`} data-testid="hours-fix-reason"><td colSpan={2} className="pt-1.5"><span className="cr-tone-warn block rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs leading-relaxed text-amber-900"><span className="font-semibold">Crew fixed the time:</span> “{crewFixReason(entry)}”</span></td></tr>
                             ))}
                             <tr><td>Paid (hours above)</td><td className="text-right tabular-nums" data-testid="hours-paid">{paid.toFixed(2)} h</td></tr>
                           </tbody></table>

@@ -32,24 +32,24 @@ export default function ScheduleReconcile() {
     check();
   }
   return (
-    <section className="mt-6 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 text-sm" data-testid="reconcile">
+    <section className="cr-panel mt-6 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 text-sm sm:p-5" data-testid="reconcile">
       <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-300">Crew dates check</h2>
       <p className="mt-1 text-[var(--cr-muted)]">Makes each crew member&apos;s work date and start time match the job&apos;s schedule. Nothing changes until you review the list and tap Fix. Invoice dates and pay stay as they are.</p>
-      <button type="button" data-testid="reconcile-check" onClick={() => { window.sessionStorage.removeItem("cr-reconcile-msg"); setMessage(""); check(); }} className="mt-2 min-h-11 rounded-lg border border-teal-500/40 px-4">Check</button>
-      {changes && changes.length === 0 && <p className="mt-2" data-testid="reconcile-none">Everything matches.</p>}
+      <button type="button" data-testid="reconcile-check" onClick={() => { window.sessionStorage.removeItem("cr-reconcile-msg"); setMessage(""); check(); }} className="mt-3 min-h-11 rounded-lg border border-teal-500/50 px-5 font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">Check</button>
+      {changes && changes.length === 0 && <p className="cr-tone-good mt-3 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 font-medium text-emerald-800" data-testid="reconcile-none">Everything matches.</p>}
       {changes && changes.length > 0 && (
         <>
-          <ul className="mt-2 divide-y divide-teal-500/10" data-testid="reconcile-preview" data-count={changes.length}>
+          <ul className="mt-3 space-y-2" data-testid="reconcile-preview" data-count={changes.length}>
             {changes.map((c, i) => (
-              <li key={`${c.docId}-${i}`} className="py-2" data-testid="reconcile-change" data-doc={c.docId}>
+              <li key={`${c.docId}-${i}`} className="cr-tone-warn rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 leading-relaxed text-amber-900" data-testid="reconcile-change" data-doc={c.docId}>
                 <span className="font-medium">{c.number}</span>{c.client ? ` · ${c.client}` : ""} · {c.what}: <span className="line-through opacity-70">{c.from}</span> → <span className="font-medium">{c.to}</span>
               </li>
             ))}
           </ul>
-          <button type="button" data-testid="reconcile-apply" disabled={busy} onClick={() => void apply()} className="mt-2 min-h-11 rounded-lg bg-teal-600 px-4 font-semibold text-white">{busy ? "Fixing…" : `Fix ${changes.length} item${changes.length === 1 ? "" : "s"}`}</button>
+          <button type="button" data-testid="reconcile-apply" disabled={busy} onClick={() => void apply()} className="mt-3 min-h-11 w-full rounded-lg bg-teal-500 px-5 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50 sm:w-auto">{busy ? "Fixing…" : `Fix ${changes.length} item${changes.length === 1 ? "" : "s"}`}</button>
         </>
       )}
-      {message && <p className="mt-2" role="status" data-testid="reconcile-message">{message}</p>}
+      {message && <p className="mt-3 rounded-lg border border-teal-500/30 px-3 py-2" role="status" data-testid="reconcile-message">{message}</p>}
     </section>
   );
 }
