@@ -49,7 +49,7 @@ import { appendChangeOrderNote, changeOrderData, changeOrdersFor, mergeChangeOrd
 import ChangeOrderNotes from "@/components/ChangeOrderNotes";
 import { ApprovalBadge, ApprovalShare } from "@/components/Approval";
 import ScheduleEditor from "@/components/ScheduleEditor";
-import { entryHours, fmtHours, hoursByWorker, ownerEditClock, refreshOwnerClock, type ClockEntry } from "@/lib/clock";
+import { entryHours, fmtHours, hoursByWorker, ownerEditClock, crewFixReason, refreshOwnerClock, type ClockEntry } from "@/lib/clock";
 import { confirmRemoval, crewForWorkers, followSchedule, jobScheduleFromForm, crewIds, workLogged, clockHoursFor, dedupeWorkerIds, readSchedule, readWorkers, saveAssignment, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
 import { readApproval, refreshApproval, type Approval } from "@/lib/approval";
 import { generateNextNow, readRecurring, readRecurringFrom, scheduleFromForm, type Frequency, type RecurringFrom } from "@/lib/recurring";
@@ -1194,6 +1194,9 @@ export default function NewInvoicePage() {
                           <table className="w-full [&_td]:py-1 [&_tr+tr]:border-t [&_tr+tr]:border-slate-200/60"><tbody>
                             <tr><td>Scheduled</td><td className="text-right tabular-nums" data-testid="hours-scheduled">{scheduled ? `${scheduled.toFixed(2)} h` : "—"}</td></tr>
                             <tr><td>Clocked</td><td className="text-right tabular-nums" data-testid="hours-clocked">{mine.length ? `${clocked.toFixed(2)} h` : "—"}</td></tr>
+                            {mine.filter((entry) => crewFixReason(entry)).map((entry) => (
+                              <tr key={`why-${entry.id}`} data-testid="hours-fix-reason"><td colSpan={2} className="text-xs"><span className="font-semibold">Crew fixed the time:</span> “{crewFixReason(entry)}”</td></tr>
+                            ))}
                             <tr><td>Paid (hours above)</td><td className="text-right tabular-nums" data-testid="hours-paid">{paid.toFixed(2)} h</td></tr>
                           </tbody></table>
                           <p className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${state === "approved" ? "cr-tone-good bg-emerald-50 text-emerald-800" : state === "changed" ? "bg-amber-200/70 text-amber-900 dark:bg-amber-500/25 dark:text-amber-100" : "bg-slate-100 text-slate-600 dark:bg-white/10"}`} data-testid="hours-approval-status">{state === "approved" ? `Approved ${approval!.hours.toFixed(2)} h (${approval!.basis}) · ${new Date(approval!.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : state === "changed" ? `Hours changed since you approved ${approval!.hours.toFixed(2)} h. Approve again.` : "Hours not approved yet"}</p>

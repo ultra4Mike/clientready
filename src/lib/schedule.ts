@@ -417,8 +417,12 @@ export async function syncScheduleCrewJobs(doc: CloudDoc) {
   const user = auth.user;
   if (!user) return;
   const schedule = readSchedule(doc.data);
-  await supabase.from("crew_jobs").delete().eq("owner_id", user.id).eq("doc_id", doc.id).like("id", `${doc.id}-sched-%`);
-  if (!schedule || !doc.data?.schedule || !schedule.workerIds.length) return;
+  // B1: derived schedules (a job/proposal with a date + time but no schedule block yet) reach crew too.
+  const keep = schedule ? dedupeWorkerIds(schedule.workerIds).map((workerId) => `${doc.id}-sched-${workerId}`) : [];
+  let stale = supabase.from("crew_jobs").delete().eq("owner_id", user.id).eq("doc_id", doc.id).like("id", `${doc.id}-sched-%`);
+  if (keep.length) stale = stale.not("id", "in", `(${keep.map((id) => `"${id}"`).join(",")})`);
+  await stale;
+  if (!schedule || !keep.length) return;
   const workers = new Map(allEmployees().map((person) => [person.id, person]));
   const data = doc.data || {};
   const rows = dedupeWorkerIds(schedule.workerIds).map((workerId) => ({
@@ -446,18 +450,18 @@ export async function syncScheduleCrewJobs(doc: CloudDoc) {
       on_my_way_at: schedule.onMyWayAt || "",
       checklist: schedule.checklist || [],
     }));
-  let { error } = await supabase.from("crew_jobs").insert(rows);
+  let { error } = await supabase.from("crew_jobs").upsert(rows, { onConflict: "id" });
   // Before the checklist migration (20261016110000) runs, crew_jobs has no checklist column.
   if (error && /checklist/.test(error.message || "")) {
-    ({ error } = await supabase.from("crew_jobs").insert(rows.map(({ checklist: _skip, ...row }) => { void _skip; return row; })));
+    ({ error } = await supabase.from("crew_jobs").upsert(rows.map(({ checklist: _skip, ...row }) => { void _skip; return row; }), { onConflict: "id" }));
   }
   // Before the on-my-way migration (110000) runs, crew_jobs has no on_my_way_at column: insert without it.
   if (error && /on_my_way_at/.test(error.message || "")) {
-    ({ error } = await supabase.from("crew_jobs").insert(rows.map(({ on_my_way_at: _skip, ...row }) => { void _skip; return row; })));
+    ({ error } = await supabase.from("crew_jobs").upsert(rows.map(({ on_my_way_at: _skip, ...row }) => { void _skip; return row; }), { onConflict: "id" }));
   }
   // Before the done-photos migration runs, crew_jobs has no done_confirmed column: insert without it.
   if (error && /done_confirmed/.test(error.message || "")) {
-    await supabase.from("crew_jobs").insert(rows.map(({ done_confirmed: _skip, on_my_way_at: _skip2, ...row }) => { void _skip; void _skip2; return row; }));
+    await supabase.from("crew_jobs").upsert(rows.map(({ done_confirmed: _skip, on_my_way_at: _skip2, ...row }) => { void _skip; void _skip2; return row; }), { onConflict: "id" });
   }
 }
 

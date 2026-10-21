@@ -1,3 +1,5 @@
+import { crewFixReason } from "@/lib/clock-reason";
+export { crewFixReason };
 import { supabase } from "@/lib/supabase";
 
 export type ClockEntry = {
@@ -46,11 +48,15 @@ export async function refreshOwnerClock(): Promise<ClockEntry[]> {
   return data as ClockEntry[];
 }
 
+
 /** Owner: fix an entry (e.g. a forgotten clock-out). */
 export async function ownerEditClock(id: string, startedAt: string, endedAt: string) {
+  // B4: the crew member's own "Fix time" reason is kept; the owner's edit is added after it.
+  const { data: before } = await supabase.from("crew_clock").select("edited_reason").eq("id", id).maybeSingle();
+  const crewReason = crewFixReason(before as ClockEntry | null);
   const { error } = await supabase
     .from("crew_clock")
-    .update({ started_at: startedAt, ended_at: endedAt, edited_reason: "Edited by owner", edited_at: new Date().toISOString(), edited_by: "owner" })
+    .update({ started_at: startedAt, ended_at: endedAt, edited_reason: crewReason ? `${crewReason} · Edited by owner`.slice(0, 200) : "Edited by owner", edited_at: new Date().toISOString(), edited_by: "owner" })
     .eq("id", id);
   return error ? error.message : "";
 }

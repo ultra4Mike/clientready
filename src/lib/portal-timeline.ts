@@ -1,3 +1,4 @@
+import { localDayOf } from "@/lib/local-day";
 import { readApproval } from "@/lib/approval";
 import { readPayments } from "@/lib/payments";
 import { readStages, stagePlan, todayYmd } from "@/lib/stages";
@@ -11,7 +12,7 @@ export type PortalTimelineItem = { key: string; date: string; kind: "sent" | "ap
 type Doc = { id: string; type: string; title: string; data: Record<string, unknown> };
 type Figures = { total: number; owed: number };
 
-const ymd = (value: unknown) => (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : "");
+export const ymd = localDayOf;
 const num = (value: unknown) => Number(String(value ?? "").replace(/[^0-9.-]/g, "")) || 0;
 
 export function portalTimeline(docs: (Doc & Figures)[], today = todayYmd()): PortalTimelineItem[] {

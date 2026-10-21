@@ -69,6 +69,7 @@ export async function saveCloudDocument(doc: CloudDoc) {
   // (Mutates doc.data so callers that store the same object locally keep the same stamp.)
   doc.data = doc.data || {};
   doc.data.updatedAt = new Date().toISOString();
+  await materializeSchedule(doc);
   const userId = await getUserId();
   if (!userId) {
     // Signed in but unreachable (offline / network error): remember to upload it later.
@@ -134,6 +135,7 @@ export async function saveCloudDocument(doc: CloudDoc) {
     else {
       markSynced(doc.id);
       writeBases([{ id: doc.id, data: doc.data }]);
+      await mirrorToCrew({ ...doc });
     }
     return doc.id;
   }
@@ -156,5 +158,35 @@ export async function saveCloudDocument(doc: CloudDoc) {
   }
   markSynced(doc.id, data.id);
   writeBases([{ id: data.id, data: doc.data }]);
+  await mirrorToCrew({ ...doc, id: data.id });
   return data.id;
+}
+
+/**
+ * B1/B2: every saved invoice/proposal keeps the crew app's schedule rows in step (date, times,
+ * checklist, status), whatever screen saved it. Errors never block the owner's save.
+ */
+/**
+ * B1: a job/proposal that is on the calendar only through its dates (no schedule block) but has
+ * crew gets its schedule block written, so crew Done/checklist/status have one place to land.
+ */
+async function materializeSchedule(doc: CloudDoc) {
+  if ((doc.type !== "invoice" && doc.type !== "proposal") || !doc.data || doc.data.schedule) return;
+  try {
+    const { readSchedule } = await import("@/lib/schedule");
+    const derived = readSchedule(doc.data);
+    if (derived && derived.workerIds.length) doc.data.schedule = { ...derived, updatedAt: doc.data.updatedAt };
+  } catch {
+    // leave it derived
+  }
+}
+
+async function mirrorToCrew(doc: CloudDoc) {
+  if (doc.type !== "invoice" && doc.type !== "proposal") return;
+  try {
+    const { syncScheduleCrewJobs } = await import("@/lib/schedule");
+    await syncScheduleCrewJobs(doc);
+  } catch {
+    // the next save or the Team > Crew dates check catches it up
+  }
 }
