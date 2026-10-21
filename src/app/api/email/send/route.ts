@@ -1,4 +1,5 @@
 import { emailConfig } from "@/lib/email-server";
+import { clientIp, rateLimited, tooMany } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +17,7 @@ export async function POST(request: Request) {
   if (!config.enabled) return fail(503, "Email sending is not set up. Use “Open in email app”.");
   const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   if (!token) return fail(401, "Sign in first.");
+  if (rateLimited(`email:${clientIp(request)}`, 20, 60_000)) return tooMany();
   const body = (await request.json().catch(() => null)) as { docId?: unknown; to?: unknown; subject?: unknown; text?: unknown } | null;
   const docId = String(body?.docId || "");
   const to = String(body?.to || "").trim();
