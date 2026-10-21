@@ -246,22 +246,22 @@ export default function ApprovePage() {
           <div className="mt-2 grid gap-4 border-t border-slate-200 pt-3 text-sm sm:grid-cols-2 sm:gap-6">
             <div className="space-y-0.5 text-slate-600">
               <LineSplit items={items} />
-              {payments.filter((payment) => amountOf(payment.amount) > 0).map((payment) => (
-                <div key={payment.id} className="flex justify-between gap-2">
-                  <span>Paid{payment.date ? ` ${payment.date}` : ""}{payment.method ? ` · ${payment.method}` : ""}</span>
-                  <span>-${amountOf(payment.amount).toFixed(2)}</span>
-                </div>
-              ))}
             </div>
             <div className="space-y-0.5">
               <div className="flex justify-between"><span>Subtotal</span><span>${totals.subtotal.toFixed(2)}</span></div>
               {totals.discount > 0 && <div className="flex justify-between"><span>{discountLabel(text(data.discountType), text(data.discountValue))}</span><span>-${totals.discount.toFixed(2)}</span></div>}
               <div className="flex justify-between"><span>Tax</span><span>${totals.tax.toFixed(2)}</span></div>
               <div className="flex justify-between font-semibold"><span>Total</span><span>${totals.total.toFixed(2)}</span></div>
-              {totals.paid > 0 && <div className="flex justify-between"><span>Paid</span><span>-${totals.paid.toFixed(2)}</span></div>}
+              {/* R59: payments (e.g. a deposit) under Total, then the balance. */}
+              {payments.filter((payment) => amountOf(payment.amount) > 0).map((payment, index) => (
+                <div key={payment.id} className="flex justify-between gap-2 text-slate-600" data-testid="approve-payment">
+                  <span>{index === 0 && (isProposal || data.fromProposal) ? "Deposit paid" : "Paid"}{payment.date ? ` ${payment.date}` : ""}{payment.method ? ` · ${payment.method}` : ""}</span>
+                  <span className="tabular-nums">-${amountOf(payment.amount).toFixed(2)}</span>
+                </div>
+              ))}
               {!isProposal && (
                 <div className="mt-2 flex items-baseline justify-between cr-tone-teal rounded-lg bg-teal-50 px-3 py-2 text-lg font-bold text-teal-900 print:bg-transparent print:px-0" data-testid="approve-owed">
-                  <span>Still owed</span><span>${totals.balance.toFixed(2)}</span>
+                  <span>{totals.paid > 0.004 && totals.balance > 0.004 ? "Remaining balance" : "Still owed"}</span><span>${totals.balance.toFixed(2)}</span>
                 </div>
               )}
             </div>

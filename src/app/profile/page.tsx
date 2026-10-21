@@ -119,8 +119,10 @@ export default function ProfilePage() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     const pct = String(profile.setAsidePercent ?? "").trim();
-    if (pct !== "" && !(/^\d+(\.\d+)?$/.test(pct) && Number(pct) <= 100)) {
-      setMessage("Set aside must be a number from 0 to 100.");
+    if (!(/^\d+(\.\d+)?$/.test(pct) && Number(pct) <= 100)) {
+      setMessage("Set aside must be a number from 0 to 100 (it can't be blank).");
+      const more = document.querySelector<HTMLDetailsElement>('[data-testid="more-settings"]'); if (more) more.open = true;
+      document.querySelector<HTMLInputElement>('[data-testid="set-aside-percent"]')?.focus();
       return;
     }
     window.localStorage.setItem("clientready-profile", JSON.stringify({ ...profile, automations }));

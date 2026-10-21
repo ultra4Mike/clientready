@@ -15,11 +15,19 @@ export function balanceLabel(paid: number, balance: number) {
   return paid > 0.004 && balance > 0.004 ? "Remaining balance" : "Still owed";
 }
 
-/** One-tap progress billing: a deposit due today, the rest due on the invoice due date. */
-export function depositRemainderStages(percent = 30, today = "", dueDate = ""): Stage[] {
+/**
+ * One-tap progress billing: a deposit due today, the rest due on the invoice due date.
+ * R57: when money is already paid (e.g. a proposal deposit carried to the invoice), the deposit stage IS
+ * that paid amount (not a new 30%), so the stages show "Deposit (paid) $50" + "Remaining balance".
+ */
+export function depositRemainderStages(percent = 30, today = "", dueDate = "", alreadyPaid = 0): Stage[] {
   const id = `${Date.now()}`;
+  const paid = round(Math.max(alreadyPaid, 0));
+  const deposit: Stage = paid > 0.004
+    ? { id: `${id}-d`, label: "Deposit (paid)", kind: "deposit", mode: "amount", value: paid.toFixed(2), dueDate: "" }
+    : { id: `${id}-d`, label: "Deposit", kind: "deposit", mode: "percent", value: String(percent), dueDate: today };
   return [
-    { id: `${id}-d`, label: "Deposit", kind: "deposit", mode: "percent", value: String(percent), dueDate: today },
+    deposit,
     // R33: the remainder is due on the invoice due date, so it can go overdue.
     { id: `${id}-f`, label: "Remaining balance", kind: "final", mode: "percent", value: "", dueDate: dueDate || "" },
   ];

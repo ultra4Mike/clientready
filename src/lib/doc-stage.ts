@@ -47,10 +47,13 @@ export function documentStage(doc: Doc, allDocs: Doc[] = []): { stage: DocStage;
   }
   const { total, owed } = docAmounts(doc);
   if (status === "paid" || (status !== "draft" && total > 0 && owed <= 0.004)) return { stage: "paid", next: "none" };
-  if (status === "draft") return { stage: "draft", next: "send" };
+  // R58: a client who approved through the link moves an invoice past Draft/Sent to Approved.
+  const approved = approval?.status === "approved";
+  if (status === "draft" && !approved) return { stage: "draft", next: "send" };
   if (schedule && !(schedule.status === "done" && schedule.confirmedAt)) {
     return { stage: "scheduled", next: schedule.status === "done" ? "confirm-done" : "complete-job" };
   }
+  if (approved && !schedule) return { stage: "approved", next: owed > 0.004 ? "collect-payment" : "none" };
   return { stage: "invoiced", next: owed > 0.004 ? "collect-payment" : "none" };
 }
 

@@ -172,6 +172,7 @@ function nextNumber(kind: DocKind) {
 
 export default function NewInvoicePage() {
   const [docId, setDocId] = useState("");
+  const [legacyPaymentIds, setLegacyPaymentIds] = useState<string[]>([]);
   const [docKind, setDocKind] = useState<DocKind>("invoice");
   const [clientName, setClientName] = useState("");
   // Saved client this document belongs to (stable across renames); "" = match by name.
@@ -403,6 +404,8 @@ export default function NewInvoicePage() {
       setNoLateFee(data.noLateFee === true);
       setDiscountValue(data.discountValue || "");
       setPayments(readPayments(data));
+      // R56: only rows that were already saved without a method when the invoice was opened are exempt (R30).
+      setLegacyPaymentIds(readPayments(data).filter((row) => (Number(String(row.amount).replace(/[^0-9.-]/g, "")) || 0) > 0 && !row.method.trim() && !(data as Record<string, unknown>).fromProposal).map((row) => row.id));
       setSignature(readSignature(data.signature));
       setProposalSignature(readSignature(data.proposalSignature));
       setPadKey((key) => key + 1);
@@ -646,7 +649,7 @@ export default function NewInvoicePage() {
     setDocId(""); setClientSearch(""); setClientName(""); setClientId(""); setClientCompany(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
     setInvoiceNumber(nextNumber(docKind)); setInvoiceDate(ymd(new Date())); setDueDate(plusDays(14)); setJobStart(""); setJobEnd("");
     setNotes(isProposal ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
-    setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setSignature(null); setProposalSignature(null); setPadKey((key) => key + 1); setDocPayLink(""); setPhotos([]); setShowPhotos(false); setChangeOrderOf(null); setFromProposal(null); setMadeInvoices([]); setChangeOrderNotes([]); setRecFreq("off"); setRecNext(""); setRecLoadedNext(""); setRecurringFrom(null); setApproval(null); setEmailLog([]); setEmailOpen(false); setSchedule(null); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
+    setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setLegacyPaymentIds([]); setSignature(null); setProposalSignature(null); setPadKey((key) => key + 1); setDocPayLink(""); setPhotos([]); setShowPhotos(false); setChangeOrderOf(null); setFromProposal(null); setMadeInvoices([]); setChangeOrderNotes([]); setRecFreq("off"); setRecNext(""); setRecLoadedNext(""); setRecurringFrom(null); setApproval(null); setEmailLog([]); setEmailOpen(false); setSchedule(null); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
     setStyle("clean"); setJobTime(""); setCosts(emptyCosts); setCrew([]); setOtherFees([]); setCrewReport(null);
   }
 
@@ -662,9 +665,10 @@ export default function NewInvoicePage() {
     const raw = window.localStorage.getItem("clientready-documents");
     const docs = raw ? JSON.parse(raw) : [];
     const localId = currentDocId(docId) || Date.now().toString();
-    if (!isProposal) {
+    {
+      // R56: proposals (deposits) are checked too, so a deposit without a method can't be copied to the invoice.
       const before = (docs as SavedDocument[]).find((item) => item.id === localId);
-      const required = paymentRequirement(saveStatus, savePayments, before?.data?.status === "paid", before ? readPayments(before.data as never) : []);
+      const required = paymentRequirement(saveStatus, savePayments, before?.data?.status === "paid", before ? readPayments(before.data as never).filter((row) => legacyPaymentIds.includes(row.id)) : []);
       if (required) {
         setSaveMessage(required);
         setPaymentProblem(required);

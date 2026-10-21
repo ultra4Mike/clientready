@@ -140,9 +140,11 @@ export const METHOD_LABEL: Record<string, string> = { Bank: "Bank transfer (ACH)
 export const methodLabel = (method: unknown) => METHOD_LABEL[String(method || "")] || String(method || "");
 
 export function paymentRequirement(status: unknown, payments: Payment[], legacyPaid = false, saved: Payment[] = []) {
-  const withAmount = payments.filter((payment) => (Number(payment.amount) || 0) > 0);
+  // R56: same parser as the paid total ("$1,200.00" counts), so a row with an amount always needs a method.
+  const amountNum = (value: unknown) => Number(String(value ?? "").replace(/[^0-9.-]/g, "")) || 0;
+  const withAmount = payments.filter((payment) => amountNum(payment.amount) > 0);
   // Rows already saved without a method (older invoices, the server's legacy card row) are left alone unless edited (Help R30).
-  const untouched = (payment: Payment) => saved.some((old) => old.id === payment.id && String(old.amount) === String(payment.amount) && !String(old.method || "").trim());
+  const untouched = (payment: Payment) => saved.some((old) => Boolean(old.id) && old.id === payment.id && String(old.amount) === String(payment.amount) && !String(old.method || "").trim());
   if (withAmount.some((payment) => !String(payment.method || "").trim() && !untouched(payment))) return "Choose how each payment was made (Method) before saving.";
   if (String(status) === "paid" && !legacyPaid && !withAmount.length) return "To mark this invoice Paid, add a payment with the amount and how it was paid, or use Mark paid.";
   return "";
