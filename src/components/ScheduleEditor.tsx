@@ -1,5 +1,6 @@
 "use client";
 
+import { overLimit, ownerOvertimeHours, weekScheduledHours } from "@/lib/overtime";
 import { checklistFromLines } from "@/lib/checklist";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { refreshOwnerUnavailable, unavailableOn, type Unavailable } from "@/lib/unavailable";
@@ -57,6 +58,8 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
   const draft = { date, startTime, endTime, workerIds, status, overrides: value?.overrides };
   const conflicts = bookingConflicts(allDocs, docId, draft);
   const blocks = bookedBlocks(allDocs, docId, date, workerIds);
+  const overtimeLimit = ownerOvertimeHours();
+  const overtime = date && workerIds.length ? overLimit(weekScheduledHours(allDocs, docId, { date, startTime, endTime, workerIds }), overtimeLimit).filter((row) => workerIds.includes(row.id)) : [];
   const length = startTime ? (endTime && endTime > startTime ? toMin(endTime) - toMin(startTime) : 60) : 60;
   const suggestion = conflicts.length ? nextOpenSlot(allDocs, docId, date, workerIds, length, startTime ? toMin(startTime) : undefined) || nextOpenSlot(allDocs, docId, date, workerIds, length) : "";
   function applySlot(slot: string) {
@@ -156,6 +159,11 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
         {travel.length > 0 && (
           <p role="alert" data-testid="travel-warning" data-state="warn" className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-900 dark:text-amber-200">
             Less than {TRAVEL_BUFFER_MINUTES} min travel time: {travel.map((w) => `${names.get(w.workerId) || "Worker"} ${w.gap < 0 ? "overlaps" : `has ${w.gap} min before/after`} ${w.otherTitle}`).join("; ")}. You can still save.
+          </p>
+        )}
+        {overtime.length > 0 && (
+          <p role="status" data-testid="overtime-warning" data-workers={overtime.map((row) => row.id).join(",")} className="mt-2 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-900 dark:text-amber-200">
+            Over {overtimeLimit} scheduled hours this week: {overtime.map((row) => `${names.get(row.id) || "Worker"} ${row.hours} hrs`).join("; ")}. You can still save.
           </p>
         )}
         {picking && (

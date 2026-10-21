@@ -10,7 +10,7 @@ function moneySettings(row: Record<string, unknown>) {
   let local: Record<string, unknown> = {};
   try { local = JSON.parse(window.localStorage.getItem("clientready-profile") || "{}") || {}; } catch { local = {}; }
   const pick = (cloud: unknown, mine: unknown, fallback: string) => (typeof cloud === "string" && cloud.trim() ? cloud : typeof mine === "string" && mine.trim() ? mine : fallback);
-  return { setAsidePercent: pick(row.set_aside_percent, local.setAsidePercent, "30"), profitAlertMargin: pick(row.profit_alert_margin, local.profitAlertMargin, "20") };
+  return { setAsidePercent: pick(row.set_aside_percent, local.setAsidePercent, "30"), profitAlertMargin: pick(row.profit_alert_margin, local.profitAlertMargin, "20"), overtimeHours: pick(row.overtime_hours, local.overtimeHours, "40") };
 }
 
 function lateFeeFields(row: Record<string, unknown>) {

@@ -1,5 +1,6 @@
 "use client";
 
+import { ownerOvertimeHours } from "@/lib/overtime";
 import { useEffect, useMemo, useState } from "react";
 import PeriodToggle from "@/components/PeriodToggle";
 import { periodRange, type PeriodRange } from "@/lib/period";
@@ -33,6 +34,19 @@ export default function TimesheetExport({ names }: { names: Record<string, strin
     }
     return [...totals.values()].sort((a, b) => a.worker.localeCompare(b.worker));
   }, [entries, range, period, names]);
+  // Overtime soft warning: clocked hours this Mon-Sun week over the Profile limit (0 = off).
+  const overtime = useMemo(() => {
+    const limit = ownerOvertimeHours();
+    const week = periodRange("week");
+    const hours = new Map<string, number>();
+    for (const entry of entries) {
+      const day = localYmd(new Date(entry.started_at));
+      if (!entry.ended_at || day < week.from || day > week.to) continue;
+      const worker = names[entry.employee_id] || entry.worker_name || entry.worker_email || "Unknown";
+      hours.set(worker, (hours.get(worker) || 0) + entryHours(entry));
+    }
+    return { limit, rows: limit > 0 ? [...hours].filter(([, h]) => h > limit + 0.001).map(([worker, h]) => ({ worker, hours: h })) : [] };
+  }, [entries, names]);
   function choose(next: PeriodRange) {
     setPeriod(next);
     if (next !== "all") setRange(periodRange(next));
@@ -70,6 +84,11 @@ export default function TimesheetExport({ names }: { names: Record<string, strin
       <h2 id="timesheet-export-title" className="text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Timesheets</h2>
       <p className="mt-1 text-xs text-[var(--cr-muted)]">Crew clock in/out hours as a spreadsheet (CSV). Hours only, no pay.</p>
       <div className="mt-3"><PeriodToggle value={period} onChange={choose} testid="timesheet-period" /></div>
+      {overtime.rows.length > 0 && (
+        <p role="status" data-testid="timesheet-overtime" className="mt-3 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-900 dark:text-amber-200">
+          Over {overtime.limit} hours this week: {overtime.rows.map((row) => `${row.worker} ${row.hours.toFixed(2)} hrs`).join("; ")}. Overtime pay rules are up to you; nothing was changed.
+        </p>
+      )}
       <table className="mt-3 w-full text-sm" data-testid="timesheet-screen" data-range={period || "custom"}>
         <thead><tr className="text-left text-xs text-[var(--cr-muted)]"><th className="py-1">Worker</th><th className="py-1 text-right">Entries</th><th className="py-1 text-right">Hours</th></tr></thead>
         <tbody>

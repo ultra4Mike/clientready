@@ -25,6 +25,7 @@ const emptyProfile = {
   paymentLink: "",
   setAsidePercent: "30",
   profitAlertMargin: "20",
+  overtimeHours: "40",
   lateFeeType: "off",
   lateFeeValue: "",
   lateFeeGraceDays: "0",
@@ -77,6 +78,7 @@ export default function ProfilePage() {
         paymentLink: row.payment_link || "",
         setAsidePercent: (typeof row.set_aside_percent === "string" && row.set_aside_percent.trim()) || local.setAsidePercent || "30",
         profitAlertMargin: (typeof row.profit_alert_margin === "string" && row.profit_alert_margin.trim()) || (local.profitAlertMargin ?? "20"),
+        overtimeHours: (typeof row.overtime_hours === "string" && row.overtime_hours.trim()) || (local.overtimeHours ?? "40"),
         lateFeeType: row.late_fee_type || local.lateFeeType || "off",
         lateFeeValue: row.late_fee_value ?? local.lateFeeValue ?? "",
         lateFeeGraceDays: row.late_fee_grace_days ?? local.lateFeeGraceDays ?? "0",
@@ -137,6 +139,8 @@ export default function ProfilePage() {
       // set_aside_percent is an original profiles column; profit_alert_margin needs migration 20261020090000.
       if (!error) {
         const money = await supabase.from("profiles").update({ set_aside_percent: String(profile.setAsidePercent ?? ""), profit_alert_margin: String(profile.profitAlertMargin ?? "") }).eq("id", user.id);
+        // Overtime hours (migration 20261021090000): its own update so an older database still saves the rest.
+        await supabase.from("profiles").update({ overtime_hours: String(profile.overtimeHours ?? "") }).eq("id", user.id);
         if (money.error && /profit_alert_margin/.test(money.error.message || "")) await supabase.from("profiles").update({ set_aside_percent: String(profile.setAsidePercent ?? "") }).eq("id", user.id);
       }
       if (error) {
@@ -252,6 +256,11 @@ export default function ProfilePage() {
           <input name="profitAlertMargin" data-testid="profit-alert-margin" inputMode="numeric" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="20" value={profile.profitAlertMargin} onChange={(event) => update("profitAlertMargin", event.target.value)} />
         </label>
         <p className="-mt-1 text-xs text-[var(--cr-muted)]">Jobs under this margin, jobs that lose money, and jobs where the crew spent more than your costs are flagged on the invoice and dashboard. 0 turns off the margin alert (losses are always flagged). Only you see this.</p>
+        <label className="block text-sm font-medium text-[var(--cr-muted)]">
+          Overtime warning above hours per week
+          <input name="overtimeHours" data-testid="overtime-hours" type="number" min={0} max={168} inputMode="numeric" className="mt-1.5 min-h-11 w-full max-w-[10rem] tabular-nums rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="40" value={profile.overtimeHours} onChange={(event) => update("overtimeHours", event.target.value)} />
+        </label>
+        <p className="-mt-1 text-xs text-[var(--cr-muted)]">A warning only, per worker, Monday to Sunday, when scheduling and on Timesheets. Pay is never changed. 0 turns it off.</p>
         <fieldset className="space-y-2" data-testid="late-fee-settings">
           <legend className="text-sm font-medium text-[var(--cr-muted)]">Late fee (suggested only, you add it yourself)</legend>
           <div className="grid grid-cols-3 gap-2">
