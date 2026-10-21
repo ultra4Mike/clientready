@@ -2,7 +2,7 @@
  * DRAFT help articles for upcoming / partly shipped features. NOT rendered (not imported by the Help Center).
  * When a feature ships, verify labels in the UI, then move the article into HELP_ARTICLES in ./articles.ts.
  * Status notes: manual payment methods shipped in 81a2084; their articles moved to articles.ts 2026-10-16;
- * per-owner card payments (Stripe Connect / other processors), in-app refunds, automatic reminders and in-app SMS are not built yet; their UI labels are marked [TBD].
+ * per-owner card payments (Stripe Connect / other processors), in-app refunds, in-app SMS is not built yet (automatic emails shipped as Automations, 9fe49fd); their UI labels are marked [TBD].
  */
 import type { HelpArticle } from "./articles";
 
@@ -20,19 +20,18 @@ export const UPCOMING_HELP_ARTICLES: UpcomingArticle[] = [
   { feature: "refunds", status: "draft", id: "refund-in-app", category: "Payments", question: "Can I issue a refund from ClientReady?",
     steps: ["Not built. [TBD: whether in-app refunds are planned].", "Today, refund in your provider's dashboard or send the money back yourself, then use Remove payment on the invoice."],
     related: ["ts-refund"], keywords: ["refund"] },
-  { feature: "reminders", status: "draft",
-    id: "auto-reminders", category: "Invoices", question: "Can ClientReady remind clients about unpaid invoices automatically?",
-    summary: "Planned: choose a reminder schedule and ClientReady emails overdue clients for you.",
-    steps: ["Open Settings and find [TBD: reminders section label].", "[TBD: toggle label] Turn on automatic reminders and pick when they go out (for example 3 days before due, on the due date, 7 days after).", "Edit the reminder message if you like and Save.", "Turn reminders off for a single invoice from that invoice."],
-    tips: ["Today you can already send a reminder by hand: open the invoice's Payment reminder and use Open in Messages or Open in email."],
-    related: ["sms-texting"], keywords: ["reminder", "overdue", "late", "nudge"] },
   { feature: "sms", status: "draft",
     id: "sms-texting", category: "Email & sharing", question: "Can I text clients from ClientReady?",
     summary: "Planned: send texts (links, reminders, On my way) from ClientReady itself.",
     steps: ["Clients must agree to receive texts; their phone must be on their client card.", "From an invoice, proposal or job, choose [TBD: in-app text action label] and review the message.", "Tap [TBD: send label]. Replies come back to [SMS reply destination]."],
     tips: ["Today, texts open in your own Messages app and are sent from your phone number.", "Clients can reply STOP to opt out."],
-    related: ["auto-reminders"], keywords: ["sms", "text", "message", "phone"] },
+    related: ["automations"], keywords: ["sms", "text", "message", "phone"] },
   { feature: "reimbursements", status: "draft", id: "crew-reimbursements", category: "Crew", question: "How do I pay crew back for what they spent?",
     steps: ["[TBD: where reimbursements live, e.g. a Reimbursements page].", "[TBD: how crew costs are marked owed, approved and paid back].", "[TBD: labels and how it affects job costs and Reports]."],
     tips: ["Draft only: Dev's reimbursements feature is in progress and not committed; labels not verified."], related: ["crew-costs-review", "crew-expenses"], keywords: ["reimburse", "pay back", "crew expenses", "owed to crew"] },
+  { feature: "api-keys", status: "shipped-verify-labels", id: "api-keys", category: "Account", question: "How do I connect ClientReady to Zapier, Make or my own tools (API keys)?",
+    summary: "Optional and off by default: turn on the API and create a key with only the permissions a tool needs.",
+    steps: ["Open Settings and find Integrations (optional).", "Turn on the API (for Zapier, Make or your own tools). You see 'API on. Create a key below.'", "Enter a Key name (e.g. Zapier) and tick only what it needs: Read clients, Add/edit clients, Read jobs, Update job status/date, Read invoices, Create draft invoices, Add visit notes.", "Tap Create key. Copy it right away: 'Copy this key now. It won't be shown again.'", "Paste it into the other tool. Docs for developers are at /developers.", "To stop a key, tap Revoke ('Key revoked.'). Turning the API off stops every key until you turn it back on."],
+    tips: ["Keys are stored scrambled (hashed); ClientReady can't show a key again. Lost it? Revoke it and make a new one.", "A key only sees your account's data. Each key is limited to 60 requests a minute; up to 10 active keys.", "A worker key [TBD label: (worker)] never sees prices or invoices.", "Invoices made through the API start as drafts. Payments and amounts are only changed in the app.", "Needs migration 20261022090000_api_keys; before it's run Settings shows 'Integrations need an account update (migration 20261022090000).'", "HOLD: do not publish until R71/R72 are fixed (Dev d2e5e44)."],
+    related: ["automations"], keywords: ["api", "api key", "zapier", "make", "integration", "webhook", "developer"] },
 ];
