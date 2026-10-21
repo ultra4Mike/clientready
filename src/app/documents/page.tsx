@@ -12,7 +12,7 @@ import { readApproval } from "@/lib/approval";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { documentTotals } from "@/lib/discount";
-import { documentStage, NEXT_LABEL, STAGE_LABEL } from "@/lib/doc-stage";
+import { collectedOn, documentStage, NEXT_LABEL, STAGE_LABEL } from "@/lib/doc-stage";
 import { displayStatus } from "@/lib/doc-status";
 import PeriodToggle from "@/components/PeriodToggle";
 import { inPeriod, periodRange, type PeriodRange } from "@/lib/period";
@@ -221,7 +221,7 @@ export default function DocumentsPage() {
       const info = factsById.get(doc.id) || facts(doc);
       const status = String(doc.data?.status || "draft");
       if (status === "draft" || !inPeriod(info.date, from, to)) continue;
-      count += 1; billed += info.total; owed += info.owed; paid += Math.max(info.total - info.owed, 0);
+      count += 1; billed += info.total; owed += info.owed; paid += collectedOn(doc);
       if (invoicePastDue(doc.data, info.total, info.owed)) overdue += info.owed;
     }
     return { count, billed, owed, overdue, paid };

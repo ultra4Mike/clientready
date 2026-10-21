@@ -9,6 +9,7 @@ import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { loadAccountIntoCache } from "@/lib/account-cache";
 import { amountOf, documentTotals } from "@/lib/discount";
+import { collectedOn } from "@/lib/doc-stage";
 import { balanceDue, isOpenBalance, invoicePastDue, paidTotal, readPayments } from "@/lib/payments";
 import { uniqueDocs } from "@/lib/change-orders";
 import FollowUps from "@/components/FollowUps";
@@ -128,7 +129,7 @@ export default function DashboardPage() {
 
   const stats = useMemo(() => {
     const paidDocs = invoices.filter((doc) => doc.data?.status === "paid");
-    const paid = paidDocs.reduce((sum, doc) => sum + invoiceTotal(doc), 0);
+    const paid = invoices.reduce((sum, doc) => sum + collectedOn(doc), 0);
     const overdueDocs = invoices.filter((doc) => invoicePastDue(doc.data as Record<string, unknown>, invoiceTotal(doc), balance(doc)));
     const overdue = overdueDocs.reduce((sum, doc) => sum + balance(doc), 0);
     const outstanding = invoices.filter((doc) => isOpenBalance(doc.data?.status, balance(doc))).reduce((sum, doc) => sum + balance(doc), 0);

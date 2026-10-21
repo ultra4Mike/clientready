@@ -64,3 +64,10 @@ export const NEXT_LABEL: Record<NextAction, string> = {
   send: "Send it", "await-approval": "Waiting for approval", schedule: "Schedule the job", "create-invoice": "Create the invoice",
   "complete-job": "Complete the job", "confirm-done": "Confirm job done", "collect-payment": "Collect payment", none: "",
 };
+
+/** R84: money collected = paid on every sent (non-draft) invoice, part payments included. Dashboard and Documents both use this. */
+export function collectedOn(doc: Doc) {
+  if (doc.type !== "invoice" || String(doc.data?.status || "draft") === "draft") return 0;
+  const { total, owed } = docAmounts(doc);
+  return Math.max(total - owed, 0);
+}
