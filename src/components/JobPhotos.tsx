@@ -5,9 +5,10 @@ import { useState } from "react";
 import PhotoAnnotator from "@/components/PhotoAnnotator";
 import { compressPhoto, dataUrlBytes, MAX_PHOTOS, orderByTag, PHOTO_TAG_LABEL, type JobPhoto, type PhotoTag } from "@/lib/photos";
 
-type EditorProps = { photos: JobPhoto[]; onChange: (photos: JobPhoto[]) => void; showOnCopy?: boolean; onShowOnCopyChange?: (value: boolean) => void };
+type CrewPhoto = { id: string; worker_name: string; photo: string; created_at: string };
+type EditorProps = { photos: JobPhoto[]; onChange: (photos: JobPhoto[]) => void; showOnCopy?: boolean; onShowOnCopyChange?: (value: boolean) => void; crewPhotos?: CrewPhoto[] };
 
-export function JobPhotosEditor({ photos, onChange, showOnCopy = false, onShowOnCopyChange }: EditorProps) {
+export function JobPhotosEditor({ photos, onChange, showOnCopy = false, onShowOnCopyChange, crewPhotos = [] }: EditorProps) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [drawing, setDrawing] = useState("");
@@ -41,7 +42,7 @@ export function JobPhotosEditor({ photos, onChange, showOnCopy = false, onShowOn
   return (
     <div className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5" data-testid="photos-editor">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-medium">Job photos ({photos.length}/{MAX_PHOTOS})</h2>
+        <h2 className="font-medium" data-testid="photos-count">Job photos ({photos.length}/{MAX_PHOTOS}){crewPhotos.length ? ` · ${crewPhotos.length} from crew` : ""}</h2>
         {!full && (
           <div className="flex gap-2">
             <label className={pick}>
@@ -55,6 +56,22 @@ export function JobPhotosEditor({ photos, onChange, showOnCopy = false, onShowOn
           </div>
         )}
       </div>
+      {crewPhotos.length > 0 && (
+        <div className="space-y-2" data-testid="crew-photos">
+          <p className="text-sm text-[var(--cr-muted)]">From the crew (marked done). Only photos you add go on the invoice.</p>
+          <div className="flex flex-wrap gap-2">
+            {crewPhotos.map((crew) => {
+              const added = photos.some((photo) => photo.id === `crew-${crew.id}`);
+              return (
+                <div key={crew.id} className="flex flex-col items-center gap-1" data-testid="crew-photo">
+                  <img src={crew.photo} alt={`Crew photo by ${crew.worker_name || "crew"}`} className="h-20 w-20 rounded-lg object-cover" />
+                  <button type="button" disabled={added || full} data-testid="crew-photo-add" onClick={() => onChange([...photos, { id: `crew-${crew.id}`, dataUrl: crew.photo, caption: crew.worker_name ? `By ${crew.worker_name}` : "", addedAt: crew.created_at || new Date().toISOString() }])} className="min-h-11 rounded-lg border border-slate-300 px-2 text-xs disabled:opacity-50">{added ? "Added" : "Add to invoice"}</button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
       {busy && <p className="text-sm text-slate-600">Shrinking photos…</p>}
       {drawingPhoto && <PhotoAnnotator src={drawingPhoto.dataUrl} onCancel={() => setDrawing("")} onSave={(dataUrl) => { onChange(photos.map((item) => item.id === drawingPhoto.id ? { ...item, dataUrl, annotated: true } : item)); setDrawing(""); }} />}
       {photos.length > 0 && (

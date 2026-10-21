@@ -53,7 +53,7 @@ import ChangeOrderNotes from "@/components/ChangeOrderNotes";
 import { ApprovalBadge, ApprovalShare } from "@/components/Approval";
 import ScheduleEditor from "@/components/ScheduleEditor";
 import { entryHours, fmtHours, hoursByWorker, ownerEditClock, crewFixReason, refreshOwnerClock, type ClockEntry } from "@/lib/clock";
-import { confirmRemoval, crewForWorkers, followSchedule, jobScheduleFromForm, crewIds, workLogged, clockHoursFor, dedupeWorkerIds, readSchedule, readWorkers, saveAssignment, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
+import { confirmRemoval, jobDonePhotos, crewForWorkers, followSchedule, jobScheduleFromForm, crewIds, workLogged, clockHoursFor, dedupeWorkerIds, readSchedule, readWorkers, saveAssignment, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
 import { readApproval, refreshApproval, type Approval } from "@/lib/approval";
 import { generateNextNow, readRecurring, readRecurringFrom, scheduleFromForm, type Frequency, type RecurringFrom } from "@/lib/recurring";
 import PayQr from "@/components/PayQr";
@@ -224,6 +224,9 @@ export default function NewInvoicePage() {
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [scheduleKey, setScheduleKey] = useState(0);
   const [workers, setWorkers] = useState<Worker[]>([]);
+  // R83: photos the crew took when marking the job done.
+  const [crewPhotos, setCrewPhotos] = useState<Awaited<ReturnType<typeof jobDonePhotos>>>([]);
+  useEffect(() => { let live = true; if (docId) jobDonePhotos(docId).then((rows) => live && setCrewPhotos(rows)).catch(() => {}); else setCrewPhotos([]); return () => { live = false; }; }, [docId]);
   // R81: always re-read the team from the cloud once, so "+ Add crew" sees everyone Active.
   useEffect(() => { refreshEmployeesCache().then((ok) => { if (ok) setWorkers(readWorkers()); }).catch(() => {}); }, []);
   const [clockEntries, setClockEntries] = useState<ClockEntry[]>([]);
@@ -1133,7 +1136,7 @@ export default function NewInvoicePage() {
                 </span>
               </label>
             )}
-            <JobPhotosEditor photos={photos} onChange={setPhotos} showOnCopy={showPhotos} onShowOnCopyChange={setShowPhotos} />
+            <JobPhotosEditor photos={photos} crewPhotos={crewPhotos} onChange={setPhotos} showOnCopy={showPhotos} onShowOnCopyChange={setShowPhotos} />
             <SignaturePad key={padKey} value={signature} onChange={setSignature} defaultName={clientName} />
             <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
             </Section>
