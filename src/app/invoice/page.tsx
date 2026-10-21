@@ -93,6 +93,7 @@ type CrewRow = {
 type DocKind = "invoice" | "proposal";
 
 const emptyItem: LineItem = { description: "", qty: "1", rate: "" };
+const CARD_FEE_PREFIX = "Card processing fee";
 const emptyCosts: JobCosts = {
   parts: "",
   gas: "",
@@ -484,6 +485,14 @@ export default function NewInvoicePage() {
     if (!lateFee || locked) return;
     setItems((current) => [...current, { description: lateFee.description, qty: "1", rate: lateFee.amount.toFixed(2) }]);
     setSaveMessage(`Late fee of $${lateFee.amount.toFixed(2)} added as a new line. Review it, then save.`);
+  }
+
+  /** Backlog 8: optional card surcharge as its own labeled line (3% of the current total). Nothing is saved until the owner saves. */
+  function addCardFee() {
+    if (locked || isProposal || !(totals.total > 0)) return;
+    const amount = Math.round(totals.total * 3) / 100;
+    setItems((current) => [...current, { ...emptyItem, description: `${CARD_FEE_PREFIX} (3%, credit card payments only)`, qty: "1", rate: amount.toFixed(2) }]);
+    setSaveMessage(`Card fee of $${amount.toFixed(2)} added as its own line. Remove it if the customer doesn't pay by credit card.`);
   }
 
   /** Owner tap: record the remaining balance as a cash payment dated today, mark the invoice paid, and save. */
@@ -969,6 +978,13 @@ export default function NewInvoicePage() {
               <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Line items & pricing</h2>
             <div className="space-y-3">
               <div className="flex items-center justify-between"><h2 className="font-medium">Line items</h2><button type="button" className="tap rounded-lg border border-teal-500/40 max-sm:min-h-11 px-3 py-1.5 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300" onClick={() => setItems((current) => [...current, { ...emptyItem }])}>Add item</button></div>
+              {!isProposal && !locked && totals.total > 0 && !items.some((item) => String(item.description || "").startsWith(CARD_FEE_PREFIX)) && (
+                <details className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm" data-testid="card-fee">
+                  <summary className="cursor-pointer text-slate-600">Pass card processing fee to the customer (optional)</summary>
+                  <p className="mt-1 text-xs text-slate-500">Adds a clearly labeled line: {CARD_FEE_PREFIX} (3%) = ${(totals.total * 0.03).toFixed(2)}. Only if they pay by credit card; remove it if they pay cash, check or bank. Not allowed on debit cards, and some states ban or cap card surcharges, so check your state first.</p>
+                  <button type="button" data-testid="card-fee-add" onClick={addCardFee} className="mt-2 min-h-11 rounded-lg border border-teal-500/40 px-3 text-sm font-medium text-teal-700 dark:text-teal-300">Add card fee line</button>
+                </details>
+              )}
               <div className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-teal-500/30 bg-teal-500/5 p-2.5 text-sm" data-testid="packages">
                 <select aria-label="Add a package" data-testid="package-add" className="min-h-11 rounded-lg border border-slate-300 px-3 py-2 text-sm" value="" onChange={(event) => { const pkg = packages.find((p) => p.id === event.target.value); if (pkg) setItems((current) => applyPackage(current, pkg)); }}>
                   <option value="">{packages.length ? "Add package…" : "No packages yet"}</option>
