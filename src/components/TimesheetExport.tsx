@@ -85,7 +85,7 @@ export default function TimesheetExport({ names }: { names: Record<string, strin
       <p className="mt-1 text-xs text-[var(--cr-muted)]">Crew clock in/out hours as a spreadsheet (CSV). Hours only, no pay.</p>
       <div className="mt-3"><PeriodToggle value={period} onChange={choose} testid="timesheet-period" /></div>
       {overtime.rows.length > 0 && (
-        <p role="status" data-testid="timesheet-overtime" className="mt-3 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-900 dark:text-amber-200">
+        <p role="status" data-testid="timesheet-overtime" className="cr-tone-warn mt-3 rounded-xl border border-amber-400 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-900 dark:text-amber-200">
           Over {overtime.limit} hours this week: {overtime.rows.map((row) => `${row.worker} ${row.hours.toFixed(2)} hrs`).join("; ")}. Overtime pay rules are up to you; nothing was changed.
         </p>
       )}
