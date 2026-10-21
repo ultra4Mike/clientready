@@ -10,6 +10,8 @@ export type TrialState = {
   cancelAtPeriodEnd?: boolean;
   /** Has a Stripe customer (can open the customer portal). */
   billing?: boolean;
+  /** Developer exemption (profiles.trial_exempt, set only by SQL/service role): fully active, no banner. */
+  exempt?: boolean;
 };
 
 const LIVE = ["active", "trialing", "past_due"];
@@ -42,6 +44,9 @@ export async function getTrialState(): Promise<TrialState> {
   // Before migration 20261017120000 runs: only the plan column exists.
   if (first.error) profile = (await supabase.from("profiles").select("plan").eq("id", user.id).maybeSingle<ProfileBilling>()).data;
 
+  // One developer account may be exempt (server-set flag; users cannot write it). Missing column -> not exempt.
+  const exemptRow = await supabase.from("profiles").select("trial_exempt").eq("id", user.id).maybeSingle<{ trial_exempt?: boolean | null }>();
+  if (!exemptRow.error && exemptRow.data?.trial_exempt === true) return { expired: false, daysLeft: 999, plan: "owner", exempt: true };
   const plan = profile?.plan || "trial";
   const status = profile?.subscription_status || "";
   const extra = { status, periodEnd: profile?.plan_period_end || null, cancelAtPeriodEnd: Boolean(profile?.cancel_at_period_end), billing: Boolean(profile?.stripe_customer_id) };
