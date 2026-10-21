@@ -104,7 +104,7 @@ export default function MobileNav({ onLogOut }: { onLogOut?: () => void }) {
             </div>
           )}
           {createOpen && !moreOpen && <div className="fixed inset-0 z-40 bg-slate-950/50 print:hidden" onClick={() => setCreateOpen(false)} />}
-          <div className={`quick-create-fab fixed right-4 ${moreOpen ? "hidden" : ""} bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 flex flex-col items-end gap-2 print:hidden`}>
+          <div className={`quick-create-fab fixed right-4 ${moreOpen || !createOpen ? "hidden" : ""} bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 flex flex-col items-end gap-2 print:hidden`}>
             {createOpen && (
               <div className="w-48 overflow-hidden rounded-2xl border border-teal-500/20 bg-[var(--cr-panel)] py-1 shadow-2xl">
                 {QUICK_CREATE.map((item) => (
@@ -114,24 +114,27 @@ export default function MobileNav({ onLogOut }: { onLogOut?: () => void }) {
                 ))}
               </div>
             )}
-            <button
-              type="button"
-              aria-label="Quick create"
-              aria-expanded={createOpen}
-              onClick={() => setCreateOpen(!createOpen)}
-              className="flex h-14 w-14 items-center justify-center rounded-full bg-teal-500 text-slate-950! shadow-lg shadow-teal-500/30 transition hover:bg-teal-400"
-            >
-              <svg aria-hidden="true" viewBox="0 0 24 24" className={`h-7 w-7 transition-transform ${createOpen ? "rotate-45" : ""}`} fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
-            </button>
           </div>
           <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-50 border-t border-teal-500/20 bg-[var(--cr-panel)]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur print:hidden">
-            <div className="mx-auto grid max-w-lg grid-cols-5">
+            <div className="mx-auto grid max-w-lg grid-cols-6">
               {mainLinks.filter((link) => TAB_HREFS.includes(link.href)).map((link) => (
                 <a key={link.href} href={link.href} className="flex flex-col items-center gap-1 px-1 py-2.5 text-[11px] font-medium transition hover:text-teal-700 dark:hover:text-teal-300">
                   <TabIcon name={link.href} />
                   {link.href === "/dashboard" ? "Home" : link.label}
                 </a>
               ))}
+              {/* R124: + lives in the tab bar, so it never covers page buttons. */}
+              <button
+                type="button"
+                aria-label="Quick create"
+                aria-expanded={createOpen}
+                data-testid="quick-create"
+                onClick={() => { setMoreOpen(false); setCreateOpen(!createOpen); }}
+                className="flex flex-col items-center gap-1 px-1 py-2 text-[11px] font-semibold text-teal-700 dark:text-teal-300"
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-teal-500 text-slate-950!"><svg aria-hidden="true" viewBox="0 0 24 24" className={`h-5 w-5 transition-transform ${createOpen ? "rotate-45" : ""}`} fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg></span>
+                New
+              </button>
               <button
                 type="button"
                 aria-expanded={moreOpen}
