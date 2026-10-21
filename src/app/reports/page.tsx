@@ -25,6 +25,7 @@ export default function ReportsPage() {
   const [crewExpenses, setCrewExpenses] = useState<CrewExpense[]>([]);
   const [year, setYear] = useState(String(new Date().getFullYear()));
 
+  const [crewLoaded, setCrewLoaded] = useState(false);
   useEffect(() => {
     // Read after mount so the static render and the first client render match.
     Promise.resolve().then(() => {
@@ -34,10 +35,12 @@ export default function ReportsPage() {
         setDocuments([]);
       }
     });
+    // R120: crew receipts show "…" until they load (not $0).
     supabase.auth.getSession().then(({ data }) => {
-      if (!data.session) return;
+      if (!data.session) return setCrewLoaded(true);
       supabase.from("crew_expenses").select("amount, created_at, kind, note, worker_name, doc_id").then(({ data: rows, error }) => {
         if (!error && rows) setCrewExpenses(rows as CrewExpense[]);
+        setCrewLoaded(true);
       });
     });
   }, []);
@@ -89,7 +92,7 @@ export default function ReportsPage() {
                   <td className={cell}>{usd(row.billed)}</td>
                   <td className={cell}>{usd(row.collected)}</td>
                   <td className={cell}>{usd(row.jobCosts)}</td>
-                  <td className={cell}>{usd(row.crewReceipts)}</td>
+                  <td className={cell} data-testid="report-crew-receipts" data-loading={crewLoaded ? undefined : "true"}>{crewLoaded ? usd(row.crewReceipts) : "…"}</td>
                 </tr>
               ))}
             </tbody>
@@ -99,7 +102,7 @@ export default function ReportsPage() {
                 <td className={cell}>{usd(report.totals.billed)}</td>
                 <td className={cell}>{usd(report.totals.collected)}</td>
                 <td className={cell}>{usd(report.totals.jobCosts)}</td>
-                <td className={cell}>{usd(report.totals.crewReceipts)}</td>
+                <td className={cell} data-testid="report-crew-receipts-total" data-loading={crewLoaded ? undefined : "true"}>{crewLoaded ? usd(report.totals.crewReceipts) : "…"}</td>
               </tr>
             </tfoot>
           </table>
