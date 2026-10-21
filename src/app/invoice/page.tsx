@@ -557,7 +557,9 @@ export default function NewInvoicePage() {
     : {};
 
   function addPayment() {
-    setPayments((current) => [...current, { id: Date.now().toString(), amount: current.length ? "" : (totals.balance || totals.total).toFixed(2), method: "Cash", date: ymd(new Date()), ref: "" }]);
+    // R105: a proposal's first deposit defaults to its requested deposit % (R90), else the balance.
+    const deposit = isProposal && Number(depositPercent) > 0 ? Math.round(totals.total * Number(depositPercent)) / 100 : 0;
+    setPayments((current) => [...current, { id: Date.now().toString(), amount: current.length ? "" : (deposit || totals.balance || totals.total).toFixed(2), method: "Cash", date: ymd(new Date()), ref: "" }]);
   }
   const lateFee = isProposal || !docId ? null : suggestedLateFee({ settings: lateFeeSettings, status, dueDate, balance: totals.balance, items, today: ymd(new Date()), skip: noLateFee });
 

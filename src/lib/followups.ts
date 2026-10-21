@@ -1,3 +1,6 @@
+import { greetingName } from "@/lib/reminders";
+/** R105: end a sentence without doubling a period ("Acme Co." stays "Acme Co."). */
+const dot = (text: string) => (/[.!?]$/.test(text.trim()) ? text.trim() : `${text.trim()}.`);
 // Owner-tap follow-up drafts: quotes waiting for approval, tomorrow's appointment reminders and
 // seasonal reminders (a client who had a job around this time last year and nothing booked since).
 // Nothing here sends anything; the owner opens each draft in their own text/email app.
@@ -11,7 +14,6 @@ export type FollowUp = { key: string; kind: "quote" | "appointment" | "seasonal"
 
 export const QUOTE_FOLLOWUP_DAYS = 3;
 const s = (value: unknown) => (typeof value === "string" ? value : "");
-const first = (name: string) => name.trim().split(/\s+/)[0] || "there";
 const biz = (name: string) => (name.trim() && name !== "Your business" ? name.trim() : "us");
 const ymd = (value: string) => value.slice(0, 10);
 function daysBetween(a: string, b: string) {
@@ -55,13 +57,13 @@ export function followUps(docs: Doc[], today: string, businessName: string, appr
       if (since < QUOTE_FOLLOWUP_DAYS) continue;
       const link = approvalUrl(doc);
       out.push({ ...base, key: `quote:${doc.id}:${sent}`, kind: "quote", sinceDays: since, subject: `Following up on your quote${base.title ? ` ${base.title}` : ""}`,
-        body: `Hi ${first(clientName)}, this is ${biz(businessName)} following up on the quote we sent${base.title ? ` (${base.title})` : ""}. Any questions, or would you like to go ahead?${link ? ` You can review and approve it here: ${link}` : ""} Thank you!` });
+        body: `Hi ${greetingName(clientName)}, this is ${biz(businessName)} following up on the quote we sent${base.title ? ` (${base.title})` : ""}. Any questions, or would you like to go ahead?${link ? ` You can review and approve it here: ${link}` : ""} Thank you!` });
     }
     if (doc.type === "invoice") {
       const schedule = readSchedule(data);
       if (!schedule || schedule.date !== tomorrow || schedule.status !== "scheduled") continue;
       out.push({ ...base, key: `appt:${doc.id}:${schedule.date}${schedule.startTime || ""}`, kind: "appointment", subject: "Appointment reminder",
-        body: `Hi ${first(clientName)}, this is ${biz(businessName)} with a reminder that we're scheduled for tomorrow, ${shortDay(tomorrow)}${timeText(schedule.startTime)}. Reply here if you need to change it. See you then!` });
+        body: `Hi ${greetingName(clientName)}, this is ${biz(businessName)} with a reminder that we're scheduled for tomorrow, ${shortDay(tomorrow)}${timeText(schedule.startTime)}. Reply here if you need to change it. See you then!` });
     }
   }
   out.push(...seasonalFollowUps(docs, today, businessName));
@@ -143,7 +145,7 @@ export function seasonalFollowUps(docs: Doc[], today: string, businessName: stri
     out.push({
       key: `season:${key}:${year}`, kind: "seasonal", docId: doc.id, title: s(data.invoiceNumber) || doc.title || "", clientName, phone: s(data.clientPhone), email: s(data.clientEmail),
       sinceDays: daysBetween(date, today), subject: `Time for your ${what ? what.toLowerCase() : "service"} again?`,
-      body: `Hi ${first(clientName)}, this is ${biz(businessName)}. Last ${month} we did ${what ? what.charAt(0).toLowerCase() + what.slice(1) : "a job"} for you. Want us to get you on the schedule again this year? Just reply here and we'll set it up. Thank you!`,
+      body: `Hi ${greetingName(clientName)}, this is ${dot(biz(businessName))} Last ${month} we did ${what ? what.charAt(0).toLowerCase() + what.slice(1) : "a job"} for you. Want us to get you on the schedule again this year? Just reply here and we'll set it up. Thank you!`,
     });
   }
   return out;
