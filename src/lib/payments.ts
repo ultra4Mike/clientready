@@ -129,3 +129,16 @@ function localToday() {
 export function isOpenBalance(status: unknown, owed: number) {
   return String(status || "draft") !== "draft" && owed > 0.004;
 }
+
+/**
+ * Required payment details. Returns "" when the invoice can be saved, else the message to show.
+ * - Any payment row with an amount needs a method (Paid with).
+ * - Status Paid needs at least one payment with an amount and a method, except an invoice that was already
+ *   saved as Paid before methods were required (legacyPaid): it keeps saving as is (Help R29).
+ */
+export function paymentRequirement(status: unknown, payments: Payment[], legacyPaid = false) {
+  const withAmount = payments.filter((payment) => (Number(payment.amount) || 0) > 0);
+  if (withAmount.some((payment) => !String(payment.method || "").trim())) return "Choose how each payment was made (Method) before saving.";
+  if (String(status) === "paid" && !legacyPaid && !withAmount.length) return "To mark this invoice Paid, add a payment with the amount and how it was paid, or use Mark paid.";
+  return "";
+}

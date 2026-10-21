@@ -26,7 +26,7 @@ import { readLateFeeSettings, suggestedLateFee, type LateFeeSettings } from "@/l
 import { saveCrewJobs } from "@/lib/crew";
 import { depositInvoice, missingDeposits } from "@/lib/proposal-deposit";
 import { docTotal } from "@/lib/review";
-import { balanceDue, paidTotal, tipTotal, paymentFields, paymentMethods, readPayments, type Payment } from "@/lib/payments";
+import { balanceDue, paidTotal, tipTotal, paymentFields, paymentMethods, paymentRequirement, readPayments, type Payment } from "@/lib/payments";
 import { JobPhotosEditor, JobPhotoStrip } from "@/components/JobPhotos";
 import { currentDocId } from "@/lib/doc-sync";
 import { isQuotaError, readPhotos, type JobPhoto } from "@/lib/photos";
@@ -228,6 +228,7 @@ export default function NewInvoicePage() {
   const [clientSearch, setClientSearch] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
   const [status, setStatus] = useState("draft");
+  const [paymentProblem, setPaymentProblem] = useState("");
   const [logo, setLogo] = useState("");
   const [style, setStyle] = useState("clean");
   const [paymentLink, setPaymentLink] = useState("");
@@ -633,6 +634,16 @@ export default function NewInvoicePage() {
     const raw = window.localStorage.getItem("clientready-documents");
     const docs = raw ? JSON.parse(raw) : [];
     const localId = currentDocId(docId) || Date.now().toString();
+    if (!isProposal) {
+      const before = (docs as SavedDocument[]).find((item) => item.id === localId);
+      const required = paymentRequirement(saveStatus, savePayments, before?.data?.status === "paid");
+      if (required) {
+        setSaveMessage(required);
+        setPaymentProblem(required);
+        return;
+      }
+    }
+    setPaymentProblem("");
     const labor = crew.length ? crew.reduce((sum, row) => sum + rowPay(row), 0).toFixed(2) : costs.labor;
     // Change-order notes are append-only: keep whatever is stored, plus what this form loaded.
     const stored = (docs as SavedDocument[]).find((item) => item.id === localId);
@@ -994,7 +1005,7 @@ export default function NewInvoicePage() {
               {payments.map((payment) => (
                 <div key={payment.id} className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-2">
                   <label className="text-sm font-medium text-slate-600">Amount paid<input className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 text-right tabular-nums" inputMode="decimal" placeholder="300" value={payment.amount} onChange={(event) => updatePayment(payment.id, { amount: event.target.value })} /></label>
-                  <label className="text-sm font-medium text-slate-600">Method<select className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={payment.method} onChange={(event) => updatePayment(payment.id, { method: event.target.value })}>{paymentMethods.map((method) => <option key={method} value={method}>{method}</option>)}</select></label>
+                  <label className="text-sm font-medium text-slate-600">Method<select className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" data-testid="payment-method" data-missing={!payment.method && Number(payment.amount) > 0 ? "true" : undefined} value={payment.method} onChange={(event) => updatePayment(payment.id, { method: event.target.value })}><option value="">Choose…</option>{(payment.method && !paymentMethods.includes(payment.method) ? [payment.method, ...paymentMethods] : paymentMethods).map((method) => <option key={method} value={method}>{method}</option>)}</select></label>
                   <label className="text-sm font-medium text-slate-600">Date paid<input type="date" className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={payment.date} onChange={(event) => updatePayment(payment.id, { date: event.target.value })} /></label>
                   <label className="text-sm font-medium text-slate-600">Reference / note<input className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Check number, confirmation, last 4" value={payment.ref} onChange={(event) => updatePayment(payment.id, { ref: event.target.value })} /></label>
                   <label className="text-sm font-medium text-slate-600">Tip (optional, not part of the bill)<input name="paymentTip" data-testid="payment-tip" className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 text-right tabular-nums" inputMode="decimal" placeholder="0.00" value={payment.tip || ""} onChange={(event) => updatePayment(payment.id, { tip: event.target.value })} /></label>
@@ -1174,7 +1185,7 @@ export default function NewInvoicePage() {
               )}
               {!locked && <button type="button" onClick={clearForm} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Clear form</button>}
             </div>
-            {saveMessage && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-slate-600">{saveMessage}</p>}
+            {saveMessage && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-slate-600" data-testid="save-message" data-kind={paymentProblem && saveMessage === paymentProblem ? "payment-required" : undefined}>{saveMessage}</p>}
           </fieldset>
         </form>
         <div className="lg:sticky lg:top-20 lg:self-start">
