@@ -852,7 +852,7 @@ export default function CrewPage() {
 
         {tab === "reports" && (
           <section className="space-y-3">
-            <button type="button" data-testid="report-open" onClick={() => setReportOpen(!reportOpen)} className={`min-h-11 w-full rounded-xl px-4 py-3 font-semibold transition ${reportOpen ? "border border-teal-700/40 hover:bg-teal-500/10 dark:border-teal-500/40" : "bg-teal-500 text-slate-950! shadow-sm hover:bg-teal-400"}`}>{reportOpen ? "Close" : "New job report"}</button>
+            <button type="button" data-testid="report-open" onClick={() => { if (!reportOpen && !form.workDate) { const d = new Date(); setForm((f) => ({ ...f, workDate: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` })); } setReportOpen(!reportOpen); }} className={`min-h-11 w-full rounded-xl px-4 py-3 font-semibold transition ${reportOpen ? "border border-teal-700/40 hover:bg-teal-500/10 dark:border-teal-500/40" : "bg-teal-500 text-slate-950! shadow-sm hover:bg-teal-400"}`}>{reportOpen ? "Close" : "New job report"}</button>
             {reportOpen && (
               <form onSubmit={saveDraft} className={`${cardClass} space-y-3`}>
                 <label className="block space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Client</span><select id="report-savedClient" name="savedClient" aria-label="Saved client" className={input} onChange={(event) => { const client = clients.find((item) => item.id === event.target.value); if (client) setForm({ ...form, clientName: client.name, clientPhone: client.phone || "", clientAddress: client.address || "" }); }}>
