@@ -3,7 +3,7 @@
 -- 1. New documents only: a BEFORE INSERT trigger takes the number under a per-owner lock. If the wanted
 --    number is already used by another doc of that owner and type (e.g. made offline on two phones),
 --    the new doc gets the next free number (title too when it was the number). Existing docs are never
---    renumbered here. Only app/API inserts (roles authenticated/service_role); admin SQL is untouched.
+--    renumbered here. Only app/API inserts (roles authenticated/service_role/anon); admin SQL is untouched.
 -- 2. duplicate_doc_numbers(): the owner's existing duplicates (for the "Fix duplicate numbers" tool).
 -- 3. The unique index is created ONLY when the account data has no duplicates left; otherwise it is
 --    skipped with a notice. Re-run this file after the owner fixes duplicates.
@@ -17,6 +17,7 @@
 create or replace function public.doc_number_parts(p_number text)
 returns table(prefix text, n bigint)
 language sql immutable
+set search_path = public
 as $$
   select coalesce(substring(p_number from '^(.*?)\d+\s*$'), ''), nullif(substring(p_number from '(\d+)\s*$'), '')::bigint
 $$;
@@ -34,7 +35,7 @@ begin
   v_num := trim(coalesce(new.data ->> 'invoiceNumber', ''));
   if v_num = '' then return new; end if;
   perform pg_advisory_xact_lock(hashtext(new.user_id::text || ':' || new.type));
-  if not exists (select 1 from public.documents d where d.user_id = new.user_id and d.type = new.type and trim(coalesce(d.data ->> 'invoiceNumber', '')) = v_num) then
+  if not exists (select 1 from public.documents d where d.user_id = new.user_id and d.type = new.type and d.id <> new.id and trim(coalesce(d.data ->> 'invoiceNumber', '')) = v_num) then
     return new;
   end if;
   v_prefix := coalesce((select prefix from public.doc_number_parts(v_num)), '');

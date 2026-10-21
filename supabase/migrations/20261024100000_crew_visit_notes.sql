@@ -33,7 +33,9 @@ begin
   if auth.uid() is null or v_email = '' then return false; end if;
   if length(coalesce(p_note, '')) > 2000 then raise exception 'note is too long (2000 characters max)' using errcode = 'P0001'; end if;
   select owner_id, coalesce(nullif(worker_name, ''), 'Crew') into v_owner, v_name from public.crew_jobs
-   where doc_id = p_doc_id and id like p_doc_id || '-sched-%' and lower(worker_email) = v_email
+   where doc_id = p_doc_id and left(id, length(p_doc_id) + 7) = p_doc_id || '-sched-' and lower(worker_email) = v_email
+     -- Only an active employee of that owner (a removed or deactivated worker can't write notes).
+     and exists (select 1 from public.employees e where e.user_id = crew_jobs.owner_id and lower(e.email) = v_email and coalesce(e.active, true))
    limit 1;
   if v_owner is null then return false; end if;
   insert into public.crew_visit_notes (doc_id, worker_email, owner_id, worker_name, note, updated_at)

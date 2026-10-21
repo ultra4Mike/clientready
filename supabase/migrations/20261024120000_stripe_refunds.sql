@@ -1,5 +1,5 @@
 -- R95/R97: Stripe refunds and stricter card payments. Safe to re-run.
--- Run after 20261024110000_crew_signup.sql.
+-- Run after 20261024100000_crew_visit_notes.sql (20261024110000 was reverted and is not part of this release).
 -- 1. record_stripe_refund(): one negative payment row per Stripe refund id ("refund_<re_id>"), idempotent.
 --    Invoice missing -> parked in stripe_pending_payments (amount negative, last_error 'refund ...').
 -- 2. record_stripe_payment_v2(): the paid sum keeps refund rows negative (regex keeps '-').
@@ -79,7 +79,8 @@ begin
     'date', to_char(coalesce(p_paid_at, now()) at time zone v_tz, 'YYYY-MM-DD'),
     'ref', v_ref);
   v_payments := v_payments || jsonb_build_array(v_new);
-  select coalesce(sum(nullif(regexp_replace(coalesce(e ->> 'amount', ''), '[^0-9.-]', '', 'g'), '')::numeric), 0)
+  -- Same clamp as record_stripe_refund: refunds count negative, the total never goes below 0.
+  select greatest(coalesce(sum(nullif(regexp_replace(coalesce(e ->> 'amount', ''), '[^0-9.-]', '', 'g'), '')::numeric), 0), 0)
     into v_total from jsonb_array_elements(v_payments) e;
   update public.documents
      set data = v_data || jsonb_build_object(
@@ -105,7 +106,7 @@ security definer
 set search_path = public
 as $$
 declare
-  v_doc uuid; v_data jsonb; v_user uuid; v_tz text; v_payments jsonb; v_total numeric;
+  v_doc uuid; v_data jsonb; v_user uuid; v_tz text; v_payments jsonb; v_total numeric; v_paid numeric; v_amount numeric;
   v_id text := 'refund_' || coalesce(p_refund_id, '');
 begin
   if p_refund_id is null or length(p_refund_id) < 3 or p_amount is null or p_amount <= 0 then return 'invalid'; end if;
@@ -121,11 +122,16 @@ begin
   end if;
   v_payments := case when jsonb_typeof(v_data -> 'payments') = 'array' then v_data -> 'payments' else '[]'::jsonb end;
   if exists (select 1 from jsonb_array_elements(v_payments) e where e ->> 'id' = v_id) then return 'duplicate'; end if;
+  -- Total refunds can never exceed what was paid: cap this refund at the net amount still paid.
+  select greatest(coalesce(sum(nullif(regexp_replace(coalesce(e ->> 'amount', ''), '[^0-9.-]', '', 'g'), '')::numeric), 0), 0)
+    into v_paid from jsonb_array_elements(v_payments) e;
+  v_amount := least(round(p_amount, 2), v_paid);
+  if v_amount <= 0 then return 'over_refund'; end if;
   select p.timezone into v_tz from public.profiles p where p.id = v_user;
   if v_tz is null or not exists (select 1 from pg_timezone_names where name = v_tz) then v_tz := coalesce(p_default_tz, 'UTC'); end if;
   if not exists (select 1 from pg_timezone_names where name = v_tz) then v_tz := 'UTC'; end if;
   v_payments := v_payments || jsonb_build_array(jsonb_build_object(
-    'id', v_id, 'amount', to_char(-round(p_amount, 2), 'FM999999990.00'), 'method', 'Card refund (Stripe)',
+    'id', v_id, 'amount', to_char(-v_amount, 'FM999999990.00'), 'method', 'Card refund (Stripe)',
     'date', to_char(coalesce(p_at, now()) at time zone v_tz, 'YYYY-MM-DD'), 'ref', left(coalesce(p_ref, ''), 120)));
   select greatest(coalesce(sum(nullif(regexp_replace(coalesce(e ->> 'amount', ''), '[^0-9.-]', '', 'g'), '')::numeric), 0), 0)
     into v_total from jsonb_array_elements(v_payments) e;

@@ -32,13 +32,16 @@ grant select (owner_id, provider, external_id, external_name, connected_at, last
 -- What was already sent (create-only sync: nothing is sent twice).
 create table if not exists public.integration_links (
   owner_id uuid not null references auth.users(id) on delete cascade,
-  provider text not null,
+  provider text not null check (provider in ('quickbooks', 'xero')),
   kind text not null check (kind in ('client', 'invoice', 'payment')),
   local_id text not null,
   remote_id text not null,
   created_at timestamptz not null default now(),
   primary key (owner_id, provider, kind, local_id)
 );
+-- Tables made by an earlier run of this file get the same provider check.
+alter table public.integration_links drop constraint if exists integration_links_provider_check;
+alter table public.integration_links add constraint integration_links_provider_check check (provider in ('quickbooks', 'xero'));
 alter table public.integration_links enable row level security;
 revoke all on public.integration_links from anon, authenticated;
 grant all on public.integration_states, public.integration_connections, public.integration_links to service_role;
