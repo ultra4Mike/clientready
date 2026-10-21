@@ -48,8 +48,11 @@ export function tipTotal(payments: Payment[]) {
   return round(payments.reduce((sum, payment) => sum + Math.max(num(payment.tip), 0), 0));
 }
 
+/** R95: a Stripe refund is saved as its own negative row (id "refund_..."), so it lowers what was paid. */
+export const isRefundRow = (payment: { id?: unknown }) => String(payment.id || "").startsWith("refund_");
+
 export function paidTotal(payments: Payment[]) {
-  return round(payments.reduce((sum, payment) => sum + Math.max(num(payment.amount), 0), 0));
+  return round(Math.max(payments.reduce((sum, payment) => sum + (isRefundRow(payment) ? Math.min(num(payment.amount), 0) : Math.max(num(payment.amount), 0)), 0), 0));
 }
 
 /**
@@ -64,7 +67,7 @@ export function balanceDue(total: number, amountPaid: number, status?: unknown) 
 
 /** Fields to save in document data. Keeps the older single-payment fields filled for pages that read them. */
 export function paymentFields(payments: Payment[]) {
-  const clean = payments.filter((payment) => num(payment.amount) > 0).map(({ tip, ...payment }) => (num(tip) > 0 ? { ...payment, tip } : payment));
+  const clean = payments.filter((payment) => num(payment.amount) > 0 || (isRefundRow(payment) && num(payment.amount) < 0)).map(({ tip, ...payment }) => (num(tip) > 0 ? { ...payment, tip } : payment));
   const latest = clean[clean.length - 1];
   return {
     payments: clean,

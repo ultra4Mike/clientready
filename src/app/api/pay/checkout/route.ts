@@ -1,3 +1,4 @@
+import { toCents } from "@/lib/stripe-money";
 import { amountToCharge, serviceClient, stripeConfig } from "@/lib/stripe-server";
 
 import { clientIp, rateLimited, tooMany } from "@/lib/rate-limit";
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
   // Progress billing: the current stage's amount unless the customer chose to pay the full balance.
   const { charge, owed, staged } = amountToCharge(data, full);
   // Never charge more than the saved remaining balance.
-  const cents = Math.round(Math.min(charge, owed) * 100);
+  const cents = toCents(Math.min(charge, owed)); // R98: integer cents, no float drift
   if (cents < 50) return Response.json({ error: "Nothing is owed on this invoice." }, { status: 400 });
 
   // Reuse an open Checkout for the same invoice and amount; expire stale ones so a client can't pay
@@ -100,6 +101,7 @@ export async function POST(request: Request) {
     "line_items[0][price_data][product_data][name]": `${number} · ${staged ? "payment due now" : "balance due"}`,
     "metadata[doc_id]": String(doc.id),
     "metadata[owed_cents]": String(cents),
+    ...(ownerId ? { "metadata[owner_id]": ownerId } : {}),
     "payment_intent_data[metadata][doc_id]": String(doc.id),
     client_reference_id: String(doc.id),
     expires_at: String(Math.floor(Date.now() / 1000) + 31 * 60),
