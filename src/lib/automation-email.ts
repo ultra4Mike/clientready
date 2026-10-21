@@ -1,3 +1,4 @@
+import { greetingName } from "@/lib/reminders";
 /**
  * Automated email content (Help R46-R51). Pure: used by the owner's app to plan and by /api/email/send,
  * which rebuilds the email from the saved invoice so automated sends are templated and go only to the
@@ -54,7 +55,7 @@ export function planOne(doc: AutoDoc, settings: Automations, ctx: AutoCtx): Auto
   const number = String(data.invoiceNumber || doc.title || "your invoice");
   const token = String(((data.approval || {}) as { token?: unknown }).token || "");
   const link = token ? `\nView and pay: ${ctx.origin}/approve?t=${encodeURIComponent(token)}` : "";
-  const first = String(doc.clientName || data.clientName || "").trim().split(/\s+/)[0] || "there";
+  const first = greetingName(String(doc.clientName || data.clientName || ""), String(data.contactName || ""), String(data.clientCompany || ""));
   const biz = ctx.business.trim() || "Your business";
   const amount = owed < total - 0.004 ? `has ${money(owed)} remaining (of ${money(total)} total)` : `is ${money(total)}`;
   const schedule = (data.schedule || {}) as { status?: unknown; confirmedAt?: unknown };

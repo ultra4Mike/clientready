@@ -21,6 +21,8 @@ type Props = {
   businessName: string;
   ownerName: string;
   approvalToken?: string;
+  contactName?: string;
+  clientCompany?: string;
   log: EmailLogEntry[];
   onLogged: (log: EmailLogEntry[], markedSent: boolean) => void;
   onClose?: () => void;
@@ -56,8 +58,8 @@ export default function EmailComposer(props: Props) {
 
   const viewUrl = approvalToken ? approvalUrl(approvalToken) : portal;
   const input = useMemo(
-    () => ({ kind, clientName: props.clientName, number: props.number, total: props.total, owed: props.owed, dueDate: props.dueDate, viewUrl, payUrl: props.payUrl, businessName: props.businessName, ownerName: props.ownerName, today: new Date().toISOString().slice(0, 10) }),
-    [kind, props.clientName, props.number, props.total, props.owed, props.dueDate, viewUrl, props.payUrl, props.businessName, props.ownerName]
+    () => ({ kind, clientName: props.clientName, contactName: props.contactName, clientCompany: props.clientCompany, number: props.number, total: props.total, owed: props.owed, dueDate: props.dueDate, viewUrl, payUrl: props.payUrl, businessName: props.businessName, ownerName: props.ownerName, today: new Date().toISOString().slice(0, 10) }),
+    [kind, props.clientName, props.contactName, props.clientCompany, props.number, props.total, props.owed, props.dueDate, viewUrl, props.payUrl, props.businessName, props.ownerName]
   );
   const subject = subjects[kind] ?? emailSubject(input);
   const body = bodies[kind] ?? emailBody(input);

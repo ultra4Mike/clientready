@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { saveCloudDocument, type CloudDoc } from "@/lib/cloud-docs";
-import { reminderSubject, reminderText } from "@/lib/reminders";
+import { greetingName, reminderSubject, reminderText } from "@/lib/reminders";
 
 /**
  * Owner emails (invoice / proposal / reminder). Everything here only builds text or records what the
@@ -22,10 +22,12 @@ export type EmailInput = {
   businessName: string;
   ownerName: string;
   today: string;
+  contactName?: string;
+  clientCompany?: string;
 };
 
 const money = (value: number) => `$${value.toFixed(2)}`;
-const first = (name: string) => (name || "").trim().split(/\s+/)[0] || "there";
+
 
 function dateText(value: string) {
   const [y, m, d] = value.split("-").map(Number);
@@ -47,12 +49,12 @@ export function emailBody(input: EmailInput) {
   }
   if (input.kind === "proposal") {
     const view = input.viewUrl ? `\n\nYou can review, sign and approve it here:\n${input.viewUrl}` : "";
-    return `Hi ${first(input.clientName)},\n\nHere is proposal ${input.number || ""} for ${money(input.total)}.${view}\n\nLet me know if you have any questions.${sign}`.replace(/proposal  for/, "proposal for");
+    return `Hi ${greetingName(input.clientName, input.contactName, input.clientCompany)},\n\nHere is proposal ${input.number || ""} for ${money(input.total)}.${view}\n\nLet me know if you have any questions.${sign}`.replace(/proposal  for/, "proposal for");
   }
   const owed = input.owed > 0.004 ? ` The balance is ${money(input.owed)}${input.dueDate ? `, due ${dateText(input.dueDate)}` : ""}.` : " It is paid in full. Thank you!";
   const view = input.viewUrl ? `\n\nView it online${input.owed > 0.004 ? " (and pay by card if offered)" : ""}:\n${input.viewUrl}` : "";
   const pay = input.payUrl && input.owed > 0.004 ? `\n\nPay here:\n${input.payUrl}` : "";
-  return `Hi ${first(input.clientName)},\n\nHere is invoice ${input.number || ""} for ${money(input.total)}.${owed}${view}${pay}${sign}`.replace(/invoice  for/, "invoice for");
+  return `Hi ${greetingName(input.clientName, input.contactName, input.clientCompany)},\n\nHere is invoice ${input.number || ""} for ${money(input.total)}.${owed}${view}${pay}${sign}`.replace(/invoice  for/, "invoice for");
 }
 
 export function validEmail(value: string) {

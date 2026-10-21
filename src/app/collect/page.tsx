@@ -267,6 +267,8 @@ export default function CollectPage() {
                 prefer={preferredContactFor(doc.data?.clientId, doc.clientName || doc.data?.clientName)}
                 input={{
                   clientName: doc.clientName || String(doc.data?.clientName || ""),
+                  contactName: String(doc.data?.contactName || ""),
+                  clientCompany: String(doc.data?.clientCompany || ""),
                   invoiceNumber: String(doc.data?.invoiceNumber || doc.title || ""),
                   owed: balance(doc),
                   dueDate: String(doc.data?.dueDate || ""),

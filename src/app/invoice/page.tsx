@@ -187,6 +187,7 @@ export default function NewInvoicePage() {
   // Saved client this document belongs to (stable across renames); "" = match by name.
   const [clientId, setClientId] = useState("");
   const [clientCompany, setClientCompany] = useState("");
+  const [contactName, setContactName] = useState(""); // R85: optional, who reminders greet
   const [clientEmail, setClientEmail] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [clientAddress, setClientAddress] = useState("");
@@ -423,6 +424,7 @@ export default function NewInvoicePage() {
       setClientName(data.clientName || "");
       setClientId(typeof (data as Record<string, unknown>).clientId === "string" ? String((data as Record<string, unknown>).clientId) : "");
       setClientCompany(data.clientCompany || "");
+      setContactName(String((data as Record<string, unknown>).contactName || ""));
       setClientEmail(data.clientEmail || "");
       setClientPhone(data.clientPhone || "");
       setClientAddress(data.clientAddress || "");
@@ -688,7 +690,7 @@ export default function NewInvoicePage() {
   function clearForm() {
     if (locked) return;
     window.history.replaceState(null, "", "/invoice");
-    setDocId(""); setClientSearch(""); setClientName(""); setClientId(""); setClientCompany(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
+    setDocId(""); setClientSearch(""); setClientName(""); setClientId(""); setClientCompany(""); setContactName(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
     setInvoiceNumber(nextNumber(docKind)); setInvoiceDate(ymd(new Date())); setDueDate(plusDays(14)); setJobStart(""); setJobEnd("");
     setNotes(isProposal ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
     setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setLegacyPaymentIds([]); setSignature(null); setProposalSignature(null); setPadKey((key) => key + 1); setDocPayLink(""); setPhotos([]); setShowPhotos(false); setChangeOrderOf(null); setFromProposal(null); setMadeInvoices([]); setChangeOrderNotes([]); setRecFreq("off"); setRecNext(""); setRecLoadedNext(""); setRecurringFrom(null); setApproval(null); setEmailLog([]); setEmailOpen(false); setSchedule(null); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
@@ -734,7 +736,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(storedSchedule && (stored?.data?.schedule || !isProposal) ? { schedule: storedSchedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.autoSent ? { autoSent: (stored?.data as Record<string, unknown>).autoSent } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviewAskedAt ? { reviewAskedAt: (stored?.data as Record<string, unknown>).reviewAskedAt } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew: savedCrew, ...(crewReport ? { crewReport } : {}) },
+      data: { clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, ...(contactName.trim() ? { contactName: contactName.trim() } : {}), clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(storedSchedule && (stored?.data?.schedule || !isProposal) ? { schedule: storedSchedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.autoSent ? { autoSent: (stored?.data as Record<string, unknown>).autoSent } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviewAskedAt ? { reviewAskedAt: (stored?.data as Record<string, unknown>).reviewAskedAt } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew: savedCrew, ...(crewReport ? { crewReport } : {}) },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -1021,6 +1023,7 @@ export default function NewInvoicePage() {
             )}
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Client name" value={clientName} onChange={(event) => { setClientName(event.target.value); setClientId(""); }} />
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Client company" value={clientCompany} onChange={(event) => setClientCompany(event.target.value)} />
+            <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Contact name (optional, used after Hi)" aria-label="Contact name" data-testid="contact-name" value={contactName} onChange={(event) => setContactName(event.target.value)} />
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Client email" value={clientEmail} onChange={(event) => setClientEmail(event.target.value)} />
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Client phone" value={clientPhone} onChange={(event) => setClientPhone(event.target.value)} />
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Client address" value={clientAddress} onChange={(event) => setClientAddress(event.target.value)} />
@@ -1407,6 +1410,8 @@ export default function NewInvoicePage() {
                 isProposal={isProposal}
                 status={status}
                 clientName={clientName}
+                contactName={contactName}
+                clientCompany={clientCompany}
                 clientEmail={clientEmail}
                 clientId={docClientId}
                 number={invoiceNumber}
@@ -1429,7 +1434,7 @@ export default function NewInvoicePage() {
           {reminderOpen && !isProposal && totals.balance > 0 && (
             <div className="print-hide mb-4">
               <ReminderPanel
-                input={{ clientName, invoiceNumber, owed: totals.balance, dueDate, payUrl: payUrlFor(docPayLink, paymentLink), businessName: businessName === "Your business" ? "" : businessName, ownerName, today: ymd(new Date()) }}
+                input={{ clientName, contactName, clientCompany, invoiceNumber, owed: totals.balance, dueDate, payUrl: payUrlFor(docPayLink, paymentLink), businessName: businessName === "Your business" ? "" : businessName, ownerName, today: ymd(new Date()) }}
                 phone={clientPhone}
                 email={clientEmail}
                 prefer={readContactMethod(savedClients.find((client) => client.id === docClientId)?.contactMethod)}
