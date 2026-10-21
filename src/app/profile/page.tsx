@@ -113,6 +113,7 @@ export default function ProfilePage() {
     const { data } = await supabase.auth.getUser();
     const user = data.user;
     if (user) {
+      let overtimeNote = "";
       const row = {
         id: user.id,
         business_name: profile.businessName,
@@ -140,7 +141,9 @@ export default function ProfilePage() {
       if (!error) {
         const money = await supabase.from("profiles").update({ set_aside_percent: String(profile.setAsidePercent ?? ""), profit_alert_margin: String(profile.profitAlertMargin ?? "") }).eq("id", user.id);
         // Overtime hours (migration 20261021090000): its own update so an older database still saves the rest.
-        await supabase.from("profiles").update({ overtime_hours: String(profile.overtimeHours ?? "") }).eq("id", user.id);
+        const overtimeSave = await supabase.from("profiles").update({ overtime_hours: String(profile.overtimeHours ?? "") }).eq("id", user.id);
+        // R36: say so when the overtime setting did not reach the account.
+        if (overtimeSave.error) overtimeNote = /overtime_hours/.test(overtimeSave.error.message || "") ? " Overtime warning saved on this device only (account update pending)." : ` Overtime warning not saved to your account: ${overtimeSave.error.message}`;
         if (money.error && /profit_alert_margin/.test(money.error.message || "")) await supabase.from("profiles").update({ set_aside_percent: String(profile.setAsidePercent ?? "") }).eq("id", user.id);
       }
       if (error) {
@@ -150,7 +153,7 @@ export default function ProfilePage() {
       }
       // Business timezone (card payment dates). Ignored quietly before migration 20261015130000 adds the column.
       await supabase.from("profiles").update({ timezone }).eq("id", user.id);
-      setMessage("Saved on this computer and in your account.");
+      setMessage("Saved on this computer and in your account." + overtimeNote);
     } else {
       setMessage("Saved on this computer. Log in to save to your account.");
     }
