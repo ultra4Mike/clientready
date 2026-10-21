@@ -1,3 +1,4 @@
+import { greetingName } from "@/lib/reminders";
 import { paySnapshot, readPaySettings } from "@/lib/pay-types";
 import { derivedWhen, isoDate } from "@/lib/job-when";
 import { readChecklist, type ChecklistItem } from "@/lib/checklist";
@@ -497,7 +498,7 @@ export async function crewOnMyWay(docId: string) {
 export function onMyWaySmsHref(phone: string, clientName: string, workerName: string) {
   const digits = phone.replace(/[^\d+]/g, "");
   if (!digits) return "";
-  const first = clientName.trim().split(/\s+/)[0] || "there";
+  const first = greetingName(clientName);
   const body = `Hi ${first}, this is ${workerName.trim() || "your crew"}. I'm on my way to you now.`;
   return `sms:${digits}?&body=${encodeURIComponent(body)}`;
 }

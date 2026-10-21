@@ -1,7 +1,9 @@
 // Review request after payment: a ready-made message the owner opens in their own text/email app. Never sent automatically.
 
+import { greetingName } from "./reminders";
+
 export function reviewMessage(clientName: string, businessName: string, link: string, paid = true) {
-  const first = clientName.trim().split(/\s+/)[0] || "there";
+  const first = greetingName(clientName); // R119: same greeting rule as reminders (no "Hi QA" for a business)
   const biz = businessName.trim() && businessName !== "Your business" ? businessName.trim() : "us";
   // R32: only thank them for a payment when the invoice is paid.
   return `Hi ${first}, thank you ${paid ? "for your payment and " : ""}for choosing ${biz}! If you were happy with the work, would you leave us a quick review? ${link.trim()}`;

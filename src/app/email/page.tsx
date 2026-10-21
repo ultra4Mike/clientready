@@ -1,5 +1,6 @@
 "use client";
 
+import { greetingName } from "@/lib/reminders";
 import { useEffect, useState } from "react";
 import { saveCloudDocument } from "@/lib/cloud-docs";
 import AppShell from "@/components/AppShell";
@@ -95,7 +96,7 @@ export default function EmailPage() {
   });
 
   const greeting =
-    tone === "friendly" ? `Hi ${clientName || "there"},` : `Hello ${clientName || "there"},`;
+    tone === "friendly" ? `Hi ${greetingName(clientName)},` : `Hello ${greetingName(clientName)},`;
   const intro =
     emailType === "follow-up"
       ? "I wanted to follow up on our recent conversation."
