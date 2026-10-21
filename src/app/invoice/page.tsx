@@ -1272,15 +1272,16 @@ export default function NewInvoicePage() {
                 </div>
               );
             })()}
-            {!isProposal && docId && status === "paid" && (() => {
+            {!isProposal && docId && (status === "paid" || schedule?.status === "done") && (() => {
               const asked = reviewAsked || reviewAskedAt(docId);
-              if (!reviewLink.trim()) return <p className="w-full text-xs text-[var(--cr-muted)]" data-testid="review-request-setup">Paid. Add a review link in <Link href="/profile" className="underline">Settings</Link> to ask {clientName.trim() || "this client"} for a review.</p>;
+              const why = status === "paid" ? "Paid." : "Job done.";
+              if (!reviewLink.trim()) return <p className="w-full text-xs text-[var(--cr-muted)]" data-testid="review-request-setup">{why} Add a review link in <Link href="/profile" className="underline">Settings</Link> to ask {clientName.trim() || "this client"} for a review.</p>;
               const body = reviewMessage(clientName, businessName, reviewLink);
               const sms = reviewSmsHref(clientPhone, body);
               const mail = reviewMailHref(clientEmail, businessName, body);
               const opened = () => setReviewAsked(noteReviewAsked(docId));
               return (
-                <div className="w-full rounded-lg border border-teal-500/30 px-3 py-2 text-sm" data-testid="review-request" data-asked={asked ? "1" : "0"}>
+                <div id="review-request" className="w-full rounded-lg border border-teal-500/30 px-3 py-2 text-sm" data-testid="review-request" data-why={status === "paid" ? "paid" : "done"} data-asked={asked ? "1" : "0"}>
                   <p className="font-medium">Ask {clientName.trim() || "your client"} for a review</p>
                   <p className="mt-1 text-xs text-[var(--cr-muted)]" data-testid="review-message">{body}</p>
                   <div className="mt-2 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">

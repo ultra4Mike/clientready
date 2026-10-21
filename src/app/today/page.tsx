@@ -5,6 +5,7 @@ import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import FollowUps from "@/components/FollowUps";
 import { loadAccountIntoCache } from "@/lib/account-cache";
+import { reviewAskedAt } from "@/lib/review-request";
 import { uniqueDocs } from "@/lib/change-orders";
 import { confirmJobDone, doneState, omwTime, onMyWaySmsHref, readWorkers, saveSchedule, statusLabel, type Schedule } from "@/lib/schedule";
 import { localYmd, niceYmd, scheduledJobs, timeLabel } from "@/lib/scheduled-jobs";
@@ -112,6 +113,7 @@ export default function TodayPage() {
                     {address && <a href={`https://maps.google.com/?q=${encodeURIComponent(address)}`} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-semibold transition disabled:opacity-50 border border-teal-500/30 hover:border-teal-400">Map</a>}
                     {schedule.status === "scheduled" && <button type="button" disabled={busy === doc.id} data-testid="today-start" onClick={() => setStatus(doc.id, schedule, "in_progress")} className="inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-semibold transition disabled:opacity-50 border border-teal-500/30 hover:border-teal-400">Start</button>}
                     {schedule.status !== "done" && <button type="button" disabled={busy === doc.id} data-testid="today-complete" onClick={() => setStatus(doc.id, schedule, "done")} className="inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-semibold transition disabled:opacity-50 bg-teal-500 text-slate-950! hover:bg-teal-400">Complete</button>}
+                    {schedule.status === "done" && done !== "awaiting" && !reviewAskedAt(doc.id) && <a href={`/invoice?id=${encodeURIComponent(doc.id)}#review-request`} data-testid="today-review" className="col-span-2 inline-flex min-h-11 items-center justify-center rounded-lg border border-teal-500/30 px-4 text-sm font-semibold transition hover:border-teal-400">Ask for a review</a>}
                     {done === "awaiting" && <button type="button" disabled={busy === doc.id} data-testid="today-confirm" onClick={() => confirm(doc.id)} className="col-span-2 inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-semibold transition disabled:opacity-50 bg-teal-500 text-slate-950! hover:bg-teal-400">Confirm done</button>}
                   </div>
                 </div>
