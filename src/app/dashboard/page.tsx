@@ -13,6 +13,7 @@ import { balanceDue, isOpenBalance, invoicePastDue, paidTotal, readPayments } fr
 import { uniqueDocs } from "@/lib/change-orders";
 import FollowUps from "@/components/FollowUps";
 import { todayYmd } from "@/lib/stages";
+import { runAutomations, type AutoPlan } from "@/lib/automations";
 import NeedsReview from "@/components/NeedsReview";
 import GettingStarted from "@/components/GettingStarted";
 
@@ -94,6 +95,7 @@ export default function DashboardPage() {
   // Clock-dependent text (greeting, chart months) renders after mount only: the server runs in UTC, the
   // owner's browser in their own zone, so rendering them on the server caused React #418 in the evening.
   const [now, setNow] = useState<Date | null>(null);
+  const [auto, setAuto] = useState<{ sent: AutoPlan[]; errors: string[] }>({ sent: [], errors: [] });
   useEffect(() => setNow(new Date()), []);
   const recurringReady = recurringDraftsReady(documents);
 
@@ -102,6 +104,8 @@ export default function DashboardPage() {
       await loadAccountIntoCache();
       // No server cron: due recurring drafts are made when the app opens.
       await runDueRecurring();
+      // Backlog 13: owner-enabled automations only (all off by default).
+      setAuto(await runAutomations().catch(() => ({ sent: [], errors: [] })));
       const profileRaw = window.localStorage.getItem("clientready-profile");
       const clientsRaw = window.localStorage.getItem("clientready-clients");
       const docsRaw = window.localStorage.getItem("clientready-documents");
@@ -349,6 +353,13 @@ export default function DashboardPage() {
 
         <aside className="min-w-0 space-y-4">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Needs attention</h2>
+          {(auto.sent.length > 0 || auto.errors.length > 0) && (
+            <div className="rounded-xl border border-teal-500/30 px-4 py-3 text-sm" data-testid="auto-sent" data-count={auto.sent.length}>
+              {auto.sent.length > 0 && <p className="font-medium">Sent automatically: {auto.sent.map((item) => `${item.kind === "done" ? "invoice" : "reminder"} to ${item.to}`).join("; ")}</p>}
+              {auto.errors.map((error) => <p key={error} className="text-xs text-rose-700 dark:text-rose-300" data-testid="auto-error">{error}</p>)}
+              <a href="/profile" className="text-xs underline">Automation settings</a>
+            </div>
+          )}
           {loaded && <FollowUps docs={documents as never} today={todayYmd()} limit={5} testid="dashboard-reminders" />}
       {recurringReady > 0 && (
         <a href="/documents?q=draft" data-testid="recurring-ready" className="flex items-center justify-between rounded-xl border border-teal-500/40 bg-teal-500/10 px-4 py-3 text-sm font-medium text-teal-700 dark:text-teal-200 transition hover:bg-teal-500/15">

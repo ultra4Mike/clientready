@@ -7,6 +7,7 @@ import PaymentMethodsSettings from "@/components/PaymentMethodsSettings";
 import TimezoneCombobox from "@/components/TimezoneCombobox";
 import LegalLinks from "@/components/LegalLinks";
 import { FormEvent, useEffect, useState } from "react";
+import { AUTOMATIONS_OFF, readAutomations, type Automations } from "@/lib/automations";
 import { supabase } from "@/lib/supabase";
 import StripeSetup from "@/components/StripeSetup";
 import AppShell from "@/components/AppShell";
@@ -44,12 +45,14 @@ export default function ProfilePage() {
   const [nextPassword, setNextPassword] = useState("");
   const [passwordMessage, setPasswordMessage] = useState("");
   const [timezone, setTimezone] = useState("America/Chicago");
+  const [automations, setAutomations] = useState<Automations>(AUTOMATIONS_OFF);
 
   useEffect(() => {
     async function load() {
       const raw = window.localStorage.getItem("clientready-profile");
       const local = raw ? { ...emptyProfile, ...JSON.parse(raw) } : emptyProfile;
       setProfile(local);
+      setAutomations(readAutomations(local.automations));
       setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Chicago");
 
       const { data } = await supabase.auth.getUser();
@@ -65,6 +68,7 @@ export default function ProfilePage() {
 
       if (!row) return;
       if (typeof row.timezone === "string" && row.timezone) setTimezone(row.timezone);
+      if ("automations" in row) setAutomations(readAutomations(row.automations));
       setProfile({
         businessName: row.business_name || "",
         ownerName: row.owner_name || "",
@@ -108,7 +112,7 @@ export default function ProfilePage() {
       setMessage("Set aside must be a number from 0 to 100.");
       return;
     }
-    window.localStorage.setItem("clientready-profile", JSON.stringify(profile));
+    window.localStorage.setItem("clientready-profile", JSON.stringify({ ...profile, automations }));
 
     const { data } = await supabase.auth.getUser();
     const user = data.user;
@@ -142,6 +146,9 @@ export default function ProfilePage() {
         const money = await supabase.from("profiles").update({ set_aside_percent: String(profile.setAsidePercent ?? ""), profit_alert_margin: String(profile.profitAlertMargin ?? "") }).eq("id", user.id);
         // Overtime hours (migration 20261021090000): its own update so an older database still saves the rest.
         const overtimeSave = await supabase.from("profiles").update({ overtime_hours: String(profile.overtimeHours ?? "") }).eq("id", user.id);
+        // Backlog 13 (migration 20261021130000): automation switches; its own update so older databases still save the rest.
+        const autoSave = await supabase.from("profiles").update({ automations }).eq("id", user.id);
+        if (autoSave.error) overtimeNote += /automations/.test(autoSave.error.message || "") ? " Automations saved on this device only (account update pending)." : ` Automations not saved to your account: ${autoSave.error.message}`;
         // R36: say so when the overtime setting did not reach the account.
         if (overtimeSave.error) overtimeNote = /overtime_hours/.test(overtimeSave.error.message || "") ? " Overtime warning saved on this device only (account update pending)." : ` Overtime warning not saved to your account: ${overtimeSave.error.message}`;
         if (money.error && /profit_alert_margin/.test(money.error.message || "")) await supabase.from("profiles").update({ set_aside_percent: String(profile.setAsidePercent ?? "") }).eq("id", user.id);
@@ -254,6 +261,13 @@ export default function ProfilePage() {
           <input name="setAsidePercent" data-testid="set-aside-percent" type="number" min={0} max={100} step="any" inputMode="decimal" className="mt-1.5 min-h-11 w-full max-w-[10rem] tabular-nums rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="30" value={profile.setAsidePercent} onChange={(event) => update("setAsidePercent", event.target.value)} />
         </label>
         <p className="-mt-1 text-xs text-[var(--cr-muted)]">Default is 30%. This is a cushion for taxes. It is not a tax return.</p>
+        <fieldset className="space-y-2 rounded-xl border border-teal-500/20 p-3" data-testid="automations">
+          <legend className="px-1 text-sm font-semibold">Automations (optional, all off by default)</legend>
+          <p className="text-xs text-[var(--cr-muted)]">These send real emails to your clients from your email setup when you open the app. Each one is logged on the invoice and never repeats. Turn on only what you want.</p>
+          <label className="flex min-h-11 items-start gap-2 text-sm"><input type="checkbox" data-testid="auto-done-email" className="mt-1 h-5 w-5 accent-teal-600" checked={automations.doneEmailInvoice} onChange={(e) => setAutomations({ ...automations, doneEmailInvoice: e.target.checked, doneIncludeReview: e.target.checked && automations.doneIncludeReview })} /><span>When you confirm a job is done, email the client the invoice with a pay link (once per invoice; needs the client&apos;s email and a customer link).</span></label>
+          <label className={`flex min-h-11 items-start gap-2 pl-7 text-sm ${automations.doneEmailInvoice ? "" : "opacity-50"}`}><input type="checkbox" data-testid="auto-done-review" disabled={!automations.doneEmailInvoice} className="mt-1 h-5 w-5 accent-teal-600" checked={automations.doneIncludeReview} onChange={(e) => setAutomations({ ...automations, doneIncludeReview: e.target.checked })} /><span>Add your review link to that email (skipped for clients who opted out).</span></label>
+          <label className="flex min-h-11 items-start gap-2 text-sm"><input type="checkbox" data-testid="auto-late-email" className="mt-1 h-5 w-5 accent-teal-600" checked={automations.lateReminderEmail} onChange={(e) => setAutomations({ ...automations, lateReminderEmail: e.target.checked })} /><span>When an invoice is past due, email the client a friendly reminder (at most every 7 days, 3 times).</span></label>
+        </fieldset>
         {/* Backlog 10: less-used settings live under one fold so the main settings stay short. */}
         <details className="cr-panel group rounded-xl border border-teal-500/25 px-3 sm:px-4 [&[open]]:pb-4" data-testid="more-settings">
           <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 text-sm font-semibold [&::-webkit-details-marker]:hidden"><span className="min-w-0 flex-1">More settings <span className="block font-normal text-xs text-[var(--cr-muted)] sm:inline">profit alerts, overtime warning, late fees</span></span><svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 shrink-0 text-teal-500 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" /></svg></summary>

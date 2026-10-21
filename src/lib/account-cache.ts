@@ -106,6 +106,8 @@ export async function loadAccountIntoCache(): Promise<boolean> {
         paymentLink: profile.payment_link || "",
         ...lateFeeFields(profile),
         ...moneySettings(profile),
+        // Backlog 13 (migration 20261021130000): the account's automation switches; before it, this device's.
+        ...("automations" in profile ? { automations: profile.automations || {} } : (() => { try { const l = JSON.parse(window.localStorage.getItem("clientready-profile") || "{}"); return l.automations ? { automations: l.automations } : {}; } catch { return {}; } })()),
       })
     );
     // Payment methods shown to customers (migration 20261016070000).
