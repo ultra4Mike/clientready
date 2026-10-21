@@ -5,6 +5,7 @@ import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import LegalLinks from "@/components/LegalLinks";
 import { HELP_ARTICLES, HELP_CATEGORIES, SUPPORT_EMAIL, type HelpArticle } from "@/lib/help/articles";
+import { helpMatches } from "@/lib/help/search";
 
 const byId = new Map(HELP_ARTICLES.map((a) => [a.id, a]));
 const haystack = (a: HelpArticle) =>
@@ -16,8 +17,7 @@ export default function HelpPage() {
   const [open, setOpen] = useState<string | null>(null);
   const categories = useMemo(() => ["All", ...HELP_CATEGORIES.filter((c) => HELP_ARTICLES.some((a) => a.category === c))], []);
   const results = useMemo(() => {
-    const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-    return HELP_ARTICLES.filter((a) => (category === "All" || a.category === category) && words.every((w) => haystack(a).includes(w)));
+    return HELP_ARTICLES.filter((a) => (category === "All" || a.category === category) && helpMatches(haystack(a), query));
   }, [query, category]);
 
   function jump(id: string) {
