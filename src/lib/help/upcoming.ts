@@ -2,7 +2,7 @@
  * DRAFT help articles for upcoming / partly shipped features. NOT rendered (not imported by the Help Center).
  * When a feature ships, verify labels in the UI, then move the article into HELP_ARTICLES in ./articles.ts.
  * Status notes: manual payment methods shipped in 81a2084; their articles moved to articles.ts 2026-10-16;
- * per-owner card payments (Stripe Connect / other processors), card fees, in-app refunds, automatic reminders and in-app SMS are not built yet; their UI labels are marked [TBD].
+ * per-owner card payments (Stripe Connect / other processors), in-app refunds, automatic reminders and in-app SMS are not built yet; their UI labels are marked [TBD].
  */
 import type { HelpArticle } from "./articles";
 
@@ -13,9 +13,6 @@ export const UPCOMING_HELP_ARTICLES: UpcomingArticle[] = [
     summary: "Planned (labels TBD): connect your own card processor so card payments go straight to you.",
     steps: ["Open Settings and find [TBD: card payments / connect section label].", "Tap [TBD: connect button label] and sign in to (or create) your own account with the provider.", "Finish the provider's setup, then return to ClientReady.", "Invoices, approval links and the portal show [TBD: pay button label]. Payments are recorded automatically once the provider confirms."],
     tips: ["Fees and payout timing are set by your provider. ClientReady never holds your money.", "Refunds and disputes are handled in your provider's dashboard."], related: ["pay-zelle-venmo-cashapp", "ts-refund"], keywords: ["card", "credit card", "stripe", "connect", "square", "paypal checkout"] },
-  { feature: "card-fee", status: "draft", id: "card-fee-surcharge", category: "Payments", question: "Can I pass card fees on to clients?",
-    steps: ["Not built yet. [TBD: whether a card fee / surcharge or cash discount option is planned, and its label].", "Today you can add a line item for a fee yourself before sending."],
-    tips: ["Surcharge rules vary by state and card network. Check before adding a card fee."], related: ["card-connect-own-account"], keywords: ["surcharge", "convenience fee", "card fee"] },
   { feature: "refunds", status: "draft", id: "refund-in-app", category: "Payments", question: "Can I issue a refund from ClientReady?",
     steps: ["Not built. [TBD: whether in-app refunds are planned].", "Today, refund in your provider's dashboard or send the money back yourself, then use Remove payment on the invoice."],
     related: ["ts-refund"], keywords: ["refund"] },
