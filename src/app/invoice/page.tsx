@@ -56,6 +56,7 @@ import { ApprovalBadge, ApprovalShare } from "@/components/Approval";
 import ScheduleEditor from "@/components/ScheduleEditor";
 import { entryHours, fmtHours, hoursByWorker, ownerEditClock, crewFixReason, refreshOwnerClock, type ClockEntry } from "@/lib/clock";
 import { confirmRemoval, jobDonePhotos, crewForWorkers, followSchedule, jobScheduleFromForm, crewIds, workLogged, clockHoursFor, dedupeWorkerIds, readSchedule, readWorkers, saveAssignment, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
+import { createClientFromInvoice } from "@/lib/client-create";
 import { defaultInvoiceTerms } from "@/lib/terms";
 import OverlapBadge from "@/components/OverlapBadge";
 import { bookingConflicts, clockText, readOverrides, type Conflict, type Override } from "@/lib/conflicts";
@@ -640,10 +641,11 @@ export default function NewInvoicePage() {
     const clients: SavedClient[] = raw ? JSON.parse(raw) : [];
     const alreadySaved = clients.some((client) => clientEmail && client.email ? client.email.toLowerCase() === clientEmail.toLowerCase() : client.name.toLowerCase() === clientName.toLowerCase());
     if (alreadySaved) return setSaveMessage("That client is already saved");
-    const next = [...clients, { id: Date.now().toString(), name: clientName, company: clientCompany, email: clientEmail, phone: clientPhone, address: clientAddress }];
-    window.localStorage.setItem("clientready-clients", JSON.stringify(next));
-    setSavedClients(next);
-    setSaveMessage("Client saved");
+    void createClientFromInvoice({ name: clientName, company: clientCompany, email: clientEmail, phone: clientPhone, address: clientAddress }).then((id) => {
+      if (id) setClientId(id);
+      setSavedClients(JSON.parse(window.localStorage.getItem("clientready-clients") || "[]"));
+      setSaveMessage("Client saved");
+    });
   }
 
   function allowCrewChange() {
@@ -768,6 +770,12 @@ export default function NewInvoicePage() {
       setSaveMessage("Trial ended. Old documents stay viewable; saving new work needs a plan. Plan details coming soon (see Plans).");
       return;
     }
+    // R116: a new client typed here is saved to Clients and linked to this document.
+    let linkedClientId = docClientId;
+    if (!linkedClientId && clientName.trim()) {
+      linkedClientId = await createClientFromInvoice({ name: clientName, company: clientCompany, email: clientEmail, phone: clientPhone, address: clientAddress }).catch(() => "");
+      if (linkedClientId) { setClientId(linkedClientId); setSavedClients(JSON.parse(window.localStorage.getItem("clientready-clients") || "[]")); }
+    }
     const raw = window.localStorage.getItem("clientready-documents");
     const docs = raw ? JSON.parse(raw) : [];
     const localId = currentDocId(docId) || Date.now().toString();
@@ -798,7 +806,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, ...(contactName.trim() ? { contactName: contactName.trim() } : {}), ...(stockUsed.length ? { stockUsed } : {}), ...(isProposal && Number(depositPercent) > 0 ? { depositPercent: String(Math.min(Number(depositPercent), 100)) } : {}), clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(storedSchedule && (stored?.data?.schedule || !isProposal) ? { schedule: storedSchedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.autoSent ? { autoSent: (stored?.data as Record<string, unknown>).autoSent } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviewAskedAt ? { reviewAskedAt: (stored?.data as Record<string, unknown>).reviewAskedAt } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew: savedCrew, ...(crewReport ? { crewReport } : {}) },
+      data: { clientName, ...(linkedClientId ? { clientId: linkedClientId } : {}), clientCompany, ...(contactName.trim() ? { contactName: contactName.trim() } : {}), ...(stockUsed.length ? { stockUsed } : {}), ...(isProposal && Number(depositPercent) > 0 ? { depositPercent: String(Math.min(Number(depositPercent), 100)) } : {}), clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(storedSchedule && (stored?.data?.schedule || !isProposal) ? { schedule: storedSchedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.autoSent ? { autoSent: (stored?.data as Record<string, unknown>).autoSent } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviewAskedAt ? { reviewAskedAt: (stored?.data as Record<string, unknown>).reviewAskedAt } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew: savedCrew, ...(crewReport ? { crewReport } : {}) },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -835,7 +843,7 @@ export default function NewInvoicePage() {
     if (crewReport?.draftId && /^[0-9a-f-]{36}$/i.test(cloudId)) await supabase.from("job_drafts").update({ opened_doc_id: cloudId }).eq("id", crewReport.draftId).then(() => undefined, () => undefined);
     setWorkers(readWorkers());
     // Contact changes also go to the linked saved client (Clients page / portal).
-    const clientsAfter = await syncClientContact(docClientId, { name: clientName, company: clientCompany, email: clientEmail, phone: clientPhone, address: clientAddress }).catch(() => null);
+    const clientsAfter = await syncClientContact(linkedClientId, { name: clientName, company: clientCompany, email: clientEmail, phone: clientPhone, address: clientAddress }).catch(() => null);
     if (clientsAfter) setSavedClients(clientsAfter as SavedClient[]);
     if (storedSchedule && !isProposal) { setSchedule(storedSchedule); setJobStart(storedSchedule.startTime || jobStart); setJobEnd(storedSchedule.endTime || ""); setCrew(savedCrew); setScheduleKey((key) => key + 1); }
     setSaveMessage(isProposal ? `Proposal saved${carried}` : "Invoice saved");
