@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import PeriodToggle from "@/components/PeriodToggle";
+import { periodRange, type PeriodRange } from "@/lib/period";
+import { entryHours, type ClockEntry } from "@/lib/clock";
 import { readOwnerClock, refreshOwnerClock } from "@/lib/clock";
-import { timesheetCsv, weekRange } from "@/lib/timesheet-csv";
+import { localYmd, timesheetCsv, weekRange } from "@/lib/timesheet-csv";
 
 const field = "mt-1 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2 text-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30";
 
@@ -10,6 +13,30 @@ const field = "mt-1 w-full rounded-lg border border-teal-500/30 bg-transparent p
 export default function TimesheetExport({ names }: { names: Record<string, string> }) {
   const [range, setRange] = useState(() => weekRange());
   const [note, setNote] = useState("");
+  const [period, setPeriod] = useState<PeriodRange | "">("week");
+  const [entries, setEntries] = useState<ClockEntry[]>([]);
+  useEffect(() => {
+    Promise.resolve().then(() => setEntries(readOwnerClock()));
+    refreshOwnerClock().then(setEntries).catch(() => {});
+  }, []);
+  // On-screen hours per worker for the chosen dates (hours only, no pay). "All time" = every entry.
+  const onScreen = useMemo(() => {
+    const totals = new Map<string, { worker: string; hours: number; count: number; open: number }>();
+    for (const entry of entries) {
+      const day = localYmd(new Date(entry.started_at));
+      if (period !== "all" && (day < range.from || day > range.to)) continue;
+      const worker = names[entry.employee_id] || entry.worker_name || entry.worker_email || "Unknown";
+      const row = totals.get(worker) || { worker, hours: 0, count: 0, open: 0 };
+      row.count += 1;
+      if (entry.ended_at) row.hours += entryHours(entry); else row.open += 1;
+      totals.set(worker, row);
+    }
+    return [...totals.values()].sort((a, b) => a.worker.localeCompare(b.worker));
+  }, [entries, range, period, names]);
+  function choose(next: PeriodRange) {
+    setPeriod(next);
+    if (next !== "all") setRange(periodRange(next));
+  }
 
   async function download() {
     if (range.from > range.to) return setNote("The start date is after the end date.");
@@ -25,7 +52,7 @@ export default function TimesheetExport({ names }: { names: Record<string, strin
     } catch {
       // no local documents
     }
-    const { csv, count } = timesheetCsv(entries, range.from, range.to, names, jobs);
+    const { csv, count } = period === "all" ? timesheetCsv(entries, "0000-01-01", "9999-12-31", names, jobs) : timesheetCsv(entries, range.from, range.to, names, jobs);
     if (!count) return setNote("No clock entries in those dates.");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
@@ -40,11 +67,25 @@ export default function TimesheetExport({ names }: { names: Record<string, strin
 
   return (
     <section className="mt-6 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 sm:p-6" data-testid="timesheet-export" aria-labelledby="timesheet-export-title">
-      <h2 id="timesheet-export-title" className="text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Timesheet export</h2>
+      <h2 id="timesheet-export-title" className="text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Timesheets</h2>
       <p className="mt-1 text-xs text-[var(--cr-muted)]">Crew clock in/out hours as a spreadsheet (CSV). Hours only, no pay.</p>
+      <div className="mt-3"><PeriodToggle value={period} onChange={choose} testid="timesheet-period" /></div>
+      <table className="mt-3 w-full text-sm" data-testid="timesheet-screen" data-range={period || "custom"}>
+        <thead><tr className="text-left text-xs text-[var(--cr-muted)]"><th className="py-1">Worker</th><th className="py-1 text-right">Entries</th><th className="py-1 text-right">Hours</th></tr></thead>
+        <tbody>
+          {onScreen.map((row) => (
+            <tr key={row.worker} data-testid="timesheet-row" data-worker={row.worker} data-hours={row.hours.toFixed(2)} className="border-t border-slate-500/20">
+              <td className="py-1.5">{row.worker}{row.open ? <span className="ml-1 text-xs text-amber-700">· {row.open} still clocked in</span> : null}</td>
+              <td className="py-1.5 text-right tabular-nums">{row.count}</td>
+              <td className="py-1.5 text-right tabular-nums">{row.hours.toFixed(2)}</td>
+            </tr>
+          ))}
+          {!onScreen.length && <tr><td colSpan={3} className="py-2 text-xs text-[var(--cr-muted)]" data-testid="timesheet-empty">No clock entries in these dates.</td></tr>}
+        </tbody>
+      </table>
       <div className="mt-3 grid grid-cols-2 gap-3">
-        <label className="text-sm font-medium">From<input type="date" name="timesheetFrom" data-testid="timesheet-from" className={field} value={range.from} onChange={(e) => setRange({ ...range, from: e.target.value })} /></label>
-        <label className="text-sm font-medium">To<input type="date" name="timesheetTo" data-testid="timesheet-to" className={field} value={range.to} onChange={(e) => setRange({ ...range, to: e.target.value })} /></label>
+        <label className="text-sm font-medium">From<input type="date" name="timesheetFrom" data-testid="timesheet-from" className={field} value={range.from} onChange={(e) => (setPeriod(""), setRange({ ...range, from: e.target.value }))} /></label>
+        <label className="text-sm font-medium">To<input type="date" name="timesheetTo" data-testid="timesheet-to" className={field} value={range.to} onChange={(e) => (setPeriod(""), setRange({ ...range, to: e.target.value }))} /></label>
       </div>
       <button type="button" data-testid="timesheet-download" onClick={download} className="mt-3 rounded-lg border border-teal-500/40 px-4 py-2.5 text-sm font-medium transition hover:border-teal-400 hover:bg-teal-500/10 max-sm:min-h-11">Download CSV</button>
       {note && <p className="mt-2 text-xs text-[var(--cr-muted)]" data-testid="timesheet-note" role="status">{note}</p>}

@@ -13,6 +13,8 @@ import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { documentTotals } from "@/lib/discount";
 import { documentStage, NEXT_LABEL, STAGE_LABEL } from "@/lib/doc-stage";
+import PeriodToggle from "@/components/PeriodToggle";
+import { inPeriod, periodRange, type PeriodRange } from "@/lib/period";
 import { balanceDue, isOpenBalance, invoicePastDue, paidTotal, readPayments } from "@/lib/payments";
 import { searchWithNumbers } from "@/lib/doc-number";
 
@@ -58,6 +60,7 @@ export default function DocumentsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [period, setPeriod] = useState<PeriodRange | "">("");
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkMessage, setBulkMessage] = useState("");
@@ -209,6 +212,25 @@ export default function DocumentsPage() {
     });
   }, [documents, factsById, typeFilter, statusFilter, fromDate, toDate, sortBy, deferredSearch]);
 
+  const overview = useMemo(() => {
+    const from = fromDate, to = toDate;
+    let count = 0, billed = 0, owed = 0, overdue = 0, paid = 0;
+    for (const doc of documents) {
+      if (doc.type !== "invoice") continue;
+      const info = factsById.get(doc.id) || facts(doc);
+      const status = String(doc.data?.status || "draft");
+      if (status === "draft" || !inPeriod(info.date, from, to)) continue;
+      count += 1; billed += info.total; owed += info.owed; paid += Math.max(info.total - info.owed, 0);
+      if (invoicePastDue(doc.data, info.total, info.owed)) overdue += info.owed;
+    }
+    return { count, billed, owed, overdue, paid };
+  }, [documents, factsById, fromDate, toDate]);
+
+  function choosePeriod(range: PeriodRange) {
+    const { from, to } = periodRange(range);
+    setPeriod(range); setFromDate(from); setToDate(to);
+  }
+
   const field = "rounded-lg border border-teal-500/30 bg-[var(--cr-card)] px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30";
   const filtersOn = typeFilter !== "all" || statusFilter !== "all" || fromDate || toDate || search;
 
@@ -233,6 +255,16 @@ export default function DocumentsPage() {
         </>}
       />
 
+      <section className="mb-3 space-y-2" data-testid="period-overview" data-range={period || (fromDate || toDate ? "custom" : "all")} data-count={overview.count} data-billed={overview.billed.toFixed(2)} data-owed={overview.owed.toFixed(2)}>
+        <PeriodToggle value={period || (fromDate || toDate ? "" : "all")} onChange={choosePeriod} />
+        <dl className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+          <div><dt className="text-xs text-[var(--cr-muted)]">Invoices sent</dt><dd className="font-semibold tabular-nums" data-testid="overview-count">{overview.count}</dd></div>
+          <div><dt className="text-xs text-[var(--cr-muted)]">Billed</dt><dd className="font-semibold tabular-nums" data-testid="overview-billed">${overview.billed.toFixed(2)}</dd></div>
+          <div><dt className="text-xs text-[var(--cr-muted)]">Paid</dt><dd className="font-semibold tabular-nums" data-testid="overview-paid">${overview.paid.toFixed(2)}</dd></div>
+          <div><dt className="text-xs text-[var(--cr-muted)]">Still owed</dt><dd className="font-semibold tabular-nums" data-testid="overview-owed">${overview.owed.toFixed(2)}{overview.overdue > 0 ? <span className="block text-xs font-medium text-rose-600" data-testid="overview-overdue">${overview.overdue.toFixed(2)} overdue</span> : null}</dd></div>
+        </dl>
+        <p className="text-xs text-[var(--cr-muted)]">By invoice date. Drafts aren&apos;t counted. The list below shows the same dates.</p>
+      </section>
       <div className="grid gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 sm:grid-cols-3 lg:grid-cols-5">
         <input
           className="sm:col-span-3 lg:col-span-5 rounded-lg border border-teal-500/30 bg-[var(--cr-card)] px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
@@ -278,8 +310,8 @@ export default function DocumentsPage() {
           <option value="paid">Paid</option>
           <option value="accepted">Accepted</option>
         </select>
-        <label className="flex min-w-0 items-center gap-2 whitespace-nowrap text-xs font-medium text-[var(--cr-muted)]">From<input type="date" aria-label="From date" className={`${field} min-w-0 flex-1`} value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></label>
-        <label className="flex min-w-0 items-center gap-2 whitespace-nowrap text-xs font-medium text-[var(--cr-muted)]">To<input type="date" aria-label="To date" className={`${field} min-w-0 flex-1`} value={toDate} onChange={(event) => setToDate(event.target.value)} /></label>
+        <label className="flex min-w-0 items-center gap-2 whitespace-nowrap text-xs font-medium text-[var(--cr-muted)]">From<input type="date" aria-label="From date" className={`${field} min-w-0 flex-1`} value={fromDate} onChange={(event) => (setPeriod(""), setFromDate(event.target.value))} /></label>
+        <label className="flex min-w-0 items-center gap-2 whitespace-nowrap text-xs font-medium text-[var(--cr-muted)]">To<input type="date" aria-label="To date" className={`${field} min-w-0 flex-1`} value={toDate} onChange={(event) => (setPeriod(""), setToDate(event.target.value))} /></label>
         </div>
       </div>
       <div className="mt-2 flex items-center justify-between text-xs text-[var(--cr-muted)]">
