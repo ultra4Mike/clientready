@@ -1,5 +1,8 @@
 "use client";
 
+import { inviteText } from "@/lib/crew-invite";
+import { mailtoHref } from "@/lib/reminders";
+
 import TimesheetExport from "@/components/TimesheetExport";
 import EmptyState from "@/components/EmptyState";
 import { FormEvent, useEffect, useState } from "react";
@@ -98,6 +101,22 @@ export default function EmployeesPage() {
     }
     load();
   }, []);
+
+  /** R92: owner-confirmed invite. App email when it's set up, else the owner's own email app (mailto). */
+  async function invite(person: Employee) {
+    const email = (person.email || "").trim();
+    if (!email || !window.confirm(`Send a crew invite to ${email}?`)) return;
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token || "";
+    const response = token ? await fetch("/api/email/invite", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ employeeId: person.id }) }).catch(() => null) : null;
+    if (response?.ok) { setMessage(`Invite sent to ${email}.`); return; }
+    const error = response ? String(((await response.json().catch(() => ({}))) as { error?: string }).error || "") : "";
+    if (response && response.status !== 503) { setMessage(`Invite not sent: ${error || "try again"}.`); return; }
+    const business = (() => { try { return String(JSON.parse(window.localStorage.getItem("clientready-profile") || "{}").businessName || ""); } catch { return ""; } })();
+    const { subject, text } = inviteText(business, person.name, window.location.origin, email.toLowerCase());
+    window.location.href = mailtoHref(email, subject, text);
+    setMessage("Opened your email app with the invite. Nothing is sent until you send it there.");
+  }
 
   function saveLocal(next: Employee[]) {
     setEmployees(next);
@@ -278,6 +297,7 @@ export default function EmployeesPage() {
               <button type="button" onClick={() => setActive(person, !person.active)} className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400 max-sm:min-h-11">
                 {person.active ? "Mark inactive" : "Mark active"}
               </button>
+              {person.email && person.active && <button type="button" data-testid={`crew-invite-${person.id}`} onClick={() => invite(person)} className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400 max-sm:min-h-11">Invite to crew app</button>}
               <button type="button" onClick={() => remove(person)} className="rounded-lg border border-rose-500/40 px-3 py-1.5 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10 max-sm:min-h-11 dark:text-rose-300">Remove</button>
             </div>
             <details className="group/raise mt-4 rounded-xl border border-teal-500/15 bg-teal-500/5">
