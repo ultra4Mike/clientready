@@ -163,3 +163,17 @@ Shared by the three ClientReady bots. Update the **Status** column when you pick
 | R100 | Dashboard painted stale totals with "Synced": no Synced/totals until this page load's server fetch finishes (shared in-flight fetch, no-store). | Dev | Done local | 2026-10-21 |
 | R101 | Duplicate invoice numbers: server trigger gives new docs the next free number; Documents "Fix duplicate numbers" (owner confirms); unique index only after duplicates are fixed (migration 20261024130000, re-run it). | Dev | Done local 13cc852; live duplicates need owner fix | 2026-10-21 |
 | R102 | Bad /invoice?id -> Invoice not found (nothing created); bad /clients/<id> not found fast. | Dev | Done local | 2026-10-21 |
+
+## R103–R113 (run 4)
+- R103 Duplicate: allowlist copy, saved to cloud first (doc-duplicate). Done.
+- R104 one money function (lib/money.ts) for Dashboard/Documents/Reports. Done.
+- R105 deposit default %, approve extras open, greetingName in follow-ups. Done.
+- R106 collect Mark sent only for drafts; calendar New job; clients CSV import/export; ?edit=. Open: client "properties", generic scroll-to-row.
+- R107 /week→/upcoming; profit-by-job by job date; PAID stamp (paid-stamp); dashboard inline search (dashboard-search, dashboard-search-hit); fuzzy Ctrl+K (1 typo, words only). Done.
+- R108 mobile: content padded clear of the floating +, slimmer Save bar. Needs a visual check at 427px.
+- R109 crew draft → invoice assigns the worker, hours = qty at their rate, labor into job costs; owner schedule shows checklist ticks (checklist-ticks). Done.
+- R110 dashboard renders before recurring/automations; crew report closes at once ("Sending…"); Mark reviewed/Confirm done instant + toast (review-toast). Perf not measured on prod.
+- R111 payment note (payment-note), form closes on save, receipt auto-prints (/receipt?print=1); /settings→/profile; jobs CSV uses job date; crew dark contrast; crew report date required. Done.
+- R112 conflicts: crew rows count as assigned; start-only = DEFAULT_JOB_MINUTES (60); overlap-badge + overlap-move on Today/Calendar/invoice; + Add crew warns (crew-clash, crew-clash-anyway, crew-clash-other). Non-interactive paths (recurring, API, draft convert, duplicate) are caught after save by the badge and Needs review, not blocked.
+- R113 Crew dates check: derived jobs no longer listed as "Unscheduled"; idempotent; invoice dates untouched.
+- Perf (Outstanding card nav, Today): not done.
