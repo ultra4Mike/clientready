@@ -73,5 +73,8 @@ export async function isCrewUser() {
   if (!user) return false;
   const { data: person } = await supabase.rpc("is_crew_email");
   const row = Array.isArray(person) ? person[0] : person;
-  return Boolean(row && row.user_id && row.user_id !== user.id);
+  const crew = Boolean(row && row.user_id && row.user_id !== user.id);
+  // R94 recovery: an empty owner profile made for a crew email is removed (one with data is only flagged).
+  if (crew) await supabase.rpc("crew_fix_owner_profile").then(() => undefined, () => undefined);
+  return crew;
 }

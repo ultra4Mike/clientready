@@ -23,7 +23,10 @@ export default function SignupPage() {
     setBusy(true);
     setMessage("");
     const cleanEmail = email.trim().toLowerCase();
-    rememberPlan(asPlan(plan));
+    // R94: a saved crew email is a crew login, never an owner account (checked before sign-up, no session needed).
+    const { data: crewCheck } = await supabase.rpc("crew_signup_check", { p_email: cleanEmail });
+    const isCrew = crewCheck === true;
+    if (!isCrew) rememberPlan(asPlan(plan));
     const { data: created, error } = await supabase.auth.signUp({
       email: cleanEmail,
       password,
@@ -31,6 +34,13 @@ export default function SignupPage() {
     if (error) {
       setBusy(false);
       setMessage(error.message);
+      return;
+    }
+    if (isCrew) {
+      setBusy(false);
+      if (!created.session) { setMessage("This email is on a crew. Confirm your email, then log in: you'll go to your crew jobs."); return; }
+      await supabase.rpc("crew_fix_owner_profile").then(() => undefined, () => undefined);
+      window.location.href = "/crew";
       return;
     }
     if (plan && !created.session) {
