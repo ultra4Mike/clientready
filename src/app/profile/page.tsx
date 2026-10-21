@@ -8,6 +8,7 @@ import TimezoneCombobox from "@/components/TimezoneCombobox";
 import LegalLinks from "@/components/LegalLinks";
 import { FormEvent, useEffect, useState } from "react";
 import { AUTOMATIONS_OFF, readAutomations, type Automations } from "@/lib/automations";
+import ApiSettings from "@/components/ApiSettings";
 import { supabase } from "@/lib/supabase";
 import StripeSetup from "@/components/StripeSetup";
 import AppShell from "@/components/AppShell";
@@ -41,6 +42,8 @@ export default function ProfilePage() {
   const [saved, setSaved] = useState(false);
   const [message, setMessage] = useState("");
   const [loginEmail, setLoginEmail] = useState("");
+  const [loginChecked, setLoginChecked] = useState(false);
+  const [signedInUser, setSignedInUser] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [nextPassword, setNextPassword] = useState("");
   const [passwordMessage, setPasswordMessage] = useState("");
@@ -55,10 +58,18 @@ export default function ProfilePage() {
       setAutomations(readAutomations(local.automations));
       setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Chicago");
 
-      const { data } = await supabase.auth.getUser();
+      // Help: the stored session answers right away (getUser needs the network and can fail on a slow link).
+      const { data: sessionData } = await supabase.auth.getSession();
+      const sessionUser = sessionData.session?.user;
+      if (sessionUser) setLoginEmail(sessionUser.email || "");
+      if (sessionUser) setLoginChecked(true);
+      if (sessionUser) setSignedInUser(true);
+      const { data } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+      setLoginChecked(true);
       const user = data.user;
       if (!user) return;
       setLoginEmail(user.email || "");
+      setSignedInUser(true);
 
       const { data: row } = await supabase
         .from("profiles")
@@ -263,7 +274,7 @@ export default function ProfilePage() {
         <p className="-mt-1 text-xs text-[var(--cr-muted)]">Default is 30%. This is a cushion for taxes. It is not a tax return.</p>
         <fieldset className="cr-panel space-y-1 rounded-xl border border-teal-500/25 p-3 sm:p-4" data-testid="automations">
           <legend className="px-1.5 text-sm font-semibold">Automations (optional, all off by default)</legend>
-          <p className="pb-2 text-xs leading-relaxed text-[var(--cr-muted)]">These send real emails to your clients from your email setup when you open the app. Each one is logged on the invoice and never repeats. Turn on only what you want.</p>
+          <p className="pb-2 text-xs leading-relaxed text-[var(--cr-muted)]">These send real emails to your clients from your email setup when you open the app. Each email is checked with your account right before it goes out, so the same one isn&apos;t sent twice (even from two devices), and it&apos;s logged on the invoice. Turn on only what you want.</p>
           <label className="flex min-h-11 cursor-pointer items-center gap-3 border-t border-teal-500/15 py-3 text-sm"><input type="checkbox" name="auto-done-email" data-testid="auto-done-email" className="cr-switch order-last" checked={automations.doneEmailInvoice} onChange={(e) => setAutomations({ ...automations, doneEmailInvoice: e.target.checked, doneIncludeReview: e.target.checked && automations.doneIncludeReview })} /><span className="min-w-0 flex-1 leading-snug">When you confirm a job is done, email the client the invoice (once per invoice; needs the client&apos;s email; includes the pay link when the invoice has a customer link). Drafts are never sent.</span></label>
           <label className={`flex min-h-11 items-center gap-3 border-l-2 border-teal-500/30 py-2 pl-3 text-sm text-[var(--cr-muted)] sm:ml-2 ${automations.doneEmailInvoice ? "cursor-pointer" : "cursor-not-allowed opacity-50"}`}><input type="checkbox" name="auto-done-review" data-testid="auto-done-review" disabled={!automations.doneEmailInvoice} className="cr-switch order-last" checked={automations.doneIncludeReview} onChange={(e) => setAutomations({ ...automations, doneIncludeReview: e.target.checked })} /><span className="min-w-0 flex-1 leading-snug">Add your review link to that email (skipped for clients who opted out).</span></label>
           <label className="flex min-h-11 cursor-pointer items-center gap-3 border-t border-teal-500/15 py-3 text-sm"><input type="checkbox" name="auto-late-email" data-testid="auto-late-email" className="cr-switch order-last" checked={automations.lateReminderEmail} onChange={(e) => setAutomations({ ...automations, lateReminderEmail: e.target.checked })} /><span className="min-w-0 flex-1 leading-snug">When an invoice is past due, email the client a friendly reminder for the overdue amount (at most every 7 days, 3 times per due date). Clients marked “No automatic emails” are skipped.</span></label>
@@ -272,6 +283,10 @@ export default function ProfilePage() {
         <details className="cr-panel group rounded-xl border border-teal-500/25 px-3 sm:px-4 [&[open]]:pb-4" data-testid="more-settings">
           <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 text-sm font-semibold [&::-webkit-details-marker]:hidden"><span className="min-w-0 flex-1">More settings <span className="block font-normal text-xs text-[var(--cr-muted)] sm:inline">profit alerts, overtime warning, late fees</span></span><svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 shrink-0 text-teal-500 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" /></svg></summary>
         <div className="mt-3 space-y-4">
+        <fieldset className="space-y-2 rounded-xl border border-teal-500/20 p-3" data-testid="integrations">
+          <legend className="px-1 text-sm font-semibold">Integrations (optional)</legend>
+          <ApiSettings />
+        </fieldset>
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
           Profit alert below % left after job costs
           <input name="profitAlertMargin" data-testid="profit-alert-margin" inputMode="numeric" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="20" value={profile.profitAlertMargin} onChange={(event) => update("profitAlertMargin", event.target.value)} />
@@ -328,7 +343,7 @@ export default function ProfilePage() {
 
       <form id="password" onSubmit={changePassword} className="scroll-mt-24 mt-6 space-y-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none sm:p-6">
         <h2 className="text-lg font-bold tracking-tight">Login password</h2>
-        <p className="text-sm text-[var(--cr-muted)]">Login email: {loginEmail || "Not signed in"}</p>
+        <p className="text-sm text-[var(--cr-muted)]">Login email: <span data-testid="login-email">{loginEmail || (signedInUser ? "Signed in (no email on this login)" : loginChecked ? "Not signed in" : "Checking…")}</span></p>
         <input type="password" name="currentPassword" aria-label="Current password" autoComplete="current-password" className="w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Current password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
         <input type="password" name="newPassword" aria-label="New password" autoComplete="new-password" className="w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="New password" value={nextPassword} onChange={(event) => setNextPassword(event.target.value)} />
         <button type="submit" className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50 w-full sm:w-auto">Update password</button>
