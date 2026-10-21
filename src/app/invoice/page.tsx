@@ -13,7 +13,7 @@ import { clientIdFor } from "@/lib/portal";
 import JobDonePanel from "@/components/JobDonePanel";
 import { StageEditor, StageSchedule } from "@/components/StageSchedule";
 import { balanceLabel, readStages, type Stage } from "@/lib/stages";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { saveCloudDocument } from "@/lib/cloud-docs";
 import { displayStatus } from "@/lib/doc-status";
 import InventoryUse, { type StockUse } from "@/components/InventoryUse";
@@ -887,15 +887,27 @@ export default function NewInvoicePage() {
   }
 
   /** New draft invoice copied from the saved version of this invoice. The original is not changed. */
+  // R122: one change order per click; the button stays disabled until we navigate to it.
+  const changeOrderBusy = useRef(false);
+  const [creatingChangeOrder, setCreatingChangeOrder] = useState(false);
   async function createChangeOrder() {
+    if (changeOrderBusy.current) return;
+    changeOrderBusy.current = true; setCreatingChangeOrder(true);
+    let leaving = false;
+    try { leaving = await createChangeOrderOnce(); } finally {
+      // Stays disabled while the page goes to the new change order; unlocks only if it stopped early.
+      if (!leaving) { changeOrderBusy.current = false; setCreatingChangeOrder(false); }
+    }
+  }
+  async function createChangeOrderOnce(): Promise<boolean> {
     if (locked) {
       setSaveMessage("Trial ended. Old documents stay viewable; saving new work needs a plan. Plan details coming soon (see Plans).");
-      return;
+      return false;
     }
     const raw = window.localStorage.getItem("clientready-documents");
     const docs = raw ? (JSON.parse(raw) as SavedDocument[]) : [];
     const original = docs.find((doc) => doc.id === docId && doc.type === "invoice");
-    if (!original) return setSaveMessage("Save this invoice first, then create a change order.");
+    if (!original) { setSaveMessage("Save this invoice first, then create a change order."); return false; }
     const originalNumber = String(original.data?.invoiceNumber || original.title);
     const count = changeOrdersFor(docs, original.id).length + 1;
     const number = nextNumber("invoice");
@@ -917,13 +929,14 @@ export default function NewInvoicePage() {
       window.localStorage.setItem("clientready-documents", JSON.stringify([...(noted ? noted.docs : latest), nextDoc]));
     } catch (error) {
       setSaveMessage(isQuotaError(error) ? "This browser's storage is full, so the change order could not be created on this device. Remove some photos or delete old documents, then try again." : "Could not create the change order on this device.");
-      return;
+      return false;
     }
     if (noted) await saveCloudDocument(noted.original);
     // Full page load on purpose: the editor reads the document once on mount, so a client-side
     // push to the same route would keep showing the original invoice.
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = `/invoice?id=${encodeURIComponent(cloudId)}`;
+    return true;
   }
 
   /** R21: a deposit recorded on the proposal after its invoice was made goes onto that first invoice, if it is still unpaid. */
@@ -1058,7 +1071,7 @@ export default function NewInvoicePage() {
                 <button type="button" onClick={createInvoiceFromProposal} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Create invoice</button>
               )}
               {!isProposal && !locked && docId && (
-                <button type="button" onClick={createChangeOrder} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Create change order</button>
+                <button type="button" data-testid="create-change-order" disabled={creatingChangeOrder} onClick={createChangeOrder} className="disabled:opacity-50 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">{creatingChangeOrder ? "Creating…" : "Create change order"}</button>
               )}
               {!locked && <button type="button" onClick={clearForm} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Clear form</button>}
         </div>
@@ -1433,7 +1446,7 @@ export default function NewInvoicePage() {
                 <button type="button" onClick={createInvoiceFromProposal} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Create invoice</button>
               )}
               {!isProposal && !locked && docId && (
-                <button type="button" onClick={createChangeOrder} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Create change order</button>
+                <button type="button" data-testid="create-change-order" disabled={creatingChangeOrder} onClick={createChangeOrder} className="disabled:opacity-50 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">{creatingChangeOrder ? "Creating…" : "Create change order"}</button>
               )}
               {!locked && <button type="button" onClick={clearForm} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Clear form</button>}
             </div>
