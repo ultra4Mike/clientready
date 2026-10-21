@@ -11,6 +11,8 @@ import { loadAccountIntoCache } from "@/lib/account-cache";
 import { amountOf, documentTotals } from "@/lib/discount";
 import { balanceDue, isOpenBalance, invoicePastDue, paidTotal, readPayments } from "@/lib/payments";
 import { uniqueDocs } from "@/lib/change-orders";
+import FollowUps from "@/components/FollowUps";
+import { todayYmd } from "@/lib/stages";
 import NeedsReview from "@/components/NeedsReview";
 import GettingStarted from "@/components/GettingStarted";
 
@@ -50,6 +52,16 @@ function invoiceTotal(doc: SavedDocument) {
     return sum + amountOf(item.qty) * amountOf(item.rate);
   }, 0);
   return documentTotals(subtotal, doc.data?.taxPercent, doc.data?.discountType, doc.data?.discountValue).total;
+}
+
+/** Names of the people scheduled on a job (saved employees), from data.schedule.workerIds. */
+function crewNames(doc: SavedDocument) {
+  const ids = ((doc.data as { schedule?: { workerIds?: unknown } } | undefined)?.schedule?.workerIds);
+  if (!Array.isArray(ids) || !ids.length) return [];
+  let people: { id: string; name?: string }[] = [];
+  try { people = JSON.parse(window.localStorage.getItem("clientready-employees") || "[]"); } catch { people = []; }
+  const names = new Map(people.map((person) => [person.id, person.name || ""]));
+  return ids.map((id) => names.get(String(id)) || "").filter(Boolean);
 }
 
 function balance(doc: SavedDocument) {
@@ -310,8 +322,16 @@ export default function DashboardPage() {
             {documents.length === 0 && loaded && <EmptyState icon="📄" title="No documents yet." line="Your recent invoices and proposals will show here." actionHref="/invoice" actionLabel="New invoice" />}
             {documents.slice(0, 5).map((doc) => (
               <a key={doc.id} href={`/documents?q=${encodeURIComponent(doc.title || "")}`} className="flex items-center justify-between gap-3 border-b border-teal-500/10 px-5 py-3 text-sm transition last:border-b-0 hover:bg-teal-500/5">
-                <span className="min-w-0">
-                  <span className="block truncate font-medium">{doc.title || "Untitled"}</span>
+                <span className="min-w-0" data-testid="recent-doc" data-doc-id={doc.id}>
+                  <span className="block truncate font-medium">{doc.title || "Untitled"}{doc.clientName && doc.clientName !== "No client" ? <span data-testid="recent-client"> · {doc.clientName}</span> : null}</span>
+                  {(() => {
+                    const first = (doc.data?.items || []).find((item) => String(item.description || "").trim()) || (doc.data?.items || [])[0];
+                    const crew = crewNames(doc);
+                    return (<>
+                      {first && <span className="block truncate text-xs" data-testid="recent-line">{String(first.description || "Item")}{first.rate ? ` · $${amountOf(first.rate).toFixed(2)}${amountOf(first.qty) !== 1 ? ` × ${first.qty}` : ""}` : ""}</span>}
+                      <span className="block truncate text-xs text-[var(--cr-muted)]" data-testid="recent-crew" data-crew-count={crew.length}>{crew.length ? `Crew: ${crew.join(", ")}` : "No employees scheduled"}</span>
+                    </>);
+                  })()}
                   <span className="block text-xs capitalize text-[var(--cr-muted)]">{doc.type} · {doc.createdAt}</span>
                 </span>
                 <span className="shrink-0 rounded-full border border-teal-500/30 px-2.5 py-0.5 text-xs font-semibold capitalize">{String(doc.data?.status || "draft")}</span>
@@ -322,6 +342,7 @@ export default function DashboardPage() {
 
         <aside className="min-w-0 space-y-4">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Needs attention</h2>
+          {loaded && <FollowUps docs={documents as never} today={todayYmd()} limit={5} testid="dashboard-reminders" />}
       {recurringReady > 0 && (
         <a href="/documents?q=draft" data-testid="recurring-ready" className="flex items-center justify-between rounded-xl border border-teal-500/40 bg-teal-500/10 px-4 py-3 text-sm font-medium text-teal-700 dark:text-teal-200 transition hover:bg-teal-500/15">
           {recurringReady} recurring draft{recurringReady === 1 ? "" : "s"} ready for review

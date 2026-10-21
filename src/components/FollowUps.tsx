@@ -9,7 +9,7 @@ import { contactMethodLabel, preferredContactFor } from "@/lib/contact-method";
 type Doc = { id: string; type: string; title?: string; clientName?: string; createdAt?: string; data?: Record<string, unknown> };
 
 /** Follow-ups to send yourself: tomorrow's appointment reminders, quotes waiting 3+ days, and seasonal reminders. Never sent automatically. */
-export default function FollowUps({ docs, today }: { docs: Doc[]; today: string }) {
+export default function FollowUps({ docs, today, limit, testid = "followups" }: { docs: Doc[]; today: string; limit?: number; testid?: string }) {
   const [business, setBusiness] = useState("");
   const [opened, setOpened] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState("");
@@ -20,12 +20,15 @@ export default function FollowUps({ docs, today }: { docs: Doc[]; today: string 
     });
   }, []);
   if (!today) return null;
-  const items = followUps(docs, today, business, (doc) => { const token = readApproval(doc.data?.approval)?.token; return token ? approvalUrl(token) : ""; });
+  const every = followUps(docs, today, business, (doc) => { const token = readApproval(doc.data?.approval)?.token; return token ? approvalUrl(token) : ""; });
+  // Dashboard: the next `limit` not yet opened; each one you open drops off and the next one fills in. Today shows all.
+  const waiting = limit ? every.filter((item) => !(opened[item.key] || followUpOpened(item.key))) : every;
+  const items = limit ? waiting.slice(0, limit) : every;
   if (!items.length) return null;
   const mark = (item: FollowUp) => setOpened((current) => ({ ...current, [item.key]: noteFollowUpOpened(item.key) }));
   return (
-    <section className="mt-6 space-y-3" data-testid="followups">
-      <h2 className="flex flex-wrap items-baseline gap-x-2 text-lg font-semibold">Follow-ups <span className="text-sm font-normal text-[var(--cr-muted)]">You send these yourself.</span></h2>
+    <section className="mt-6 space-y-3" data-testid={testid} data-total={waiting.length} data-shown={items.length}>
+      <h2 className="flex flex-wrap items-baseline gap-x-2 text-lg font-semibold">{limit ? "Reminders to send" : "Follow-ups"} <span className="text-sm font-normal text-[var(--cr-muted)]">You send these yourself.</span>{limit && waiting.length > items.length ? <a href="/today" data-testid={`${testid}-all`} className="text-sm font-medium text-teal-600 underline">See all {waiting.length} on Today</a> : null}</h2>
       {items.map((item) => {
         const when = opened[item.key] || followUpOpened(item.key);
         const source = docs.find((doc) => doc.id === item.docId);
