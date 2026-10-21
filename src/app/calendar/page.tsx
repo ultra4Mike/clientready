@@ -1,5 +1,6 @@
 "use client";
 
+import OverlapBadge from "@/components/OverlapBadge";
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
@@ -165,6 +166,7 @@ export default function CalendarPage() {
           </>
         )}
         {!compact && people && <span className="block truncate opacity-80">{people}</span>}
+        {!compact && clashing.has(job.doc.id) && <span className="block" onClick={(event) => event.stopPropagation()}><OverlapBadge docs={docs} doc={job.doc} onMoved={() => setState((prev) => ({ ...prev, docs: readDocs() }))} /></span>}
         {job.schedule.onMyWayAt && job.schedule.status !== "done" && <span className="block truncate opacity-80" data-testid={`${tid}omw`}>🚗 {compact ? "On way" : `On the way · ${omwTime(job.schedule.onMyWayAt)}`}</span>}
         {doneState(job.schedule) === "awaiting" && <span className="block truncate opacity-80" data-testid={`${tid}done-awaiting`}>{compact ? "To confirm" : DONE_LABEL.awaiting}</span>}
         {!compact && doneState(job.schedule) === "confirmed" && <span className="block truncate opacity-80">{DONE_LABEL.confirmed}</span>}

@@ -1,5 +1,6 @@
 "use client";
 
+import OverlapBadge from "@/components/OverlapBadge";
 import { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
@@ -97,6 +98,7 @@ export default function TodayPage() {
                   <p className="text-base font-semibold">
                     <a href={`/invoice?id=${encodeURIComponent(doc.id)}`} className="underline-offset-2 hover:underline">{text(doc.data?.clientName) || doc.clientName || doc.title}</a>
                   </p>
+                  <OverlapBadge docs={docs} doc={doc} onMoved={read} />
                   <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--cr-muted)]" data-testid="today-status"><span className={`inline-block shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold ${schedule.status === "done" ? (done === "awaiting" ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300" : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300") : schedule.status === "in_progress" ? "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300" : "border-teal-500/30 bg-teal-500/10 text-teal-700 dark:text-teal-300"}`}>{statusLabel(schedule)}</span><span className="min-w-0 break-words"><span className="whitespace-nowrap">{doc.title}</span>{people ? ` · ${people}` : ""}</span></p>
                   {schedule.checklist && schedule.checklist.length > 0 && (
                     <p className={`inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold tabular-nums ${schedule.checklist.every((item) => item.done) ? "cr-tone-good border-emerald-300 bg-emerald-50 text-emerald-800" : "cr-tone-warn border-amber-300 bg-amber-50 text-amber-900"}`} data-testid="today-checklist"><svg aria-hidden="true" viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l4 4 10-10" /></svg>Checklist {schedule.checklist.filter((item) => item.done).length}/{schedule.checklist.length}</p>

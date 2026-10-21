@@ -8,6 +8,8 @@ export type Conflict = Block & { mine: { start: number; end: number } };
 type Sched = { date?: string; startTime?: string; endTime?: string; workerIds?: string[]; status?: string; overrides?: unknown };
 type Doc = { id: string; title?: string; data?: Record<string, unknown> };
 
+/** A job with a start but no end counts as this long everywhere (R112). */
+export const DEFAULT_JOB_MINUTES = 60;
 const mins = (time: string) => { const [h, m] = time.split(":").map(Number); return h * 60 + m; };
 export const clockText = (total: number) => {
   const h = Math.floor(total / 60), m = total % 60;
@@ -17,7 +19,12 @@ export const hhmmOf = (total: number) => `${String(Math.floor(total / 60)).padSt
 
 function sched(doc: Doc): Sched | null {
   const raw = doc.data?.schedule as Sched | undefined;
-  if (raw && typeof raw === "object" && /^\d{4}-\d{2}-\d{2}$/.test(String(raw.date || ""))) return raw;
+  if (raw && typeof raw === "object" && /^\d{4}-\d{2}-\d{2}$/.test(String(raw.date || ""))) {
+    // R112: people added with "+ Add crew" (crew rows) count too, not only schedule.workerIds.
+    const crew = (Array.isArray(doc.data?.crew) ? doc.data?.crew : []) as { employeeId?: unknown }[];
+    const ids = Array.from(new Set([...(raw.workerIds || []).map(String), ...crew.map((row) => String(row.employeeId || "")).filter(Boolean)]));
+    return { ...raw, workerIds: ids };
+  }
   // Same rule as every other view (lib/job-when): a job with a start time and a date counts.
   const when = derivedWhen(doc.data as Record<string, unknown> | undefined);
   return when ? ({ ...when, status: "scheduled" } as unknown as Sched) : null;
@@ -25,7 +32,7 @@ function sched(doc: Doc): Sched | null {
 function span(s: Sched) {
   if (!s.startTime || !/^\d{2}:\d{2}$/.test(s.startTime)) return null;
   const start = mins(s.startTime);
-  const end = s.endTime && /^\d{2}:\d{2}$/.test(s.endTime) && mins(s.endTime) > start ? mins(s.endTime) : start + 60;
+  const end = s.endTime && /^\d{2}:\d{2}$/.test(s.endTime) && mins(s.endTime) > start ? mins(s.endTime) : start + DEFAULT_JOB_MINUTES;
   return { start, end };
 }
 export function readOverrides(value: unknown): Override[] {
@@ -87,4 +94,26 @@ export function allConflicts(docs: Doc[]) {
     }
   }
   return out;
+}
+
+/** R112: overlaps for one job as it is saved now (any path that sets a time or crew). */
+export function conflictsForDoc(docs: Doc[], doc: Doc): Conflict[] {
+  const s = sched(doc);
+  return s ? bookingConflicts(docs.filter((item) => item.id !== doc.id), doc.id, s) : [];
+}
+
+/** R112: same job moved to the next open time for its people (same date and length), or null. */
+export function moveToNextOpen(docs: Doc[], doc: Doc): { startTime: string; endTime: string } | null {
+  const s = sched(doc);
+  const t = s && span(s);
+  if (!s || !t || !s.date) return null;
+  const length = t.end - t.start;
+  const start = nextOpenSlot(docs, doc.id, s.date, (s.workerIds || []).map(String), length, t.start);
+  if (!start) return null;
+  return { startTime: start, endTime: hhmmOf(mins(start) + length) };
+}
+
+/** Doc ids that are in an unresolved same-worker overlap right now. */
+export function clashingIds(docs: Doc[]) {
+  return new Set(allConflicts(docs).flatMap((c) => [c.docId, c.otherDocId]));
 }
