@@ -365,6 +365,8 @@ export default function NewInvoicePage() {
           }
         }
         setDocKind(kind);
+        // R106: Calendar "New job" starts with a visit today (time and crew to fill in).
+        if (new URLSearchParams(window.location.search).get("visit")) { setSchedule({ date: ymd(new Date()), startTime: "", workerIds: [], status: "scheduled", updatedAt: "" } as Schedule); setScheduleKey((key) => key + 1); window.setTimeout(() => document.getElementById("schedule")?.scrollIntoView({ block: "start" }), 300); }
         setInvoiceNumber(nextNumber(kind));
         setInvoiceDate(ymd(new Date()));
         setDueDate(plusDays(14));

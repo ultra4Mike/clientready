@@ -250,9 +250,9 @@ export default function CollectPage() {
                 <button type="button" onClick={() => openInvoice(doc.id)} className="rounded-lg border border-teal-500/30 px-4 py-2.5 text-sm font-medium transition hover:border-teal-400 lg:px-3 lg:py-2">
                   Open
                 </button>
-                <button type="button" onClick={() => setStatus(doc.id, "sent")} className="rounded-lg border border-teal-500/30 px-4 py-2.5 text-sm font-medium transition hover:border-teal-400 lg:px-3 lg:py-2">
+                {String(doc.data?.status || "draft") === "draft" && <button type="button" onClick={() => setStatus(doc.id, "sent")} className="rounded-lg border border-teal-500/30 px-4 py-2.5 text-sm font-medium transition hover:border-teal-400 lg:px-3 lg:py-2">
                   Mark sent
-                </button>
+                </button>}
                 <button type="button" data-testid={`reminder-${doc.id}`} onClick={() => setReminderId(reminderId === doc.id ? "" : doc.id)} className="rounded-lg border border-teal-500/30 px-4 py-2.5 text-sm font-medium transition hover:border-teal-400 lg:px-3 lg:py-2">
                   Reminder
                 </button>

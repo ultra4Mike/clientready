@@ -202,7 +202,7 @@ export default function CalendarPage() {
 
   return (
     <AppShell title="Calendar">
-      <PageHeader title="Calendar" subtitle={<><span className="hidden sm:inline">Drag jobs onto the week or month. Click a slot or job to edit it.</span><span className="sm:hidden">Tap a slot or job to edit it.</span></>} actions={<a href="/invoice" className="rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">New job</a>} />
+      <PageHeader title="Calendar" subtitle={<><span className="hidden sm:inline">Drag jobs onto the week or month. Click a slot or job to edit it.</span><span className="sm:hidden">Tap a slot or job to edit it.</span></>} actions={<a href="/invoice?visit=1#schedule" data-testid="calendar-new-job" className="rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">New job</a>} />
       <section className="py-0">
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div className="inline-flex w-full gap-1 rounded-xl border border-slate-500/30 bg-[var(--cr-card)] p-1 shadow-sm sm:w-auto" role="tablist">
@@ -226,7 +226,7 @@ export default function CalendarPage() {
           {(Object.keys(DONE_LABEL) as DoneState[]).map((key) => <span key={key} data-testid={`legend-done-${key}`} className={`whitespace-nowrap rounded-full border px-2.5 py-0.5 font-medium ${DONE_CLASS[key]}`}>{DONE_LABEL[key]}</span>)}
           <span className="basis-full opacity-90 sm:basis-auto"><span className="hidden sm:inline">Drag a job to move it. Click a slot or job to edit.</span><span className="sm:hidden">Tap a job or time slot to edit or move it.</span></span>
         </div>
-        {message && <p className="mt-3 rounded-lg border border-teal-500/30 px-3 py-2 text-sm" data-testid="calendar-message">{message}</p>}
+        {message && <p role="status" className="pointer-events-none fixed bottom-24 left-1/2 z-40 -translate-x-1/2 rounded-lg border border-teal-500/30 bg-[var(--cr-card)] px-3 py-2 text-sm shadow-lg" data-testid="calendar-message">{message}</p>}
         {conflictNote && <p role="status" className={`mt-2 rounded-xl border px-3 py-2.5 text-sm font-medium ${conflictNote.state === "moved" ? "cr-tone-teal border-teal-400 bg-teal-50 text-teal-900" : "cr-tone-warn border-amber-400 bg-amber-50 text-amber-900"}`} data-testid="calendar-conflict" data-state={conflictNote.state}>{conflictNote.text}</p>}
 
         {editing && editingDoc && (
