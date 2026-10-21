@@ -15,7 +15,27 @@ export function toCsv(header: string[], rows: unknown[][]) {
   return [header, ...rows].map((row) => row.map((cell) => csvCell(s(cell))).join(",")).join("\r\n") + "\r\n";
 }
 
-export function exportFiles(input: { profile: Row | null; clients: Row[]; documents: Row[]; employees: Row[] }) {
+/** R34: no live customer links in an export: drop every token/link-bearing key, keep approval status only. */
+export function stripLinks<T>(value: T): T {
+  const walk = (v: unknown, key = ""): unknown => {
+    if (Array.isArray(v)) return v.map((item) => walk(item));
+    if (v && typeof v === "object") {
+      const out: Row = {};
+      for (const [k, child] of Object.entries(v as Row)) {
+        if (/token|portal|secret/i.test(k)) continue;
+        out[k] = walk(child, k);
+      }
+      return out;
+    }
+    if (typeof v === "string" && /[?&](t|p|token)=[A-Za-z0-9_-]{16,}/.test(v)) return "";
+    void key;
+    return v;
+  };
+  return walk(value) as T;
+}
+
+export function exportFiles(raw: { profile: Row | null; clients: Row[]; documents: Row[]; employees: Row[] }) {
+  const input = stripLinks(raw);
   const docs = uniqueDocs(input.documents as never) as unknown as { id: string; type: string; title?: string; clientName?: string; createdAt?: string; data?: Row }[];
   const clients = toCsv(["Name", "Company", "Email", "Phone", "Address", "Notes"], input.clients.map((c) => [c.name, c.company, c.email, c.phone, c.address, c.notes]));
   const documents = toCsv(["Type", "Number", "Client", "Status", "Date", "Due", "Total", "Paid", "Owed", "Job date"], docs.map((d) => {

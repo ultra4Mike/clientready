@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { isCrewUser } from "@/lib/crew";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { loadAccountIntoCache } from "@/lib/account-cache";
-import { exportZip } from "@/lib/account-export";
+import { exportZip, stripLinks } from "@/lib/account-export";
 import { downloadBytes } from "@/lib/zip";
 
 function read(key: string) {
@@ -16,8 +17,12 @@ export default function BackupPage() {
   const [message, setMessage] = useState("");
 
   const [exporting, setExporting] = useState(false);
+  // R34: owner only. Crew accounts never get the buttons (AppShell also sends them to /crew).
+  const [owner, setOwner] = useState<boolean | null>(null);
+  useEffect(() => { isCrewUser().then((crew) => setOwner(!crew)).catch(() => setOwner(true)); }, []);
   // Backlog 5: the whole account (cloud first, then this device's copy if offline) as a ZIP of CSVs + backup.json.
   async function downloadAccountZip() {
+    if (!owner) return;
     setExporting(true);
     const fromCloud = await loadAccountIntoCache().catch(() => false);
     const bytes = exportZip({ profile: read("clientready-profile"), clients: read("clientready-clients") || [], documents: read("clientready-documents") || [], employees: read("clientready-employees") || [] });
@@ -27,13 +32,14 @@ export default function BackupPage() {
   }
 
   function downloadBackup() {
-    const backup = {
+    if (!owner) return;
+    const backup = stripLinks({
       savedAt: new Date().toISOString(),
       profile: read("clientready-profile"),
       clients: read("clientready-clients"),
       documents: read("clientready-documents"),
       appointments: read("clientready-appointments"),
-    };
+    });
     const blob = new Blob([JSON.stringify(backup, null, 2)], {
       type: "application/json",
     });
@@ -93,13 +99,15 @@ export default function BackupPage() {
         <div className="mt-6 divide-y divide-teal-500/20 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] shadow-sm">
           <div className="space-y-3 p-5 sm:p-6">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Download</h2>
-          <button type="button" data-testid="account-export" disabled={exporting} onClick={downloadAccountZip} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-teal-500/60 px-4 py-2.5 text-sm font-semibold text-teal-700 transition hover:bg-teal-500/10 disabled:opacity-50 sm:w-auto dark:text-teal-300">
+          {owner === false && <p data-testid="backup-owner-only" className="text-sm text-rose-700">Only the business owner can download or restore data.</p>}
+          <button type="button" data-testid="account-export" disabled={exporting || !owner} onClick={downloadAccountZip} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-teal-500/60 px-4 py-2.5 text-sm font-semibold text-teal-700 transition hover:bg-teal-500/10 disabled:opacity-50 sm:w-auto dark:text-teal-300">
             {exporting ? "Preparing…" : "Download everything (ZIP of spreadsheets)"}
           </button>
           <p className="text-xs text-[var(--cr-muted)]">Clients, documents, line items, payments and employees from your account as CSV files, plus a full backup file. Opens in Excel, Google Sheets or Numbers.</p>
           <button
             type="button"
             onClick={downloadBackup}
+            disabled={!owner}
             data-testid="backup-json"
             className="min-h-11 rounded-lg border border-teal-500/40 px-4 py-2.5 text-sm font-medium transition hover:bg-teal-500/10"
           >
