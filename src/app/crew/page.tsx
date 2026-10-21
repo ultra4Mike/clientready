@@ -423,6 +423,19 @@ export default function CrewPage() {
   }
 
   /** One tap: camera first, then the expense form opens with the receipt attached and the amount box focused. */
+  // R125: a job photo any time from the card (owner sees it in Job photos). Changes nothing else.
+  async function addJobPhoto(docId: string, file: File | undefined) {
+    if (!file) return;
+    setBusy(`photo-${docId}`);
+    try {
+      const photo = await compressImage(file);
+      const { data, error } = await supabase.rpc("crew_add_job_photo", { p_doc_id: docId, p_photo: photo, p_client_key: newUploadKey() });
+      setMessage(error ? `Could not add the photo: ${error.message}` : data === false ? "Could not add the photo." : "Job photo added. The owner can see it on the job.");
+    } catch (error) {
+      setMessage((error as Error).message);
+    } finally { setBusy(""); }
+  }
+
   async function snapReceipt(docId: string, file: File | undefined) {
     if (!file) return;
     setSpend({ kind: "parts", amount: "", note: "", receipt: "" });
@@ -681,6 +694,10 @@ export default function CrewPage() {
             <label data-testid={`snap-receipt-${card.doc_id}`} className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-teal-500/50 px-4 text-sm font-semibold text-teal-700 transition hover:border-teal-400 hover:bg-teal-500/10 focus-within:ring-2 focus-within:ring-teal-400 dark:text-teal-300">
               <Icon name="camera" />Snap receipt
               <input aria-label="Snap receipt for this job" type="file" accept="image/*" capture="environment" className="sr-only" data-testid={`snap-receipt-input-${card.doc_id}`} onClick={nativePhotoClick((files) => snapReceipt(card.doc_id, files[0]))} onChange={(event) => { void snapReceipt(card.doc_id, event.target.files?.[0]); event.target.value = ""; }} />
+            </label>
+            <label data-testid={`job-photo-${card.doc_id}`} className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-teal-500/50 px-4 text-sm font-semibold text-teal-700 transition hover:border-teal-400 hover:bg-teal-500/10 dark:text-teal-300">
+              <Icon name="camera" />Job photo
+              <input aria-label="Add a job photo" type="file" accept="image/*" capture="environment" className="sr-only" data-testid={`job-photo-input-${card.doc_id}`} onClick={nativePhotoClick((files) => addJobPhoto(card.doc_id, files[0]))} onChange={(event) => { void addJobPhoto(card.doc_id, event.target.files?.[0]); event.target.value = ""; }} />
             </label>
             </div>
           )}
