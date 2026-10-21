@@ -436,6 +436,11 @@ export async function syncScheduleCrewJobs(doc: CloudDoc) {
     workers.set(person.id, { ...(known || { id: person.id, name: person.name || "" }), name: known?.name || person.name || "", email: person.email || known?.email || "" });
   }
   const data = doc.data || {};
+  // (3) Pay rows show on the crew app too: keep their date/time with the schedule on every save (not paid ones).
+  const payRows = (Array.isArray(data.crew) ? data.crew : []) as CrewRow[];
+  await Promise.all(payRows.filter((row) => row && row.id && !row.paidToWorker).map((row) =>
+    supabase.from("crew_jobs").update({ job_date: schedule.date, start_time: schedule.startTime || row.startTime || "", end_time: schedule.endTime || row.endTime || "" })
+      .eq("owner_id", user.id).eq("id", `${doc.id}-${row.id}`).then(() => undefined, () => undefined)));
   const rows = dedupeWorkerIds(schedule.workerIds).map((workerId) => ({
       id: `${doc.id}-sched-${workerId}`,
       owner_id: user.id,

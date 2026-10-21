@@ -271,10 +271,12 @@ export default function CrewPage() {
     // B2: a reschedule made while this app sat open shows up when the phone comes back to it.
     const seen = () => { if (document.visibilityState === "visible" && navigator.onLine) void load(); };
     document.addEventListener("visibilitychange", seen);
+    // And while it stays open, a fresh read every minute (cheap: own rows only).
+    const poll = window.setInterval(() => { if (document.visibilityState === "visible" && navigator.onLine) void load(); }, 60_000);
     const gone = () => setOffline(true);
     window.addEventListener("online", back);
     window.addEventListener("offline", gone);
-    return () => { window.clearInterval(timer); window.clearTimeout(first); window.clearTimeout(start); window.removeEventListener("online", back); window.removeEventListener("offline", gone); document.removeEventListener("visibilitychange", seen); };
+    return () => { window.clearInterval(timer); window.clearTimeout(first); window.clearTimeout(start); window.removeEventListener("online", back); window.removeEventListener("offline", gone); document.removeEventListener("visibilitychange", seen); window.clearInterval(poll); };
   }, []);
 
   function switchTheme() {
