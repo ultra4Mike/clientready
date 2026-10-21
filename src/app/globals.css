@@ -506,6 +506,11 @@ html.dark [data-testid="auto-sent"] .cr-tone-bad { background-color: rgba(127, 2
 /* Plain red text link (e.g. Remove from job) — never a filled button, even inside dark panels */
 html.dark .cr-link-danger, html.dark #crew-spend .cr-link-danger { background-color: transparent !important; background-image: none !important; border-color: transparent !important; box-shadow: none !important; color: #fda4af !important; }
 .cr-link-danger { background-color: transparent !important; }
+/* Root cause: html.dark .owner-costs button:not([data-testid="section-toggle"]) (specificity 0,3,2) paints every button in
+   the costs/profit panel solid teal and beat .cr-link-danger (0,2,1). Same scope + one more class, declared later, wins. */
+html.dark .owner-costs button.cr-link-danger:not([data-testid="section-toggle"]) { background-color: transparent !important; background-image: none !important; border: 0 !important; box-shadow: none !important; color: #fda4af !important; }
+/* Calendar week chips: exactly two text lines, cut at a line boundary (block children defeat line-clamp's ellipsis) */
+.cr-chip2 { display: block; max-height: calc(2 * 1.375em + 0.5rem); overflow: hidden; }
 
 /* R108 (mobile ≤900px): the floating + never covers the end of a page (search, cards, tabs) — leave room under content;
    the sticky Save bar is slimmer. */
@@ -520,3 +525,6 @@ html.dark .cr-link-danger, html.dark #crew-spend .cr-link-danger { background-co
 .crew-tab-idle { color: #334155; }
 html.dark .crew-tab-idle { color: #cbe7e3 !important; background-color: rgb(255 255 255 / 0.04); }
 html.dark a.crew-delete-link { color: #fda4af !important; }
+/* Duplicate numbers: keep the suggested fix button solid teal inside the amber group */
+html.dark .cr-tone-warn .cr-dup-primary { background-color: #14b8a6 !important; color: #042f2e !important; }
+html.dark .cr-tone-warn .cr-dup-btn:not(.cr-dup-primary) { border-color: rgba(253, 230, 138, 0.5) !important; }
