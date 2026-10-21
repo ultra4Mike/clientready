@@ -845,7 +845,12 @@ export default function NewInvoicePage() {
     // Contact changes also go to the linked saved client (Clients page / portal).
     const clientsAfter = await syncClientContact(linkedClientId, { name: clientName, company: clientCompany, email: clientEmail, phone: clientPhone, address: clientAddress }).catch(() => null);
     if (clientsAfter) setSavedClients(clientsAfter as SavedClient[]);
-    if (storedSchedule && !isProposal) { setSchedule(storedSchedule); setJobStart(storedSchedule.startTime || jobStart); setJobEnd(storedSchedule.endTime || ""); setCrew(savedCrew); setScheduleKey((key) => key + 1); }
+    if (storedSchedule && !isProposal) {
+      // R123: only rebuild the schedule editor when the saved time really differs from what it shows;
+      // re-keying on every invoice save reverted a date being typed and closed the time picker.
+      const same = (x: Schedule | null, y: Schedule | null) => Boolean(x && y) && x!.date === y!.date && (x!.startTime || "") === (y!.startTime || "") && (x!.endTime || "") === (y!.endTime || "") && [...x!.workerIds].sort().join() === [...y!.workerIds].sort().join();
+      const changedSchedule = !same(storedSchedule, schedule);
+      setSchedule(storedSchedule); setJobStart(storedSchedule.startTime || jobStart); setJobEnd(storedSchedule.endTime || ""); setCrew(savedCrew); if (changedSchedule) setScheduleKey((key) => key + 1); }
     setSaveMessage(isProposal ? `Proposal saved${carried}` : "Invoice saved");
     return cloudId;
   }

@@ -4,7 +4,7 @@ import { overLimit, ownerOvertimeHours, weekScheduledHours } from "@/lib/overtim
 import { checklistFromLines } from "@/lib/checklist";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { refreshOwnerUnavailable, unavailableOn, type Unavailable } from "@/lib/unavailable";
-import { bookedBlocks, bookingConflicts, clockText, nextOpenSlot, readOverrides, type Override } from "@/lib/conflicts";
+import { bookedBlocks, bookingConflicts, clockText, DEFAULT_JOB_MINUTES, nextOpenSlot, readOverrides, type Override } from "@/lib/conflicts";
 import { STATUS_LABEL, TRAVEL_BUFFER_MINUTES, travelWarnings, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
 
 function readDocsSafe(): { id: string; title?: string; data?: Record<string, unknown> }[] {
@@ -101,7 +101,7 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
 
   /** Why this can't be saved yet ("" = it can). */
   function problem() {
-    if (!date) return "Pick a date.";
+    if (!date || !/^(19|20)\d\d-\d\d-\d\d$/.test(date)) return "Pick a date."; // R123: half-typed years don't save
     if (startTime && endTime && endTime <= startTime) return "End time must be after the start time.";
     if (conflicts.length && !bookAnyway) return "Someone on this job is already booked at that time. Pick another time, or tick Book anyway.";
     return "";
@@ -114,9 +114,11 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
   const saveRef = useRef<(auto: boolean) => void>(() => undefined);
   useEffect(() => {
     if (!autoSave || fingerprint === first.current) return;
+    // R123: a start with no end gets the default length before it saves (no end-less autosave).
+    if (startTime && !endTime && /^\d\d:\d\d$/.test(startTime)) { setEndTime(toHhmm(toMin(startTime) + DEFAULT_JOB_MINUTES)); return; }
     const blocked = Boolean(problem());
     const mark = window.setTimeout(() => setAutoState(blocked ? "unsaved" : "waiting"), 0);
-    const timer = blocked ? 0 : window.setTimeout(() => { first.current = fingerprint; saveRef.current(true); }, 700);
+    const timer = blocked ? 0 : window.setTimeout(() => { first.current = fingerprint; saveRef.current(true); }, 1200);
     return () => { window.clearTimeout(mark); if (timer) window.clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fingerprint, autoSave]);
