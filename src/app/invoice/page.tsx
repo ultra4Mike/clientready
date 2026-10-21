@@ -22,6 +22,7 @@ import { priceSummary, PRICES_ARE_PLACEHOLDERS } from "@/lib/plans";
 import { syncClientContact } from "@/lib/client-sync";
 import { noteReviewAsked, reviewAskedAt, reviewMailHref, reviewMessage, reviewSmsHref } from "@/lib/review-request";
 import { jobProfit } from "@/lib/job-profit";
+import { CARD_FEE_PASS_THROUGH } from "@/lib/flags";
 import { JobProfitBreakdown } from "@/components/JobProfitBreakdown";
 import VisitNotes, { readVisitNotes, type VisitNote } from "@/components/VisitNotes";
 import { crewReportTotal, profitAlerts, readMinMargin, readSetAside } from "@/lib/profit-alerts";
@@ -492,7 +493,7 @@ export default function NewInvoicePage() {
 
   /** Backlog 8: optional card surcharge as its own labeled line (3% of the current total). Nothing is saved until the owner saves. */
   function addCardFee() {
-    if (locked || isProposal || !(totals.total > 0)) return;
+    if (!CARD_FEE_PASS_THROUGH || locked || isProposal || !(totals.total > 0)) return;
     const amount = Math.round(totals.total * 3) / 100;
     setItems((current) => [...current, { ...emptyItem, description: `${CARD_FEE_PREFIX} (3%, credit card payments only)`, qty: "1", rate: amount.toFixed(2) }]);
     setSaveMessage(`Card fee of $${amount.toFixed(2)} added as its own line. Remove it if the customer doesn't pay by credit card.`);
@@ -981,7 +982,7 @@ export default function NewInvoicePage() {
               <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Line items & pricing</h2>
             <div className="space-y-3">
               <div className="flex items-center justify-between"><h2 className="font-medium">Line items</h2><button type="button" className="tap rounded-lg border border-teal-500/40 max-sm:min-h-11 px-3 py-1.5 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300" onClick={() => setItems((current) => [...current, { ...emptyItem }])}>Add item</button></div>
-              {!isProposal && !locked && totals.total > 0 && !items.some((item) => String(item.description || "").startsWith(CARD_FEE_PREFIX)) && (
+              {CARD_FEE_PASS_THROUGH && !isProposal && !locked && totals.total > 0 && !items.some((item) => String(item.description || "").startsWith(CARD_FEE_PREFIX)) && (
                 <details className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm" data-testid="card-fee">
                   <summary className="cursor-pointer text-slate-600">Pass card processing fee to the customer (optional)</summary>
                   <p className="mt-1 text-xs text-slate-500">Adds a clearly labeled line: {CARD_FEE_PREFIX} (3%) = ${(totals.total * 0.03).toFixed(2)}. Only if they pay by credit card; remove it if they pay cash, check or bank. Not allowed on debit cards, and some states ban or cap card surcharges, so check your state first.</p>
