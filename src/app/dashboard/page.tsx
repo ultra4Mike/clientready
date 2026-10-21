@@ -13,6 +13,7 @@ import { cashCollected } from "@/lib/money";
 import { balanceDue, isOpenBalance, invoicePastDue, paidTotal, readPayments } from "@/lib/payments";
 import { uniqueDocs } from "@/lib/change-orders";
 import FollowUps from "@/components/FollowUps";
+import TodayJobsBlock from "@/components/TodayJobsBlock";
 import { todayYmd } from "@/lib/stages";
 import { runAutomations, type AutoPlan } from "@/lib/automations";
 import { jobWhen } from "@/lib/job-when";
@@ -379,6 +380,7 @@ export default function DashboardPage() {
         </div>
 
         <aside className="min-w-0 space-y-4">
+          <TodayJobsBlock docs={documents as never} loaded={loaded} />
           <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Needs attention</h2>
           {(auto.sent.length > 0 || auto.errors.length > 0) && (
             <div className={`space-y-2 rounded-xl border px-4 py-3 text-sm ${auto.errors.length ? "border-rose-300/70" : "cr-tone-good border-emerald-300 bg-emerald-50 text-emerald-800"}`} data-testid="auto-sent" data-count={auto.sent.length}>
