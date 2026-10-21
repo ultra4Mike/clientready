@@ -8,7 +8,6 @@ import TimezoneCombobox from "@/components/TimezoneCombobox";
 import LegalLinks from "@/components/LegalLinks";
 import { FormEvent, useEffect, useState } from "react";
 import { AUTOMATIONS_OFF, readAutomations, type Automations } from "@/lib/automations";
-import ApiSettings from "@/components/ApiSettings";
 import { INTEGRATIONS } from "@/lib/flags";
 import { supabase } from "@/lib/supabase";
 import StripeSetup from "@/components/StripeSetup";
@@ -289,7 +288,7 @@ export default function ProfilePage() {
 {INTEGRATIONS && (
         <fieldset className="space-y-2 rounded-xl border border-teal-500/20 p-3" data-testid="integrations">
           <legend className="px-1 text-sm font-semibold">Integrations (optional)</legend>
-          <ApiSettings />
+          <a href="/integrations" className="underline" data-testid="integrations-link">QuickBooks, Xero and API keys</a>
         </fieldset>
         )}
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
