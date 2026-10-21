@@ -24,7 +24,7 @@ export function changeOrdersFor(docs: Doc[], originalId: string) {
  */
 export function changeOrderData(original: Doc, newNumber: string, today: string, due: string) {
   const data = { ...(original.data || {}) };
-  for (const key of ["payments", "paymentAmount", "paymentMethod", "paymentDate", "paymentRef", "signature", "proposalSignature", "photos", "jobCosts", "crew", "recurring", "recurringFrom", "recurringReview", "approval", "schedule", "jobTime", "changeOrderNotes", "fromProposal", "reviews", "stages", "updatedAt", "emailLog", "crewReport", "noLateFee"]) {
+  for (const key of ["payments", "paymentAmount", "paymentMethod", "paymentDate", "paymentRef", "signature", "proposalSignature", "photos", "jobCosts", "crew", "recurring", "recurringFrom", "recurringReview", "approval", "schedule", "jobTime", "changeOrderNotes", "fromProposal", "reviews", "stages", "updatedAt", "emailLog", "crewReport", "noLateFee", "jobStart", "jobEnd", "stockUsed", "depositPercent", "renumberedFrom", "items"]) {
     delete data[key];
   }
   return {
@@ -33,6 +33,8 @@ export function changeOrderData(original: Doc, newNumber: string, today: string,
     invoiceDate: today,
     dueDate: due,
     status: "draft",
+    // R87: a change order is only the extra work (a delta), linked to the original, never a second calendar job.
+    items: [{ description: `Change to ${String(original.data?.invoiceNumber || original.title)}: `, qty: "1", rate: "", category: "" }],
     changeOrderOf: { id: original.id, number: String(original.data?.invoiceNumber || original.title) },
   };
 }

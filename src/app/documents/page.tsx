@@ -189,6 +189,12 @@ export default function DocumentsPage() {
       } else if (statusFilter === "overdue") {
         // Same rule as the dashboard's Overdue card: past due and unpaid, no manual status needed.
         if (doc.type !== "invoice" || !invoicePastDue(doc.data, info.total, info.owed)) return false;
+      } else if (statusFilter === "paid") {
+        // R80: Paid = nothing owed (payments, not just the status box).
+        if (!(doc.type === "invoice" && status !== "draft" && info.total > 0 && info.owed <= 0.004)) return false;
+      } else if (statusFilter === "accepted") {
+        // R80: "Accepted" = proposals the client approved (approval link) or marked accepted.
+        if (!(doc.type === "proposal" && (status === "accepted" || (doc.data?.approval as { status?: string } | undefined)?.status === "approved"))) return false;
       } else if (statusFilter === "unpaid" ? !(doc.type === "invoice" && info.owed > 0 && status !== "draft") : statusFilter !== "all" && status !== statusFilter) return false;
       if (fromDate && (!info.date || info.date < fromDate)) return false;
       if (toDate && (!info.date || info.date > toDate)) return false;
