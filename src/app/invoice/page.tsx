@@ -56,6 +56,8 @@ import { ApprovalBadge, ApprovalShare } from "@/components/Approval";
 import ScheduleEditor from "@/components/ScheduleEditor";
 import { entryHours, fmtHours, hoursByWorker, ownerEditClock, crewFixReason, refreshOwnerClock, type ClockEntry } from "@/lib/clock";
 import { confirmRemoval, jobDonePhotos, crewForWorkers, followSchedule, jobScheduleFromForm, crewIds, workLogged, clockHoursFor, dedupeWorkerIds, readSchedule, readWorkers, saveAssignment, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
+import OverlapBadge from "@/components/OverlapBadge";
+import { bookingConflicts, clockText, readOverrides, type Conflict, type Override } from "@/lib/conflicts";
 import { readApproval, refreshApproval, type Approval } from "@/lib/approval";
 import { generateNextNow, readRecurring, readRecurringFrom, scheduleFromForm, type Frequency, type RecurringFrom } from "@/lib/recurring";
 import PayQr from "@/components/PayQr";
@@ -643,12 +645,22 @@ export default function NewInvoicePage() {
     return window.confirm("This invoice is paid. Changing crew pay can make the year log wrong. Continue?");
   }
 
-  function addCrew() {
-    const person = employees.find((item) => item.id === pickedEmployee);
+  // R112: "+ Add crew" runs the same double-booking check as the schedule editor and calendar.
+  const [crewClash, setCrewClash] = useState<{ personId: string; name: string; lines: string[]; conflicts: Conflict[] } | null>(null);
+  function addCrew(force = false) {
+    const person = employees.find((item) => item.id === (force && crewClash ? crewClash.personId : pickedEmployee));
     if (!person) return setSaveMessage("Pick an employee, then click Add");
     if (crew.some((row) => row.employeeId === person.id) || !dedupeWorkerIds([...crewIds(crew), person.id]).includes(person.id)) {
       return setSaveMessage(`${person.name} is already on this job.`);
     }
+    const mine = { date: schedule?.date || invoiceDate, startTime: schedule?.startTime || jobStart, endTime: schedule?.endTime || jobEnd, workerIds: [person.id], status: schedule?.status, overrides: schedule?.overrides };
+    const clash = bookingConflicts(docsForStage() as { id: string; data?: Record<string, unknown> }[], docId, mine);
+    if (clash.length && !force) {
+      setCrewClash({ personId: person.id, name: person.name, conflicts: clash, lines: clash.map((c) => `${person.name} is already on ${c.title} ${clockText(c.start)}–${clockText(c.end)}`) });
+      return;
+    }
+    const overrides = force ? clash.map((c) => ({ workerId: c.workerId, otherDocId: c.docId, at: new Date().toISOString() })) : [];
+    setCrewClash(null);
     if (!allowCrewChange()) return;
     const nextCrew = [...crew, {
       id: `crew-${person.id}`, employeeId: person.id, name: person.name, rate: person.rate,
@@ -659,14 +671,17 @@ export default function NewInvoicePage() {
     setCosts((current) => ({ ...current, labor: nextCrew.reduce((sum, row) => sum + rowPay(row), 0).toFixed(2) }));
     setPickedEmployee("");
     setSaveMessage(`${person.name} added. Pick the next person and click Add again.`);
-    void shareAssignment(nextCrew);
+    void shareAssignment(nextCrew, [], overrides);
   }
 
   /** Crew/pay section changed who is on the job: save it as the job's assignment (schedule.workerIds). */
-  async function shareAssignment(nextCrew: CrewRow[], confirmed: string[] = []) {
+  async function shareAssignment(nextCrew: CrewRow[], confirmed: string[] = [], overrides: Override[] = []) {
     if (!docId) return;
     try {
-      const saved = await saveAssignment(docId, dedupeWorkerIds(crewIds(nextCrew)), confirmed);
+      let saved = await saveAssignment(docId, dedupeWorkerIds(crewIds(nextCrew)), confirmed);
+      const current = saved?.data ? readSchedule(saved.data) : null;
+      // "Assign anyway" is recorded on the job, same as Book anyway in the schedule editor.
+      if (overrides.length && current) saved = await saveSchedule(docId, { ...current, overrides: [...readOverrides(current.overrides), ...overrides] }) || saved;
       if (saved?.data?.schedule) {
         setSchedule(readSchedule(saved.data));
         setScheduleKey((key) => key + 1);
@@ -1249,8 +1264,19 @@ export default function NewInvoicePage() {
                       <option key={person.id} value={person.id}>{person.name} · ${Number(person.rate || 0).toFixed(2)}/hr</option>
                     ))}
                   </select>
-                  <button type="button" onClick={addCrew} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Add</button>
+                  <button type="button" data-testid="crew-add" onClick={() => addCrew()} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Add</button>
                 </div>
+                {docId && !crewClash && <OverlapBadge docs={docsForStage() as { id: string; data?: Record<string, unknown> }[]} doc={(docsForStage() as { id: string; data?: Record<string, unknown> }[]).find((item) => item.id === docId) || { id: docId }} onMoved={() => window.location.reload()} />}
+                {crewClash && (
+                  <div role="alert" data-testid="crew-clash" className="mt-2 rounded-lg border border-amber-400/60 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                    <p className="font-semibold">Double-booked</p>
+                    {crewClash.lines.map((line) => <p key={line}>{line}</p>)}
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button type="button" data-testid="crew-clash-anyway" onClick={() => addCrew(true)} className="min-h-11 rounded-lg border border-amber-500 px-3 font-medium">Assign anyway</button>
+                      <button type="button" data-testid="crew-clash-other" onClick={() => { setCrewClash(null); setPickedEmployee(""); document.getElementById("schedule")?.scrollIntoView({ behavior: "smooth" }); }} className="min-h-11 rounded-lg bg-amber-500 px-3 font-semibold text-slate-950!">Pick another time or worker</button>
+                    </div>
+                  </div>
+                )}
                 {crew.map((row) => (
                   <div key={row.id} className="mt-3 space-y-2 border-t border-amber-200 pt-3 text-slate-900">
                     <p className="text-sm font-medium text-slate-900">{row.name} · ${Number(row.rate || 0).toFixed(2)}/hr saved on this job</p>
