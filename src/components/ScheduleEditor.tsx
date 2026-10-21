@@ -138,19 +138,19 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
           </p>
         )}
         {blocks.length > 0 && (
-          <ul className="mt-2 space-y-1 text-xs" data-testid="booked-blocks" aria-label="Already booked">
+          <ul className="mt-2 space-y-1.5 text-xs" data-testid="booked-blocks" aria-label="Already booked">
             {blocks.map((b) => {
               const clash = conflicts.some((c) => c.docId === b.docId && c.workerId === b.workerId);
               const near = !clash && travel.some((w) => w.workerId === b.workerId && w.otherTitle === b.title);
-              return <li key={`${b.docId}-${b.workerId}`} data-testid="booked-block" data-state={clash ? "blocked" : near ? "warn" : "free"} data-doc-id={b.docId} className={clash ? "font-semibold text-rose-700 dark:text-rose-300" : ""}>{names.get(b.workerId) || "Worker"} booked {clockText(b.start)}–{clockText(b.end)} · {b.title}</li>;
+              return <li key={`${b.docId}-${b.workerId}`} data-testid="booked-block" data-state={clash ? "blocked" : near ? "warn" : "free"} data-doc-id={b.docId} className={`cr-booked rounded-md border px-2.5 py-1.5 tabular-nums ${clash ? "cr-booked-clash border-rose-400/60 font-semibold text-rose-700 dark:text-rose-300" : "border-slate-300/60 text-[var(--cr-muted)]"}`}>{names.get(b.workerId) || "Worker"} booked {clockText(b.start)}–{clockText(b.end)} · {b.title}</li>;
             })}
           </ul>
         )}
         {conflicts.length > 0 && (
-          <div role="alert" data-testid="booking-conflict" data-state="blocked" className="mt-2 rounded-lg border border-rose-500/60 bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-900 dark:text-rose-200">
+          <div role="alert" data-testid="booking-conflict" data-state="blocked" className="cr-tone-warn mt-2 space-y-2 rounded-xl border border-amber-400 bg-amber-50 px-3 py-3 text-sm font-medium text-amber-900">
             <p>Double-booked: {conflicts.map((c) => `${names.get(c.workerId) || "Worker"} is already on ${c.title} ${clockText(c.start)}–${clockText(c.end)}`).join("; ")}.</p>
-            {suggestion && <button type="button" data-testid="next-open-slot" data-time={suggestion} onClick={() => applySlot(suggestion)} className="mt-2 min-h-11 rounded-lg bg-teal-500 px-3 text-sm font-semibold text-slate-950!">Use next open time: {clockText(toMin(suggestion))}</button>}
-            <label className="mt-2 flex min-h-11 items-center gap-2"><input type="checkbox" data-testid="book-anyway" checked={bookAnyway} onChange={(event) => setBookAnyway(event.target.checked)} className="h-5 w-5" />Book anyway (they&apos;ll be on two jobs at once; this is saved on the job)</label>
+            {suggestion && <button type="button" data-testid="next-open-slot" data-time={suggestion} onClick={() => applySlot(suggestion)} className="cr-slot-chip inline-flex min-h-11 items-center gap-1.5 rounded-full bg-teal-500 px-4 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">Use next open time: {clockText(toMin(suggestion))}</button>}
+            <label className="cr-book-anyway flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-rose-400/60 px-3 py-2 text-sm font-medium text-rose-700"><input type="checkbox" data-testid="book-anyway" checked={bookAnyway} onChange={(event) => setBookAnyway(event.target.checked)} className="h-5 w-5" />Book anyway (they&apos;ll be on two jobs at once; this is saved on the job)</label>
           </div>
         )}
         {travel.length > 0 && (

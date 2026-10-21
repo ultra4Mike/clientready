@@ -48,30 +48,31 @@ export default function PaymentMethodsSettings() {
         <p className="text-sm text-[var(--cr-muted)]">Shown on your invoices, approval links and client portal with copy buttons. You still mark invoices paid yourself.</p>
       </div>
       <div className="relative" data-testid="pm-select">
-        <button type="button" data-testid="pm-trigger" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(!open)} className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-teal-500/30 px-3 text-left text-sm">
-          <span className="min-w-0 truncate">{selected.length ? `${selected.length} selected` : "Choose payment methods"}</span><span aria-hidden="true">▾</span>
+        <button type="button" data-testid="pm-trigger" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(!open)} className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-teal-500/40 bg-[var(--cr-card)] px-3 text-left text-sm shadow-sm transition hover:border-teal-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400">
+          <span className="min-w-0 truncate">{selected.length ? `${selected.length} selected` : "Choose payment methods"}</span><svg aria-hidden="true" viewBox="0 0 20 20" className={`h-4 w-4 shrink-0 text-teal-500 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
         {open && (
-          <div role="listbox" aria-multiselectable="true" data-testid="pm-options" className="mt-1 max-h-80 overflow-auto rounded-lg border border-teal-500/30 bg-[var(--cr-card)] p-1 shadow-lg">
+          <div role="listbox" aria-multiselectable="true" data-testid="pm-options" className="cr-panel absolute inset-x-0 z-30 mt-1 max-h-80 overflow-auto rounded-xl border border-teal-500/40 bg-[var(--cr-panel)] p-1.5 shadow-xl">
             {PROVIDERS.map((provider) => {
               const on = Boolean(config[provider.id]?.enabled);
               return (
-                <label key={provider.id} role="option" aria-selected={on} data-testid={`pm-option-${provider.id}`} data-selected={on ? "true" : "false"} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-2 text-sm hover:bg-teal-500/10">
+                <label key={provider.id} role="option" aria-selected={on} data-testid={`pm-option-${provider.id}`} data-selected={on ? "true" : "false"} className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2.5 text-sm transition ${on ? "cr-tone-teal border border-teal-500/40 bg-teal-500/10 font-medium" : "border border-transparent hover:bg-teal-500/10"}`}>
                   <input className="h-5 w-5 shrink-0 accent-teal-500" type="checkbox" name={`pm-${provider.id}-enabled`} data-testid={`pm-enable-${provider.id}`} checked={on} onChange={(event) => set(provider.id, { enabled: event.target.checked })} />
-                  {provider.label}
+                  <span className="flex-1">{provider.label}</span>
+                  {on && <span aria-hidden="true" className="font-bold text-teal-600 dark:text-teal-300">✓</span>}
                 </label>
               );
             })}
-            <button type="button" data-testid="pm-done" onClick={() => setOpen(false)} className="mt-1 min-h-11 w-full rounded-md bg-teal-500 text-sm font-semibold text-slate-950!">Done</button>
+            <button type="button" data-testid="pm-done" onClick={() => setOpen(false)} className="sticky bottom-0 mt-1.5 min-h-11 w-full rounded-lg bg-teal-500 shadow-sm transition hover:bg-teal-400 text-sm font-semibold text-slate-950!">Done</button>
           </div>
         )}
       </div>
       {selected.length > 0 && (
         <ul className="flex flex-wrap gap-2" data-testid="pm-chips">
           {selected.map((provider) => (
-            <li key={provider.id} data-testid={`pm-chip-${provider.id}`} className="inline-flex min-h-9 items-center gap-1 rounded-full border border-teal-500/40 bg-teal-500/10 pl-3 pr-1 text-sm">
+            <li key={provider.id} data-testid={`pm-chip-${provider.id}`} className="inline-flex min-h-11 items-center gap-1 rounded-full border border-teal-500/40 bg-teal-500/10 pl-3 pr-1 text-sm">
               {provider.label}
-              <button type="button" aria-label={`Remove ${provider.label}`} data-testid={`pm-chip-remove-${provider.id}`} onClick={() => set(provider.id, { enabled: false })} className="inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-teal-500/20">×</button>
+              <button type="button" aria-label={`Remove ${provider.label}`} data-testid={`pm-chip-remove-${provider.id}`} onClick={() => set(provider.id, { enabled: false })} className="inline-flex h-11 w-11 -my-1 items-center justify-center rounded-full hover:bg-teal-500/20">×</button>
             </li>
           ))}
         </ul>
@@ -90,8 +91,8 @@ export default function PaymentMethodsSettings() {
               </label>
             ))}
             {provider.kind === "hosted" && (
-              <p className="mt-1 text-xs" data-testid="pm-stripe-status" data-live={cardLive ? "true" : "false"}>
-                {cardLive === null ? "Checking card payments…" : cardLive ? <span className="font-semibold text-emerald-700 dark:text-emerald-300">Online card payments: on. Customers see a Pay by card button.</span> : <span className="text-[var(--cr-muted)]">Online card payments aren&apos;t set up yet, so customers won&apos;t see a card button.</span>}
+              <p data-testid="pm-stripe-status" data-live={cardLive ? "true" : "false"} className={`mt-2 rounded-lg border px-3 py-2 text-xs ${cardLive ? "cr-tone-good border-emerald-300 bg-emerald-50" : "cr-tone-warn border-amber-300 bg-amber-50"}`}>
+                {cardLive === null ? "Checking card payments…" : cardLive ? <span className="font-semibold text-emerald-700 dark:text-emerald-300">Online card payments: on. Customers see a Pay by card button.</span> : <span className="text-amber-800 dark:text-amber-200">Online card payments aren&apos;t set up yet, so customers won&apos;t see a card button.</span>}
               </p>
             )}
             {!provider.ready(cfg) && <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-300">Add the details above or customers won&apos;t see this one.</p>}
