@@ -46,7 +46,7 @@ export function documentStage(doc: Doc, allDocs: Doc[] = []): { stage: DocStage;
     return { stage: "sent", next: "await-approval" };
   }
   const { total, owed } = docAmounts(doc);
-  if (status === "paid" || (status !== "draft" && total > 0 && owed <= 0.004)) return { stage: "paid", next: "none" };
+  if (status === "paid" || (total > 0 && owed <= 0.004)) return { stage: "paid", next: "none" };
   // R58: a client who approved through the link moves an invoice past Draft/Sent to Approved.
   const approved = approval?.status === "approved";
   if (status === "draft" && !approved) return { stage: "draft", next: "send" };

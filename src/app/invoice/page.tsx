@@ -56,6 +56,7 @@ import { ApprovalBadge, ApprovalShare } from "@/components/Approval";
 import ScheduleEditor from "@/components/ScheduleEditor";
 import { entryHours, fmtHours, hoursByWorker, ownerEditClock, crewFixReason, refreshOwnerClock, type ClockEntry } from "@/lib/clock";
 import { confirmRemoval, jobDonePhotos, crewForWorkers, followSchedule, jobScheduleFromForm, crewIds, workLogged, clockHoursFor, dedupeWorkerIds, readSchedule, readWorkers, saveAssignment, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
+import { defaultInvoiceTerms } from "@/lib/terms";
 import OverlapBadge from "@/components/OverlapBadge";
 import { bookingConflicts, clockText, readOverrides, type Conflict, type Override } from "@/lib/conflicts";
 import { readApproval, refreshApproval, type Approval } from "@/lib/approval";
@@ -371,8 +372,8 @@ export default function NewInvoicePage() {
         if (new URLSearchParams(window.location.search).get("visit")) { setSchedule({ date: ymd(new Date()), startTime: "", workerIds: [], status: "scheduled", updatedAt: "" } as Schedule); setScheduleKey((key) => key + 1); window.setTimeout(() => document.getElementById("schedule")?.scrollIntoView({ block: "start" }), 300); }
         setInvoiceNumber(nextNumber(kind));
         setInvoiceDate(ymd(new Date()));
-        setDueDate(plusDays(14));
-        setNotes(kind === "proposal" ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
+        setDueDate(plusDays(kind === "proposal" ? 14 : defaultInvoiceTerms().days));
+        setNotes(kind === "proposal" ? "This proposal is valid for 14 days." : defaultInvoiceTerms().notes);
         // Crew job report opened from /drafts (R82: costs go into Job costs; client carried; one invoice per report).
         const draftRaw = window.localStorage.getItem("clientready-open-draft");
         if (draftRaw) {
@@ -615,7 +616,7 @@ export default function NewInvoicePage() {
     setDocKind(kind);
     if (!docId) setInvoiceNumber(nextNumber(kind));
     if (kind === "proposal" && (status === "paid" || status === "overdue")) setStatus("sent");
-    setNotes(kind === "proposal" ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
+    setNotes(kind === "proposal" ? "This proposal is valid for 14 days." : defaultInvoiceTerms().notes);
   }
 
   function chooseClient(client: SavedClient) {
@@ -747,8 +748,8 @@ export default function NewInvoicePage() {
     if (locked) return;
     window.history.replaceState(null, "", "/invoice");
     setDocId(""); setClientSearch(""); setClientName(""); setClientId(""); setClientCompany(""); setContactName(""); setStockUsed([]); setDepositPercent(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
-    setInvoiceNumber(nextNumber(docKind)); setInvoiceDate(ymd(new Date())); setDueDate(plusDays(14)); setJobStart(""); setJobEnd("");
-    setNotes(isProposal ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
+    setInvoiceNumber(nextNumber(docKind)); setInvoiceDate(ymd(new Date())); setDueDate(plusDays(isProposal ? 14 : defaultInvoiceTerms().days)); setJobStart(""); setJobEnd("");
+    setNotes(isProposal ? "This proposal is valid for 14 days." : defaultInvoiceTerms().notes);
     setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setLegacyPaymentIds([]); setSignature(null); setProposalSignature(null); setPadKey((key) => key + 1); setDocPayLink(""); setPhotos([]); setShowPhotos(false); setChangeOrderOf(null); setFromProposal(null); setMadeInvoices([]); setChangeOrderNotes([]); setRecFreq("off"); setRecNext(""); setRecLoadedNext(""); setRecurringFrom(null); setApproval(null); setEmailLog([]); setEmailOpen(false); setSchedule(null); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
     setStyle("clean"); setJobTime(""); setCosts(emptyCosts); setCrew([]); setOtherFees([]); setCrewReport(null);
   }
@@ -961,8 +962,8 @@ export default function NewInvoicePage() {
       createdAt: new Date().toLocaleDateString(),
       data: {
         clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, clientEmail, clientPhone, clientAddress,
-        invoiceNumber: number, invoiceDate: ymd(new Date()), dueDate: plusDays(14),
-        jobStart, jobEnd, notes: "Payment is due within 14 days.", taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(copyDeposit ? payments : []), signature: null, proposalSignature: signature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), fromProposal: { id: proposalId, number: invoiceNumber || "Proposal", ...(copyDeposit ? { depositApplied: true } : {}) }, items,
+        invoiceNumber: number, invoiceDate: ymd(new Date()), dueDate: plusDays(defaultInvoiceTerms().days),
+        jobStart, jobEnd, notes: defaultInvoiceTerms().notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(copyDeposit ? payments : []), signature: null, proposalSignature: signature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), fromProposal: { id: proposalId, number: invoiceNumber || "Proposal", ...(copyDeposit ? { depositApplied: true } : {}) }, items,
         status: "draft", style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew,
       },
     };
@@ -1551,7 +1552,7 @@ export default function NewInvoicePage() {
                 <p className={`text-xs uppercase tracking-wide ${labelClass}`}>{isProposal ? "Proposal" : "Invoice"}</p>
                 <h2 className="text-xl font-semibold leading-tight">{invoiceNumber || (isProposal ? "PROP-0000" : "INV-0000")}</h2>
                 <div className={`text-sm ${mutedClass}`}>
-                  <div>Date: {invoiceDate || "-"} · {isProposal ? "Valid until" : "Due"}: {dueDate || "-"}</div>
+                  <div>Date: {invoiceDate || "-"} · {!isProposal && totals.total > 0 && totals.balance <= 0.004 ? <span data-testid="preview-paid-in-full">Paid in full</span> : <>{isProposal ? "Valid until" : "Due"}: {dueDate || "-"}</>}</div>
                   {(jobStart || jobEnd) && <div>Time: {jobStart || "-"} to {jobEnd || "-"}</div>}
                   {changeOrderOf && !isProposal && <div data-testid="change-order-link">Change order to <a className="underline" href={`/invoice?id=${encodeURIComponent(changeOrderOf.id)}`}>{changeOrderOf.number}</a></div>}
                   {recurringFrom && !isProposal && <div className="print-hide" data-testid="recurring-link">Recurring from <a className="underline" href={`/invoice?id=${encodeURIComponent(recurringFrom.id)}`}>{recurringFrom.number}</a></div>}
@@ -1593,7 +1594,7 @@ export default function NewInvoicePage() {
             </div>
             {!isProposal && status !== "paid" && totals.balance > 0.004 && <PayOptions config={payMethods} amount={totals.balance} reference={invoiceNumber} />}
             {!isProposal && <StageSchedule stages={stages} total={totals.total} balance={totals.balance} muted={mutedClass} />}
-            {notes && <p className={`mt-3 text-sm ${mutedClass}`}>{notes}</p>}
+            {notes && !(!isProposal && totals.total > 0 && totals.balance <= 0.004 && /\bdue\b/i.test(notes) && notes.length < 120) && <p className={`mt-3 text-sm ${mutedClass}`} data-testid="preview-notes">{notes}</p>}
             {showPhotos && <JobPhotoStrip photos={photos} muted={mutedClass} />}
             {(qrUrl && !isProposal) || signature || (proposalSignature && !isProposal) ? (
               <div className="print-keep mt-3 grid grid-cols-2 items-end gap-6 border-t border-slate-500 pt-3">
