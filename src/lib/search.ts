@@ -19,7 +19,7 @@ function score(query: string, title: string, fields: string[]) {
     const d = digits(word);
     if (hay.includes(word)) total += norm(title).startsWith(word) ? 5 : norm(title).includes(word) ? 3 : 1;
     else if (d.length >= 3 && d === word.replace(/[^\d]/g, "") && hayDigits.includes(d)) total += 2;
-    else if (word.length >= 4 && hay.split(/[^a-z0-9]+/).some((token) => nearWord(word, token))) total += 1;
+    else if (word.length >= 4 && /[a-z]/.test(word) && !/\d/.test(word) && hay.split(/[^a-z0-9]+/).some((token) => nearWord(word, token))) total += 1;
     else return 0;
   }
   return total;
