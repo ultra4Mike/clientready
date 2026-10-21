@@ -492,3 +492,5 @@ html.dark .cr-seg button[aria-pressed="true"] { background-color: #14b8a6 !impor
 /* Overdue stat in the bad tone when there is money overdue */
 html.dark .cr-stat-bad { background-color: rgba(127, 29, 29, 0.35) !important; border-color: rgba(244, 63, 94, 0.5) !important; }
 html.dark .cr-stat-bad p:nth-of-type(2) { color: #fda4af !important; }
+/* Crew sync banner: keep the Retry button solid teal inside the red/amber tones */
+html.dark [data-testid="crew-sync"] [data-testid="crew-queue-item-retry"] { background-color: #14b8a6 !important; color: #042f2e !important; border-color: #14b8a6 !important; }

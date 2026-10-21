@@ -99,7 +99,7 @@ export default function BackupPage() {
         <div className="mt-6 divide-y divide-teal-500/20 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] shadow-sm">
           <div className="space-y-3 p-5 sm:p-6">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Download</h2>
-          {owner === false && <p data-testid="backup-owner-only" className="text-sm text-rose-700">Only the business owner can download or restore data.</p>}
+          {owner === false && <p data-testid="backup-owner-only" className="rounded-lg border border-slate-300 bg-slate-500/5 px-3 py-2 text-sm text-[var(--cr-muted)]">Only the business owner can download or restore data.</p>}
           <button type="button" data-testid="account-export" disabled={exporting || !owner} onClick={downloadAccountZip} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-teal-500/60 px-4 py-2.5 text-sm font-semibold text-teal-700 transition hover:bg-teal-500/10 disabled:opacity-50 sm:w-auto dark:text-teal-300">
             {exporting ? "Preparing…" : "Download everything (ZIP of spreadsheets)"}
           </button>

@@ -255,8 +255,8 @@ export default function ProfilePage() {
         </label>
         <p className="-mt-1 text-xs text-[var(--cr-muted)]">Default is 30%. This is a cushion for taxes. It is not a tax return.</p>
         {/* Backlog 10: less-used settings live under one fold so the main settings stay short. */}
-        <details className="rounded-xl border border-teal-500/20 p-3" data-testid="more-settings">
-          <summary className="cursor-pointer text-sm font-semibold">More settings <span className="font-normal text-xs text-[var(--cr-muted)]">profit alerts, overtime warning, late fees</span></summary>
+        <details className="cr-panel group rounded-xl border border-teal-500/25 px-3 sm:px-4 [&[open]]:pb-4" data-testid="more-settings">
+          <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 text-sm font-semibold [&::-webkit-details-marker]:hidden"><span className="min-w-0 flex-1">More settings <span className="block font-normal text-xs text-[var(--cr-muted)] sm:inline">profit alerts, overtime warning, late fees</span></span><svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 shrink-0 text-teal-500 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" /></svg></summary>
         <div className="mt-3 space-y-4">
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
           Profit alert below % left after job costs

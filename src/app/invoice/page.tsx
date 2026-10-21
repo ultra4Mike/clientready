@@ -1296,7 +1296,7 @@ export default function NewInvoicePage() {
             {!isProposal && docId && (status === "paid" || schedule?.status === "done") && (() => {
               const asked = reviewAsked || reviewAskedAt(docId);
               const why = status === "paid" ? "Paid." : "Job done.";
-              if (clientOptedOut(docClientId, clientName)) return <p className="w-full text-xs text-[var(--cr-muted)]" data-testid="review-optout">{clientName.trim() || "This client"} asked not to get review requests.</p>;
+              if (clientOptedOut(docClientId, clientName)) return <p className="flex w-full items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2.5 text-xs text-[var(--cr-muted)]" data-testid="review-optout">{clientName.trim() || "This client"} asked not to get review requests.</p>;
               if (!reviewLink.trim()) return <p className="w-full text-xs text-[var(--cr-muted)]" data-testid="review-request-setup">{why} Add a review link in <Link href="/profile" className="underline">Settings</Link> to ask {clientName.trim() || "this client"} for a review.</p>;
               const body = reviewMessage(clientName, businessName, reviewLink, status === "paid");
               const sms = reviewSmsHref(clientPhone, body);

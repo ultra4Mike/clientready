@@ -642,7 +642,7 @@ export default function CrewPage() {
             <button type="button" data-testid={`add-expense-${card.doc_id}`} onClick={() => { setSpend({ kind: "parts", amount: "", note: "", receipt: "" }); setSpendOpen(card.doc_id); }} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-teal-800 transition hover:bg-teal-500/10 dark:text-teal-300">
               <Icon name="receipt" />Add expense / receipt
             </button>
-            <label data-testid={`snap-receipt-${card.doc_id}`} className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl border border-teal-500/30 px-3 text-sm font-medium transition hover:border-teal-400 hover:bg-teal-500/10">
+            <label data-testid={`snap-receipt-${card.doc_id}`} className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-teal-500/50 px-4 text-sm font-semibold text-teal-700 transition hover:border-teal-400 hover:bg-teal-500/10 focus-within:ring-2 focus-within:ring-teal-400 dark:text-teal-300">
               <Icon name="camera" />Snap receipt
               <input aria-label="Snap receipt for this job" type="file" accept="image/*" capture="environment" className="sr-only" data-testid={`snap-receipt-input-${card.doc_id}`} onClick={nativePhotoClick((files) => snapReceipt(card.doc_id, files[0]))} onChange={(event) => { void snapReceipt(card.doc_id, event.target.files?.[0]); event.target.value = ""; }} />
             </label>
@@ -715,7 +715,7 @@ export default function CrewPage() {
                 </p>
               ) : null;
           return (
-            <div role="status" data-testid="crew-sync" data-state={state} data-waiting={onPhone} className={`space-y-2 rounded-xl border p-3 text-sm ${offline ? "cr-tone-warn border-amber-500/40 bg-amber-50 text-amber-900" : "border-teal-500/30 bg-[var(--cr-panel)]"}`}>
+            <div role="status" data-testid="crew-sync" data-state={state} data-waiting={onPhone} className={`space-y-2 rounded-xl border p-3 text-sm sm:p-4 ${state === "offline" ? "cr-tone-warn border-amber-500/40 bg-amber-50 text-amber-900" : state === "failed" ? "cr-tone-bad border-rose-300 bg-rose-50 text-rose-800" : "cr-tone-teal border-teal-400/50 bg-teal-50 text-teal-900"}`}>
               {!queue.length && statusLine}
               {queue.length > 0 && (
                 <div className="space-y-2" data-testid="crew-queue" data-count={waiting}>
@@ -723,7 +723,7 @@ export default function CrewPage() {
             {queue.filter((item) => item.lastError).map((item) => (
               <p key={item.id} className="cr-tone-bad flex flex-wrap items-center gap-2 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-rose-800" data-testid="crew-queue-failed" data-doc-id={item.docId}>
                 <span className="min-w-0 flex-1 basis-48">{item.kind === "done" ? "Done photos" : item.kind === "report" ? "Job report" : "Expense"} for {cards.find((card) => card.doc_id === item.docId)?.client_name || "a job"} couldn&apos;t be sent: {item.lastError}</span>
-                <button type="button" className="ml-auto inline-flex min-h-11 min-w-11 items-center rounded-lg border border-teal-500/50 px-4 font-semibold" data-testid="crew-queue-item-retry" disabled={offline} onClick={() => retryQueued(item).then(() => { refreshQueue(); flush(); })}>Retry</button>
+                <button type="button" className="ml-auto inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg bg-teal-600 px-4 font-semibold text-white transition hover:bg-teal-500 disabled:cursor-not-allowed disabled:opacity-50" data-testid="crew-queue-item-retry" disabled={offline} onClick={() => retryQueued(item).then(() => { refreshQueue(); flush(); })}>Retry</button>
                 <button type="button" className="inline-flex min-h-11 min-w-11 items-center rounded-lg border border-rose-400/60 px-4 font-semibold" data-testid="crew-queue-discard" onClick={() => removeQueued(item.id).then(() => refreshQueue())}>Discard</button>
               </p>
             ))}

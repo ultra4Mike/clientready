@@ -289,7 +289,7 @@ export default function ClientsPage() {
                 {CONTACT_METHODS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
               </select>
             </label>
-            <label className="flex min-h-11 items-center gap-2 text-sm text-slate-600">
+            <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 transition hover:border-teal-500 has-[:checked]:border-teal-500 has-[:checked]:bg-teal-500/10">
               <input type="checkbox" data-testid="client-review-optout" className="h-5 w-5 accent-teal-600" checked={Boolean(form.reviewOptOut)} onChange={(event) => setForm({ ...form, reviewOptOut: event.target.checked })} />
               Don&apos;t ask this client for reviews
             </label>
