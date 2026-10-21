@@ -229,6 +229,12 @@ export default function NewInvoicePage() {
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [scheduleKey, setScheduleKey] = useState(0);
   const [workers, setWorkers] = useState<Worker[]>([]);
+  // R101: a new doc whose number was already used gets the next free number from the server.
+  useEffect(() => {
+    const onRenumber = (event: Event) => { const { from, to } = (event as CustomEvent<{ from: string; to: string }>).detail || {}; if (!to) return; setInvoiceNumber((current) => (current === from ? to : current)); setSaveMessage(`${from} was already used, so this one is ${to}.`); };
+    window.addEventListener("clientready-renumbered", onRenumber);
+    return () => window.removeEventListener("clientready-renumbered", onRenumber);
+  }, []);
   // R83: photos the crew took when marking the job done.
   const [crewPhotos, setCrewPhotos] = useState<Awaited<ReturnType<typeof jobDonePhotos>>>([]);
   useEffect(() => { let live = true; if (docId) jobDonePhotos(docId).then((rows) => live && setCrewPhotos(rows)).catch(() => {}); else setCrewPhotos([]); return () => { live = false; }; }, [docId]);

@@ -149,12 +149,23 @@ export async function saveCloudDocument(doc: CloudDoc) {
       client_name: doc.clientName,
       data: doc.data,
     })
-    .select("id")
+    .select("id, title, data")
     .single();
 
   if (insertError || !data?.id) {
     markUnsynced(doc.id);
     return doc.id;
+  }
+  // R101: the server gave this new document the next free number (its number was already used).
+  const saved = (data.data || {}) as Record<string, unknown>;
+  if (saved.renumberedFrom && saved.invoiceNumber !== doc.data.invoiceNumber) {
+    const from = String(saved.renumberedFrom), to = String(saved.invoiceNumber);
+    doc.data.invoiceNumber = to; doc.data.renumberedFrom = from; doc.title = String(data.title || doc.title);
+    try {
+      const list = JSON.parse(window.localStorage.getItem("clientready-documents") || "[]") as CloudDoc[];
+      window.localStorage.setItem("clientready-documents", JSON.stringify(list.map((item) => (item.id === doc.id || item.id === data.id ? { ...item, title: doc.title, data: { ...(item.data || {}), invoiceNumber: to, renumberedFrom: from } } : item))));
+    } catch { /* cache only */ }
+    window.dispatchEvent(new CustomEvent("clientready-renumbered", { detail: { id: data.id, from, to } }));
   }
   markSynced(doc.id, data.id);
   writeBases([{ id: data.id, data: doc.data }]);

@@ -11,6 +11,7 @@ import { ApprovalBadge } from "@/components/Approval";
 import { readApproval } from "@/lib/approval";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
+import DuplicateNumbers from "@/components/DuplicateNumbers";
 import { documentTotals } from "@/lib/discount";
 import { collectedOn, documentStage, NEXT_LABEL, STAGE_LABEL } from "@/lib/doc-stage";
 import { displayStatus } from "@/lib/doc-status";
@@ -255,6 +256,7 @@ export default function DocumentsPage() {
             </a>
         </>}
       />
+      <DuplicateNumbers documents={documents as unknown as Parameters<typeof DuplicateNumbers>[0]["documents"]} onChanged={(list) => setDocuments(list as unknown as SavedDocument[])} />
 
       <section className="mb-3 space-y-2" data-testid="period-overview" data-range={period || (fromDate || toDate ? "custom" : "all")} data-count={overview.count} data-billed={overview.billed.toFixed(2)} data-owed={overview.owed.toFixed(2)}>
         <PeriodToggle value={period || (fromDate || toDate ? "" : "all")} onChange={choosePeriod} />
