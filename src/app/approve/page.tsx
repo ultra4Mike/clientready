@@ -162,21 +162,28 @@ export default function ApprovePage() {
             </p>
           ) : (
             <div className="space-y-3">
-            {portal && (
-              <div data-testid="portal-sign">
-                <p className="mb-1 font-medium text-slate-600">Sign (optional)</p>
-                <SignaturePad value={mySignature} onChange={setMySignature} />
-              </div>
-            )}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <label className="flex min-w-0 flex-1 flex-col gap-1.5 font-medium text-slate-600">
-                Your name (optional)
-                <input aria-label="Your name" value={name} maxLength={100} onChange={(event) => setName(event.target.value)} className="min-h-11 rounded-lg border border-slate-300 px-3 py-2.5 text-base sm:text-sm font-normal text-slate-900 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" />
-              </label>
-              <button type="button" disabled={busy} onClick={approve} className="min-h-11 w-full rounded-lg bg-emerald-600 px-5 py-2.5 font-semibold text-white shadow-sm transition hover:bg-emerald-500 disabled:opacity-60 sm:w-auto">
+              {/* Backlog 2: one tap, no account. Summary, one big button; name and signature are optional extras. */}
+              <p className="text-base text-slate-700" data-testid="approve-summary">
+                <span className="font-semibold">{doc.business.name || "Your contractor"}</span> sent {isProposal ? "a proposal" : "an invoice"} ({number}) for <span className="font-semibold tabular-nums">${totals.total.toFixed(2)}</span>. Tap Approve if it looks right. No account needed.
+              </p>
+              <button type="button" data-testid="approve-one-tap" disabled={busy} onClick={approve} className="min-h-14 w-full rounded-xl bg-emerald-600 px-5 text-lg font-semibold text-white shadow-md transition hover:bg-emerald-500 disabled:opacity-60">
                 {busy ? "Approving…" : `Approve ${isProposal ? "proposal" : "invoice"}`}
               </button>
-            </div>
+              <details className="rounded-lg border border-slate-200 p-3" data-testid="approve-extras">
+                <summary className="cursor-pointer font-medium text-slate-600">Add your name{portal ? " or signature" : ""} (optional)</summary>
+                <div className="mt-2 space-y-3">
+                  <label className="flex flex-col gap-1.5 font-medium text-slate-600">
+                    Your name
+                    <input aria-label="Your name" value={name} maxLength={100} onChange={(event) => setName(event.target.value)} className="min-h-11 rounded-lg border border-slate-300 px-3 py-2.5 text-base font-normal text-slate-900 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 sm:text-sm" />
+                  </label>
+                  {portal && (
+                    <div data-testid="portal-sign">
+                      <p className="mb-1 font-medium text-slate-600">Sign</p>
+                      <SignaturePad value={mySignature} onChange={setMySignature} />
+                    </div>
+                  )}
+                </div>
+              </details>
             </div>
           )}
           {message && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{message}</p>}
