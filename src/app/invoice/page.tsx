@@ -23,6 +23,7 @@ import { syncClientContact } from "@/lib/client-sync";
 import { noteReviewAsked, reviewAskedAt, reviewMailHref, reviewMessage, reviewSmsHref } from "@/lib/review-request";
 import { jobProfit } from "@/lib/job-profit";
 import { JobProfitBreakdown } from "@/components/JobProfitBreakdown";
+import VisitNotes, { readVisitNotes, type VisitNote } from "@/components/VisitNotes";
 import { crewReportTotal, profitAlerts, readMinMargin, readSetAside } from "@/lib/profit-alerts";
 import { readLateFeeSettings, suggestedLateFee, type LateFeeSettings } from "@/lib/late-fees";
 import { saveCrewJobs } from "@/lib/crew";
@@ -179,6 +180,7 @@ export default function NewInvoicePage() {
   const [jobStart, setJobStart] = useState("");
   const [jobMiles, setJobMiles] = useState("");
   const [hoursApprovals, setHoursApprovals] = useState<Record<string, HoursApproval>>({});
+  const [visitNotes, setVisitNotes] = useState<VisitNote[]>([]);
   const [jobEnd, setJobEnd] = useState("");
   const [notes, setNotes] = useState("Payment is due within 14 days.");
   const [taxPercent, setTaxPercent] = useState("0");
@@ -387,6 +389,7 @@ export default function NewInvoicePage() {
       setJobStart(data.jobStart || "");
       setJobMiles(String((data as Record<string, unknown>).jobMiles ?? ""));
       setHoursApprovals(readHoursApprovals((data as Record<string, unknown>).hoursApprovals));
+      setVisitNotes(readVisitNotes((data as Record<string, unknown>).visitNotes));
       setJobEnd(data.jobEnd || "");
       setNotes(data.notes || (kind === "proposal" ? "This proposal is valid for 14 days." : "Payment is due within 14 days."));
       setTaxPercent(data.taxPercent || "0");
@@ -672,7 +675,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(stored?.data?.schedule ? { schedule: stored.data.schedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew, ...(crewReport ? { crewReport } : {}) },
+      data: { clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(stored?.data?.schedule ? { schedule: stored.data.schedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew, ...(crewReport ? { crewReport } : {}) },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -1200,6 +1203,7 @@ export default function NewInvoicePage() {
               {docId && !locked
                 ? <ScheduleEditor key={scheduleKey} docId={docId} value={schedule} workers={workers} onSave={saveJobSchedule} confirmRemove={(ids) => confirmRemoval(workLogged(crew, ids, clockHoursFor(docId)))} />
                 : <p className="text-xs text-slate-600">Save the document first, then schedule the job here or on the Calendar.</p>}
+              {!isProposal && <VisitNotes notes={visitNotes} onChange={setVisitNotes} today={ymd(new Date())} disabled={locked} />}
               {docId && <JobDonePanel docId={docId} schedule={schedule} onConfirmed={(next) => { setSchedule(next); setScheduleKey((key) => key + 1); }} />}
             </Section>
             {docId && !locked && <Section id="approval" label="Approval" headerFirst={false}><ApprovalShare docId={docId} approval={approval} onChange={setApproval} /></Section>}
