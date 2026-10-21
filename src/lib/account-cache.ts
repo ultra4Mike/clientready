@@ -1,4 +1,5 @@
 import { DOC_BASE_KEY, writeBases } from "@/lib/three-way";
+import { markFetched } from "@/lib/sync-status";
 import { clientFromRow, readCachedClients } from "@/lib/client-rows";
 import { supabase } from "@/lib/supabase";
 import { fetchCloudDocuments, type CloudDoc } from "@/lib/cloud-docs";
@@ -75,7 +76,14 @@ function readLocalDocs(): CloudDoc[] {
  * - A different account signs in: the previous account's never-uploaded documents are parked
  *   under that account, and this account starts from its own cloud data only.
  */
+let inFlight: Promise<boolean> | null = null;
 export async function loadAccountIntoCache(): Promise<boolean> {
+  // Callers at the same moment (page + sync pill) share one server fetch.
+  if (!inFlight) inFlight = loadAccountOnce().catch(() => false).then((ok) => { markFetched(ok); return ok; }).finally(() => { inFlight = null; });
+  return inFlight;
+}
+
+async function loadAccountOnce(): Promise<boolean> {
   const { data, error: userError } = await supabase.auth.getUser();
   const user = data.user;
   if (userError || !user) return false;

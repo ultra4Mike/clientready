@@ -94,6 +94,7 @@ export default function DashboardPage() {
   // Needs Review items still open (null until NeedsReview has loaded and reported).
   const [reviewCount, setReviewCount] = useState<number | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [stale, setStale] = useState(false);
   // Clock-dependent text (greeting, chart months) renders after mount only: the server runs in UTC, the
   // owner's browser in their own zone, so rendering them on the server caused React #418 in the evening.
   const [now, setNow] = useState<Date | null>(null);
@@ -103,7 +104,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function load() {
-      await loadAccountIntoCache();
+      // R100: no totals until the server fetch is done (the cache can be stale from another device).
+      const fresh = await loadAccountIntoCache();
+      if (!fresh) setStale(true);
       // No server cron: due recurring drafts are made when the app opens.
       await runDueRecurring();
       // Backlog 13: owner-enabled automations only (all off by default).
@@ -209,7 +212,7 @@ export default function DashboardPage() {
     <AppShell title="Dashboard">
       <PageHeader
         title={`${hello}${ownerName ? `, ${ownerName}` : ""}.`}
-        subtitle={<>{!loaded ? "Loading your numbers…" : stats.invoiceCount === 0
+        subtitle={<>{stale && loaded ? <span data-testid="dashboard-stale">Couldn&apos;t reach the server. These are the numbers saved on this device. </span> : null}{!loaded ? "Loading your numbers…" : stats.invoiceCount === 0
           ? "Create your first invoice to see totals."
           : "Here is what is happening with your invoices today."}</>}
         actions={<>

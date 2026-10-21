@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { loadAccountIntoCache } from "@/lib/account-cache";
-import { currentSyncState, isSyncing, onSyncChange, pendingIds, setSyncing, type SyncState } from "@/lib/sync-status";
+import { currentSyncState, hasFetched, isSyncing, onSyncChange, pendingIds, setSyncing, type SyncState } from "@/lib/sync-status";
 
 /** Uploads documents saved while offline and sends queued deletes. Uses the normal merge (by id/updatedAt). */
 export async function flushPending() {
@@ -50,6 +50,8 @@ export default function SyncPill() {
       if (!alive) return;
       setSignedIn(Boolean(data.session));
       update();
+      // R100: "Synced" only after a server fetch on this page load.
+      if (data.session && !hasFetched()) void loadAccountIntoCache().then(update);
       flushPending();
     });
     const stop = onSyncChange(update);

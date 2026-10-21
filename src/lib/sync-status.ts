@@ -11,6 +11,13 @@ export type SyncState = "local" | "syncing" | "synced" | "offline";
 const DIRTY_KEY = "clientready-unsynced-ids";
 const EVENT = "clientready-sync";
 let syncing = false;
+// R100: "Synced" only after this page load fetched the account from the server once.
+let fetchedOnce = false;
+export function markFetched(ok: boolean) {
+  if (ok) fetchedOnce = true;
+  window.dispatchEvent(new Event(EVENT));
+}
+export const hasFetched = () => fetchedOnce;
 
 function read(): string[] {
   try {
@@ -56,7 +63,7 @@ export function setSyncing(value: boolean) {
 
 export function currentSyncState(): SyncState {
   if (typeof navigator !== "undefined" && navigator.onLine === false) return "offline";
-  if (syncing) return "syncing";
+  if (syncing || !fetchedOnce) return "syncing";
   return pendingIds().length ? "local" : "synced";
 }
 
