@@ -576,7 +576,7 @@ export default function NewInvoicePage() {
     : docStage.next === "collect-payment" ? { onNext: () => setReminderOpen(true) }
     : docStage.next === "schedule" ? { href: "/calendar" }
     : docStage.next === "create-invoice" ? { onNext: () => void createInvoiceFromProposal() }
-    : docStage.next === "complete-job" || docStage.next === "confirm-done" ? { href: "/today" }
+    : docStage.next === "complete-job" || docStage.next === "confirm-done" ? { href: "/calendar?view=day" }
     : {};
 
   function addPayment() {
@@ -1710,7 +1710,7 @@ function CrewSpend({ docId, estimate, report, locked, onUse }: { docId: string; 
       {all.map((row) => (
         <div key={row.id} className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border border-slate-200 px-3 py-2" data-testid="cve-line" data-kind={row.kind} data-source={row.fromReport ? "report" : "expense"}>
           <p className="min-w-0 flex-1">{row.worker_name} · <span className="font-medium">{crewKindLabel(row.kind)}</span> · <span className="tabular-nums">${num(row.amount).toFixed(2)}</span> · {row.note}{row.fromReport ? " · job report" : ""}</p>
-          {row.receipt ? <a href={row.receipt} download={`receipt-${row.id}.jpg`} className="inline-flex min-h-11 items-center text-xs font-medium text-teal-700 underline">Save receipt</a> : row.hasReceipt ? <a href="/drafts" className="inline-flex min-h-11 items-center text-xs font-medium text-teal-700 underline">Receipt on Crew drafts</a> : null}
+          {row.receipt ? <a href={row.receipt} download={`receipt-${row.id}.jpg`} className="inline-flex min-h-11 items-center text-xs font-medium text-teal-700 underline">Save receipt</a> : row.hasReceipt ? <a href="/documents?view=crew-drafts" className="inline-flex min-h-11 items-center text-xs font-medium text-teal-700 underline">Receipt on Crew drafts</a> : null}
         </div>
       ))}
     </div>

@@ -2,13 +2,15 @@
 
 import GlobalSearch from "@/components/GlobalSearch";
 import TrialBanner from "@/components/TrialBanner";
-import { ReactNode, useEffect, useSyncExternalStore } from "react";
+import { ReactNode, useEffect, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { clearLocalBusiness } from "@/lib/account-cache";
 import { disablePush } from "@/lib/push";
 import { isCrewUser } from "@/lib/crew";
 import ConflictToast from "@/components/ConflictToast";
+import { CalendarViewTabs, DocumentsViewTabs } from "@/components/ViewTabs";
+import { calendarView, documentsView } from "@/lib/view-routes";
 import SyncPill from "@/components/SyncPill";
 import { flushClientContactQueue } from "@/lib/client-sync";
 import MobileNav, { BOTTOM_LINKS, NAV_GROUPS } from "@/components/MobileNav";
@@ -45,6 +47,14 @@ export default function AppShell({
   showTitle?: boolean;
 }) {
   const pathname = usePathname() || "";
+  // Redesign 3: views that live inside Calendar / Documents get the same view tabs on top.
+  const [embeddedTabs, setEmbeddedTabs] = useState<ReactNode>(null);
+  useEffect(() => {
+    const search = window.location.search;
+    if (pathname === "/calendar" && ["day", "list", "year", "schedule"].includes(calendarView(search))) setEmbeddedTabs(<div className="mb-3"><CalendarViewTabs current={calendarView(search)} /></div>);
+    else if (pathname === "/documents" && ["crew-drafts", "history"].includes(documentsView(search))) setEmbeddedTabs(<DocumentsViewTabs current={documentsView(search)} />);
+    else setEmbeddedTabs(null);
+  }, [pathname]);
   // The theme is whatever class the layout's inline script put on <html> (read before paint; the server renders "dark").
   const theme = useSyncExternalStore(subscribeTheme, readTheme, () => "dark");
   useEffect(() => {
@@ -150,7 +160,7 @@ export default function AppShell({
             </div>
           </header>
           <div className="app-main p-4 pb-[calc(11.5rem+env(safe-area-inset-bottom))] min-[900px]:p-6 print:pb-4">
-            <div className="mx-auto w-full max-w-6xl"><TrialBanner />{children}</div>
+            <div className="mx-auto w-full max-w-6xl"><TrialBanner />{embeddedTabs}{children}</div>
           </div>
         </div>
       </div>

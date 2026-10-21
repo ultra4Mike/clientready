@@ -11,12 +11,7 @@ const mainLinks = [
 ];
 
 const moreLinks = [
-  { href: "/today", label: "Today" },
-  { href: "/upcoming", label: "This week" },
-  { href: "/history", label: "History" },
   { href: "/employees", label: "Employees" },
-  { href: "/drafts", label: "Crew drafts" },
-  { href: "/year", label: "Year packet" },
   { href: "/reports", label: "Reports" },
   { href: "/mileage", label: "Mileage" },
   { href: "/inventory", label: "Inventory" },
@@ -26,11 +21,11 @@ const moreLinks = [
 const ALL_LINKS = [...mainLinks, ...moreLinks];
 const byHref = (href: string) => ALL_LINKS.find((link) => link.href === href)!;
 export const NAV_GROUPS = [
-  { label: "Home", links: ["/dashboard", "/today"].map(byHref) },
-  { label: "Schedule", links: ["/calendar", "/upcoming"].map(byHref) },
-  { label: "Clients", links: ["/clients", "/history"].map(byHref) },
-  { label: "Work", links: ["/drafts", "/inventory"].map(byHref) },
-  { label: "Money", links: ["/documents", "/collect", "/reports", "/mileage", "/year"].map(byHref) },
+  { label: "Home", links: ["/dashboard"].map(byHref) },
+  { label: "Schedule", links: ["/calendar"].map(byHref) },
+  { label: "Clients", links: ["/clients"].map(byHref) },
+  { label: "Work", links: ["/inventory"].map(byHref) },
+  { label: "Money", links: ["/documents", "/collect", "/reports", "/mileage"].map(byHref) },
   { label: "Team", links: ["/employees"].map(byHref) },
 ];
 export const BOTTOM_LINKS = [{ href: "/profile", label: "Settings" }, byHref("/backup"), { href: "/help", label: "Help" }];
@@ -39,7 +34,7 @@ const QUICK_CREATE = [
   { href: "/invoice", label: "New invoice" },
   { href: "/proposal", label: "New proposal" },
   { href: "/clients", label: "Add client" },
-  { href: "/schedule", label: "Schedule" },
+  { href: "/calendar?view=schedule", label: "Schedule" },
 ];
 
 const TAB_HREFS = ["/dashboard", "/documents", "/calendar", "/clients"];

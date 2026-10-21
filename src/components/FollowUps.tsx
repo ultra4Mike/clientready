@@ -28,7 +28,7 @@ export default function FollowUps({ docs, today, limit, testid = "followups" }: 
   const mark = (item: FollowUp) => setOpened((current) => ({ ...current, [item.key]: noteFollowUpOpened(item.key) }));
   return (
     <section className="mt-6 space-y-3" data-testid={testid} data-total={waiting.length} data-shown={items.length}>
-      <h2 className="flex flex-wrap items-baseline gap-x-2 text-lg font-semibold">{limit ? "Reminders to send" : "Follow-ups"} <span className="text-sm font-normal text-[var(--cr-muted)]">You send these yourself.</span>{limit && waiting.length > items.length ? <a href="/today" data-testid={`${testid}-all`} className="text-sm font-medium text-teal-600 underline">See all {waiting.length} on Today</a> : null}</h2>
+      <h2 className="flex flex-wrap items-baseline gap-x-2 text-lg font-semibold">{limit ? "Reminders to send" : "Follow-ups"} <span className="text-sm font-normal text-[var(--cr-muted)]">You send these yourself.</span>{limit && waiting.length > items.length ? <a href="/calendar?view=day" data-testid={`${testid}-all`} className="text-sm font-medium text-teal-600 underline">See all {waiting.length} on Today</a> : null}</h2>
       {items.map((item) => {
         const when = opened[item.key] || followUpOpened(item.key);
         const source = docs.find((doc) => doc.id === item.docId);
