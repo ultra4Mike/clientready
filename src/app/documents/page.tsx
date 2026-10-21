@@ -13,6 +13,7 @@ import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { documentTotals } from "@/lib/discount";
 import { documentStage, NEXT_LABEL, STAGE_LABEL } from "@/lib/doc-stage";
+import { displayStatus } from "@/lib/doc-status";
 import PeriodToggle from "@/components/PeriodToggle";
 import { inPeriod, periodRange, type PeriodRange } from "@/lib/period";
 import { balanceDue, isOpenBalance, invoicePastDue, paidTotal, readPayments } from "@/lib/payments";
@@ -376,7 +377,7 @@ export default function DocumentsPage() {
               {doc.data?.outcome ? <p className="truncate text-xs text-[var(--cr-muted)]">{doc.data.outcome}</p> : null}
             </div>
             <p className="text-right text-sm tabular-nums text-[var(--cr-muted)] md:hidden xl:block xl:text-left">{doc.createdAt}</p>
-            <div><span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize ${({ paid: "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300", draft: "border-slate-400/40 bg-slate-400/15", sent: "border-sky-500/40 bg-sky-500/15 text-sky-700 dark:text-sky-300", overdue: "border-red-500/40 bg-red-500/15 text-red-700 dark:text-red-300", accepted: "border-teal-500/40 bg-teal-500/15 text-teal-700 dark:text-teal-300" } as Record<string, string>)[String(doc.data?.status || "")] || "border-teal-500/30"}`}>{String(doc.data?.status || "—")}</span></div>
+            <div>{(() => { const shown = displayStatus(doc, documents); return <span data-testid="doc-status" data-status={shown.key} className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${({ paid: "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300", draft: "border-slate-400/40 bg-slate-400/15", sent: "border-sky-500/40 bg-sky-500/15 text-sky-700 dark:text-sky-300", overdue: "border-red-500/40 bg-red-500/15 text-red-700 dark:text-red-300", approved: "border-teal-500/40 bg-teal-500/15 text-teal-700 dark:text-teal-300", scheduled: "border-teal-500/40 bg-teal-500/15 text-teal-700 dark:text-teal-300" } as Record<string, string>)[shown.key] || "border-teal-500/30"}`}>{shown.label}</span>; })()}</div>
             <div className="whitespace-nowrap text-right text-sm tabular-nums">
               <p className="font-semibold">{(factsById.get(doc.id)?.total || 0) > 0 ? `$${(factsById.get(doc.id)?.total || 0).toFixed(2)}` : "—"}</p>
               {(factsById.get(doc.id)?.owed || 0) > 0 && doc.data?.status !== "draft" ? <p className="text-xs text-amber-600 dark:text-amber-300">${(factsById.get(doc.id)?.owed || 0).toFixed(2)} owed</p> : null}

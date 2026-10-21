@@ -15,6 +15,8 @@ import { StageEditor, StageSchedule } from "@/components/StageSchedule";
 import { balanceLabel, readStages, type Stage } from "@/lib/stages";
 import { useEffect, useMemo, useState } from "react";
 import { saveCloudDocument } from "@/lib/cloud-docs";
+import { displayStatus } from "@/lib/doc-status";
+import { refreshEmployeesCache } from "@/lib/account-cache";
 import { paySnapshot, readPaySettings, rowPayMoney, type PayType } from "@/lib/pay-types";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
@@ -133,6 +135,10 @@ function hoursBetween(start: string, end: string) {
   if (mins <= 0) return "";
   return (mins / 60).toFixed(2);
 }
+/** Saved documents (for the "invoiced" proposal stage). */
+function docsForStage(): { id?: string; type: string; data?: Record<string, unknown> }[] {
+  try { return typeof window === "undefined" ? [] : JSON.parse(window.localStorage.getItem("clientready-documents") || "[]"); } catch { return []; }
+}
 function rowPay(row: CrewRow) {
   // R55 + pay types: exact clocked minutes for hourly; fixed day / per job / owner override; money rounded once.
   return rowPayMoney(row);
@@ -218,6 +224,8 @@ export default function NewInvoicePage() {
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [scheduleKey, setScheduleKey] = useState(0);
   const [workers, setWorkers] = useState<Worker[]>([]);
+  // R81: always re-read the team from the cloud once, so "+ Add crew" sees everyone Active.
+  useEffect(() => { refreshEmployeesCache().then((ok) => { if (ok) setWorkers(readWorkers()); }).catch(() => {}); }, []);
   const [clockEntries, setClockEntries] = useState<ClockEntry[]>([]);
   const [clockFix, setClockFix] = useState<{ id: string; start: string; end: string } | null>(null);
   const [items, setItems] = useState<LineItem[]>([{ ...emptyItem }]);
@@ -437,10 +445,15 @@ export default function NewInvoicePage() {
       setWorkers(readWorkers());
       setScheduleKey((key) => key + 1);
       // The cloud is the source of truth for approval (the customer approves there).
-      refreshApproval(doc.id).then((latest) => { if (latest !== undefined) setApproval(latest); });
+      refreshApproval(doc.id).then((latest) => {
+        if (latest === undefined) return;
+        setApproval(latest);
+        // R80: an approved proposal reads Accepted in the status box too (never back to Draft/Sent).
+        if (latest?.status === "approved" && doc.type === "proposal") setStatus((current) => (current === "draft" || current === "sent" ? "accepted" : current));
+      });
       setItems(loadedItems);
       setClientSearch(data.clientName || "");
-      setStatus(data.status || "draft");
+      setStatus(doc.type === "proposal" && readApproval(data.approval)?.status === "approved" && (!data.status || data.status === "draft" || data.status === "sent") ? "accepted" : data.status || "draft");
       setStyle(data.style || "clean");
       setJobTime(data.jobTime || "");
       setCosts({ ...emptyCosts, ...(data.jobCosts || {}), otherFees: loadedFees });
@@ -923,7 +936,7 @@ export default function NewInvoicePage() {
           <p className="text-xs font-semibold uppercase tracking-wider text-teal-600 dark:text-teal-300">{isProposal ? "Proposal" : "Invoice"}</p>
           <div className="mt-1 flex flex-wrap items-center gap-3">
             <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{invoiceNumber || (isProposal ? "New proposal" : "New invoice")}</h2>
-            <span className="rounded-full border border-teal-500/40 bg-teal-500/10 px-3 py-0.5 text-xs font-semibold capitalize">{status}</span>
+            <span className="rounded-full border border-teal-500/40 bg-teal-500/10 px-3 py-0.5 text-xs font-semibold" data-testid="doc-header-status">{displayStatus({ id: docId, type: isProposal ? "proposal" : "invoice", data: { status, approval, schedule, payments, items, taxPercent, discountType, discountValue, dueDate, stages } }, docsForStage()).label}</span>
           </div>
           <p className="mt-1 text-sm text-[var(--cr-muted)]">{clientName || "No client yet"} · Total ${totals.total.toFixed(2)}</p>
         </div>

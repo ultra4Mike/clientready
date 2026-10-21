@@ -109,7 +109,7 @@ export function isPastDue(status: unknown, dueDate: unknown, owed: number, today
 
 /**
  * isPastDue for a whole invoice. With a payment plan / stages (data.stages), each installment is judged on its
- * own due date: overdue only when an unpaid installment's date has passed (later ones not yet due don't count).
+ * own due date (an unpaid installment's date has passed), and the invoice due date passing with money owed also counts (R86).
  */
 export function invoicePastDue(data: Record<string, unknown> | undefined, total: number, owed: number, today = localToday()) {
   const d = data || {};
@@ -117,6 +117,8 @@ export function invoicePastDue(data: Record<string, unknown> | undefined, total:
   if (!stages.length) return isPastDue(d.status, d.dueDate, owed, today);
   const s = String(d.status || "draft");
   if (s === "draft" || s === "paid" || !(owed > 0.004)) return false;
+  // R86: the invoice's own due date still counts — past it with money owed is overdue, stages or not.
+  if (isPastDue(s, d.dueDate, owed, today)) return true;
   return stagePlan(total, owed, stages, today).rows.some((row) => row.state === "overdue");
 }
 
