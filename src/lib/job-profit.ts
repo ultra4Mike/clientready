@@ -24,9 +24,12 @@ export function irsMileageRate(ymd = "") {
 export type ProfitLine = { key: string; label: string; amount: number };
 export type JobProfit = { total: number; lines: ProfitLine[]; cost: number; profit: number; margin: number | null };
 
+// R37: only real card payments (Card (Stripe), Credit/debit card, legacy "Card"/"Stripe") get the estimate.
+const CARD_METHODS = new Set(["card", "stripe", "card (stripe)", "credit/debit card", "credit card", "debit card", "credit/debit"]);
 export function isCardMethod(method: unknown) {
-  return /card|stripe/i.test(String(method || ""));
+  return CARD_METHODS.has(String(method || "").trim().toLowerCase());
 }
+export const CARD_FEE_LINE_PREFIX = "Card processing fee";
 
 export function jobProfit(input: { total: number; data: Record<string, unknown> }): JobProfit {
   const data = input.data || {};
@@ -34,6 +37,11 @@ export function jobProfit(input: { total: number; data: Record<string, unknown> 
   const fees = Array.isArray(costs.otherFees) ? (costs.otherFees as { amount?: unknown }[]) : [];
   const payments = Array.isArray(data.payments) ? (data.payments as { amount?: unknown; method?: unknown }[]) : [];
   const cardFees = payments.filter((p) => money(p.amount) > 0 && isCardMethod(p.method)).reduce((sum, p) => sum + money(p.amount) * CARD_FEE.percent / 100 + CARD_FEE.fixed, 0);
+  // R37/R40: a passed-through card fee line is not revenue; it offsets the estimated card fees (never counted twice).
+  const items = Array.isArray(data.items) ? (data.items as { description?: unknown; qty?: unknown; rate?: unknown }[]) : [];
+  const collected = items.filter((i) => String(i.description || "").startsWith(CARD_FEE_LINE_PREFIX)).reduce((sum, i) => sum + money(i.qty || 1) * money(i.rate), 0);
+  const revenue = input.total - collected;
+  const netCard = Math.max(0, cardFees - collected);
   const gas = money(costs.gas);
   const miles = money(data.jobMiles);
   const day = String(((data.schedule || {}) as { date?: unknown }).date || data.invoiceDate || "");
@@ -44,10 +52,11 @@ export function jobProfit(input: { total: number; data: Record<string, unknown> 
     { key: "crew", label: "Crew pay", amount: money(costs.labor) },
     { key: "meals", label: "Meals", amount: money(costs.lunch) },
     { key: "fees", label: "Other fees", amount: fees.reduce((sum, fee) => sum + money(fee.amount), 0) },
-    { key: "card", label: "Card fees (est. 2.9% + 30¢)", amount: cardFees },
+    { key: "card", label: collected > 0 ? `Card fees (est., after $${collected.toFixed(2)} collected)` : "Card fees (est. 2.9% + 30¢)", amount: netCard },
     { key: "mileage", label: `Mileage (${miles} mi × $${irsMileageRate(day).toFixed(3).replace(/0$/, "")})`, amount: mileage },
   ].map((line) => ({ ...line, amount: r2(line.amount) })).filter((line) => line.amount > 0);
   const cost = r2(lines.reduce((sum, line) => sum + line.amount, 0));
-  const profit = r2(input.total - cost);
-  return { total: r2(input.total), lines, cost, profit, margin: input.total > 0 ? Math.round((profit / input.total) * 100) : null };
+  // Customer paid the full total (fee line included); the business pays the full estimated card fees.
+  const profit = r2(input.total - (cost - r2(netCard)) - cardFees);
+  return { total: r2(revenue), lines, cost, profit, margin: revenue > 0 ? Math.round((profit / revenue) * 100) : null };
 }
