@@ -13,6 +13,11 @@ export const dynamic = "force-dynamic";
 const fail = (status: number, error: string) => Response.json({ error }, { status, headers: { "cache-control": "no-store" } });
 const RESOURCES = new Set(["clients", "jobs", "invoices", "events"]);
 
+/** Caller IP for the bad-key limit (first x-forwarded-for hop set by the host). */
+function callerIp(request: Request) {
+  return (request.headers.get("x-forwarded-for") || "").split(",")[0].trim() || request.headers.get("x-real-ip") || "";
+}
+
 async function handle(request: Request, path: string[], method: "GET" | "POST" | "PATCH") {
   const supabaseUrl = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
@@ -44,7 +49,7 @@ async function handle(request: Request, path: string[], method: "GET" | "POST" |
   const response = await fetch(`${supabaseUrl}/rest/v1/rpc/api_call`, {
     method: "POST",
     headers: { apikey: anonKey, authorization: `Bearer ${anonKey}`, "content-type": "application/json" },
-    body: JSON.stringify({ p_key: key, p_resource: res, p_action: action, p_id: id || null, p_body: body }),
+    body: JSON.stringify({ p_key: key, p_resource: res, p_action: action, p_id: id || null, p_body: body, p_ip: callerIp(request) }),
   }).catch(() => null);
   if (!response?.ok) return fail(502, "The API could not reach the database. Try again.");
   const result = (await response.json().catch(() => null)) as { status?: number; data?: unknown; error?: string } | null;

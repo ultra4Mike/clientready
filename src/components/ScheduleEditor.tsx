@@ -110,13 +110,14 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
   // R53: every change saves by itself shortly after (date, time, crew, status, notes, checklist).
   const fingerprint = JSON.stringify([date, startTime, endTime, workerIds, status, crewNote, checklistText, bookAnyway]);
   const first = useRef(fingerprint);
+  // The latest save(), read from the timers below (save is declared further down).
+  const saveRef = useRef<(auto: boolean) => void>(() => undefined);
   useEffect(() => {
     if (!autoSave || fingerprint === first.current) return;
-    const why = problem();
-    if (why) { setAutoState("unsaved"); return; }
-    setAutoState("waiting");
-    const timer = window.setTimeout(() => { first.current = fingerprint; save(true); }, 700);
-    return () => window.clearTimeout(timer);
+    const blocked = Boolean(problem());
+    const mark = window.setTimeout(() => setAutoState(blocked ? "unsaved" : "waiting"), 0);
+    const timer = blocked ? 0 : window.setTimeout(() => { first.current = fingerprint; saveRef.current(true); }, 700);
+    return () => { window.clearTimeout(mark); if (timer) window.clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fingerprint, autoSave]);
   useEffect(() => {
@@ -135,7 +136,8 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
     const confirmed = confirmedRef.current; confirmedRef.current = [];
     onSave({ date, startTime, ...(endTime ? { endTime } : {}), workerIds, status, updatedAt: value?.updatedAt || "", ...(overrides.length ? { overrides } : {}), ...(crewNote.trim() ? { crewNote: crewNote.trim() } : {}), ...(checklistFromLines(checklistText, value?.checklist).length ? { checklist: checklistFromLines(checklistText, value?.checklist) } : {}) }, auto || autoSave ? { keepOpen: true, confirmed } : undefined);
     if (auto || autoSave) { first.current = fingerprint; setAutoState("saved"); }
-  }
+  }  useEffect(() => { saveRef.current = save; });
+
 
   return (
     <div className="space-y-3 text-sm" data-testid="schedule-editor">

@@ -69,10 +69,14 @@ export async function POST(request: Request) {
     const response = await rest(`rpc/${name}`, { method: "POST", body: JSON.stringify(args) });
     return response?.ok ? response.json().catch(() => null) : null;
   };
-  const quota = await rpc("email_quota_take", {});
-  if (quota !== "") return fail(429, quota === "day" ? "Daily email limit reached (100). Try again tomorrow." : "Too many emails at once. Wait a minute and try again.");
+  // R76: an automated send claims first, so "Already sent" never uses up a slot of the email limit.
   const claim = auto ? { p_doc: docId, p_kind: auto.kind, p_period: auto.period } : null;
   if (claim && (await rpc("claim_automation_send", claim)) !== true) return fail(409, "Already sent.");
+  const quota = await rpc("email_quota_take", {});
+  if (quota !== "") {
+    if (claim) await rpc("release_automation_send", claim);
+    return fail(429, quota === "day" ? "Daily email limit reached (100). Try again tomorrow." : "Too many emails at once. Wait a minute and try again.");
+  }
 
   const sendResponse = await fetch(`${config.apiBase}/emails`, {
     method: "POST",
