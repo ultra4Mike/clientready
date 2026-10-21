@@ -4,6 +4,7 @@ import { checklistProgress, readChecklist, type ChecklistItem } from "@/lib/chec
 import { nativePhotoClick } from "@/lib/native-camera";
 import { confirmLogoutWithQueue, enqueue, flushQueue, isNetworkError, newUploadKey, queued, removeQueued, retryQueued, type QueueItem, type QueueKind } from "@/lib/photo-queue";
 import EmptyState from "@/components/EmptyState";
+import { nextJob, recentJobs } from "@/lib/crew-next";
 import CrewDaysOff from "@/components/CrewDaysOff";
 import { CREW_KINDS, legacySummary, type CostLine, type CrewKind } from "@/lib/cost-categories";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -806,6 +807,31 @@ export default function CrewPage() {
               );
             })()}
             {todayCards.map(jobCard)}
+            {(() => {
+              const next = nextJob(cards, today);
+              const recent = recentJobs(cards, today);
+              return (
+                <>
+                  <div className={cardClass} data-testid="crew-next-job" data-doc-id={next?.doc_id || ""}>
+                    <h3 className="font-semibold">Next job</h3>
+                    {next ? (
+                      <a href={`/crew/job?id=${encodeURIComponent(next.doc_id)}`} data-testid="crew-next-open" className="mt-1 flex min-h-11 flex-wrap items-center justify-between gap-2 text-sm">
+                        <span>{dayLabel(next.job_date)}{next.start_time ? ` · ${timeLabel(next.start_time)}` : ""} · {next.client_name}</span>
+                        <span className="font-semibold underline">Open</span>
+                      </a>
+                    ) : <p className="mt-1 text-sm text-[var(--cr-muted)]" data-testid="crew-next-none">No upcoming jobs.</p>}
+                  </div>
+                  <div className={cardClass} data-testid="crew-recent-jobs" data-count={recent.length}>
+                    <h3 className="font-semibold">Recent jobs</h3>
+                    {recent.length === 0 ? <p className="mt-1 text-sm text-[var(--cr-muted)]">No recent jobs yet.</p> : (
+                      <ul className="mt-1 divide-y divide-teal-500/10 text-sm">
+                        {recent.map((row) => <li key={row.id} data-testid="crew-recent-job" data-doc-id={row.doc_id}><a href={`/crew/job?id=${encodeURIComponent(row.doc_id)}`} className="flex min-h-11 items-center justify-between gap-2"><span>{dayLabel(row.job_date)} · {row.client_name}</span><span className="text-xs text-[var(--cr-muted)]">{STATUS_LABEL[(row.schedule_status || "scheduled") as JobStatus] || ""}</span></a></li>)}
+                      </ul>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
           </section>
         )}
 
@@ -943,7 +969,11 @@ export default function CrewPage() {
           </section>
         )}
         {userId && <p className="pt-4 text-center text-xs text-[var(--cr-muted)]">You only see your own jobs, time and expenses. Prices and company costs are not shown.</p>}
-        <footer className="flex justify-center border-t border-teal-500/15 pt-3"><a href="/account/delete" className="crew-delete-link tap inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-3 py-2 text-xs text-rose-700 underline-offset-2 transition hover:bg-rose-500/10 hover:underline dark:text-rose-300" data-testid="crew-delete-account">Delete my account</a></footer>
+        <details className={cardClass} data-testid="crew-profile">
+          <summary className="flex min-h-11 cursor-pointer items-center font-semibold">Profile</summary>
+          <p className="mt-1 text-sm" data-testid="crew-profile-name">{name}</p>
+          <div className="mt-3 border-t border-teal-500/15 pt-3"><a href="/account/delete" className="crew-delete-link tap inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-3 py-2 text-xs text-rose-700 underline-offset-2 transition hover:bg-rose-500/10 hover:underline dark:text-rose-300" data-testid="crew-delete-account">Delete my account</a></div>
+        </details>
       </div>
     </main>
   );
