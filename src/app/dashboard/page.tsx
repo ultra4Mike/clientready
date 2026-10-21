@@ -107,10 +107,6 @@ export default function DashboardPage() {
       // R100: no totals until the server fetch is done (the cache can be stale from another device).
       const fresh = await loadAccountIntoCache();
       if (!fresh) setStale(true);
-      // No server cron: due recurring drafts are made when the app opens.
-      await runDueRecurring();
-      // Backlog 13: owner-enabled automations only (all off by default).
-      setAuto(await runAutomations().catch(() => ({ sent: [], errors: [] })));
       const profileRaw = window.localStorage.getItem("clientready-profile");
       const clientsRaw = window.localStorage.getItem("clientready-clients");
       const docsRaw = window.localStorage.getItem("clientready-documents");
@@ -121,6 +117,12 @@ export default function DashboardPage() {
       setClients(clientsRaw ? JSON.parse(clientsRaw) : []);
       setDocuments(uniqueDocs(docsRaw ? JSON.parse(docsRaw) : []));
       setLoaded(true);
+      // R110: show the dashboard first; recurring drafts and automations run after, then the list refreshes.
+      // No server cron: due recurring drafts are made when the app opens.
+      await runDueRecurring().catch(() => null);
+      // Backlog 13: owner-enabled automations only (all off by default).
+      setAuto(await runAutomations().catch(() => ({ sent: [], errors: [] })));
+      setDocuments(uniqueDocs(JSON.parse(window.localStorage.getItem("clientready-documents") || "[]")));
     }
     load();
   }, []);

@@ -470,6 +470,7 @@ export default function CrewPage() {
   async function saveDraft(event: FormEvent) {
     event.preventDefault();
     if (!form.clientName.trim() || !ownerId) return setMessage("Add who the job was for.");
+    if (!form.workDate) return setMessage("Add the date of the job."); // R111
     if (costLines.some((line) => !line.amount.trim() && (line.note.trim() || line.receipt))) return setMessage("Add the amount for each cost, or remove the empty line.");
     const costs: CostLine[] = costLines.filter((line) => line.amount.trim()).map(({ kind, amount, note, receipt }) => ({ kind, amount: amount.trim(), note: note.trim(), ...(receipt ? { receipt } : {}) }));
     const row = {
@@ -480,16 +481,17 @@ export default function CrewPage() {
       drive_hours: form.driveHours, drive_minutes: form.driveMinutes, notes: form.notes, finished: form.finished,
       collected_amount: form.collectedAmount, collected_method: form.collectedMethod, status: "draft",
     };
+    // R110: close at once and send behind it; if it fails the report comes back exactly as typed.
+    const keptForm = form, keptLines = costLines;
     setBusy("report");
+    setForm(empty); setCostLines([newCostLine()]); setReportOpen(false);
+    setMessage("Sending job report…");
     const result = await sendOrQueue("report", "", row, (key) => insertReport(row, key));
     setBusy("");
-    if (result.error) return setMessage(result.error);
-    setForm(empty);
-    setCostLines([newCostLine()]);
-    if (result.queued) { setReportOpen(false); return setMessage("Saved on this phone. The job report will send when you're back online."); }
-    setReportOpen(false);
+    if (result.error) { setForm(keptForm); setCostLines(keptLines); setReportOpen(true); return setMessage(result.error); }
+    if (result.queued) return setMessage("Saved on this phone. The job report will send when you're back online.");
     setMessage("Job report sent. The owner will review it.");
-    load();
+    void load();
   }
 
   function jobCard(card: Card) {
@@ -862,7 +864,7 @@ export default function CrewPage() {
                 <label className="block space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Address</span><input id="report-clientAddress" name="clientAddress" className={input} placeholder="Address" value={form.clientAddress} onChange={(event) => setForm({ ...form, clientAddress: event.target.value })} /></label></div>
                 <label className="block space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Work done</span><textarea id="report-workDone" name="workDone" className={`${input} min-h-20`} placeholder="What was done" value={form.workDone} onChange={(event) => setForm({ ...form, workDone: event.target.value })} /></label>
                 <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
-                  <label className="space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Date</span><input id="report-workDate" name="workDate" type="date" className={input} value={form.workDate} onChange={(event) => setForm({ ...form, workDate: event.target.value })} /></label>
+                  <label className="space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Date *</span><input id="report-workDate" name="workDate" required aria-required="true" type="date" className={input} value={form.workDate} onChange={(event) => setForm({ ...form, workDate: event.target.value })} /></label>
                   <label className="space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Hours</span><input id="report-hours" name="hours" className={input} value={form.hours} onChange={(event) => setForm({ ...form, hours: event.target.value })} /></label>
                   <label className="space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Start</span><input id="report-startTime" name="startTime" type="time" className={input} value={form.startTime} onChange={(event) => setForm({ ...form, startTime: event.target.value })} /></label>
                   <label className="space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">End</span><input id="report-endTime" name="endTime" type="time" className={input} value={form.endTime} onChange={(event) => setForm({ ...form, endTime: event.target.value })} /></label>

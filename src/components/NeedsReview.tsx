@@ -21,27 +21,38 @@ export default function NeedsReview({ documents, onDocuments, loading = false, o
       .then(({ data }) => setExpenses((data || []) as ExpenseRow[]));
   }, []);
 
-  const items = reviewItems(documents, expenses);
+  const [hidden, setHidden] = useState<string[]>([]);
+  const items = reviewItems(documents, expenses).filter((item) => !hidden.includes(`${item.docId}:${item.key}`));
   const count = items.length;
   // Lets the dashboard know how many items still need review (only once data has loaded).
   useEffect(() => {
     if (!loading) onCount?.(count);
   }, [count, loading, onCount]);
 
+  // R110: no wait — the row goes away at once with a toast; the save runs behind it (row comes back if it fails).
+  const [toast, setToast] = useState("");
   async function review(item: ReviewItem) {
-    setBusy(`${item.docId}:${item.key}`);
-    if (item.kind === "done") {
-      // Confirming is the review for a crew-done job (sets schedule.confirmedAt; nothing else changes).
-      await confirmJobDone(item.docId).catch(() => null);
-      onDocuments(JSON.parse(window.localStorage.getItem("clientready-documents") || "[]"));
-    } else {
-      onDocuments(await markReviewed(item));
+    const id = `${item.docId}:${item.key}`;
+    setHidden((list) => [...list, id]);
+    setToast(item.kind === "done" ? "Job confirmed done" : "Marked reviewed");
+    window.setTimeout(() => setToast(""), 2500);
+    try {
+      if (item.kind === "done") {
+        // Confirming is the review for a crew-done job (sets schedule.confirmedAt; nothing else changes).
+        await confirmJobDone(item.docId);
+        onDocuments(JSON.parse(window.localStorage.getItem("clientready-documents") || "[]"));
+      } else {
+        onDocuments(await markReviewed(item));
+      }
+    } catch {
+      setHidden((list) => list.filter((value) => value !== id));
+      setToast("Could not save. Try again.");
     }
-    setBusy("");
   }
 
   return (
     <section data-testid="needs-review" data-count={loading ? undefined : count} data-loading={loading ? "true" : undefined} className="mb-8 rounded-2xl data-[loading=true]:animate-pulse data-[loading=true]:opacity-70 border border-teal-500/20 bg-[var(--cr-card)] p-4 sm:p-5">
+      {toast && <p role="status" data-testid="review-toast" className="pointer-events-none fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-teal-500/30 bg-[var(--cr-card)] px-3 py-2 text-sm shadow-lg">{toast}</p>}
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-base font-semibold">Needs review</h2>
         <span data-testid="needs-review-count" className="rounded-full bg-teal-500/15 px-2.5 py-0.5 text-xs font-semibold text-teal-700 dark:text-teal-200">{loading ? "…" : items.length}</span>
