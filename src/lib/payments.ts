@@ -1,6 +1,6 @@
 import { readStages, stagePlan } from "./stages";
 /** tip: extra the client gave on top of the bill; never counts toward the balance. */
-export type Payment = { id: string; amount: string; method: string; date: string; ref: string; tip?: string };
+export type Payment = { id: string; amount: string; method: string; date: string; ref: string; tip?: string; note?: string };
 
 export const paymentMethods = ["Cash", "Check", "Venmo", "Cash App", "Zelle", "PayPal", "Bank", "Card", "Card (Stripe)", "Other"];
 
@@ -34,6 +34,7 @@ export function readPayments(data?: PaymentData | null): Payment[] {
         date: String(item.date || ""),
         ref: String(item.ref || ""),
         ...(num(item.tip) > 0 ? { tip: String(item.tip) } : {}),
+        ...(item.note ? { note: String(item.note).slice(0, 300) } : {}),
       };
     });
   }

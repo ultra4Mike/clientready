@@ -78,6 +78,8 @@ export default function CollectPage() {
   const [paidDate, setPaidDate] = useState(today());
   const [amount, setAmount] = useState("");
   const [paymentRef, setPaymentRef] = useState("");
+  const [paymentNote, setPaymentNote] = useState("");
+  const [paidMessage, setPaidMessage] = useState("");
   const [reminderId, setReminderId] = useState("");
   const [profile, setProfile] = useState<{ businessName?: string; ownerName?: string; paymentLink?: string }>({});
 
@@ -129,12 +131,13 @@ export default function CollectPage() {
     setPaidDate(today());
     setAmount(balance(doc).toFixed(2));
     setPaymentRef("");
+    setPaymentNote("");
   }
 
   async function savePaid(doc: SavedDocument) {
     const next = documents.map((item) => {
       if (item.id !== doc.id) return item;
-      const payments = [...readPayments(item.data), { id: Date.now().toString(), amount, method, date: paidDate, ref: paymentRef }];
+      const payments = [...readPayments(item.data), { id: Date.now().toString(), amount, method, date: paidDate, ref: paymentRef, ...(paymentNote.trim() ? { note: paymentNote.trim() } : {}) }];
       const stillOwed = balanceDue(invoiceTotal(item), paidTotal(payments));
       return {
         ...item,
@@ -148,8 +151,10 @@ export default function CollectPage() {
     });
     saveDocs(next);
     const updated = next.find((item) => item.id === doc.id);
+    setPayingId(""); // R111: form closes as soon as it is saved
+    setPaidMessage("Payment saved");
+    window.setTimeout(() => setPaidMessage(""), 2500);
     if (updated) await saveCloud(updated);
-    setPayingId("");
     if (method === "Cash" && updated) {
       window.localStorage.setItem(
         "clientready-receipt",
@@ -159,9 +164,10 @@ export default function CollectPage() {
           amount,
           date: paidDate,
           method,
+          note: paymentNote.trim(),
         })
       );
-      window.location.href = "/receipt";
+      window.location.href = "/receipt?print=1";
     }
   }
 
@@ -194,6 +200,7 @@ export default function CollectPage() {
     <AppShell title="Get paid">
       <PageHeader title="Get paid" subtitle="Unpaid invoices and overdue amounts, with the next step on each one." actions={<a href="/invoice" className="rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">New invoice +</a>} />
       <StuckPayments />
+      {paidMessage && <p role="status" data-testid="payment-saved" className="pointer-events-none fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-teal-500/30 bg-[var(--cr-card)] px-3 py-2 text-sm shadow-lg">{paidMessage}</p>}
 
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <div className="min-w-0 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 shadow-sm sm:p-6">
@@ -313,6 +320,14 @@ export default function CollectPage() {
                   placeholder={refLabel}
                   value={paymentRef}
                   onChange={(event) => setPaymentRef(event.target.value)}
+                />
+                <input
+                  data-testid="payment-note"
+                  aria-label="Note"
+                  className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30 sm:col-span-2"
+                  placeholder="Note (optional)"
+                  value={paymentNote}
+                  onChange={(event) => setPaymentNote(event.target.value)}
                 />
                 <p className="text-xs text-[var(--cr-muted)] sm:col-span-2">
                   Do not enter a full card, account, or routing number.

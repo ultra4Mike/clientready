@@ -11,6 +11,7 @@ type Receipt = {
   amount: string;
   date: string;
   method: string;
+  note?: string;
 };
 
 export default function ReceiptPage() {
@@ -25,6 +26,8 @@ export default function ReceiptPage() {
     }
     const raw = window.localStorage.getItem("clientready-receipt");
     if (raw) setReceipt(JSON.parse(raw));
+    // R111: "Save and print receipt" really prints.
+    if (raw && new URLSearchParams(window.location.search).get("print") === "1") window.setTimeout(() => window.print(), 300);
   }, []);
 
   return (
@@ -46,6 +49,7 @@ export default function ReceiptPage() {
             <div className="flex justify-between gap-4 py-2.5"><span className="text-slate-500">Received from</span><span className="font-medium">{receipt.clientName || "Client"}</span></div>
             <div className="flex justify-between gap-4 py-2.5"><span className="text-slate-500">Invoice</span><span className="font-medium">{receipt.invoiceNumber}</span></div>
             <div className="flex justify-between gap-4 py-2.5"><span className="text-slate-500">Date</span><span className="font-medium">{receipt.date}</span></div>
+            {receipt.note && <div className="flex justify-between gap-4 py-2.5" data-testid="receipt-note"><span className="text-slate-500">Note</span><span className="font-medium">{receipt.note}</span></div>}
             <div className="flex justify-between gap-4 py-2.5"><span className="text-slate-500">Method</span><span className="font-medium">Paid in cash</span></div>
             <div className="flex items-baseline justify-between gap-4 py-3"><span className="font-semibold">Amount</span><span className="text-2xl font-bold tabular-nums">${Number(receipt.amount || 0).toFixed(2)}</span></div>
             <p className="py-4 text-xs text-slate-500">This is a payment receipt. It is not a tax form.</p>

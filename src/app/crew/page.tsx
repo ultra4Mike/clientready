@@ -709,7 +709,7 @@ export default function CrewPage() {
         </div>
         <nav className="mx-auto mt-3 grid max-w-3xl grid-cols-4 gap-1 rounded-xl border border-teal-700/30 bg-[var(--cr-card)] dark:border-teal-500/20 p-1 text-xs sm:text-sm" role="tablist">
           {tabs.map(([key, label]) => (
-            <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => { setTab(key); window.scrollTo({ top: 0 }); }} className={`min-h-11 rounded-lg px-1 py-2 font-medium leading-tight transition ${tab === key ? "bg-teal-500 font-semibold text-slate-950! shadow-sm" : "hover:bg-teal-500/10"}`}>{label}</button>
+            <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => { setTab(key); window.scrollTo({ top: 0 }); }} className={`min-h-11 rounded-lg px-1 py-2 font-medium leading-tight transition ${tab === key ? "bg-teal-500 font-semibold text-slate-950! shadow-sm" : "crew-tab-idle hover:bg-teal-500/10"}`}>{label}</button>
           ))}
         </nav>
       </header>
@@ -910,7 +910,7 @@ export default function CrewPage() {
           </section>
         )}
         {userId && <p className="pt-4 text-center text-xs text-[var(--cr-muted)]">You only see your own jobs, time and expenses. Prices and company costs are not shown.</p>}
-        <footer className="flex justify-center border-t border-teal-500/15 pt-3"><a href="/account/delete" className="tap inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-3 py-2 text-xs text-rose-700 underline-offset-2 transition hover:bg-rose-500/10 hover:underline dark:text-rose-300" data-testid="crew-delete-account">Delete my account</a></footer>
+        <footer className="flex justify-center border-t border-teal-500/15 pt-3"><a href="/account/delete" data-testid="crew-delete-account" className="crew-delete-link tap inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-3 py-2 text-xs text-rose-700 underline-offset-2 transition hover:bg-rose-500/10 hover:underline dark:text-rose-300" data-testid="crew-delete-account">Delete my account</a></footer>
       </div>
     </main>
   );

@@ -60,8 +60,9 @@ export default function TodayPage() {
 
   async function confirm(docId: string) {
     setBusy(docId);
+    setMessage("Job confirmed done."); // R110: say it now; correct it if the save fails
     const saved = await confirmJobDone(docId).catch(() => null);
-    setMessage(saved ? "Job confirmed done." : "Could not confirm. Try again.");
+    if (!saved) setMessage("Could not confirm. Try again.");
     read();
     setBusy("");
   }
