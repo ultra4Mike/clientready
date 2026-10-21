@@ -3,6 +3,7 @@ import { amountOf, documentTotals } from "@/lib/discount";
 import { balanceDue, isOpenBalance, paidTotal, readPayments } from "@/lib/payments";
 import { readApproval } from "@/lib/approval";
 import { readSchedule } from "@/lib/schedule";
+import { allConflicts, clockText } from "@/lib/conflicts";
 import { isPendingRecurringDraft, readRecurring, ymd } from "@/lib/recurring";
 import { readChangeOrderOf } from "@/lib/change-orders";
 import { saveCloudDocument, type CloudDoc } from "@/lib/cloud-docs";
@@ -14,7 +15,7 @@ import { saveCloudDocument, type CloudDoc } from "@/lib/cloud-docs";
  * (e.g. the balance changes, a new approval link is sent, the expense amount is edited).
  * Reviewing never touches status, payments or any money field.
  */
-export type ReviewKind = "expense" | "done" | "balance" | "approval" | "recurring" | "change" | "missing";
+export type ReviewKind = "expense" | "done" | "balance" | "approval" | "recurring" | "change" | "missing" | "conflict";
 export type ReviewItem = { key: string; version: string; kind: ReviewKind; docId: string; title: string; detail: string; href: string };
 export type ExpenseRow = { id: string; doc_id: string; worker_name?: string; kind?: string; amount?: string; note?: string; created_at?: string };
 
@@ -77,6 +78,15 @@ export function reviewItems(docs: Doc[], expenses: ExpenseRow[], today = ymd(new
       title: `${row.worker_name || "Crew"} spent ${money(amount)} (${crewKindLabel(row.kind)})`,
       detail: `${numberOf(doc)}${who(doc)}${row.note ? ` · ${row.note}` : ""}`, href: `${open(doc)}#crew-spend`,
     });
+  }
+
+  // Double-bookings, re-checked on every load/sync (edits from another phone or offline included; Help R26).
+  const workerNames = (() => { if (typeof window === "undefined") return new Map<string, string>(); try { return new Map((JSON.parse(window.localStorage.getItem("clientready-employees") || "[]") as { id: string; name?: string }[]).map((p) => [p.id, p.name || ""])); } catch { return new Map<string, string>(); } })();
+  for (const c of allConflicts(docs)) {
+    const doc = byId.get(c.docId);
+    if (!doc) continue;
+    all.push({ key: `conflict:${c.otherDocId}:${c.workerId}`, version: `${c.date}|${c.start}|${c.end}`, kind: "conflict", docId: c.docId,
+      title: `${workerNames.get(c.workerId) || "A worker"} is double-booked on ${c.date}`, detail: `${c.title} and ${c.otherTitle} overlap ${clockText(c.start)}–${clockText(c.end)} · open the job to move it or Book anyway`, href: `${open(doc)}#schedule` });
   }
 
   for (const doc of docs) {

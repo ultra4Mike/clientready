@@ -2,6 +2,7 @@ import { readChecklist, type ChecklistItem } from "@/lib/checklist";
 import { supabase } from "@/lib/supabase";
 import { isUuid, saveCloudDocument, type CloudDoc } from "@/lib/cloud-docs";
 import { moneySnapshot } from "@/lib/change-orders";
+import { readOverrides, type Override } from "@/lib/conflicts";
 
 export type JobStatus = "scheduled" | "in_progress" | "done";
 export type Schedule = {
@@ -22,6 +23,8 @@ export type Schedule = {
   onMyWayBy?: string;
   /** Job-complete checklist (owner writes, crew tick). */
   checklist?: ChecklistItem[];
+  /** "Book anyway" decisions: this person may overlap that other job (lib/conflicts). */
+  overrides?: Override[];
 };
 export type Worker = { id: string; name: string; email?: string; phone?: string; role?: string; rate?: string; active?: boolean };
 /** The older per-job crew/pay rows (data.crew). */
@@ -97,6 +100,7 @@ export function readSchedule(data: Record<string, unknown> | undefined): Schedul
       ...(raw.onMyWayAt ? { onMyWayAt: String(raw.onMyWayAt) } : {}),
       ...(raw.onMyWayBy ? { onMyWayBy: String(raw.onMyWayBy).slice(0, 80) } : {}),
       ...(readChecklist(raw.checklist).length ? { checklist: readChecklist(raw.checklist) } : {}),
+      ...(readOverrides(raw.overrides).length ? { overrides: readOverrides(raw.overrides) } : {}),
     };
   }
   if (data?.jobTime && isDate(data?.dueDate)) {

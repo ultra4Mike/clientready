@@ -3,7 +3,14 @@
 import { checklistFromLines } from "@/lib/checklist";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { refreshOwnerUnavailable, unavailableOn, type Unavailable } from "@/lib/unavailable";
+import { bookedBlocks, bookingConflicts, clockText, nextOpenSlot, readOverrides, type Override } from "@/lib/conflicts";
 import { STATUS_LABEL, TRAVEL_BUFFER_MINUTES, travelWarnings, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
+
+function readDocsSafe(): { id: string; title?: string; data?: Record<string, unknown> }[] {
+  try { return JSON.parse(window.localStorage.getItem("clientready-documents") || "[]") || []; } catch { return []; }
+}
+const toMin = (time: string) => { const [h, m] = time.split(":").map(Number); return h * 60 + m; };
+const toHhmm = (total: number) => { const t = Math.max(0, Math.min(23 * 60 + 59, total)); return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`; };
 
 function watchOnline(callback: () => void) {
   window.addEventListener("online", callback);
@@ -45,6 +52,19 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
   const off = date ? unavailableOn(daysOff, date) : new Map<string, string>();
   const names = new Map(workers.map((person) => [person.id, person.name]));
   const travel = typeof window === "undefined" ? [] : travelWarnings(docId, date, startTime, endTime, workerIds);
+  const [bookAnyway, setBookAnyway] = useState(false);
+  const allDocs = typeof window === "undefined" ? [] : readDocsSafe();
+  const draft = { date, startTime, endTime, workerIds, status, overrides: value?.overrides };
+  const conflicts = bookingConflicts(allDocs, docId, draft);
+  const blocks = bookedBlocks(allDocs, docId, date, workerIds);
+  const length = startTime ? (endTime && endTime > startTime ? toMin(endTime) - toMin(startTime) : 60) : 60;
+  const suggestion = conflicts.length ? nextOpenSlot(allDocs, docId, date, workerIds, length, startTime ? toMin(startTime) : undefined) || nextOpenSlot(allDocs, docId, date, workerIds, length) : "";
+  function applySlot(slot: string) {
+    const start = toMin(slot);
+    setStartTime(slot);
+    if (endTime || startTime) setEndTime(toHhmm(start + length));
+    setBookAnyway(false);
+  }
   // Not already on the job, by id or (for older duplicate employee records) by email.
   const takenEmails = new Set(workers.filter((person) => workerIds.includes(person.id)).map((person) => (person.email || "").trim().toLowerCase()).filter(Boolean));
   const available = workers.filter((person) => !workerIds.includes(person.id) && !takenEmails.has((person.email || "").trim().toLowerCase()));
@@ -63,7 +83,9 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
     const removed = workerIds.filter((id) => !next.includes(id));
     if (removed.length && confirmRemove && !confirmRemove(removed)) return;
     setWorkerIds(next);
-    if (value) onSave({ ...value, workerIds: next }, { keepOpen: true, confirmed: removed });
+    // Adding someone who is already booked then: wait for Save (and Book anyway) instead of saving now.
+    const clash = value ? bookingConflicts(readDocsSafe(), docId, { ...value, workerIds: next }) : [];
+    if (value && !clash.length) onSave({ ...value, workerIds: next }, { keepOpen: true, confirmed: removed });
   }
 
   const offline = useSyncExternalStore(watchOnline, () => navigator.onLine === false, () => false);
@@ -71,8 +93,11 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
   function save() {
     if (!date) return setError("Pick a date.");
     if (startTime && endTime && endTime <= startTime) return setError("End time must be after the start time.");
+    if (conflicts.length && !bookAnyway) return setError("Someone on this job is already booked at that time. Pick another time, or tick Book anyway.");
     setError("");
-    onSave({ date, startTime, ...(endTime ? { endTime } : {}), workerIds, status, updatedAt: value?.updatedAt || "", ...(crewNote.trim() ? { crewNote: crewNote.trim() } : {}), ...(checklistFromLines(checklistText, value?.checklist).length ? { checklist: checklistFromLines(checklistText, value?.checklist) } : {}) });
+    const at = new Date().toISOString();
+    const overrides: Override[] = [...readOverrides(value?.overrides), ...(bookAnyway ? conflicts.map((c) => ({ workerId: c.workerId, otherDocId: c.docId, at })) : [])];
+    onSave({ date, startTime, ...(endTime ? { endTime } : {}), workerIds, status, updatedAt: value?.updatedAt || "", ...(overrides.length ? { overrides } : {}), ...(crewNote.trim() ? { crewNote: crewNote.trim() } : {}), ...(checklistFromLines(checklistText, value?.checklist).length ? { checklist: checklistFromLines(checklistText, value?.checklist) } : {}) });
   }
 
   return (
@@ -112,8 +137,24 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
             Marked unavailable on this day: {workerIds.filter((id) => off.has(id)).map((id) => `${names.get(id) || "Worker"}${off.get(id) ? ` (${off.get(id)})` : ""}`).join(", ")}
           </p>
         )}
+        {blocks.length > 0 && (
+          <ul className="mt-2 space-y-1 text-xs" data-testid="booked-blocks" aria-label="Already booked">
+            {blocks.map((b) => {
+              const clash = conflicts.some((c) => c.docId === b.docId && c.workerId === b.workerId);
+              const near = !clash && travel.some((w) => w.workerId === b.workerId && w.otherTitle === b.title);
+              return <li key={`${b.docId}-${b.workerId}`} data-testid="booked-block" data-state={clash ? "blocked" : near ? "warn" : "free"} data-doc-id={b.docId} className={clash ? "font-semibold text-rose-700 dark:text-rose-300" : ""}>{names.get(b.workerId) || "Worker"} booked {clockText(b.start)}–{clockText(b.end)} · {b.title}</li>;
+            })}
+          </ul>
+        )}
+        {conflicts.length > 0 && (
+          <div role="alert" data-testid="booking-conflict" data-state="blocked" className="mt-2 rounded-lg border border-rose-500/60 bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-900 dark:text-rose-200">
+            <p>Double-booked: {conflicts.map((c) => `${names.get(c.workerId) || "Worker"} is already on ${c.title} ${clockText(c.start)}–${clockText(c.end)}`).join("; ")}.</p>
+            {suggestion && <button type="button" data-testid="next-open-slot" data-time={suggestion} onClick={() => applySlot(suggestion)} className="mt-2 min-h-11 rounded-lg bg-teal-500 px-3 text-sm font-semibold text-slate-950!">Use next open time: {clockText(toMin(suggestion))}</button>}
+            <label className="mt-2 flex min-h-11 items-center gap-2"><input type="checkbox" data-testid="book-anyway" checked={bookAnyway} onChange={(event) => setBookAnyway(event.target.checked)} className="h-5 w-5" />Book anyway (they&apos;ll be on two jobs at once; this is saved on the job)</label>
+          </div>
+        )}
         {travel.length > 0 && (
-          <p role="alert" data-testid="travel-warning" className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-900 dark:text-amber-200">
+          <p role="alert" data-testid="travel-warning" data-state="warn" className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-900 dark:text-amber-200">
             Less than {TRAVEL_BUFFER_MINUTES} min travel time: {travel.map((w) => `${names.get(w.workerId) || "Worker"} ${w.gap < 0 ? "overlaps" : `has ${w.gap} min before/after`} ${w.otherTitle}`).join("; ")}. You can still save.
           </p>
         )}

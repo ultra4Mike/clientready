@@ -6,6 +6,7 @@ import PageHeader from "@/components/PageHeader";
 import ScheduleEditor from "@/components/ScheduleEditor";
 import { uniqueDocs } from "@/lib/change-orders";
 import { scheduledJobs } from "@/lib/scheduled-jobs";
+import { allConflicts, bookingConflicts, clockText, nextOpenSlot, readOverrides } from "@/lib/conflicts";
 import { confirmRemovalFor, moveSchedule, omwTime, readSchedule, readWorkers, saveSchedule, DONE_CLASS, DONE_LABEL, doneState, STATUS_CLASS, STATUS_LABEL, statusClass, statusLabel, type DoneState, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
 
 type SavedDocument = {
@@ -63,11 +64,13 @@ export default function CalendarPage() {
   }, []);
 
   const { docs, workers, today } = state;
+  const [conflictNote, setConflictNote] = useState<{ state: string; text: string } | null>(null);
   const current = anchor || today;
   const workerName = useMemo(() => new Map(workers.map((person) => [person.id, person.name])), [workers]);
 
   const jobDocs = docs.filter((doc) => doc.type === "invoice" || doc.type === "proposal");
   const jobs: Job[] = scheduledJobs(jobDocs);
+  const clashing = new Set(allConflicts(jobDocs).flatMap((c) => [c.docId, c.otherDocId]));
   const unscheduled = jobDocs.filter((doc) => !readSchedule(doc.data) && text(doc.data?.status) !== "paid");
 
   async function save(docId: string, schedule: Schedule | null, options?: { keepOpen?: boolean; confirmed?: string[] }) {
@@ -81,6 +84,8 @@ export default function CalendarPage() {
     if (!options?.keepOpen) setEditing(null);
   }
 
+  const toMin = (time: string) => { const [h, m] = time.split(":").map(Number); return h * 60 + m; };
+
   function dropOn(date: string, startTime?: string) {
     return async (event: React.DragEvent) => {
       event.preventDefault();
@@ -91,6 +96,26 @@ export default function CalendarPage() {
       const next = existing
         ? moveSchedule(existing, date, startTime)
         : { date, startTime: startTime || "", workerIds: [], status: "scheduled" as JobStatus, updatedAt: "" };
+      // Same double-booking check as the schedule editor: offer the next open time, else Book anyway (recorded).
+      const clash = bookingConflicts(docs, docId, next);
+      if (clash.length) {
+        const who = clash.map((c) => `${workerName.get(c.workerId) || "Worker"} is already on ${c.title} ${clockText(c.start)}–${clockText(c.end)}`).join("\n");
+        const length = next.startTime ? (next.endTime && next.endTime > next.startTime ? toMin(next.endTime) - toMin(next.startTime) : 60) : 60;
+        const slot = nextOpenSlot(docs, docId, date, next.workerIds, length, next.startTime ? toMin(next.startTime) : undefined) || nextOpenSlot(docs, docId, date, next.workerIds, length);
+        if (slot && window.confirm(`Double-booked:\n${who}\n\nMove it to the next open time, ${clockText(toMin(slot))}, instead?`)) {
+          const moved = moveSchedule(next, date, slot);
+          setConflictNote({ state: "moved", text: `Moved to the next open time, ${clockText(toMin(slot))}.` });
+          return save(docId, moved);
+        }
+        if (!window.confirm(`Book anyway?\n${who}\n\nThey'll be on two jobs at once. This is saved on the job. Cancel keeps it where it was.`)) {
+          setConflictNote({ state: "blocked", text: "Not moved: someone on this job is already booked then." });
+          return;
+        }
+        const at = new Date().toISOString();
+        setConflictNote({ state: "override", text: "Booked anyway. Saved on the job." });
+        return save(docId, { ...next, overrides: [...readOverrides(next.overrides), ...clash.map((c) => ({ workerId: c.workerId, otherDocId: c.docId, at }))] });
+      }
+      setConflictNote(null);
       await save(docId, next);
     };
   }
@@ -104,6 +129,7 @@ export default function CalendarPage() {
         draggable
         data-testid={`${tid}job-${job.doc.id}`}
         data-status={job.schedule.status}
+        data-state={clashing.has(job.doc.id) ? "blocked" : undefined}
         data-done={doneState(job.schedule) || undefined}
         onDragStart={(event) => event.dataTransfer.setData("text/plain", job.doc.id)}
         onClick={(event) => { event.stopPropagation(); setEditing({ docId: job.doc.id }); }}
@@ -184,6 +210,7 @@ export default function CalendarPage() {
           <span className="basis-full opacity-90 sm:basis-auto"><span className="hidden sm:inline">Drag a job to move it. Click a slot or job to edit.</span><span className="sm:hidden">Tap a job or time slot to edit or move it.</span></span>
         </div>
         {message && <p className="mt-3 rounded-lg border border-teal-500/30 px-3 py-2 text-sm" data-testid="calendar-message">{message}</p>}
+        {conflictNote && <p role="status" className="mt-2 rounded-lg border border-rose-500/40 px-3 py-2 text-sm" data-testid="calendar-conflict" data-state={conflictNote.state}>{conflictNote.text}</p>}
 
         {editing && editingDoc && (
           <div className="mt-4 rounded-2xl border border-teal-500/30 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5">

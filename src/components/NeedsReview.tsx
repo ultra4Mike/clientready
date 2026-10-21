@@ -6,7 +6,7 @@ import { confirmJobDone } from "@/lib/schedule";
 import { markReviewed, reviewItems, type ExpenseRow, type ReviewItem, type ReviewKind } from "@/lib/review";
 
 const LABEL: Record<ReviewKind, string> = {
-  expense: "Crew expense", done: "Job done", balance: "Balance owed", approval: "Awaiting approval", recurring: "Recurring", change: "Change order", missing: "Missing details",
+  expense: "Crew expense", done: "Job done", balance: "Balance owed", approval: "Awaiting approval", recurring: "Recurring", change: "Change order", missing: "Missing details", conflict: "Double-booked",
 };
 
 type Doc = { id: string; type: string; title: string; clientName?: string; data?: Record<string, unknown> };
