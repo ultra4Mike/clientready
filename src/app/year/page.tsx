@@ -39,6 +39,8 @@ type CrewRow = {
   workDate?: string;
   bonus?: string;
   note?: string;
+  hoursFromClock?: boolean;
+  clockMinutes?: number;
 };
 
 type Employee = { id: string; name: string; kind?: "employee" | "contractor" };
@@ -108,7 +110,9 @@ function invoiceTotal(doc: SavedDocument) {
 }
 
 function crewPay(row: CrewRow) {
-  return money(row.hours) * money(row.rate) + money(row.bonus);
+  // R55: same rule as the invoice: exact clocked minutes, money rounded once.
+  const hours = row.hoursFromClock && row.clockMinutes ? row.clockMinutes / 60 : money(row.hours);
+  return Math.round((hours * money(row.rate) + money(row.bonus)) * 100) / 100;
 }
 
 export default function YearPage() {

@@ -341,6 +341,8 @@ export default function CrewPage() {
   // Clock taps saved offline show right away (the phone's tap time is sent when back online).
   const clock = useMemo(() => withQueuedClock(loadedClock, queue), [loadedClock, queue]);
   const open = clock.find((entry) => !entry.ended_at);
+  const openCard = open ? cards.find((card) => card.doc_id === open.doc_id) : undefined;
+  const openLabel = open ? `${openCard ? [openCard.invoice_number, openCard.client_name].filter(Boolean).join(" · ") || "another job" : "another job"} since ${clockTime(open.started_at)}` : "";
   const weekStart = today ? addDays(today, -new Date(`${today}T00:00:00`).getDay()) : "";
   const weekDays = weekStart ? Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)) : [];
   const todayCards = cards.filter((card) => card.job_date === today);
@@ -397,6 +399,8 @@ export default function CrewPage() {
     const label = kind === "clock-in" ? "Clocked in" : "Clocked out";
     await act(`clock-${docId}`, async () => (await sendOrQueue(kind, docId, { at }, (key) => (kind === "clock-in" ? crewClockIn : crewClockOut)(docId, at, key))).error,
       navigator.onLine ? `${label}.` : `${label} on this phone at ${clockTime(at)}. It will send when you're back online.`);
+    // R54: reload once more shortly after, so a just-closed entry can't leave other jobs stuck on "On another job".
+    if (kind === "clock-out" && navigator.onLine) window.setTimeout(() => { void load(); }, 1500);
   }
 
   async function markDone(card: Card) {
@@ -586,8 +590,13 @@ export default function CrewPage() {
               <button type="button" disabled={busy !== ""} data-testid={`clock-out-${card.doc_id}`} onClick={() => clockTap("clock-out", card.doc_id)} className="min-h-11 shrink-0 rounded-xl bg-amber-500 px-4 py-2 font-semibold text-slate-950!">Clock out</button>
             ) : past ? (
               <p data-testid={`past-state-${card.doc_id}`} data-completed={status === "done" ? "true" : "false"} className="shrink-0 rounded-full border border-slate-400/40 px-3 py-1.5 text-xs font-semibold text-[var(--cr-muted)]"><span className="inline-flex items-center gap-1">{status === "done" ? <><Icon name="check" className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />Completed</> : "Past job"}</span></p>
+            ) : open && open.doc_id !== card.doc_id ? (
+              <div className="shrink-0 text-right" data-testid={`on-other-job-${card.doc_id}`}>
+                <p className="text-xs text-[var(--cr-muted)]" data-testid="on-other-job-label">On another job: {openLabel}</p>
+                <button type="button" disabled={busy !== ""} data-testid={`clock-out-there-${open.doc_id}`} onClick={() => clockTap("clock-out", open.doc_id)} className="mt-1 min-h-11 rounded-xl border border-amber-500 px-3 py-2 text-sm font-semibold">Clock out there</button>
+              </div>
             ) : (
-              <button type="button" disabled={busy !== "" || Boolean(open)} data-testid={`clock-in-${card.doc_id}`} onClick={() => clockTap("clock-in", card.doc_id)} className="min-h-11 shrink-0 rounded-xl bg-teal-500 px-4 py-2 font-semibold text-slate-950! disabled:opacity-40">{open ? "On another job" : "Clock in"}</button>
+              <button type="button" disabled={busy !== "" || Boolean(open)} data-testid={`clock-in-${card.doc_id}`} onClick={() => clockTap("clock-in", card.doc_id)} className="min-h-11 shrink-0 rounded-xl bg-teal-500 px-4 py-2 font-semibold text-slate-950! disabled:opacity-40">Clock in</button>
             )}
           </div>
           {mine.length > 0 && (

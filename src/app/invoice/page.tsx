@@ -91,6 +91,8 @@ type CrewRow = {
   paidDate: string;
   /** Hours were filled from the worker's clock entries (true) or typed by the owner (false/absent). */
   hoursFromClock?: boolean;
+  /** R55: exact clocked minutes (pay uses these; only the money is rounded). */
+  clockMinutes?: number;
 };
 type DocKind = "invoice" | "proposal";
 
@@ -128,7 +130,9 @@ function hoursBetween(start: string, end: string) {
   return (mins / 60).toFixed(2);
 }
 function rowPay(row: CrewRow) {
-  return money(row.hours) * money(row.rate) + money(row.bonus);
+  // R55: clock-fed hours pay on the exact minutes; round only the money.
+  const hours = row.hoursFromClock && row.clockMinutes ? row.clockMinutes / 60 : money(row.hours);
+  return Math.round((hours * money(row.rate) + money(row.bonus)) * 100) / 100;
 }
 function toLocalInput(iso: string) {
   const date = new Date(iso);
@@ -149,7 +153,8 @@ function feedClockHours(rows: CrewRow[], entries: ClockEntry[], docId: string) {
     filled.add(row.employeeId);
     if (row.hours && !row.hoursFromClock) return row;
     const hours = clocked.toFixed(2);
-    return row.hours === hours && row.hoursFromClock ? row : { ...row, hours, hoursFromClock: true };
+    const clockMinutes = clocked * 60;
+    return row.hours === hours && row.hoursFromClock && row.clockMinutes === clockMinutes ? row : { ...row, hours, hoursFromClock: true, clockMinutes };
   });
 }
 
@@ -611,7 +616,7 @@ export default function NewInvoicePage() {
   function updateCrew(id: string, patch: Partial<CrewRow>) {
     if (!allowCrewChange()) return;
     // Typing hours makes them the owner's: clock entries won't overwrite them after this.
-    if ("hours" in patch) patch = { ...patch, hoursFromClock: false };
+    if ("hours" in patch) patch = { ...patch, hoursFromClock: false, clockMinutes: undefined };
     setCrew((current) => current.map((row) => {
       if (row.id !== id) return row;
       const next = { ...row, ...patch };

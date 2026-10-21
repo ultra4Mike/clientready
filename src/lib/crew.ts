@@ -10,6 +10,8 @@ type CrewRow = {
   bonus?: string;
   workDate?: string;
   paidToWorker?: boolean;
+  hoursFromClock?: boolean;
+  clockMinutes?: number;
   startTime?: string;
   endTime?: string;
 };
@@ -53,7 +55,7 @@ export async function saveCrewJobs(
       invoice_number: job.invoiceNumber,
       hours: row.hours,
       rate: row.rate,
-      pay: money(row.hours) * money(row.rate) + money(row.bonus || ""),
+      pay: Math.round(((row.hoursFromClock && row.clockMinutes ? row.clockMinutes / 60 : money(row.hours)) * money(row.rate) + money(row.bonus || "")) * 100) / 100,
       note: row.note || "",
       client_name: job.clientName || "",
       client_phone: job.clientPhone || "",
