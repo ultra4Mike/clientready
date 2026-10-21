@@ -84,6 +84,23 @@ export default function CalendarPage() {
     if (!options?.keepOpen) setEditing(null);
   }
 
+  /**
+   * Dropping an unscheduled job: one action sets the job date + start (and end, keeping the job's
+   * length) and keeps everyone already on the job's crew, so their crew work dates/times and /crew
+   * follow. The invoice issue date, numbering and due date are never changed.
+   */
+  function unscheduledDrop(data: Record<string, unknown> | undefined, date: string, startTime?: string): Schedule {
+    const crew = (Array.isArray(data?.crew) ? data.crew : []) as { employeeId?: unknown }[];
+    const workerIds = Array.from(new Set(crew.map((row) => String(row.employeeId || "")).filter(Boolean)));
+    const isT = (v: unknown) => typeof v === "string" && /^\d{2}:\d{2}$/.test(v);
+    const start = startTime || (isT(data?.jobStart) ? String(data?.jobStart) : "");
+    const base = { date, startTime: start, workerIds, status: "scheduled" as JobStatus, updatedAt: "" };
+    if (!start) return base;
+    const js = String(data?.jobStart || ""), je = String(data?.jobEnd || "");
+    if (isT(js) && isT(je) && je > js) return moveSchedule({ ...base, startTime: js, endTime: je }, date, start);
+    return base;
+  }
+
   const toMin = (time: string) => { const [h, m] = time.split(":").map(Number); return h * 60 + m; };
 
   function dropOn(date: string, startTime?: string) {
@@ -95,7 +112,7 @@ export default function CalendarPage() {
       const existing = readSchedule(doc.data);
       const next = existing
         ? moveSchedule(existing, date, startTime)
-        : { date, startTime: startTime || "", workerIds: [], status: "scheduled" as JobStatus, updatedAt: "" };
+        : unscheduledDrop(doc.data, date, startTime);
       // Same double-booking check as the schedule editor: offer the next open time, else Book anyway (recorded).
       const clash = bookingConflicts(docs, docId, next);
       if (clash.length) {

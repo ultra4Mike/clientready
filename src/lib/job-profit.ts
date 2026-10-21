@@ -6,6 +6,7 @@
  * - Card fees: 2.9% + 30¢ on each payment made by card (Card (Stripe) or Credit/debit card), labeled "est.".
  * - Mileage: miles on the job × the IRS business rate, only when no gas cost was entered (never both).
  */
+import { jobWhen } from "./job-when";
 const money = (value: unknown) => Number(String(value ?? "").replace(/[^0-9.-]/g, "")) || 0;
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -44,7 +45,7 @@ export function jobProfit(input: { total: number; data: Record<string, unknown> 
   const netCard = Math.max(0, cardFees - collected);
   const gas = money(costs.gas);
   const miles = money(data.jobMiles);
-  const day = String(((data.schedule || {}) as { date?: unknown }).date || data.invoiceDate || "");
+  const day = jobWhen(data)?.date || String(data.invoiceDate || "");
   const mileage = gas > 0 ? 0 : miles * irsMileageRate(day);
   const lines: ProfitLine[] = [
     { key: "materials", label: "Materials and supplies", amount: money(costs.parts) + money(costs.tools) },

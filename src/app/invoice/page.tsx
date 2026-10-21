@@ -50,7 +50,7 @@ import ChangeOrderNotes from "@/components/ChangeOrderNotes";
 import { ApprovalBadge, ApprovalShare } from "@/components/Approval";
 import ScheduleEditor from "@/components/ScheduleEditor";
 import { entryHours, fmtHours, hoursByWorker, ownerEditClock, refreshOwnerClock, type ClockEntry } from "@/lib/clock";
-import { confirmRemoval, crewForWorkers, followSchedule, crewIds, workLogged, clockHoursFor, dedupeWorkerIds, readSchedule, readWorkers, saveAssignment, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
+import { confirmRemoval, crewForWorkers, followSchedule, jobScheduleFromForm, crewIds, workLogged, clockHoursFor, dedupeWorkerIds, readSchedule, readWorkers, saveAssignment, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
 import { readApproval, refreshApproval, type Approval } from "@/lib/approval";
 import { generateNextNow, readRecurring, readRecurringFrom, scheduleFromForm, type Frequency, type RecurringFrom } from "@/lib/recurring";
 import PayQr from "@/components/PayQr";
@@ -421,6 +421,8 @@ export default function NewInvoicePage() {
       setApproval(readApproval(data.approval));
       setEmailLog(readEmailLog((data as Record<string, unknown>).emailLog));
       setSchedule(readSchedule(doc.data as Record<string, unknown>));
+      const loadedSchedule = (doc.data as Record<string, unknown>)?.schedule ? readSchedule(doc.data as Record<string, unknown>) : null;
+      if (loadedSchedule?.startTime) { setJobStart(loadedSchedule.startTime); setJobEnd(loadedSchedule.endTime || ""); }
       setWorkers(readWorkers());
       setScheduleKey((key) => key + 1);
       // The cloud is the source of truth for approval (the customer approves there).
@@ -669,7 +671,9 @@ export default function NewInvoicePage() {
     // Change-order notes are append-only: keep whatever is stored, plus what this form loaded.
     const stored = (docs as SavedDocument[]).find((item) => item.id === localId);
     // One source of truth: crew rows take the schedule's date/times (rows paid to the worker keep theirs).
-    const storedSchedule = stored?.data?.schedule ? readSchedule(stored.data) : null;
+    // Scheduling has one source of truth (data.schedule). A changed Job start/end or crew work date
+    // here moves the schedule; a job with a start time and no schedule yet gets one (on the calendar).
+    const storedSchedule = isProposal ? (stored?.data?.schedule ? readSchedule(stored.data) : null) : jobScheduleFromForm(stored?.data?.schedule ? readSchedule(stored.data) : null, { jobStart, jobEnd, invoiceDate, crew });
     const savedCrew = crew.map((row) => followSchedule(row, storedSchedule));
     const keptNotes = mergeChangeOrderNotes(readChangeOrderNotes(stored?.data?.changeOrderNotes), changeOrderNotes);
     const recurring = isProposal ? null : scheduleFromForm(readRecurring(stored?.data?.recurring), { frequency: recFreq, intervalDays: recInterval, nextRunDate: recNext, loadedNextRunDate: recLoadedNext, today: ymd(new Date()) });
@@ -679,7 +683,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(stored?.data?.schedule ? { schedule: stored.data.schedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.autoSent ? { autoSent: (stored?.data as Record<string, unknown>).autoSent } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviewAskedAt ? { reviewAskedAt: (stored?.data as Record<string, unknown>).reviewAskedAt } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew: savedCrew, ...(crewReport ? { crewReport } : {}) },
+      data: { clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(storedSchedule && (stored?.data?.schedule || !isProposal) ? { schedule: storedSchedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.autoSent ? { autoSent: (stored?.data as Record<string, unknown>).autoSent } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviewAskedAt ? { reviewAskedAt: (stored?.data as Record<string, unknown>).reviewAskedAt } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew: savedCrew, ...(crewReport ? { crewReport } : {}) },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -718,14 +722,24 @@ export default function NewInvoicePage() {
     // Contact changes also go to the linked saved client (Clients page / portal).
     const clientsAfter = await syncClientContact(docClientId, { name: clientName, company: clientCompany, email: clientEmail, phone: clientPhone, address: clientAddress }).catch(() => null);
     if (clientsAfter) setSavedClients(clientsAfter as SavedClient[]);
+    if (storedSchedule && !isProposal) { setSchedule(storedSchedule); setJobStart(storedSchedule.startTime || jobStart); setJobEnd(storedSchedule.endTime || ""); setCrew(savedCrew); setScheduleKey((key) => key + 1); }
     setSaveMessage(isProposal ? `Proposal saved${carried}` : "Invoice saved");
+    return cloudId;
   }
 
   async function saveJobSchedule(next: Schedule | null, options?: { keepOpen?: boolean; confirmed?: string[] }) {
     try {
-      const saved = await saveSchedule(docId, next, options?.confirmed);
+      // R53: a new invoice can be scheduled right away; the draft is saved first (no "save the document first").
+      let id = docId;
+      if (!id) {
+        id = (await saveDocument()) || "";
+        if (!id) return;
+      }
+      const saved = await saveSchedule(id, next, options?.confirmed);
       const savedSchedule = saved ? readSchedule(saved.data) : null;
       setSchedule(savedSchedule);
+      // One source of truth: the form's Job start/end show the schedule's times.
+      if (savedSchedule) { setJobStart(savedSchedule.startTime || ""); setJobEnd(savedSchedule.endTime || ""); }
       // Same people in the crew/pay section: add empty rows for new people, drop removed ones,
       // leave everyone else's hours and pay as typed.
       if (savedSchedule) setCrew((current) => crewForWorkers(current, savedSchedule.workerIds, savedSchedule) as CrewRow[]);
@@ -1205,8 +1219,8 @@ export default function NewInvoicePage() {
                 <p className="font-semibold">Schedule</p>
                 {schedule && <span className="text-xs" data-testid="schedule-summary">{schedule.date}{schedule.startTime ? ` ${schedule.startTime}` : ""}{schedule.endTime ? `–${schedule.endTime}` : ""} · {STATUS_LABEL[schedule.status]}</span>}
               </div>
-              {docId && !locked
-                ? <ScheduleEditor key={scheduleKey} docId={docId} value={schedule} workers={workers} onSave={saveJobSchedule} confirmRemove={(ids) => confirmRemoval(workLogged(crew, ids, clockHoursFor(docId)))} />
+              {!locked
+                ? <ScheduleEditor key={scheduleKey} autoSave docId={docId} value={schedule} workers={workers} onSave={saveJobSchedule} confirmRemove={(ids) => confirmRemoval(workLogged(crew, ids, clockHoursFor(docId)))} />
                 : <p className="text-xs text-slate-600">Save the document first, then schedule the job here or on the Calendar.</p>}
               {!isProposal && <VisitNotes notes={visitNotes} onChange={setVisitNotes} today={ymd(new Date())} disabled={locked} />}
               {docId && <JobDonePanel docId={docId} schedule={schedule} onConfirmed={(next) => { setSchedule(next); setScheduleKey((key) => key + 1); }} />}

@@ -1,3 +1,4 @@
+import { derivedWhen, isoDate } from "@/lib/job-when";
 import { readChecklist, type ChecklistItem } from "@/lib/checklist";
 import { supabase } from "@/lib/supabase";
 import { isUuid, saveCloudDocument, type CloudDoc } from "@/lib/cloud-docs";
@@ -103,10 +104,35 @@ export function readSchedule(data: Record<string, unknown> | undefined): Schedul
       ...(readOverrides(raw.overrides).length ? { overrides: readOverrides(raw.overrides) } : {}),
     };
   }
+  // A job with a start time but no schedule is still on the calendar (shared rule: lib/job-when).
+  const derived = derivedWhen(data);
+  if (derived) return { date: derived.date, startTime: derived.startTime, ...(derived.endTime ? { endTime: derived.endTime } : {}), workerIds: derived.workerIds, status: "scheduled", updatedAt: "" };
   if (data?.jobTime && isDate(data?.dueDate)) {
     return { date: String(data.dueDate), startTime: parseLegacyTime(data.jobTime), workerIds: [], status: "scheduled", updatedAt: "" };
   }
   return null;
+}
+
+/**
+ * The invoice form's view of the schedule on save: edits to Job start/end or a crew row's work date
+ * move the schedule (rows paid to the worker are history and don't); with no schedule, a start time
+ * plus a date (crew work date, else invoice date) creates one.
+ */
+export function jobScheduleFromForm(base: Schedule | null, form: { jobStart: string; jobEnd: string; invoiceDate: string; crew: { employeeId?: string; workDate?: string; paidToWorker?: boolean }[] }): Schedule | null {
+  const stamp = new Date().toISOString();
+  if (!base) {
+    const derived = readSchedule({ jobStart: form.jobStart, jobEnd: form.jobEnd, invoiceDate: form.invoiceDate, crew: form.crew });
+    return derived ? { ...derived, updatedAt: stamp } : null;
+  }
+  const edited = form.crew.find((row) => !row.paidToWorker && isoDate(row.workDate) && row.workDate !== base.date);
+  const next: Schedule = { ...base };
+  if (edited) next.date = isoDate(edited.workDate);
+  if (isTime(form.jobStart)) {
+    next.startTime = form.jobStart;
+    if (isTime(form.jobEnd) && form.jobEnd > form.jobStart) next.endTime = form.jobEnd; else delete next.endTime;
+  }
+  const changed = next.date !== base.date || next.startTime !== base.startTime || (next.endTime || "") !== (base.endTime || "");
+  return changed ? { ...next, updatedAt: stamp } : base;
 }
 
 export function scheduleStamp(value: unknown) {
@@ -314,9 +340,11 @@ export function applySchedule<T extends CloudDoc>(docs: T[], docId: string, sche
   const updated = { ...doc, data } as T;
   guardDroppedRows(crew, (updated.data.crew || []) as CrewRow[], confirmed);
   if (moneyExceptCrew(updated.data) !== before) throw new Error("Schedule change would touch money fields");
-  const keptBefore = new Map(crew.map((row) => [row.id, JSON.stringify(row)]));
+  // Pay fields stay as typed; only the date/times follow the schedule (one source of truth).
+  const payOnly = (row: CrewRow) => JSON.stringify({ ...row, workDate: undefined, startTime: undefined, endTime: undefined });
+  const keptBefore = new Map(crew.map((row) => [row.id, payOnly(row)]));
   for (const row of (updated.data.crew || []) as CrewRow[]) {
-    if (keptBefore.has(row.id) && keptBefore.get(row.id) !== JSON.stringify(row)) throw new Error("Schedule change would edit crew pay");
+    if (keptBefore.has(row.id) && keptBefore.get(row.id) !== payOnly(row)) throw new Error("Schedule change would edit crew pay");
   }
   const next = [...docs];
   next[index] = updated;

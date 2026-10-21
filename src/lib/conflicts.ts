@@ -1,3 +1,4 @@
+import { derivedWhen } from "./job-when";
 // Double-booking rules. The same person on two jobs whose times overlap is blocked unless the owner taps
 // "Book anyway" (recorded on the job as schedule.overrides). Different people may overlap freely.
 // Jobs without a start time ("Any time") and done jobs are never compared. A job with no end time counts as 1 hour.
@@ -16,7 +17,10 @@ export const hhmmOf = (total: number) => `${String(Math.floor(total / 60)).padSt
 
 function sched(doc: Doc): Sched | null {
   const raw = doc.data?.schedule as Sched | undefined;
-  return raw && typeof raw === "object" && /^\d{4}-\d{2}-\d{2}$/.test(String(raw.date || "")) ? raw : null;
+  if (raw && typeof raw === "object" && /^\d{4}-\d{2}-\d{2}$/.test(String(raw.date || ""))) return raw;
+  // Same rule as every other view (lib/job-when): a job with a start time and a date counts.
+  const when = derivedWhen(doc.data as Record<string, unknown> | undefined);
+  return when ? ({ ...when, status: "scheduled" } as unknown as Sched) : null;
 }
 function span(s: Sched) {
   if (!s.startTime || !/^\d{2}:\d{2}$/.test(s.startTime)) return null;

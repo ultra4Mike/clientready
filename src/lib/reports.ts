@@ -1,4 +1,5 @@
 import { docAmounts } from "@/lib/doc-stage";
+import { jobWhen } from "@/lib/job-when";
 import { readPayments } from "@/lib/payments";
 import { isPendingRecurringDraft } from "@/lib/recurring";
 import { uniqueDocs } from "@/lib/change-orders";
@@ -17,9 +18,7 @@ function money(value: unknown) {
 /** "2026-03-05" or a saved local date like "3/5/2026" -> { year, month 0-11 }, or null. */
 /** The scheduled job day (YYYY-MM-DD) saved on the invoice, or "". */
 function scheduledDay(data: Record<string, unknown>) {
-  const schedule = data.schedule as { date?: unknown } | undefined;
-  const day = String(schedule && typeof schedule === "object" ? schedule.date || "" : "").slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : "";
+  return jobWhen(data)?.date || "";
 }
 
 export function yearMonth(value: unknown): { year: string; month: number } | null {

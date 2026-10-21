@@ -5,6 +5,7 @@ import EmptyState from "@/components/EmptyState";
 import { FormEvent, useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
+import ScheduleReconcile from "@/components/ScheduleReconcile";
 import { supabase } from "@/lib/supabase";
 
 type RateChange = { rate: string; effectiveDate: string };
@@ -264,6 +265,7 @@ export default function EmployeesPage() {
       <TimesheetExport names={Object.fromEntries(employees.map((person) => [person.id, person.name]))} />
       </div>
       </div>
+      <ScheduleReconcile />
     </AppShell>
   );
 }

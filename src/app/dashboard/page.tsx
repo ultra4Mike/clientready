@@ -14,6 +14,7 @@ import { uniqueDocs } from "@/lib/change-orders";
 import FollowUps from "@/components/FollowUps";
 import { todayYmd } from "@/lib/stages";
 import { runAutomations, type AutoPlan } from "@/lib/automations";
+import { jobWhen } from "@/lib/job-when";
 import NeedsReview from "@/components/NeedsReview";
 import GettingStarted from "@/components/GettingStarted";
 
@@ -57,7 +58,7 @@ function invoiceTotal(doc: SavedDocument) {
 
 /** Names of the people scheduled on a job (saved employees), from data.schedule.workerIds. */
 function crewNames(doc: SavedDocument) {
-  const ids = ((doc.data as { schedule?: { workerIds?: unknown } } | undefined)?.schedule?.workerIds);
+  const ids = jobWhen(doc.data as Record<string, unknown> | undefined)?.workerIds;
   if (!Array.isArray(ids) || !ids.length) return [];
   let people: { id: string; name?: string }[] = [];
   try { people = JSON.parse(window.localStorage.getItem("clientready-employees") || "[]"); } catch { people = []; }

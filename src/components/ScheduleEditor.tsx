@@ -2,7 +2,7 @@
 
 import { overLimit, ownerOvertimeHours, weekScheduledHours } from "@/lib/overtime";
 import { checklistFromLines } from "@/lib/checklist";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { refreshOwnerUnavailable, unavailableOn, type Unavailable } from "@/lib/unavailable";
 import { bookedBlocks, bookingConflicts, clockText, nextOpenSlot, readOverrides, type Override } from "@/lib/conflicts";
 import { STATUS_LABEL, TRAVEL_BUFFER_MINUTES, travelWarnings, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
@@ -30,10 +30,15 @@ type Props = {
   saveLabel?: string;
   /** This job, so it is not compared with itself for travel time. */
   docId?: string;
+  /** R53: save changes automatically (invoice page), so a change can't be lost by not clicking Save. */
+  autoSave?: boolean;
 };
 
 /** Date, start/end time, assigned workers and status for one job. */
-export default function ScheduleEditor({ value, workers, defaults, onSave, onCancel, confirmRemove, saveLabel = "Save schedule", docId = "" }: Props) {
+export default function ScheduleEditor({ value, workers, defaults, onSave, onCancel, confirmRemove, saveLabel = "Save schedule", docId = "", autoSave = false }: Props) {
+  const [autoState, setAutoState] = useState<"" | "waiting" | "saved" | "unsaved">("");
+  const changes = useRef(0);
+  const confirmedRef = useRef<string[]>([]);
   const [date, setDate] = useState(value?.date || defaults?.date || "");
   const [startTime, setStartTime] = useState(value?.startTime || defaults?.startTime || "");
   const [endTime, setEndTime] = useState(value?.endTime || "");
@@ -86,6 +91,7 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
     const removed = workerIds.filter((id) => !next.includes(id));
     if (removed.length && confirmRemove && !confirmRemove(removed)) return;
     setWorkerIds(next);
+    if (autoSave) { confirmedRef.current = [...confirmedRef.current, ...removed]; changes.current += 1; return; }
     // Adding someone who is already booked then: wait for Save (and Book anyway) instead of saving now.
     const clash = value ? bookingConflicts(readDocsSafe(), docId, { ...value, workerIds: next }) : [];
     if (value && !clash.length) onSave({ ...value, workerIds: next }, { keepOpen: true, confirmed: removed });
@@ -93,14 +99,42 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
 
   const offline = useSyncExternalStore(watchOnline, () => navigator.onLine === false, () => false);
 
-  function save() {
-    if (!date) return setError("Pick a date.");
-    if (startTime && endTime && endTime <= startTime) return setError("End time must be after the start time.");
-    if (conflicts.length && !bookAnyway) return setError("Someone on this job is already booked at that time. Pick another time, or tick Book anyway.");
+  /** Why this can't be saved yet ("" = it can). */
+  function problem() {
+    if (!date) return "Pick a date.";
+    if (startTime && endTime && endTime <= startTime) return "End time must be after the start time.";
+    if (conflicts.length && !bookAnyway) return "Someone on this job is already booked at that time. Pick another time, or tick Book anyway.";
+    return "";
+  }
+
+  // R53: every change saves by itself shortly after (date, time, crew, status, notes, checklist).
+  const fingerprint = JSON.stringify([date, startTime, endTime, workerIds, status, crewNote, checklistText, bookAnyway]);
+  const first = useRef(fingerprint);
+  useEffect(() => {
+    if (!autoSave || fingerprint === first.current) return;
+    const why = problem();
+    if (why) { setAutoState("unsaved"); return; }
+    setAutoState("waiting");
+    const timer = window.setTimeout(() => { first.current = fingerprint; save(true); }, 700);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fingerprint, autoSave]);
+  useEffect(() => {
+    if (!autoSave || (autoState !== "unsaved" && autoState !== "waiting")) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [autoSave, autoState]);
+
+  function save(auto = false) {
+    const why = problem();
+    if (why) return setError(why);
     setError("");
     const at = new Date().toISOString();
     const overrides: Override[] = [...readOverrides(value?.overrides), ...(bookAnyway ? conflicts.map((c) => ({ workerId: c.workerId, otherDocId: c.docId, at })) : [])];
-    onSave({ date, startTime, ...(endTime ? { endTime } : {}), workerIds, status, updatedAt: value?.updatedAt || "", ...(overrides.length ? { overrides } : {}), ...(crewNote.trim() ? { crewNote: crewNote.trim() } : {}), ...(checklistFromLines(checklistText, value?.checklist).length ? { checklist: checklistFromLines(checklistText, value?.checklist) } : {}) });
+    const confirmed = confirmedRef.current; confirmedRef.current = [];
+    onSave({ date, startTime, ...(endTime ? { endTime } : {}), workerIds, status, updatedAt: value?.updatedAt || "", ...(overrides.length ? { overrides } : {}), ...(crewNote.trim() ? { crewNote: crewNote.trim() } : {}), ...(checklistFromLines(checklistText, value?.checklist).length ? { checklist: checklistFromLines(checklistText, value?.checklist) } : {}) }, auto || autoSave ? { keepOpen: true, confirmed } : undefined);
+    if (auto || autoSave) { first.current = fingerprint; setAutoState("saved"); }
   }
 
   return (
@@ -190,13 +224,18 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
         )}
       </div>
       {error && <p className="text-red-600">{error}</p>}
+      {autoSave && autoState && (
+        <p role="status" data-testid="schedule-autosave" data-state={autoState} className={`text-xs ${autoState === "unsaved" ? "text-amber-700 dark:text-amber-300" : "text-[var(--cr-muted)]"}`}>
+          {autoState === "saved" ? "Saved automatically." : autoState === "waiting" ? "Saving…" : `Not saved yet: ${problem() || "check the fields."}`}
+        </p>
+      )}
       {offline && (
         <p role="status" data-testid="schedule-offline-note" data-crew={workerIds.length > 0 ? "1" : "0"} className="rounded-lg border border-amber-400/60 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
           No signal: this saves on this device only.{workerIds.length > 0 ? " Your crew won't see the change on their phones until you're back online." : " It syncs when you're back online."}
         </p>
       )}
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={save} className="rounded-lg bg-slate-900 px-3 py-1.5 text-white">{saveLabel}</button>
+        <button type="button" onClick={() => save()} className="rounded-lg bg-slate-900 px-3 py-1.5 text-white">{saveLabel}</button>
         {value && <button type="button" onClick={() => onSave(null)} className="rounded-lg border border-slate-300 px-3 py-1.5">Unschedule</button>}
         {onCancel && <button type="button" onClick={onCancel} className="rounded-lg border border-slate-300 px-3 py-1.5">Cancel</button>}
       </div>
