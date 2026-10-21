@@ -48,7 +48,7 @@ const emptyClient = {
 async function saveReviewOptOut(id: string, optOut: boolean | undefined, autoOptOut?: boolean) {
   if (!id) return;
   await supabase.from("clients").update({ review_opt_out: Boolean(optOut) }).eq("id", id);
-  // R51 (migration 20261021140000): its own update for the same reason.
+  // R51 (migration 20261021160000): its own update for the same reason.
   await supabase.from("clients").update({ auto_email_opt_out: Boolean(autoOptOut) }).eq("id", id);
 }
 
