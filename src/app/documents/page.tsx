@@ -387,7 +387,7 @@ export default function DocumentsPage() {
               <button type="button" onClick={() => openDocument(doc)} className="rounded-lg bg-teal-500 px-3 py-1.5 text-sm font-semibold text-slate-950! transition hover:bg-teal-400 max-md:min-h-11 max-md:flex-1">
                 Open
               </button>
-              <button type="button" onClick={() => duplicateDocument(doc)} className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400 md:max-xl:px-2 md:max-xl:text-xs max-md:min-h-11 max-md:flex-1">
+              <button type="button" data-testid="doc-duplicate" onClick={() => duplicateDocument(doc)} className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400 md:max-xl:px-2 md:max-xl:text-xs max-md:min-h-11 max-md:flex-1">
                 Duplicate
               </button>
               <button
