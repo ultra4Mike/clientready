@@ -12,6 +12,8 @@ import { readApproval } from "@/lib/approval";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import DuplicateNumbers from "@/components/DuplicateNumbers";
+import { copyDocData } from "@/lib/doc-copy";
+import { nextFreeNumber } from "@/lib/doc-numbers";
 import { documentTotals } from "@/lib/discount";
 import { collectedOn, documentStage, NEXT_LABEL, STAGE_LABEL } from "@/lib/doc-stage";
 import { displayStatus } from "@/lib/doc-status";
@@ -123,26 +125,20 @@ export default function DocumentsPage() {
   }
 
   function duplicateDocument(doc: SavedDocument) {
-    // A copy is a new document: it must not share the original's approval link.
-    // A copy is a new job too: it isn't on the schedule yet.
-    // Nor is it another period of a recurring schedule (one draft per period), or already reviewed.
-    const { approval: _approval, schedule: _schedule, recurringFrom: _from, recurringReview: _review, reviews: _reviews, ...rest } = (doc.data || {}) as Record<string, unknown>;
-    void _approval;
-    void _schedule;
-    void _from;
-    void _review;
-    void _reviews;
+    // R103: a fresh draft — no payments, deposit, schedule, status, approval link or old number.
+    const number = nextFreeNumber(documents as never, doc.type, String(doc.data?.invoiceNumber || ""));
+    const today = new Date();
+    const ymdOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     const copy: SavedDocument = {
       ...doc,
       id: Date.now().toString(),
-      title: `${doc.title} copy`,
-      createdAt: new Date().toLocaleDateString(),
-      data: {
-        ...rest,
-        status: "draft",
-      },
+      title: number,
+      createdAt: today.toLocaleDateString(),
+      data: copyDocData(doc.data, number, ymdOf(today), ymdOf(new Date(today.getTime() + 14 * 86400000))),
     };
     saveList([copy, ...documents]);
+    window.localStorage.setItem("clientready-flash", `Copied ${String(doc.data?.invoiceNumber || doc.title)} as ${number} (draft, nothing paid, not scheduled).`);
+    openDocument(copy);
   }
 
   function removeDocument(id: string) {

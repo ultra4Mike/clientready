@@ -430,6 +430,8 @@ export default function NewInvoicePage() {
         return;
       }
       window.history.replaceState(null, "", `/invoice?id=${encodeURIComponent(doc.id)}`);
+      const flash = window.localStorage.getItem("clientready-flash");
+      if (flash) { window.localStorage.removeItem("clientready-flash"); window.setTimeout(() => setSaveMessage(flash), 0); }
       const data = (doc.data || {}) as {
         clientName?: string; clientCompany?: string; clientEmail?: string; clientPhone?: string; clientAddress?: string;
         invoiceNumber?: string; invoiceDate?: string; dueDate?: string; jobStart?: string; jobEnd?: string; notes?: string;
