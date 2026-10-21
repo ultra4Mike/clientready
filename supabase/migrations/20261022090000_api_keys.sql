@@ -224,8 +224,8 @@ begin
     -- Polling feed for Zapier/Make-style triggers: what changed since a time.
     select jsonb_build_object(
       'clients', case when 'clients:read' = any(k.scopes) then (select coalesce(jsonb_agg(api_client_json(x)), '[]') from (select * from clients where user_id = owner and updated_at > coalesce((body ->> 'since')::timestamptz, now() - interval '1 day') order by updated_at limit 100) x) end,
-      'jobs', case when 'jobs:read' = any(k.scopes) then (select coalesce(jsonb_agg(api_job_json(x, k.no_prices)), '[]') from (select * from documents where user_id = owner and data ? 'schedule' and (worker is null or data -> 'schedule' -> 'workerIds' ? worker) and data ->> 'updatedAt' > coalesce(body ->> 'since', to_char((now() - interval '1 day') at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS')) limit 100) x) end,
-      'invoices', case when 'invoices:read' = any(k.scopes) then (select coalesce(jsonb_agg(api_invoice_json(x)), '[]') from (select * from documents where user_id = owner and type = 'invoice' and data ->> 'updatedAt' > coalesce(body ->> 'since', to_char((now() - interval '1 day') at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS')) limit 100) x) end,
+      'jobs', case when 'jobs:read' = any(k.scopes) then (select coalesce(jsonb_agg(api_job_json(x, k.no_prices)), '[]') from (select * from documents where user_id = owner and data ? 'schedule' and (worker is null or data -> 'schedule' -> 'workerIds' ? worker) and data ->> 'updatedAt' > coalesce(body ->> 'since', to_char((now() - interval '1 day') at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS')) order by data ->> 'updatedAt' limit 100) x) end,
+      'invoices', case when 'invoices:read' = any(k.scopes) then (select coalesce(jsonb_agg(api_invoice_json(x)), '[]') from (select * from documents where user_id = owner and type = 'invoice' and data ->> 'updatedAt' > coalesce(body ->> 'since', to_char((now() - interval '1 day') at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS')) order by data ->> 'updatedAt' limit 100) x) end,
       'now', stamp) into out;
     return jsonb_build_object('status', 200, 'data', jsonb_strip_nulls(out));
   end if;
