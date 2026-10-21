@@ -577,7 +577,12 @@ export default function NewInvoicePage() {
   function addPayment() {
     // R105: a proposal's first deposit defaults to its requested deposit % (R90), else the balance.
     const deposit = isProposal && Number(depositPercent) > 0 ? Math.round(totals.total * Number(depositPercent)) / 100 : 0;
-    setPayments((current) => [...current, { id: Date.now().toString(), amount: current.length ? "" : (deposit || totals.balance || totals.total).toFixed(2), method: "Cash", date: ymd(new Date()), ref: "" }]);
+    // R115: every new payment row defaults to what is still owed (total minus the rows already there).
+    setPayments((current) => {
+      const left = Math.max(0, Math.round((totals.total - paidTotal(current)) * 100) / 100);
+      const amount = isProposal && !current.length && deposit ? deposit : left;
+      return [...current, { id: Date.now().toString(), amount: amount > 0 ? amount.toFixed(2) : "", method: "Cash", date: ymd(new Date()), ref: "" }];
+    });
   }
   const lateFee = isProposal || !docId ? null : suggestedLateFee({ settings: lateFeeSettings, status, dueDate, balance: totals.balance, items, today: ymd(new Date()), skip: noLateFee });
 
