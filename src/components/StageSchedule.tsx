@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { depositRemainderStages, installmentStages, STAGE_KIND_LABEL, stagePlan, todayYmd, type PlanEvery, type Stage } from "@/lib/stages";
+import { stageName, depositRemainderStages, installmentStages, STAGE_KIND_LABEL, stagePlan, todayYmd, type PlanEvery, type Stage } from "@/lib/stages";
 
 const STATE_LABEL = { paid: "Paid", due: "Due now", overdue: "Overdue", upcoming: "Upcoming" } as const;
 const STATE_CLASS = { paid: "cr-tone-good border-emerald-300 bg-emerald-50 text-emerald-700", due: "cr-tone-teal border-teal-300 bg-teal-50 font-semibold text-teal-700", overdue: "cr-tone-bad border-rose-300 bg-rose-50 font-semibold text-red-600", upcoming: "border-slate-300 text-slate-500" } as const;
@@ -18,7 +18,7 @@ export function StageSchedule({ stages, total, balance, muted = "text-slate-600"
           {plan.rows.map((row) => (
             <tr key={row.id} data-testid="stage-row" data-state={row.state} className="border-t border-slate-200 first:border-0">
               <td className="py-2 pr-2">
-                {row.label || STAGE_KIND_LABEL[row.kind]}
+                {stageName(row)}
                 <span className={`block text-xs ${muted}`}>{row.mode === "percent" && row.value ? `${row.value}% · ` : ""}{row.dueDate ? `due ${row.dueDate}` : "no due date"}</span>
               </td>
               <td className="py-2 pr-2 text-right tabular-nums">${row.amount.toFixed(2)}{row.paid > 0 && row.remaining > 0 && <span className="cr-tone-warn mt-1 inline-flex whitespace-nowrap rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800" data-testid="stage-partial">${row.paid.toFixed(2)} paid · ${row.remaining.toFixed(2)} left</span>}</td>

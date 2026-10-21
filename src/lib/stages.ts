@@ -66,6 +66,12 @@ export function stageAmounts(total: number, stages: Stage[]) {
  * The schedule with what is paid against each stage. `balance` is the invoice's still-owed amount
  * (so an older invoice marked paid without payment amounts counts as fully paid).
  */
+/** R57 (live): a deposit stage that's fully paid reads "Deposit (paid)" (custom names are kept). */
+export function stageName(row: { label: string; kind: StageKind; state?: string }) {
+  const base = row.label || STAGE_KIND_LABEL[row.kind];
+  return row.state === "paid" && row.kind === "deposit" && /^deposit$/i.test(base.trim()) ? "Deposit (paid)" : base;
+}
+
 export function stagePlan(total: number, balance: number, stages: Stage[], today: string) {
   const amounts = stageAmounts(total, stages);
   let pool = round(Math.max(total - balance, 0));
