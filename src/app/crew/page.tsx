@@ -10,6 +10,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { crewMarkDone, crewCheckItem, crewOnMyWay, omwTime, crewSetJobStatus, onMyWaySmsHref, STATUS_CLASS, STATUS_LABEL, type JobStatus } from "@/lib/schedule";
 import { compressPhoto } from "@/lib/photos";
+import CrewVisitNote from "@/components/CrewVisitNote";
 import { compressImage, crewClockIn, crewClockOut, crewEditClock, entryHours, withQueuedClock, fmtHours, fmtTimer, type ClockEntry } from "@/lib/clock";
 
 type Client = { id: string; name: string; phone: string; address: string };
@@ -522,7 +523,8 @@ export default function CrewPage() {
             : <span className="flex min-h-11 items-center justify-center rounded-xl border border-dashed border-teal-500/20 px-3 py-2 text-center opacity-50">No address</span>}
         </div>
         {card.client_address && <p className="mt-2 text-sm text-[var(--cr-muted)]">{card.client_address}</p>}
-        {card.client_email && <p className="text-sm"><a className="tap underline" href={`mailto:${card.client_email}`}>{card.client_email}</a></p>}
+        {card.client_email && !card.client_phone && <p className="text-sm"><a className="tap underline" href={`mailto:${card.client_email}`}>{card.client_email}</a></p>}
+        <CrewVisitNote docId={card.doc_id} />
         {(card.crewNote || card.payRow?.note) && (
           <p className="mt-2 rounded-xl bg-teal-500/10 px-3 py-2 text-sm flex items-start gap-2" data-testid="crew-note"><Icon name="note" className="mt-0.5 h-4 w-4 text-teal-700 dark:text-teal-300" /><span>{card.crewNote || card.payRow?.note}</span></p>
         )}

@@ -586,3 +586,16 @@ export function travelWarnings(docId: string, date: string, startTime: string, e
   }
   return out;
 }
+
+/** R88: crew saves their visit note (own table; never changes the job, schedule or invoice). Returns "" when saved. */
+export async function crewSaveVisitNote(docId: string, note: string) {
+  const { data, error } = await supabase.rpc("crew_set_visit_note", { p_doc_id: docId, p_note: note });
+  if (error) return error.message;
+  return data === false ? "Could not save the note." : "";
+}
+
+/** R88: visit notes the crew wrote (owner: all on this job; crew: their own). */
+export async function jobVisitNotes(docId: string) {
+  const { data } = await supabase.from("crew_visit_notes").select("worker_email, worker_name, note, updated_at").eq("doc_id", docId).order("updated_at", { ascending: false });
+  return ((data || []) as { worker_email: string; worker_name: string; note: string; updated_at: string }[]).filter((row) => row.note.trim());
+}

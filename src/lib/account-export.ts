@@ -37,7 +37,7 @@ export function stripLinks<T>(value: T): T {
 export function exportFiles(raw: { profile: Row | null; clients: Row[]; documents: Row[]; employees: Row[] }) {
   const input = stripLinks(raw);
   const docs = uniqueDocs(input.documents as never) as unknown as { id: string; type: string; title?: string; clientName?: string; createdAt?: string; data?: Row }[];
-  const clients = toCsv(["Name", "Company", "Email", "Phone", "Address", "Notes"], input.clients.map((c) => [c.name, c.company, c.email, c.phone, c.address, c.notes]));
+  const clients = toCsv(["Name", "Company", "Email", "Phone", "Address", "Notes", "Preferences", "Contact method"], input.clients.map((c) => [c.name, c.company, c.email, c.phone, c.address, c.notes, c.preferences, c.contactMethod]));
   const documents = toCsv(["Type", "Number", "Client", "Status", "Date", "Due", "Total", "Paid", "Owed", "Job date"], docs.map((d) => {
     const data = d.data || {};
     const { total, paid, owed } = docAmounts(d as never);
