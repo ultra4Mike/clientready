@@ -35,7 +35,7 @@ import { readLateFeeSettings, suggestedLateFee, type LateFeeSettings } from "@/l
 import { saveCrewJobs } from "@/lib/crew";
 import { depositInvoice, missingDeposits } from "@/lib/proposal-deposit";
 import { docTotal } from "@/lib/review";
-import { balanceDue, paidTotal, tipTotal, paymentFields, methodLabel, paymentMethods, paymentRequirement, readPayments, type Payment } from "@/lib/payments";
+import { balanceDue, owedAfterRefunds, refundState, refundedTotal, paidTotal, tipTotal, paymentFields, methodLabel, paymentMethods, paymentRequirement, readPayments, type Payment } from "@/lib/payments";
 import { JobPhotosEditor, JobPhotoStrip } from "@/components/JobPhotos";
 import { currentDocId } from "@/lib/doc-sync";
 import { isQuotaError, readPhotos, type JobPhoto } from "@/lib/photos";
@@ -211,6 +211,7 @@ export default function NewInvoicePage() {
   const [taxPercent, setTaxPercent] = useState("0");
   const [discountType, setDiscountType] = useState<DiscountType>("percent");
   const [noLateFee, setNoLateFee] = useState(false);
+  const [rebillRefund, setRebillRefund] = useState(false); // R126
   const [discountValue, setDiscountValue] = useState("");
   const [payments, setPayments] = useState<Payment[]>([]);
   const [signature, setSignature] = useState<Signature | null>(null);
@@ -454,7 +455,7 @@ export default function NewInvoicePage() {
       const data = (doc.data || {}) as {
         clientName?: string; clientCompany?: string; clientEmail?: string; clientPhone?: string; clientAddress?: string;
         invoiceNumber?: string; invoiceDate?: string; dueDate?: string; jobStart?: string; jobEnd?: string; notes?: string;
-        taxPercent?: string; discountType?: string; discountValue?: string; noLateFee?: unknown; signature?: unknown; proposalSignature?: unknown; payLink?: string; photos?: unknown; showPhotos?: unknown; fromProposal?: { id?: string; number?: string }; changeOrderOf?: unknown; changeOrderNotes?: unknown; recurring?: unknown; recurringFrom?: unknown; approval?: unknown; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
+        taxPercent?: string; discountType?: string; discountValue?: string; noLateFee?: unknown; rebillRefund?: unknown; signature?: unknown; proposalSignature?: unknown; payLink?: string; photos?: unknown; showPhotos?: unknown; fromProposal?: { id?: string; number?: string }; changeOrderOf?: unknown; changeOrderNotes?: unknown; recurring?: unknown; recurringFrom?: unknown; approval?: unknown; items?: LineItem[]; status?: string; style?: string; jobTime?: string; jobCosts?: JobCosts; crew?: CrewRow[];
       };
       const kind: DocKind = doc.type === "proposal" ? "proposal" : "invoice";
       const loadedItems = Array.isArray(data.items) && data.items.length ? data.items.map((item) => ({ ...item, category: normalizeCategory(item.category) })) : [{ ...emptyItem }];
@@ -483,6 +484,7 @@ export default function NewInvoicePage() {
       setTaxPercent(data.taxPercent || "0");
       setDiscountType(normalizeDiscountType(data.discountType));
       setNoLateFee(data.noLateFee === true);
+      setRebillRefund(data.rebillRefund === true);
       setDiscountValue(data.discountValue || "");
       setPayments(readPayments(data));
       // R56: only rows that were already saved without a method when the invoice was opened are exempt (R30).
@@ -556,8 +558,10 @@ export default function NewInvoicePage() {
     const subtotal = items.reduce((sum, item) => sum + amountOf(item.qty) * amountOf(item.rate), 0);
     const base = documentTotals(subtotal, taxPercent, discountType, discountValue);
     const paid = paidTotal(payments);
-    return { ...base, paid, balance: balanceDue(base.total, paid, status) };
-  }, [items, taxPercent, discountType, discountValue, payments, status]);
+    // R126: a refund on a paid-in-full invoice doesn't reopen a balance unless the owner re-bills it.
+    return { ...base, paid, balance: isProposal ? balanceDue(base.total, paid, status) : owedAfterRefunds(base.total, payments, status, rebillRefund) };
+  }, [items, taxPercent, discountType, discountValue, payments, status, rebillRefund, isProposal]);
+  const refund = isProposal ? "" : refundState(totals.total, payments);
 
   // Picked client's id, else the one saved client with exactly this name (else none: match by name).
   const docClientId = clientId || clientIdFor({ clientName }, savedClients);
@@ -806,7 +810,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, ...(linkedClientId ? { clientId: linkedClientId } : {}), clientCompany, ...(contactName.trim() ? { contactName: contactName.trim() } : {}), ...(stockUsed.length ? { stockUsed } : {}), ...(isProposal && Number(depositPercent) > 0 ? { depositPercent: String(Math.min(Number(depositPercent), 100)) } : {}), clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(storedSchedule && (stored?.data?.schedule || !isProposal) ? { schedule: storedSchedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.autoSent ? { autoSent: (stored?.data as Record<string, unknown>).autoSent } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviewAskedAt ? { reviewAskedAt: (stored?.data as Record<string, unknown>).reviewAskedAt } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew: savedCrew, ...(crewReport ? { crewReport } : {}) },
+      data: { clientName, ...(linkedClientId ? { clientId: linkedClientId } : {}), clientCompany, ...(contactName.trim() ? { contactName: contactName.trim() } : {}), ...(stockUsed.length ? { stockUsed } : {}), ...(isProposal && Number(depositPercent) > 0 ? { depositPercent: String(Math.min(Number(depositPercent), 100)) } : {}), clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), ...(rebillRefund ? { rebillRefund: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(storedSchedule && (stored?.data?.schedule || !isProposal) ? { schedule: storedSchedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.autoSent ? { autoSent: (stored?.data as Record<string, unknown>).autoSent } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviewAskedAt ? { reviewAskedAt: (stored?.data as Record<string, unknown>).reviewAskedAt } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew: savedCrew, ...(crewReport ? { crewReport } : {}) },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -1226,6 +1230,12 @@ export default function NewInvoicePage() {
             <Section id="payments" label="Payments" className="cr-panel space-y-3 rounded-xl border border-slate-200 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3 pr-10 max-sm:pr-12">
                 <h2 className="min-w-0 text-xs font-semibold uppercase tracking-wide text-teal-600 dark:text-teal-300">{isProposal ? "Deposit received" : "Payments received"}</h2>
+                {refund && (
+                  <p data-testid="refund-state" data-state={rebillRefund ? "rebilled" : refund} className="w-full text-sm">
+                    {refund === "refunded" ? "Refunded" : "Partially refunded"}: ${refundedTotal(payments).toFixed(2)} returned to the client. {rebillRefund ? "The refunded amount is owed again." : "Nothing is owed."}{" "}
+                    <button type="button" data-testid="refund-rebill" onClick={() => setRebillRefund(!rebillRefund)} className="cr-btn cr-btn-text">{rebillRefund ? "Don't re-bill" : "Re-bill the refunded amount"}</button>
+                  </p>
+                )}
                 <button type="button" className="min-h-11 shrink-0 whitespace-nowrap rounded-lg border border-teal-500/40 px-3 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 sm:min-h-9 dark:text-teal-300" onClick={addPayment}>{payments.length ? "Add another payment" : isProposal ? "Add deposit" : "Add payment"}</button>
               </div>
               {payments.map((payment) => (

@@ -55,3 +55,23 @@ export function cashCollected(docs: Doc[], from = "", to = "") {
   const total = cashEntries(docs).filter((e) => (!from || e.date >= from) && (!to || e.date <= to)).reduce((sum, e) => sum + e.amount, 0);
   return Math.round(total * 100) / 100;
 }
+
+/**
+ * R126: the ONE billed / outstanding calculation. Each doc id once, invoices only, never drafts, voided
+ * or pending recurring drafts. Outstanding is refund-aware (docAmounts). Optional invoice-date range.
+ */
+export function billedOutstanding(allDocs: Doc[], from = "", to = "") {
+  const seen = new Set<string>();
+  let count = 0, billed = 0, outstanding = 0;
+  for (const doc of allDocs) {
+    if (seen.has(doc.id)) continue;
+    seen.add(doc.id);
+    if (doc.type !== "invoice" || voided(doc) || String(doc.data?.status || "draft") === "draft") continue;
+    const date = ymd(doc.data?.invoiceDate) || ymd(doc.createdAt);
+    if ((from && date < from) || (to && date > to)) continue;
+    const { total, owed } = docAmounts(doc);
+    count += 1; billed += total; outstanding += owed;
+  }
+  const r = (n: number) => Math.round(n * 100) / 100;
+  return { count, billed: r(billed), outstanding: r(outstanding) };
+}

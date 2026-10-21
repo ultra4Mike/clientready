@@ -52,6 +52,30 @@ export function tipTotal(payments: Payment[]) {
 /** R95: a Stripe refund is saved as its own negative row (id "refund_..."), so it lowers what was paid. */
 export const isRefundRow = (payment: { id?: unknown }) => String(payment.id || "").startsWith("refund_");
 
+/** R126: money in before refunds (positive rows only). */
+export function grossPaid(payments: Payment[]) {
+  return round(payments.reduce((sum, payment) => sum + (isRefundRow(payment) ? 0 : Math.max(num(payment.amount), 0)), 0));
+}
+export function refundedTotal(payments: Payment[]) {
+  return round(payments.reduce((sum, payment) => sum + (isRefundRow(payment) ? Math.max(-num(payment.amount), 0) : 0), 0));
+}
+/** R126: "refunded" / "partially_refunded" when an invoice was paid in full and then refunded; "" otherwise. */
+export function refundState(total: number, payments: Payment[]): "" | "refunded" | "partially_refunded" {
+  const refunded = refundedTotal(payments);
+  if (refunded <= 0.004 || total <= 0 || grossPaid(payments) < total - 0.004) return "";
+  return paidTotal(payments) <= 0.004 ? "refunded" : "partially_refunded";
+}
+export const isVoidStatus = (status: unknown) => ["void", "voided", "deleted"].includes(String(status || ""));
+/**
+ * R126: what is owed, refund-aware. A void invoice owes nothing. A refund on a paid-in-full invoice does
+ * not reopen a balance unless the owner chose to re-bill it (data.rebillRefund).
+ */
+export function owedAfterRefunds(total: number, payments: Payment[], status?: unknown, rebill?: unknown) {
+  if (isVoidStatus(status)) return 0;
+  if (!rebill && refundState(total, payments)) return balanceDue(total, grossPaid(payments), status);
+  return balanceDue(total, paidTotal(payments), status);
+}
+
 export function paidTotal(payments: Payment[]) {
   return round(Math.max(payments.reduce((sum, payment) => sum + (isRefundRow(payment) ? Math.min(num(payment.amount), 0) : Math.max(num(payment.amount), 0)), 0), 0));
 }

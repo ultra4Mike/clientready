@@ -9,8 +9,8 @@ import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { loadAccountIntoCache } from "@/lib/account-cache";
 import { amountOf, documentTotals } from "@/lib/discount";
-import { cashCollected } from "@/lib/money";
-import { balanceDue, isOpenBalance, invoicePastDue, paidTotal, readPayments } from "@/lib/payments";
+import { billedOutstanding, cashCollected } from "@/lib/money";
+import { isOpenBalance, invoicePastDue, owedAfterRefunds, paidTotal, readPayments } from "@/lib/payments";
 import { uniqueDocs } from "@/lib/change-orders";
 import FollowUps from "@/components/FollowUps";
 import TodayJobsBlock from "@/components/TodayJobsBlock";
@@ -69,7 +69,8 @@ function crewNames(doc: SavedDocument) {
 }
 
 function balance(doc: SavedDocument) {
-  return balanceDue(invoiceTotal(doc), paidTotal(readPayments(doc.data)), doc.data?.status);
+  // R126: refund-aware and 0 for void (same rule as billedOutstanding).
+  return owedAfterRefunds(invoiceTotal(doc), readPayments(doc.data), doc.data?.status, (doc.data as Record<string, unknown> | undefined)?.rebillRefund);
 }
 
 function monthKey(value: string) {
@@ -145,7 +146,7 @@ export default function DashboardPage() {
     const paid = cashCollected(documents);
     const overdueDocs = invoices.filter((doc) => invoicePastDue(doc.data as Record<string, unknown>, invoiceTotal(doc), balance(doc)));
     const overdue = overdueDocs.reduce((sum, doc) => sum + balance(doc), 0);
-    const outstanding = invoices.filter((doc) => isOpenBalance(doc.data?.status, balance(doc))).reduce((sum, doc) => sum + balance(doc), 0);
+    const outstanding = billedOutstanding(documents as never).outstanding; // R126: shared, deduped, no void
     const paidRate = invoices.length
       ? Math.round((paidDocs.length / invoices.length) * 100)
       : 0;

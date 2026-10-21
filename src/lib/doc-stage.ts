@@ -1,5 +1,5 @@
 import { amountOf, documentTotals } from "@/lib/discount";
-import { balanceDue, paidTotal, readPayments } from "@/lib/payments";
+import { owedAfterRefunds, balanceDue, paidTotal, readPayments } from "@/lib/payments";
 import { readApproval } from "@/lib/approval";
 import { readSchedule } from "@/lib/schedule";
 
@@ -27,7 +27,7 @@ export function docAmounts(doc: Doc) {
   const subtotal = items.reduce((sum, item) => sum + amountOf(item.qty) * amountOf(item.rate), 0);
   const total = documentTotals(subtotal, String(data.taxPercent ?? ""), String(data.discountType ?? ""), String(data.discountValue ?? "")).total;
   const paid = doc.type === "invoice" ? paidTotal(readPayments(data)) : 0;
-  const owed = doc.type === "invoice" ? balanceDue(total, paid, data.status) : 0;
+  const owed = doc.type === "invoice" ? owedAfterRefunds(total, readPayments(data), data.status, data.rebillRefund) : 0;
   return { total, paid, owed };
 }
 

@@ -1,7 +1,7 @@
 import { docAmounts } from "@/lib/doc-stage";
 import { jobWhen } from "@/lib/job-when";
 import { cashEntries } from "@/lib/money";
-import { readPayments } from "@/lib/payments";
+import { isVoidStatus, readPayments } from "@/lib/payments";
 import { isPendingRecurringDraft } from "@/lib/recurring";
 import { uniqueDocs } from "@/lib/change-orders";
 import { jobProfit, type ProfitLine } from "@/lib/job-profit";
@@ -51,7 +51,7 @@ export function buildReport(allDocs: Doc[], crewExpenses: CrewExpense[], year: s
   const months: MonthRow[] = MONTHS.map((_, month) => ({ month, billed: 0, collected: 0, jobCosts: 0, crewReceipts: 0 }));
   const jobs: JobRow[] = [];
   for (const doc of docs) {
-    if (doc.type !== "invoice" || isPendingRecurringDraft(doc)) continue;
+    if (doc.type !== "invoice" || isPendingRecurringDraft(doc) || isVoidStatus(doc.data?.status) || doc.data?.deleted) continue;
     const data = doc.data || {};
     const { total } = docAmounts(doc);
     if (String(data.status || "draft") === "draft") continue;

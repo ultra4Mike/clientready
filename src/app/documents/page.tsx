@@ -16,12 +16,12 @@ import { copyDocData } from "@/lib/doc-copy";
 import { saveCloudDocument } from "@/lib/cloud-docs";
 import { nextFreeNumber } from "@/lib/doc-numbers";
 import { documentTotals } from "@/lib/discount";
-import { cashCollected } from "@/lib/money";
+import { billedOutstanding, cashCollected } from "@/lib/money";
 import { documentStage, NEXT_LABEL, STAGE_LABEL } from "@/lib/doc-stage";
 import { displayStatus } from "@/lib/doc-status";
 import PeriodToggle from "@/components/PeriodToggle";
 import { inPeriod, periodRange, type PeriodRange } from "@/lib/period";
-import { balanceDue, isOpenBalance, invoicePastDue, paidTotal, readPayments } from "@/lib/payments";
+import { isOpenBalance, isVoidStatus, invoicePastDue, owedAfterRefunds, paidTotal, readPayments } from "@/lib/payments";
 import { searchWithNumbers } from "@/lib/doc-number";
 
 type SavedDocument = {
@@ -48,7 +48,7 @@ function facts(doc: SavedDocument) {
   const items = Array.isArray(data.items) ? (data.items as { qty?: unknown; rate?: unknown }[]) : [];
   const subtotal = items.reduce((sum, item) => sum + num(item.qty) * num(item.rate), 0);
   const total = documentTotals(subtotal, data.taxPercent as string, data.discountType as string, data.discountValue as string).total;
-  const owed = doc.type === "invoice" ? balanceDue(total, paidTotal(readPayments(data)), data.status) : 0;
+  const owed = doc.type === "invoice" ? owedAfterRefunds(total, readPayments(data), data.status, data.rebillRefund) : 0;
   const created = Date.parse(doc.createdAt);
   const date = String(data.invoiceDate || "") || (Number.isNaN(created) ? "" : new Date(created).toISOString().slice(0, 10));
   const updated = Date.parse(String(data.updatedAt || ""));
@@ -223,12 +223,15 @@ export default function DocumentsPage() {
   const overview = useMemo(() => {
     const from = fromDate, to = toDate;
     let count = 0, billed = 0, owed = 0, overdue = 0, paid = 0;
+    // R126: billed / owed from the shared billedOutstanding (each id once, no drafts or void).
+    ({ count, billed, outstanding: owed } = billedOutstanding(documents as never, from, to));
+    const seen = new Set<string>();
     for (const doc of documents) {
-      if (doc.type !== "invoice") continue;
+      if (doc.type !== "invoice" || seen.has(doc.id)) continue;
+      seen.add(doc.id);
       const info = factsById.get(doc.id) || facts(doc);
       const status = String(doc.data?.status || "draft");
-      if (status === "draft" || !inPeriod(info.date, from, to)) continue;
-      count += 1; billed += info.total; owed += info.owed; 
+      if (status === "draft" || isVoidStatus(status) || !inPeriod(info.date, from, to)) continue;
       if (invoicePastDue(doc.data, info.total, info.owed)) overdue += info.owed;
     }
     paid = cashCollected(documents, from, to); // R104: cash basis, by payment date
