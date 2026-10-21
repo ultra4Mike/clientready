@@ -80,7 +80,7 @@ export const PROVIDERS: PaymentProvider[] = [
     ready: (c) => Boolean(clean(c.payTo) || clean(c.address, 500)),
     option: (c, ctx) => {
       const text = [clean(c.payTo) && `Payable to ${clean(c.payTo)}`, clean(c.address, 500) && `Mail to ${clean(c.address, 500)}`, ctx.reference && `Write ${ctx.reference} on the memo line`].filter(Boolean).join(". ");
-      return { id: "check", label: "Check by mail", detail: text, copy: [clean(c.payTo), clean(c.address, 500)].filter(Boolean).join("\n") };
+      return { id: "check", label: "Check", detail: text, copy: [clean(c.payTo), clean(c.address, 500)].filter(Boolean).join("\n") };
     },
   },
   {

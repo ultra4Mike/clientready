@@ -103,8 +103,7 @@ export function isPastDue(status: unknown, dueDate: unknown, owed: number, today
   if (s === "draft" || s === "paid" || !(owed > 0.004)) return false;
   const due = String(dueDate || "").slice(0, 10);
   const hasDue = /^\d{4}-\d{2}-\d{2}$/.test(due);
-  // A manual "overdue" never overrides a due date that hasn't passed yet.
-  if (s === "overdue") return !hasDue || due < today;
+  // Only a passed due date counts; a manual "overdue" with no or a future due date does not.
   return hasDue && due < today;
 }
 
@@ -136,6 +135,10 @@ export function isOpenBalance(status: unknown, owed: number) {
  * - Status Paid needs at least one payment with an amount and a method, except an invoice that was already
  *   saved as Paid before methods were required (legacyPaid): it keeps saving as is (Help R29).
  */
+/** Display names matching the Settings picker; stored values stay as they are (backward compatible). */
+export const METHOD_LABEL: Record<string, string> = { Bank: "Bank transfer (ACH)", Card: "Credit/debit card", "Card (Stripe)": "Card (Stripe)" };
+export const methodLabel = (method: unknown) => METHOD_LABEL[String(method || "")] || String(method || "");
+
 export function paymentRequirement(status: unknown, payments: Payment[], legacyPaid = false) {
   const withAmount = payments.filter((payment) => (Number(payment.amount) || 0) > 0);
   if (withAmount.some((payment) => !String(payment.method || "").trim())) return "Choose how each payment was made (Method) before saving.";

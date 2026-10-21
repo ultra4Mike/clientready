@@ -8,7 +8,7 @@ import PageHeader from "@/components/PageHeader";
 import StuckPayments from "@/components/StuckPayments";
 import { saveCloudDocument } from "@/lib/cloud-docs";
 import { amountOf, documentTotals } from "@/lib/discount";
-import { balanceDue, invoicePastDue, isOpenBalance, paidTotal, paymentFields, paymentMethods, readPayments } from "@/lib/payments";
+import { balanceDue, invoicePastDue, methodLabel, isOpenBalance, paidTotal, paymentFields, paymentMethods, readPayments } from "@/lib/payments";
 import { uniqueDocs } from "@/lib/change-orders";
 import { isPendingRecurringDraft } from "@/lib/recurring";
 import ReminderPanel from "@/components/ReminderPanel";
@@ -290,7 +290,7 @@ export default function CollectPage() {
                 >
                   {methods.map((item) => (
                     <option key={item} value={item}>
-                      {item}
+                      {methodLabel(item)}
                     </option>
                   ))}
                 </select>
