@@ -6,7 +6,7 @@ import { isPendingRecurringDraft } from "@/lib/recurring";
 import { uniqueDocs } from "@/lib/change-orders";
 import { buildReport, MONTHS, yearMonth } from "@/lib/reports";
 import { taxCategories } from "@/lib/tax-categories";
-import { milesOf, totalMiles, type Trip } from "@/lib/mileage";
+import { countedTrips, milesOf, totalMiles, type Trip } from "@/lib/mileage";
 
 /**
  * Accountant package for one year: a ZIP of plain CSVs an accountant can open in any spreadsheet.
@@ -73,7 +73,7 @@ export function accountantFiles(allDocs: Doc[], crew: CrewExpense[], trips: Trip
     return [day(item.created_at), doc ? numberOf(doc) : "", item.worker_name || "", item.kind || "", r2(amountOf(item.amount)), item.note || ""];
   }).sort((a, b) => a[0].localeCompare(b[0]));
 
-  const yearTrips = trips.filter((trip) => String(trip.date || "").startsWith(year)).sort((a, b) => a.date.localeCompare(b.date));
+  const yearTrips = countedTrips(trips).filter((trip) => String(trip.date || "").startsWith(year)).sort((a, b) => a.date.localeCompare(b.date));
   const report = buildReport(allDocs, crew, year);
   const tax = taxCategories(allDocs, year);
   const summary: (string | number)[][] = [
