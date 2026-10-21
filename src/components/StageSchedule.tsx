@@ -21,7 +21,7 @@ export function StageSchedule({ stages, total, balance, muted = "text-slate-600"
                 {row.label || STAGE_KIND_LABEL[row.kind]}
                 <span className={`block text-xs ${muted}`}>{row.mode === "percent" && row.value ? `${row.value}% · ` : ""}{row.dueDate ? `due ${row.dueDate}` : "no due date"}</span>
               </td>
-              <td className="py-2 pr-2 text-right tabular-nums">${row.amount.toFixed(2)}{row.paid > 0 && row.remaining > 0 && <span className={`block text-xs ${muted}`} data-testid="stage-partial">${row.paid.toFixed(2)} paid · ${row.remaining.toFixed(2)} left</span>}</td>
+              <td className="py-2 pr-2 text-right tabular-nums">${row.amount.toFixed(2)}{row.paid > 0 && row.remaining > 0 && <span className="cr-tone-warn mt-1 inline-flex whitespace-nowrap rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800" data-testid="stage-partial">${row.paid.toFixed(2)} paid · ${row.remaining.toFixed(2)} left</span>}</td>
               <td className="py-2 text-right"><span className={`inline-flex whitespace-nowrap rounded-full border px-2 py-0.5 text-xs ${STATE_CLASS[row.state]}`}>{STATE_LABEL[row.state]}</span></td>
             </tr>
           ))}
@@ -54,7 +54,7 @@ export function StageEditor({ stages, onChange, total, balance, dueDate = "" }: 
       </div>
       <PlanMaker total={total} balance={balance} hasStages={stages.length > 0} onMake={onChange} />
       {stages.length === 0 && balance > 0.004 && (
-        <button type="button" data-testid="stage-preset-deposit" onClick={() => onChange(depositRemainderStages(30, todayYmd(), dueDate, total - balance))} className="tap min-h-11 w-full rounded-lg border border-dashed border-teal-500/50 bg-teal-500/5 px-3 py-2 text-left text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">
+        <button type="button" data-testid="stage-preset-deposit" onClick={() => onChange(depositRemainderStages(30, todayYmd(), dueDate, total - balance))} className="tap min-h-11 w-full rounded-lg border border-teal-500/50 bg-teal-500/5 px-4 py-2.5 text-left text-sm font-semibold leading-snug text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">
           {total - balance > 0.004
             ? <>Use the ${(total - balance).toFixed(2)} already paid as the deposit + remaining balance ${balance.toFixed(2)} {dueDate ? `due ${dueDate}` : "later"}</>
             : <>Deposit now + remaining balance {dueDate ? `due ${dueDate}` : "later"} <span className="font-normal text-slate-500">(30% / 70%, edit below)</span></>}
