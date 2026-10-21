@@ -99,7 +99,7 @@ export default function PortalPage() {
               </span>
               <span className="shrink-0 text-right text-sm">
                 <span className="block font-semibold tabular-nums">${total.toFixed(2)}</span>
-                {doc.type === "invoice" && <span className={`mt-0.5 inline-block text-xs font-semibold ${rowOwed > 0 ? "text-amber-700 cr-text-warn" : "text-emerald-700 cr-text-good"}`}>{rowOwed > 0 ? `$${rowOwed.toFixed(2)} owed` : paid > 0 ? "Paid" : ""}</span>}
+                {doc.type === "invoice" && <span className={`mt-0.5 inline-block text-xs font-semibold ${rowOwed > 0 ? "text-amber-700 cr-text-warn" : "text-emerald-700 cr-text-good"}`}>{rowOwed > 0 ? (paid > 0.004 ? <span data-testid="portal-remaining">${paid.toFixed(2)} paid · ${rowOwed.toFixed(2)} remaining</span> : `$${rowOwed.toFixed(2)} owed`) : paid > 0 ? "Paid" : ""}</span>}
               </span>
               <span aria-hidden="true" className="shrink-0 text-xl text-slate-400">›</span>
             </a>

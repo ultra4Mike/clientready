@@ -3,7 +3,7 @@
 import PayOptions from "@/components/PayOptions";
 import { readLocalPaymentMethods, type PaymentMethodsConfig } from "@/lib/payments/providers";
 import { StageSchedule } from "@/components/StageSchedule";
-import { readStages, type Stage } from "@/lib/stages";
+import { balanceLabel, readStages, type Stage } from "@/lib/stages";
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
@@ -340,8 +340,8 @@ export default function InvoiceViewPage() {
                 </div>
               ) : (
               <div className="mt-2 flex items-baseline justify-between cr-tone-teal rounded-lg bg-teal-50 px-3 py-2 text-lg font-bold text-teal-900 print:bg-transparent print:px-0">
-                <span>Still owed</span>
-                <span>${totals.balance.toFixed(2)}</span>
+                <span data-testid="view-balance-label">{balanceLabel(totals.paid, totals.balance)}</span>
+                <span data-testid="view-balance">${totals.balance.toFixed(2)}</span>
               </div>
               )}
             </div>

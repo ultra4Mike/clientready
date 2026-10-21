@@ -10,6 +10,20 @@ export type StageRow = Stage & { amount: number; paid: number; remaining: number
 const num = (value: unknown) => Number(String(value ?? "").replace(/[^0-9.-]/g, "")) || 0;
 const round = (value: number) => Math.round(value * 100) / 100;
 
+/** One wording everywhere: once something is paid and money is still owed, it is the "Remaining balance". */
+export function balanceLabel(paid: number, balance: number) {
+  return paid > 0.004 && balance > 0.004 ? "Remaining balance" : "Still owed";
+}
+
+/** One-tap progress billing: a deposit due today, the rest due when the job is done (no date). */
+export function depositRemainderStages(percent = 30, today = ""): Stage[] {
+  const id = `${Date.now()}`;
+  return [
+    { id: `${id}-d`, label: "Deposit", kind: "deposit", mode: "percent", value: String(percent), dueDate: today },
+    { id: `${id}-f`, label: "Remaining balance", kind: "final", mode: "percent", value: "", dueDate: "" },
+  ];
+}
+
 export const STAGE_KIND_LABEL: Record<StageKind, string> = { deposit: "Deposit", progress: "Progress", final: "Final" };
 
 export function readStages(value: unknown): Stage[] {

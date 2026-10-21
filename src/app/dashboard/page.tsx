@@ -335,6 +335,10 @@ export default function DashboardPage() {
                       <span className={`block truncate text-xs ${crew.length ? "text-teal-700 dark:text-teal-300" : "italic text-[var(--cr-muted)]"}`} data-testid="recent-crew" data-crew-count={crew.length}>{crew.length ? `Crew: ${crew.join(", ")}` : "No employees scheduled"}</span>
                     </>);
                   })()}
+                  {doc.type === "invoice" && (() => {
+                    const total = invoiceTotal(doc); const owed = balance(doc); const paid = total - owed;
+                    return paid > 0.004 && owed > 0.004 ? <span className="block text-xs font-medium tabular-nums text-amber-700 dark:text-amber-300" data-testid="recent-remaining">${paid.toFixed(2)} paid · Remaining balance ${owed.toFixed(2)}</span> : null;
+                  })()}
                   <span className="block text-xs capitalize text-[var(--cr-muted)]">{doc.type} · {doc.createdAt}</span>
                 </span>
                 <span className="shrink-0 rounded-full border border-teal-500/30 px-2.5 py-0.5 text-xs font-semibold capitalize">{String(doc.data?.status || "draft")}</span>

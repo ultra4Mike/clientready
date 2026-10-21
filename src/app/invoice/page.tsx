@@ -12,7 +12,7 @@ import { readEmailLog, type EmailLogEntry } from "@/lib/email";
 import { clientIdFor } from "@/lib/portal";
 import JobDonePanel from "@/components/JobDonePanel";
 import { StageEditor, StageSchedule } from "@/components/StageSchedule";
-import { readStages, type Stage } from "@/lib/stages";
+import { balanceLabel, readStages, type Stage } from "@/lib/stages";
 import { useEffect, useMemo, useState } from "react";
 import { saveCloudDocument } from "@/lib/cloud-docs";
 import { supabase } from "@/lib/supabase";
@@ -1027,7 +1027,7 @@ export default function NewInvoicePage() {
               ))}
               <div className="flex items-end justify-between border-t border-slate-200 pt-3">
                 <p className="text-sm tabular-nums text-slate-600">Total ${totals.total.toFixed(2)} · {isProposal ? "Deposit" : "Paid"} ${totals.paid.toFixed(2)}</p>
-                <p className="text-right"><span className="block text-sm font-medium text-slate-600">{isProposal && totals.paid > 0 ? "Balance after deposit" : "Still owed"}</span><span data-testid="still-owed" className={`text-2xl font-bold tabular-nums ${totals.balance <= 0.004 && totals.paid > 0 ? "text-emerald-700 dark:text-emerald-300" : ""}`}>${totals.balance.toFixed(2)}</span></p>
+                <p className="text-right"><span className="block text-sm font-medium text-slate-600">{isProposal && totals.paid > 0 ? "Balance after deposit" : balanceLabel(totals.paid, totals.balance)}</span><span data-testid="still-owed" className={`text-2xl font-bold tabular-nums ${totals.balance <= 0.004 && totals.paid > 0 ? "text-emerald-700 dark:text-emerald-300" : ""}`}>${totals.balance.toFixed(2)}</span></p>
               </div>
             </Section>
             {!isProposal && <StageEditor stages={stages} onChange={setStages} total={totals.total} balance={totals.balance} />}
@@ -1387,7 +1387,7 @@ export default function NewInvoicePage() {
                 <div className="flex justify-between font-semibold"><span>Total</span><span>${totals.total.toFixed(2)}</span></div>
                 {totals.paid > 0 && <div className="flex justify-between text-emerald-700"><span>{isProposal ? "Deposit paid ✓" : "Paid"}</span><span>-${totals.paid.toFixed(2)}</span></div>}
                 {tipTotal(payments) > 0 && <div className="flex justify-between" data-testid="tip-line"><span>Tip received, thank you</span><span>${tipTotal(payments).toFixed(2)}</span></div>}
-                {(!isProposal || totals.paid > 0) && <div className="mt-1 flex justify-between border-t border-slate-500 pt-1 text-lg font-bold"><span>{isProposal ? "Balance after deposit" : "Still owed"}</span><span data-testid="preview-still-owed">${totals.balance.toFixed(2)}</span></div>}
+                {(!isProposal || totals.paid > 0) && <div className="mt-1 flex justify-between border-t border-slate-500 pt-1 text-lg font-bold"><span data-testid="preview-balance-label">{isProposal ? "Balance after deposit" : balanceLabel(totals.paid, totals.balance)}</span><span data-testid="preview-still-owed">${totals.balance.toFixed(2)}</span></div>}
               </div>
             </div>
             {!isProposal && status !== "paid" && totals.balance > 0.004 && <PayOptions config={payMethods} amount={totals.balance} reference={invoiceNumber} />}

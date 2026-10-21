@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { installmentStages, STAGE_KIND_LABEL, stagePlan, todayYmd, type PlanEvery, type Stage } from "@/lib/stages";
+import { depositRemainderStages, installmentStages, STAGE_KIND_LABEL, stagePlan, todayYmd, type PlanEvery, type Stage } from "@/lib/stages";
 
 const STATE_LABEL = { paid: "Paid", due: "Due now", overdue: "Overdue", upcoming: "Upcoming" } as const;
 const STATE_CLASS = { paid: "text-emerald-700", due: "font-semibold text-teal-700", overdue: "font-semibold text-red-600", upcoming: "text-slate-500" } as const;
@@ -53,6 +53,11 @@ export function StageEditor({ stages, onChange, total, balance }: { stages: Stag
         <button type="button" className="tap min-h-11 shrink-0 whitespace-nowrap rounded-lg border border-teal-500/40 px-3 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 sm:min-h-10 dark:text-teal-300" onClick={add} data-testid="stage-add">Add stage</button>
       </div>
       <PlanMaker total={total} balance={balance} hasStages={stages.length > 0} onMake={onChange} />
+      {stages.length === 0 && balance > 0.004 && (
+        <button type="button" data-testid="stage-preset-deposit" onClick={() => onChange(depositRemainderStages(30, todayYmd()))} className="tap min-h-11 w-full rounded-lg border border-teal-500/40 px-3 text-left text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">
+          Deposit now + remaining balance when done <span className="font-normal text-slate-500">(30% / 70%, edit below)</span>
+        </button>
+      )}
       {stages.length === 0 && <p className="text-xs text-slate-500">Split this invoice into deposit / progress / final payments with due dates. The invoice total does not change.</p>}
       {plan.rows.map((row) => (
         <div key={row.id} className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-2 sm:grid-cols-5" data-testid="stage-edit-row">
