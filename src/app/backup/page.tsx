@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { isCrewUser } from "@/lib/crew";
+import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { loadAccountIntoCache } from "@/lib/account-cache";
@@ -13,13 +13,35 @@ function read(key: string) {
   return raw ? JSON.parse(raw) : null;
 }
 
+/** R44: fails closed. Signed out = this device's own data (allowed); signed in, the crew check must succeed and say "not crew". */
+async function ownerCheck() {
+  const { data, error } = await supabase.auth.getUser();
+  if (error && !/session/i.test(error.message || "")) return false;
+  const user = data?.user;
+  if (!user) return true;
+  const { data: person, error: crewError } = await supabase.rpc("is_crew_email");
+  if (crewError) return false;
+  const row = Array.isArray(person) ? person[0] : person;
+  return !(row && row.user_id && row.user_id !== user.id);
+}
+
+/** R43: a restored document keeps this device's approval block (live token), so links already sent keep working. */
+function keepLiveApprovals(restored: unknown) {
+  if (!Array.isArray(restored)) return restored;
+  const current = (read("clientready-documents") || []) as { id?: string; data?: Record<string, unknown> }[];
+  return restored.map((doc: { id?: string; data?: Record<string, unknown> }) => {
+    const live = current.find((item) => item.id === doc.id)?.data?.approval;
+    return live && doc && doc.data ? { ...doc, data: { ...doc.data, approval: live } } : doc;
+  });
+}
+
 export default function BackupPage() {
   const [message, setMessage] = useState("");
 
   const [exporting, setExporting] = useState(false);
   // R34: owner only. Crew accounts never get the buttons (AppShell also sends them to /crew).
   const [owner, setOwner] = useState<boolean | null>(null);
-  useEffect(() => { isCrewUser().then((crew) => setOwner(!crew)).catch(() => setOwner(true)); }, []);
+  useEffect(() => { ownerCheck().then(setOwner).catch(() => setOwner(false)); }, []);
   // Backlog 5: the whole account (cloud first, then this device's copy if offline) as a ZIP of CSVs + backup.json.
   async function downloadAccountZip() {
     if (!owner) return;
@@ -73,7 +95,7 @@ export default function BackupPage() {
         if (backup.documents) {
           window.localStorage.setItem(
             "clientready-documents",
-            JSON.stringify(backup.documents)
+            JSON.stringify(keepLiveApprovals(backup.documents))
           );
         }
         if (backup.appointments) {
