@@ -124,7 +124,7 @@ export default function ReportsPage() {
                 <tbody>
                   {report.jobs.map((job) => (
                     <tr key={job.id} data-testid="report-job" data-id={job.id} data-total={job.total.toFixed(2)} data-cost={job.cost.toFixed(2)} data-profit={job.profit.toFixed(2)} className="border-t border-slate-200/60">
-                      <td className="px-2 py-1.5"><Link href={`/invoice?id=${encodeURIComponent(job.id)}`} className="text-teal-600 hover:underline">{job.number}</Link> {job.jobDate ? <span className="text-xs text-slate-500" data-testid="report-job-date" data-date={job.jobDate}>· Job {shortDay(job.jobDate)}</span> : <span className="text-xs text-slate-500">{MONTHS[job.month]}</span>}</td>
+                      <td className="px-2 py-1.5"><Link href={`/invoice?id=${encodeURIComponent(job.id)}`} className="text-teal-600 hover:underline">{job.number}</Link> {job.jobDate ? <span className="whitespace-nowrap text-xs tabular-nums text-slate-500" data-testid="report-job-date" data-date={job.jobDate}>· Job {shortDay(job.jobDate)}</span> : <span className="text-xs text-slate-500">{MONTHS[job.month]}</span>}</td>
                       <td className="px-2 py-1.5">{job.client}</td>
                       <td className={cell}>{usd(job.total)}</td>
                       <td className={cell}>{usd(job.cost)}</td>

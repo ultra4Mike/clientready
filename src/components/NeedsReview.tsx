@@ -58,6 +58,7 @@ export default function NeedsReview({ documents, onDocuments, loading = false, o
                 <span className="text-xs font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-300">{LABEL[item.kind]}</span>
                 <span className="block text-sm font-medium break-words sm:truncate">{item.title}</span>
                 <span className="block text-xs text-[var(--cr-muted)] break-words sm:truncate">{item.detail}</span>
+                {item.kind === "missing" && String(item.title).includes(" is missing ") && <span aria-hidden="true" className="mt-1.5 flex flex-wrap gap-1.5">{String(item.title).split(" is missing ")[1].split(/,\s*/).filter(Boolean).map((part) => <span key={part} className="cr-tone-warn inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">{part}</span>)}</span>}
               </a>
               <button type="button" disabled={Boolean(busy)} onClick={() => review(item)} data-testid="mark-reviewed"
                 className="tap min-h-11 shrink-0 self-start rounded-lg border border-teal-500/30 px-3 py-1.5 text-xs sm:min-h-0 sm:self-auto font-medium text-teal-700 transition hover:bg-teal-500/10 disabled:opacity-50 dark:text-teal-200">

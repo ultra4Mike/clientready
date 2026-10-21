@@ -1139,17 +1139,17 @@ export default function NewInvoicePage() {
                         setSaveMessage("Hours approved. Save the document to keep it.");
                       };
                       return (
-                        <div className="rounded-lg border border-slate-200 p-2 text-xs" data-testid={`hours-approval-${row.employeeId}`} data-state={state}>
-                          <table className="w-full"><tbody>
+                        <div className={`rounded-xl border p-3 text-sm ${state === "changed" ? "cr-tone-warn border-amber-400 bg-amber-50" : state === "approved" ? "border-emerald-300 dark:border-emerald-700/70" : "border-slate-200"}`} data-testid={`hours-approval-${row.employeeId}`} data-state={state}>
+                          <table className="w-full [&_td]:py-1 [&_tr+tr]:border-t [&_tr+tr]:border-slate-200/60"><tbody>
                             <tr><td>Scheduled</td><td className="text-right tabular-nums" data-testid="hours-scheduled">{scheduled ? `${scheduled.toFixed(2)} h` : "—"}</td></tr>
                             <tr><td>Clocked</td><td className="text-right tabular-nums" data-testid="hours-clocked">{mine.length ? `${clocked.toFixed(2)} h` : "—"}</td></tr>
                             <tr><td>Paid (hours above)</td><td className="text-right tabular-nums" data-testid="hours-paid">{paid.toFixed(2)} h</td></tr>
                           </tbody></table>
-                          <p className="mt-1 font-medium" data-testid="hours-approval-status">{state === "approved" ? `Approved ${approval!.hours.toFixed(2)} h (${approval!.basis}) · ${new Date(approval!.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : state === "changed" ? `Hours changed since you approved ${approval!.hours.toFixed(2)} h. Approve again.` : "Hours not approved yet"}</p>
-                          <div className="mt-1 flex flex-wrap gap-2">
-                            {mine.length > 0 && <button type="button" data-testid="approve-clocked" onClick={() => approve(clocked, "clocked")} className="min-h-11 rounded-md border border-teal-500/40 px-2 sm:min-h-8">Approve clocked</button>}
-                            {scheduled > 0 && <button type="button" data-testid="approve-scheduled" onClick={() => approve(scheduled, "scheduled")} className="min-h-11 rounded-md border border-teal-500/40 px-2 sm:min-h-8">Approve scheduled</button>}
-                            {paid > 0 && <button type="button" data-testid="approve-paid" onClick={() => approve(paid, "paid hours")} className="min-h-11 rounded-md border border-teal-500/40 px-2 sm:min-h-8">Approve paid hours</button>}
+                          <p className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${state === "approved" ? "cr-tone-good bg-emerald-50 text-emerald-800" : state === "changed" ? "bg-amber-200/70 text-amber-900 dark:bg-amber-500/25 dark:text-amber-100" : "bg-slate-100 text-slate-600 dark:bg-white/10"}`} data-testid="hours-approval-status">{state === "approved" ? `Approved ${approval!.hours.toFixed(2)} h (${approval!.basis}) · ${new Date(approval!.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : state === "changed" ? `Hours changed since you approved ${approval!.hours.toFixed(2)} h. Approve again.` : "Hours not approved yet"}</p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {mine.length > 0 && <button type="button" data-testid="approve-clocked" onClick={() => approve(clocked, "clocked")} className="min-h-11 rounded-lg border border-teal-500/50 px-3 font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">Approve clocked</button>}
+                            {scheduled > 0 && <button type="button" data-testid="approve-scheduled" onClick={() => approve(scheduled, "scheduled")} className="min-h-11 rounded-lg border border-teal-500/50 px-3 font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">Approve scheduled</button>}
+                            {paid > 0 && <button type="button" data-testid="approve-paid" onClick={() => approve(paid, "paid hours")} className="min-h-11 rounded-lg border border-teal-500/50 px-3 font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">Approve paid hours</button>}
                           </div>
                         </div>
                       );

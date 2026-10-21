@@ -210,7 +210,7 @@ export default function CalendarPage() {
           <span className="basis-full opacity-90 sm:basis-auto"><span className="hidden sm:inline">Drag a job to move it. Click a slot or job to edit.</span><span className="sm:hidden">Tap a job or time slot to edit or move it.</span></span>
         </div>
         {message && <p className="mt-3 rounded-lg border border-teal-500/30 px-3 py-2 text-sm" data-testid="calendar-message">{message}</p>}
-        {conflictNote && <p role="status" className="mt-2 rounded-lg border border-rose-500/40 px-3 py-2 text-sm" data-testid="calendar-conflict" data-state={conflictNote.state}>{conflictNote.text}</p>}
+        {conflictNote && <p role="status" className={`mt-2 rounded-xl border px-3 py-2.5 text-sm font-medium ${conflictNote.state === "moved" ? "cr-tone-teal border-teal-400 bg-teal-50 text-teal-900" : "cr-tone-warn border-amber-400 bg-amber-50 text-amber-900"}`} data-testid="calendar-conflict" data-state={conflictNote.state}>{conflictNote.text}</p>}
 
         {editing && editingDoc && (
           <div className="mt-4 rounded-2xl border border-teal-500/30 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5">

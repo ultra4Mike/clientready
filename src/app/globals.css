@@ -477,3 +477,18 @@ html.dark .cr-panel .text-emerald-700 { color: #6ee7b7 !important; }
 html.dark .cr-qr-btn { color: #99f6e4 !important; }
 html.dark .cr-qr-btn.cr-tone-good { color: #a7f3d0 !important; }
 html.dark .cr-qr-hint { color: #94a3b8 !important; border-color: rgba(148, 163, 184, 0.4) !important; background-color: rgba(148, 163, 184, 0.06) !important; }
+
+/* Scheduling conflicts: booked blocks striped, clashing ones muted red; Book anyway as danger outline */
+.cr-booked { background-image: repeating-linear-gradient(135deg, rgba(148,163,184,0.12) 0 6px, transparent 6px 12px); }
+.cr-booked-clash { background-image: repeating-linear-gradient(135deg, rgba(225,29,72,0.12) 0 6px, transparent 6px 12px); }
+html.dark .cr-booked-clash { color: #fda4af !important; border-color: rgba(244,63,94,0.55) !important; }
+html.dark .cr-tone-warn .cr-slot-chip { background-color: #14b8a6 !important; color: #042f2e !important; }
+html.dark .cr-tone-warn .cr-book-anyway, html.dark .cr-tone-warn .cr-book-anyway * { color: #fecdd3 !important; border-color: rgba(244,63,94,0.6) !important; }
+html.dark .cr-tone-warn [data-testid="hours-approval-status"] { background-color: rgba(245,158,11,0.3) !important; }
+html.dark .cr-tone-warn button { color: #fde68a !important; }
+/* Period switch: segmented control */
+.cr-seg { background-color: rgba(20,184,166,0.06); }
+html.dark .cr-seg button[aria-pressed="true"] { background-color: #14b8a6 !important; color: #042f2e !important; }
+/* Overdue stat in the bad tone when there is money overdue */
+html.dark .cr-stat-bad { background-color: rgba(127, 29, 29, 0.35) !important; border-color: rgba(244, 63, 94, 0.5) !important; }
+html.dark .cr-stat-bad p:nth-of-type(2) { color: #fda4af !important; }

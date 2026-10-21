@@ -73,14 +73,14 @@ export default function MileagePage() {
           <button type="button" data-testid="mileage-add" onClick={add} className="min-h-11 self-end rounded-lg bg-teal-500 px-4 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">Add trip</button>
           {error && <p role="alert" className="text-sm text-red-600 sm:col-span-6">{error}</p>}
         </div>
-        <div className="grid gap-3 rounded-2xl border border-teal-500/20 p-4 sm:grid-cols-2" data-testid="mileage-quick">
+        <div className="grid gap-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:grid-cols-2 sm:p-5" data-testid="mileage-quick">
           <div>
-            <label className="text-sm">Total miles today<input name="milesToday" data-testid="mileage-today" inputMode="decimal" className={input} value={quick.day} onChange={(e) => setQuick({ ...quick, day: e.target.value })} /></label>
-            <button type="button" data-testid="mileage-today-add" onClick={() => addQuick("daily")} className="mt-2 min-h-11 rounded-lg border border-teal-500/40 px-4 text-sm font-medium">Save today&apos;s total</button>
+            <label className="block text-sm font-medium text-[var(--cr-muted)]">Total miles today<input name="milesToday" data-testid="mileage-today" inputMode="decimal" className={input} value={quick.day} onChange={(e) => setQuick({ ...quick, day: e.target.value })} /></label>
+            <button type="button" data-testid="mileage-today-add" onClick={() => addQuick("daily")} className="mt-2 min-h-11 w-full rounded-lg border border-teal-500/50 px-4 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 sm:w-auto dark:text-teal-300">Save today&apos;s total</button>
           </div>
           <div>
-            <label className="text-sm">Total miles this week<input name="milesWeek" data-testid="mileage-week" inputMode="decimal" className={input} value={quick.week} onChange={(e) => setQuick({ ...quick, week: e.target.value })} /></label>
-            <button type="button" data-testid="mileage-week-add" onClick={() => addQuick("weekly")} className="mt-2 min-h-11 rounded-lg border border-teal-500/40 px-4 text-sm font-medium">Save this week&apos;s total</button>
+            <label className="block text-sm font-medium text-[var(--cr-muted)]">Total miles this week<input name="milesWeek" data-testid="mileage-week" inputMode="decimal" className={input} value={quick.week} onChange={(e) => setQuick({ ...quick, week: e.target.value })} /></label>
+            <button type="button" data-testid="mileage-week-add" onClick={() => addQuick("weekly")} className="mt-2 min-h-11 w-full rounded-lg border border-teal-500/50 px-4 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 sm:w-auto dark:text-teal-300">Save this week&apos;s total</button>
           </div>
           <p className="text-xs text-slate-500 sm:col-span-2">A total counts only miles not already logged that day or week (invoice miles and trips), so nothing is counted twice. Saving again replaces it.</p>
           {quickNote && <p role="status" className="text-sm sm:col-span-2" data-testid="mileage-quick-note">{quickNote}</p>}
@@ -90,7 +90,7 @@ export default function MileagePage() {
           <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200">
             {shown.map((trip) => (
               <li key={trip.id} data-testid={`trip-${trip.id}`} data-source={trip.source || "trip"} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
-                <span><span className="font-medium tabular-nums">{trip.date}{trip.until ? `–${trip.until}` : ""}</span> · {trip.source === "daily" || trip.source === "weekly" ? `${milesOf(trip)} mi total, adds ${addedMiles(trip, trips)} mi` : `${milesOf(trip)} mi`}{trip.source === "invoice" ? <span className="text-xs text-slate-500" data-testid="trip-from-invoice"> · from invoice</span> : null}{trip.from || trip.to ? ` · ${trip.from || "?"} → ${trip.to || "?"}` : ""}{trip.purpose ? ` · ${trip.purpose}` : ""}</span>
+                <span><span className="font-medium tabular-nums">{trip.date}{trip.until ? `–${trip.until}` : ""}</span> · {trip.source === "daily" || trip.source === "weekly" ? `${milesOf(trip)} mi total, adds ${addedMiles(trip, trips)} mi` : `${milesOf(trip)} mi`}{trip.source === "invoice" ? <span className="ml-1 rounded-full border border-teal-500/30 px-2 py-0.5 text-xs text-teal-700 dark:text-teal-300" data-testid="trip-from-invoice"> · from invoice</span> : null}{trip.from || trip.to ? ` · ${trip.from || "?"} → ${trip.to || "?"}` : ""}{trip.purpose ? ` · ${trip.purpose}` : ""}</span>
                 <button type="button" aria-label={`Delete trip on ${trip.date}`} className="min-h-11 px-2 text-slate-500" onClick={() => window.confirm("Delete this trip?") && setTrips(mileage.remove(trip.id))}>Delete</button>
               </li>
             ))}

@@ -241,7 +241,7 @@ export default function DashboardPage() {
             {!loaded ? "Loading…" : stats.paid === 0 ? "No payments yet" : `${stats.paidRate}% marked paid`}
           </p>
         </a>
-        <a href="/documents?filter=overdue" data-testid="stat-overdue" data-loading={loaded ? undefined : "true"} className="group block data-[loading=true]:pointer-events-none data-[loading=true]:animate-pulse rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5">
+        <a href="/documents?filter=overdue" data-testid="stat-overdue" data-loading={loaded ? undefined : "true"} className={`group block data-[loading=true]:pointer-events-none data-[loading=true]:animate-pulse rounded-2xl border ${stats.overdue > 0 ? "cr-stat-bad border-rose-400/50 bg-rose-50/60 dark:bg-rose-950/30" : "border-teal-500/15 bg-[var(--cr-card)]"} p-4 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:p-5`}>
           <div className="flex items-start justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Overdue</p>
             <IconWrap>!</IconWrap>
@@ -321,15 +321,15 @@ export default function DashboardPage() {
             )}
             {documents.length === 0 && loaded && <EmptyState icon="📄" title="No documents yet." line="Your recent invoices and proposals will show here." actionHref="/invoice" actionLabel="New invoice" />}
             {documents.slice(0, 5).map((doc) => (
-              <a key={doc.id} href={`/documents?q=${encodeURIComponent(doc.title || "")}`} className="flex items-center justify-between gap-3 border-b border-teal-500/10 px-5 py-3 text-sm transition last:border-b-0 hover:bg-teal-500/5">
-                <span className="min-w-0" data-testid="recent-doc" data-doc-id={doc.id}>
+              <a key={doc.id} href={`/documents?q=${encodeURIComponent(doc.title || "")}`} className="flex items-start justify-between gap-3 border-b border-teal-500/10 px-4 py-3.5 text-sm transition last:border-b-0 hover:bg-teal-500/5 sm:px-5">
+                <span className="min-w-0 space-y-0.5" data-testid="recent-doc" data-doc-id={doc.id}>
                   <span className="block truncate font-medium">{doc.title || "Untitled"}{doc.clientName && doc.clientName !== "No client" ? <span data-testid="recent-client"> · {doc.clientName}</span> : null}</span>
                   {(() => {
                     const first = (doc.data?.items || []).find((item) => String(item.description || "").trim()) || (doc.data?.items || [])[0];
                     const crew = crewNames(doc);
                     return (<>
-                      {first && <span className="block truncate text-xs" data-testid="recent-line">{String(first.description || "Item")}{first.rate ? ` · $${amountOf(first.rate).toFixed(2)}${amountOf(first.qty) !== 1 ? ` × ${first.qty}` : ""}` : ""}</span>}
-                      <span className="block truncate text-xs text-[var(--cr-muted)]" data-testid="recent-crew" data-crew-count={crew.length}>{crew.length ? `Crew: ${crew.join(", ")}` : "No employees scheduled"}</span>
+                      {first && <span className="block truncate text-xs tabular-nums text-slate-700 dark:text-slate-200" data-testid="recent-line">{String(first.description || "Item")}{first.rate ? ` · $${amountOf(first.rate).toFixed(2)}${amountOf(first.qty) !== 1 ? ` × ${first.qty}` : ""}` : ""}</span>}
+                      <span className={`block truncate text-xs ${crew.length ? "text-teal-700 dark:text-teal-300" : "italic text-[var(--cr-muted)]"}`} data-testid="recent-crew" data-crew-count={crew.length}>{crew.length ? `Crew: ${crew.join(", ")}` : "No employees scheduled"}</span>
                     </>);
                   })()}
                   <span className="block text-xs capitalize text-[var(--cr-muted)]">{doc.type} · {doc.createdAt}</span>
