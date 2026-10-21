@@ -613,7 +613,7 @@ export default function CrewPage() {
                   <span>{dayLabel(ymd(new Date(entry.started_at)))} · {clockTime(entry.started_at)} – {entry.ended_at ? clockTime(entry.ended_at) : "now"}{entry.edited_reason ? ` · edited: ${entry.edited_reason}` : ""}</span>
                   <span className="flex items-center gap-2">
                     <span className="tabular-nums">{fmtHours(entryHours(entry, now))}</span>
-                    {entry.id.startsWith("pending-") ? <span className="text-xs text-[var(--cr-muted)]" data-testid="clock-pending">Not sent yet</span> : <button type="button" className="text-xs font-medium text-teal-700 underline-offset-2 hover:underline dark:text-teal-300" onClick={() => setFixing({ id: entry.id, start: localInput(entry.started_at), end: localInput(entry.ended_at || new Date().toISOString()), reason: "" })}>Fix time</button>}
+                    {entry.id.startsWith("pending-") ? <span className="text-xs text-[var(--cr-muted)]" data-testid="clock-pending">Not sent yet</span> : <button type="button" data-testid="clock-fix-time" className="inline-flex min-h-11 min-w-11 items-center rounded-lg border border-teal-600/40 px-3 text-sm font-medium text-teal-700 dark:text-teal-300" onClick={() => setFixing({ id: entry.id, start: localInput(entry.started_at), end: localInput(entry.ended_at || new Date().toISOString()), reason: "" })}>Fix time</button>}
                   </span>
                 </li>
               ))}
@@ -893,7 +893,7 @@ export default function CrewPage() {
                 </fieldset>
                 <label className="block space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Notes</span><textarea id="report-notes" name="notes" className={`${input} min-h-16`} placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>
                 <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-teal-700/30 px-3 py-2 text-sm font-medium dark:border-teal-500/20"><input id="report-finished" name="finished" className="h-6 w-6 accent-teal-600" type="checkbox" checked={form.finished} onChange={(event) => setForm({ ...form, finished: event.target.checked })} /> Job is finished</label>
-                <button type="submit" data-testid="report-submit" disabled={busy !== ""} className="sticky bottom-3 min-h-11 w-full rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! shadow-lg transition hover:bg-teal-400">Send job report</button>
+                <button type="submit" data-testid="report-submit" disabled={busy !== ""} className="mt-2 min-h-12 w-full rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! shadow-lg transition hover:bg-teal-400">Send job report</button>
               </form>
             )}
             <h2 className="pt-2 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Reports you sent</h2>
