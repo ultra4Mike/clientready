@@ -1,3 +1,4 @@
+import { paySnapshot, readPaySettings } from "@/lib/pay-types";
 import { derivedWhen, isoDate } from "@/lib/job-when";
 import { readChecklist, type ChecklistItem } from "@/lib/checklist";
 import { supabase } from "@/lib/supabase";
@@ -27,11 +28,12 @@ export type Schedule = {
   /** "Book anyway" decisions: this person may overlap that other job (lib/conflicts). */
   overrides?: Override[];
 };
-export type Worker = { id: string; name: string; email?: string; phone?: string; role?: string; rate?: string; active?: boolean };
+export type Worker = { id: string; name: string; email?: string; phone?: string; role?: string; rate?: string; active?: boolean; paySettings?: unknown };
 /** The older per-job crew/pay rows (data.crew). */
 export type CrewRow = {
   id: string; employeeId: string; name: string; rate: string; hours: string; startTime: string; endTime: string;
   workDate: string; note: string; bonus: string; paidToWorker: boolean; paidDate: string;
+  payType?: "hourly" | "day" | "job"; fixedPay?: string; payOverride?: string;
 };
 
 export const STATUS_LABEL: Record<JobStatus, string> = { scheduled: "Scheduled", in_progress: "In progress", done: "Done" };
@@ -221,6 +223,8 @@ export function crewForWorkers(crew: CrewRow[], workerIds: string[], schedule: P
   const byId = new Map(people.map((person) => [person.id, person]));
   const added = workerIds.filter((id) => !have.has(id)).map((id) => ({
     id: `crew-${id}`, employeeId: id, name: byId.get(id)?.name || "Worker", rate: byId.get(id)?.rate || "",
+    // Pay type snapshot (fixed day / per job); hourly adds nothing, so default pay is unchanged.
+    ...paySnapshot(readPaySettings(byId.get(id)?.paySettings), byId.get(id)?.rate || ""),
     hours: "", startTime: schedule?.startTime || "", endTime: schedule?.endTime || "", workDate: schedule?.date || "",
     note: "", bonus: "", paidToWorker: false, paidDate: "",
   }));

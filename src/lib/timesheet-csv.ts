@@ -1,5 +1,6 @@
 // Owner-only timesheet CSV from crew clock entries. Hours only (no pay), one row per entry plus a total per worker.
 import { entryHours, type ClockEntry } from "@/lib/clock";
+import { overtimePremium, readPaySettings } from "@/lib/pay-types";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 export const localYmd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -22,7 +23,8 @@ export function csvCell(value: string | number) {
 
 type Job = { title: string; client: string };
 
-export function timesheetCsv(entries: ClockEntry[], from: string, to: string, names: Record<string, string>, jobs: Record<string, Job>) {
+/** `pay`: employee id -> pay settings. An "Overtime" column appears only when someone has overtime switched on. */
+export function timesheetCsv(entries: ClockEntry[], from: string, to: string, names: Record<string, string>, jobs: Record<string, Job>, pay: Record<string, unknown> = {}) {
   const rows = entries
     .filter((e) => {
       const d = localYmd(new Date(e.started_at));
@@ -33,15 +35,22 @@ export function timesheetCsv(entries: ClockEntry[], from: string, to: string, na
       const end = e.ended_at ? new Date(e.ended_at) : null;
       const worker = names[e.employee_id] || e.worker_name || e.worker_email || "Unknown";
       const job = jobs[e.doc_id] || { title: e.doc_id, client: "" };
-      return { worker, date: localYmd(start), start, end, job, hours: end ? entryHours(e) : null, edited: e.edited_reason || "" };
+      return { id: e.employee_id, worker, date: localYmd(start), start, end, job, hours: end ? entryHours(e) : null, edited: e.edited_reason || "" };
     })
     .sort((a, b) => a.worker.localeCompare(b.worker) || a.start.getTime() - b.start.getTime());
-  const lines = [["Worker", "Date", "Job", "Client", "Clock in", "Clock out", "Hours", "Edited"].join(",")];
+  const otOn = rows.some((r) => readPaySettings(pay[r.id]).overtime?.on);
+  const lines = [["Worker", "Date", "Job", "Client", "Clock in", "Clock out", "Hours", "Edited", ...(otOn ? ["Overtime"] : [])].join(",")];
+  const perWorker = new Map<string, { id: string; date: string; hours: number }[]>();
   const totals = new Map<string, number>();
   for (const r of rows) {
     lines.push([r.worker, r.date, r.job.title, r.job.client, localTime(r.start), r.end ? localTime(r.end) : "still clocked in", r.hours === null ? "" : r.hours.toFixed(2), r.edited].map(csvCell).join(","));
     totals.set(r.worker, (totals.get(r.worker) || 0) + (r.hours || 0));
+    perWorker.set(r.worker, [...(perWorker.get(r.worker) || []), { id: r.id, date: r.date, hours: r.hours || 0 }]);
   }
-  for (const [worker, h] of totals) lines.push([worker, "", "Total", "", "", "", h.toFixed(2), ""].map(csvCell).join(","));
+  for (const [worker, h] of totals) {
+    const list = perWorker.get(worker) || [];
+    const ot = otOn ? overtimePremium(list.map((x) => ({ date: x.date, hours: x.hours, rate: 0 })), readPaySettings(pay[list[0]?.id])).hours : 0;
+    lines.push([worker, "", "Total", "", "", "", h.toFixed(2), "", ...(otOn ? [ot.toFixed(2)] : [])].map(csvCell).join(","));
+  }
   return { csv: lines.join("\r\n") + "\r\n", count: rows.length };
 }

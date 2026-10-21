@@ -151,6 +151,7 @@ export async function loadAccountIntoCache(): Promise<boolean> {
         hireDate: row.hire_date || "",
         active: row.active !== false,
         rateHistory: row.rate_history || [],
+        paySettings: row.pay_settings || {},
       }))
     )
   );

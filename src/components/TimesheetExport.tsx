@@ -66,7 +66,13 @@ export default function TimesheetExport({ names }: { names: Record<string, strin
     } catch {
       // no local documents
     }
-    const { csv, count } = period === "all" ? timesheetCsv(entries, "0000-01-01", "9999-12-31", names, jobs) : timesheetCsv(entries, range.from, range.to, names, jobs);
+    const pay: Record<string, unknown> = {};
+    try {
+      for (const person of JSON.parse(window.localStorage.getItem("clientready-employees") || "[]")) if (person?.id) pay[person.id] = person.paySettings;
+    } catch {
+      // no cached team
+    }
+    const { csv, count } = period === "all" ? timesheetCsv(entries, "0000-01-01", "9999-12-31", names, jobs, pay) : timesheetCsv(entries, range.from, range.to, names, jobs, pay);
     if (!count) return setNote("No clock entries in those dates.");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
