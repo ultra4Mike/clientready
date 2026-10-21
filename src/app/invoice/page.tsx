@@ -21,6 +21,8 @@ import { getTrialState } from "@/lib/trial";
 import { priceSummary, PRICES_ARE_PLACEHOLDERS } from "@/lib/plans";
 import { syncClientContact } from "@/lib/client-sync";
 import { noteReviewAsked, reviewAskedAt, reviewMailHref, reviewMessage, reviewSmsHref } from "@/lib/review-request";
+import { jobProfit } from "@/lib/job-profit";
+import { JobProfitBreakdown } from "@/components/JobProfitBreakdown";
 import { crewReportTotal, profitAlerts, readMinMargin, readSetAside } from "@/lib/profit-alerts";
 import { readLateFeeSettings, suggestedLateFee, type LateFeeSettings } from "@/lib/late-fees";
 import { saveCrewJobs } from "@/lib/crew";
@@ -847,10 +849,12 @@ export default function NewInvoicePage() {
   const jobMath = useMemo(() => {
     const otherTotal = otherFees.reduce((sum, fee) => sum + money(fee.amount), 0);
     const jobCost = money(costs.parts) + money(costs.gas) + money(costs.labor) + money(costs.tools) + money(costs.lunch) + otherTotal;
-    const leftOver = totals.total - jobCost;
+    const labor = crew.length ? crew.reduce((sum, row) => sum + rowPay(row), 0).toFixed(2) : costs.labor;
+    const breakdown = jobProfit({ total: totals.total, data: { jobCosts: { ...costs, labor, otherFees }, payments, jobMiles, invoiceDate, schedule } });
+    const leftOver = breakdown.profit;
     const setAside = leftOver > 0 ? leftOver * ((Number(setAsidePercent) || 0) / 100) : 0;
-    return { jobCost, leftOver, setAside, yours: leftOver - setAside };
-  }, [costs, otherFees, totals.total, setAsidePercent]);
+    return { jobCost, breakdown, leftOver, setAside, yours: leftOver - setAside };
+  }, [costs, otherFees, totals.total, setAsidePercent, crew, payments, jobMiles, invoiceDate, schedule]);
   const jobAlerts = isProposal ? [] : profitAlerts({ total: totals.total, jobCost: jobMath.jobCost, crewTotal: crewReportTotal(crewReport), minMargin });
 
   const payUrl = payUrlFor(docPayLink, paymentLink);
@@ -1161,10 +1165,9 @@ export default function NewInvoicePage() {
               </Section>
               <label className="block text-sm">Cost notes<textarea className="mt-1.5 min-h-16 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={costs.notes} onChange={(event) => setCosts({ ...costs, notes: event.target.value })} /></label>
               <div className="space-y-1 text-sm">
-                <p>Job cost: ${jobMath.jobCost.toFixed(2)}</p>
+                <JobProfitBreakdown profit={jobMath.breakdown} />
                 {(costs.driveHours || costs.driveMinutes) && <p>Drive time: {costs.driveHours || "0"} hrs {costs.driveMinutes || "0"} min, not added to job cost</p>}
-                <p>You charge: ${totals.total.toFixed(2)}</p>
-                <p>Left over: ${jobMath.leftOver.toFixed(2)}</p>
+
                 <p>Set aside ({setAsidePercent}%): ${jobMath.setAside.toFixed(2)}</p>
                 <p className="font-semibold">Yours after set-aside: ${jobMath.yours.toFixed(2)}</p>
                 {jobAlerts.map((alert) => (

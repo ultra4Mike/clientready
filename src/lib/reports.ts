@@ -2,6 +2,7 @@ import { docAmounts } from "@/lib/doc-stage";
 import { readPayments } from "@/lib/payments";
 import { isPendingRecurringDraft } from "@/lib/recurring";
 import { uniqueDocs } from "@/lib/change-orders";
+import { jobProfit, type ProfitLine } from "@/lib/job-profit";
 
 type Doc = { id: string; type: string; title?: string; clientName?: string; createdAt?: string; data?: Record<string, unknown> };
 type CrewExpense = { amount?: unknown; created_at?: string };
@@ -38,7 +39,7 @@ export function ownerJobCost(data: Record<string, unknown> = {}) {
 }
 
 export type MonthRow = { month: number; billed: number; collected: number; jobCosts: number; crewReceipts: number };
-export type JobRow = { id: string; type: string; number: string; client: string; date: string; month: number; total: number; cost: number; profit: number; jobDate: string };
+export type JobRow = { id: string; type: string; number: string; client: string; date: string; month: number; total: number; cost: number; profit: number; jobDate: string; lines: ProfitLine[] };
 
 /**
  * One year by month. Billed: sent invoices by invoice date. Collected: payments by the date received.
@@ -67,9 +68,11 @@ export function buildReport(allDocs: Doc[], crewExpenses: CrewExpense[], year: s
     const when = yearMonth(data.invoiceDate || doc.createdAt);
     if (when?.year !== year) continue;
     const cost = ownerJobCost(data);
+    // Profit by job uses the one breakdown (adds card fees and mileage); month job costs stay the owner's entered costs.
+    const all = jobProfit({ total, data });
     months[when.month].billed += total;
     months[when.month].jobCosts += cost;
-    jobs.push({ id: doc.id, type: doc.type, number: String(data.invoiceNumber || doc.title || "Invoice"), client: doc.clientName || "No client", date: String(data.invoiceDate || doc.createdAt || ""), month: when.month, total, cost, profit: total - cost, jobDate: scheduledDay(data) });
+    jobs.push({ id: doc.id, type: doc.type, number: String(data.invoiceNumber || doc.title || "Invoice"), client: doc.clientName || "No client", date: String(data.invoiceDate || doc.createdAt || ""), month: when.month, total, cost: all.cost, profit: all.profit, jobDate: scheduledDay(data), lines: all.lines });
   }
   for (const item of crewExpenses) {
     const when = yearMonth(item.created_at);

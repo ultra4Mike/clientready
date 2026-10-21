@@ -1,5 +1,6 @@
 "use client";
 import { readSetAside } from "@/lib/profit-alerts";
+import { buildReport } from "@/lib/reports";
 
 import { crewKindLabel } from "@/lib/cost-categories";
 import { useEffect, useMemo, useState } from "react";
@@ -274,6 +275,7 @@ export default function YearPage() {
   }, [documents, employees, year]);
 
   const inYear = (doc: SavedDocument) => String(doc.data?.invoiceDate || doc.createdAt || "").includes(year);
+  const profitJobs = useMemo(() => buildReport(documents as never, [], year), [documents, year]);
   const extras = useMemo(() => {
     const invoices = documents.filter((doc) => doc.type === "invoice" && !isPendingRecurringDraft(doc) && (doc.data?.status || "draft") !== "draft" && inYear(doc));
     const split = { labor: 0, materials: 0, other: 0, tagged: 0 };
@@ -464,6 +466,18 @@ export default function YearPage() {
           {extras.receipts.length > 0 && <p className="mt-1 text-xs text-slate-500">Shown for your records. Not added to Expenses above, so nothing is counted twice if you also entered it as a job cost.</p>}
         </div>
 
+        <h2 className="mt-8 border-b border-slate-200 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-700">Profit by job</h2>
+        {profitJobs.jobs.length === 0 ? <p className="py-2 text-sm text-slate-500">No invoices sent in {year}.</p> : (
+          <table className="mt-1 w-full text-sm tabular-nums" data-testid="year-job-profit" data-profit={profitJobs.totals.profit.toFixed(2)}>
+            <thead><tr className="text-xs text-slate-500"><th className="py-1 text-left">Job</th><th className="py-1 text-right">Charged</th><th className="py-1 text-right" title="Materials, gas, crew pay, meals, other fees, card fees (est.) and mileage">All costs</th><th className="py-1 text-right">Profit</th></tr></thead>
+            <tbody>{profitJobs.jobs.map((job) => (
+              <tr key={job.id} data-testid="year-job" data-cost={job.cost.toFixed(2)} data-profit={job.profit.toFixed(2)} className="border-t border-slate-200 align-top">
+                <td className="py-1">{job.number} · {job.client}{job.lines.length > 0 && <span className="block text-xs text-slate-500">{job.lines.map((line) => `${line.label} $${line.amount.toFixed(2)}`).join(" · ")}</span>}</td>
+                <td className="py-1 text-right">${job.total.toFixed(2)}</td><td className="py-1 text-right">${job.cost.toFixed(2)}</td><td className="py-1 text-right font-semibold">${job.profit.toFixed(2)}</td>
+              </tr>))}</tbody>
+            <tfoot><tr className="border-t border-slate-300 font-semibold"><td className="py-1" colSpan={3}>Total profit after all costs</td><td className="py-1 text-right">${profitJobs.totals.profit.toFixed(2)}</td></tr></tfoot>
+          </table>
+        )}
         <h2 className="mt-8 border-b border-slate-200 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-700">Billed labor and materials</h2>
         <div data-testid="year-split">
           {extras.split.tagged === 0 ? <p className="mt-2 text-sm text-slate-500">No invoices with items marked Labor or Materials this year.</p> : (

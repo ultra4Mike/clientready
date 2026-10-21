@@ -117,7 +117,7 @@ export default function ReportsPage() {
                     <th className="px-2 py-1.5 text-left">Job</th>
                     <th className="px-2 py-1.5 text-left">Client</th>
                     <th className={cell}>Invoice total</th>
-                    <th className={cell}>Job cost</th>
+                    <th className={cell} title="Materials, gas, crew pay, meals, other fees, card fees (est.) and mileage">All costs</th>
                     <th className={cell}>Profit</th>
                   </tr>
                 </thead>
@@ -127,7 +127,7 @@ export default function ReportsPage() {
                       <td className="px-2 py-1.5"><Link href={`/invoice?id=${encodeURIComponent(job.id)}`} className="text-teal-600 hover:underline">{job.number}</Link> {job.jobDate ? <span className="whitespace-nowrap text-xs tabular-nums text-slate-500" data-testid="report-job-date" data-date={job.jobDate}>· Job {shortDay(job.jobDate)}</span> : <span className="text-xs text-slate-500">{MONTHS[job.month]}</span>}</td>
                       <td className="px-2 py-1.5">{job.client}</td>
                       <td className={cell}>{usd(job.total)}</td>
-                      <td className={cell}>{usd(job.cost)}</td>
+                      <td className={cell} title={job.lines.map((line) => `${line.label}: ${usd(line.amount)}`).join("\n") || "No costs entered"} data-testid="report-job-cost">{usd(job.cost)}</td>
                       <td className={cell}>{usd(job.profit)}</td>
                     </tr>
                   ))}
