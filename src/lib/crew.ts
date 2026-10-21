@@ -1,3 +1,4 @@
+import { rowPayMoney, type PayType } from "@/lib/pay-types";
 import { supabase } from "@/lib/supabase";
 
 type CrewRow = {
@@ -12,13 +13,12 @@ type CrewRow = {
   paidToWorker?: boolean;
   hoursFromClock?: boolean;
   clockMinutes?: number;
+  payType?: PayType;
+  fixedPay?: string;
+  payOverride?: string;
   startTime?: string;
   endTime?: string;
 };
-
-function money(value: string) {
-  return Number(String(value).replace(/[^0-9.-]/g, "")) || 0;
-}
 
 export async function saveCrewJobs(
   docId: string,
@@ -55,7 +55,7 @@ export async function saveCrewJobs(
       invoice_number: job.invoiceNumber,
       hours: row.hours,
       rate: row.rate,
-      pay: Math.round(((row.hoursFromClock && row.clockMinutes ? row.clockMinutes / 60 : money(row.hours)) * money(row.rate) + money(row.bonus || "")) * 100) / 100,
+      pay: rowPayMoney(row),
       note: row.note || "",
       client_name: job.clientName || "",
       client_phone: job.clientPhone || "",

@@ -15,6 +15,7 @@ import { StageEditor, StageSchedule } from "@/components/StageSchedule";
 import { balanceLabel, readStages, type Stage } from "@/lib/stages";
 import { useEffect, useMemo, useState } from "react";
 import { saveCloudDocument } from "@/lib/cloud-docs";
+import { paySnapshot, readPaySettings, rowPayMoney, type PayType } from "@/lib/pay-types";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
 import { getTrialState } from "@/lib/trial";
@@ -93,6 +94,9 @@ type CrewRow = {
   hoursFromClock?: boolean;
   /** R55: exact clocked minutes (pay uses these; only the money is rounded). */
   clockMinutes?: number;
+  payType?: PayType;
+  fixedPay?: string;
+  payOverride?: string;
 };
 type DocKind = "invoice" | "proposal";
 
@@ -130,9 +134,8 @@ function hoursBetween(start: string, end: string) {
   return (mins / 60).toFixed(2);
 }
 function rowPay(row: CrewRow) {
-  // R55: clock-fed hours pay on the exact minutes; round only the money.
-  const hours = row.hoursFromClock && row.clockMinutes ? row.clockMinutes / 60 : money(row.hours);
-  return Math.round((hours * money(row.rate) + money(row.bonus)) * 100) / 100;
+  // R55 + pay types: exact clocked minutes for hourly; fixed day / per job / owner override; money rounded once.
+  return rowPayMoney(row);
 }
 function toLocalInput(iso: string) {
   const date = new Date(iso);
@@ -568,6 +571,7 @@ export default function NewInvoicePage() {
     if (!allowCrewChange()) return;
     const nextCrew = [...crew, {
       id: `crew-${person.id}`, employeeId: person.id, name: person.name, rate: person.rate,
+      ...paySnapshot(readPaySettings((person as { paySettings?: unknown }).paySettings), person.rate),
       hours: "", startTime: schedule?.startTime || jobStart, endTime: schedule?.endTime || jobEnd, workDate: schedule?.date || invoiceDate, note: "", bonus: "", paidToWorker: false, paidDate: "",
     }];
     setCrew(nextCrew);
@@ -1149,6 +1153,7 @@ export default function NewInvoicePage() {
                       <label className="text-sm text-slate-900">Start<input type="time" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={row.startTime} onChange={(event) => updateCrew(row.id, { startTime: event.target.value })} /></label>
                       <label className="text-sm text-slate-900">End<input type="time" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={row.endTime} onChange={(event) => updateCrew(row.id, { endTime: event.target.value })} /></label>
                       <label className="text-sm text-slate-900 sm:col-span-2">Extra pay for this job<input className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="100" value={row.bonus} onChange={(event) => updateCrew(row.id, { bonus: event.target.value })} /></label>
+                      <label className="text-sm text-slate-900 sm:col-span-2">Override pay for this job <span className="text-xs text-slate-500">({row.payType === "day" ? `fixed day $${Number(row.fixedPay || 0).toFixed(2)}` : row.payType === "job" ? `set $${Number(row.fixedPay || 0).toFixed(2)} per job` : "hourly"}; leave blank to use it)</span><input data-testid={`crew-pay-override-${row.employeeId}`} inputMode="decimal" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={row.payOverride || ""} onChange={(event) => updateCrew(row.id, { payOverride: event.target.value })} /></label>
                     </div>
                     {(() => {
                       const mine = clockEntries.filter((entry) => entry.doc_id === docId && entry.employee_id === row.employeeId);
@@ -1197,6 +1202,7 @@ export default function NewInvoicePage() {
                             {mine.filter((entry) => crewFixReason(entry)).map((entry) => (
                               <tr key={`why-${entry.id}`} data-testid="hours-fix-reason"><td colSpan={2} className="text-xs"><span className="font-semibold">Crew fixed the time:</span> “{crewFixReason(entry)}”</td></tr>
                             ))}
+                            {(row.payType === "day" || row.payType === "job" || String(row.payOverride ?? "").trim()) && <tr data-testid="hours-pay-type"><td colSpan={2} className="text-xs">{String(row.payOverride ?? "").trim() ? `Pay overridden for this job: $${rowPay(row).toFixed(2)}` : row.payType === "day" ? `Fixed day: $${Number(row.fixedPay || 0).toFixed(2)} whatever the clock says` : `Set amount per job: $${Number(row.fixedPay || 0).toFixed(2)}`}. Hours are kept for records.</td></tr>}
                             <tr><td>Paid (hours above)</td><td className="text-right tabular-nums" data-testid="hours-paid">{paid.toFixed(2)} h</td></tr>
                           </tbody></table>
                           <p className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${state === "approved" ? "cr-tone-good bg-emerald-50 text-emerald-800" : state === "changed" ? "bg-amber-200/70 text-amber-900 dark:bg-amber-500/25 dark:text-amber-100" : "bg-slate-100 text-slate-600 dark:bg-white/10"}`} data-testid="hours-approval-status">{state === "approved" ? `Approved ${approval!.hours.toFixed(2)} h (${approval!.basis}) · ${new Date(approval!.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : state === "changed" ? `Hours changed since you approved ${approval!.hours.toFixed(2)} h. Approve again.` : "Hours not approved yet"}</p>
