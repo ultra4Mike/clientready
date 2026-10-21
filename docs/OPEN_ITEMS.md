@@ -158,4 +158,5 @@ Shared by the three ClientReady bots. Update the **Status** column when you pick
 | R90 | Proposal deposit request %. | Dev | Done local | 2026-10-21 |
 | R91 | Resend setup guide when app email is off. | Dev | Done local 3425fa3 | 2026-10-21 |
 | R92 | Invite to crew app button (+ /api/email/invite, mailto fallback). Fix time tap target; report Send bar not sticky. | Dev | Done local 67d3a25 | 2026-10-21 |
-| R94 | Crew email signed up as owner: pre-signup anon check, lower/trim is_crew_email, DB guard on profiles, recovery (migration 20261024110000). Live root cause unconfirmed (likely older live is_crew_email). | Dev | Done local b9ac932 | 2026-10-21 |
+| R94 | (Revised: no crew-to-owner bug, email was unconfirmed.) Check-your-email screen after sign-up; confirm link -> /auth/callback (crew -> /crew, owners -> dashboard); unconfirmed login shows Resend confirmation. Crew-detection changes reverted (4c0aae4). | Dev | Done local 159b372 | 2026-10-21 |
+| R95-R99 | Stripe: refunds (negative rows), async_payment_failed, USD-only/zero-decimal, matching checkout required (else parked), owner_id metadata, integer cents, Node >=22 (migration 20261024120000). | Dev | Done local 739065c | 2026-10-21 |
