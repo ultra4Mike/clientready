@@ -63,6 +63,13 @@ export async function removeQueued(id: string) {
   await run("readwrite", (store) => store.delete(id));
 }
 
+/** R41: the crew member chose Retry on a refused item: clear the error so the next send tries it again. */
+export async function retryQueued(item: QueueItem) {
+  const { lastError: _e, ...rest } = item;
+  void _e;
+  await save(rest as QueueItem);
+}
+
 async function save(item: QueueItem) {
   await run("readwrite", (store) => store.put(item));
 }

@@ -2,7 +2,7 @@
 
 import { checklistProgress, readChecklist, type ChecklistItem } from "@/lib/checklist";
 import { nativePhotoClick } from "@/lib/native-camera";
-import { confirmLogoutWithQueue, enqueue, flushQueue, isNetworkError, newUploadKey, queued, removeQueued, type QueueItem, type QueueKind } from "@/lib/photo-queue";
+import { confirmLogoutWithQueue, enqueue, flushQueue, isNetworkError, newUploadKey, queued, removeQueued, retryQueued, type QueueItem, type QueueKind } from "@/lib/photo-queue";
 import EmptyState from "@/components/EmptyState";
 import CrewDaysOff from "@/components/CrewDaysOff";
 import { CREW_KINDS, legacySummary, type CostLine, type CrewKind } from "@/lib/cost-categories";
@@ -701,7 +701,8 @@ export default function CrewPage() {
           const offline = offlineFlag || (mounted && navigator.onLine === false);
           const waiting = queue.filter((item) => !item.lastError).length;
           // Clock taps, checklist ticks, photos, expenses and reports all wait in the same phone queue.
-          const onPhone = waiting;
+          // R41: refused items still count as waiting (they are on this phone) until sent or discarded.
+          const onPhone = queue.length;
           if (!offline && !queue.length) return null;
           const state = offline ? "offline" : onPhone ? "waiting" : "failed";
           const statusLine = offline || onPhone > 0 ? (
@@ -722,7 +723,8 @@ export default function CrewPage() {
             {queue.filter((item) => item.lastError).map((item) => (
               <p key={item.id} className="cr-tone-bad flex flex-wrap items-center gap-2 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-rose-800" data-testid="crew-queue-failed" data-doc-id={item.docId}>
                 <span className="min-w-0 flex-1 basis-48">{item.kind === "done" ? "Done photos" : item.kind === "report" ? "Job report" : "Expense"} for {cards.find((card) => card.doc_id === item.docId)?.client_name || "a job"} couldn&apos;t be sent: {item.lastError}</span>
-                <button type="button" className="ml-auto inline-flex min-h-11 min-w-11 items-center rounded-lg border border-rose-400/60 px-4 font-semibold" data-testid="crew-queue-discard" onClick={() => removeQueued(item.id).then(() => refreshQueue())}>Discard</button>
+                <button type="button" className="ml-auto inline-flex min-h-11 min-w-11 items-center rounded-lg border border-teal-500/50 px-4 font-semibold" data-testid="crew-queue-item-retry" disabled={offline} onClick={() => retryQueued(item).then(() => { refreshQueue(); flush(); })}>Retry</button>
+                <button type="button" className="inline-flex min-h-11 min-w-11 items-center rounded-lg border border-rose-400/60 px-4 font-semibold" data-testid="crew-queue-discard" onClick={() => removeQueued(item.id).then(() => refreshQueue())}>Discard</button>
               </p>
             ))}
                 </div>
