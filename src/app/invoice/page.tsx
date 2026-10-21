@@ -1309,6 +1309,7 @@ export default function NewInvoicePage() {
                       return (
                         <div className="rounded-lg bg-slate-50 p-2 text-xs text-slate-700" data-testid={`clock-${row.employeeId}`}>
                           <p className="font-medium">Clocked {fmtHours(clocked)} ({mine.length} entr{mine.length === 1 ? "y" : "ies"}) · {row.hoursFromClock ? "hours above come from the clock" : "your typed hours are kept"}</p>
+                          {mine.some((entry) => entry.ended_at && Date.parse(entry.ended_at) - Date.parse(entry.started_at) < 60000) && <p className="mt-1 rounded bg-amber-50 px-2 py-1 text-amber-900" data-testid="clock-zero-warning">⚠ One entry is under a minute (0 minutes), likely a mis-tap. Use Fix time to correct it.</p>}
                           {mine.map((entry) => (
                             <div key={entry.id} className="mt-1 flex flex-wrap items-center gap-2" data-testid="owner-clock-entry">
                               <span>{new Date(entry.started_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} – {entry.ended_at ? new Date(entry.ended_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : <b className="text-amber-700">still clocked in</b>}</span>

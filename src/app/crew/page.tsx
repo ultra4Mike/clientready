@@ -407,6 +407,11 @@ export default function CrewPage() {
       navigator.onLine ? `${label}.` : `${label} on this phone at ${clockTime(at)}. It will send when you're back online.`);
     // R54: reload once more shortly after, so a just-closed entry can't leave other jobs stuck on "On another job".
     if (kind === "clock-out" && navigator.onLine) window.setTimeout(() => { void load(); }, 1500);
+    // R121: a clock-out within a minute of clocking in is almost always a mis-tap; say so (nothing is changed).
+    const started = clock.find((entry) => entry.doc_id === docId && !entry.ended_at)?.started_at;
+    if (kind === "clock-out" && started && Date.parse(at) - Date.parse(started) < 60000) {
+      setMessage("That time entry is under a minute (0 minutes). If it was a mis-tap, use Fix time on this job to correct it.");
+    }
   }
 
   async function markDone(card: Card) {
@@ -467,6 +472,15 @@ export default function CrewPage() {
     }
   }
 
+  // R121: crew can keep a report as a draft on this phone and send it later (receipts stay attached).
+  const draftKey = `cr-crew-report-draft:${email}`;
+  function saveReportDraft() {
+    try {
+      window.localStorage.setItem(draftKey, JSON.stringify({ form, costLines }));
+      setReportOpen(false);
+      setMessage("Draft saved on this phone. Open Job report to finish and send it.");
+    } catch { setMessage("Could not save the draft on this phone (no space)."); }
+  }
   async function saveDraft(event: FormEvent) {
     event.preventDefault();
     if (!form.clientName.trim() || !ownerId) return setMessage("Add who the job was for.");
@@ -490,6 +504,7 @@ export default function CrewPage() {
     setBusy("");
     if (result.error) { setForm(keptForm); setCostLines(keptLines); setReportOpen(true); return setMessage(result.error); }
     if (result.queued) return setMessage("Saved on this phone. The job report will send when you're back online.");
+    try { window.localStorage.removeItem(draftKey); } catch { /* none */ }
     setMessage("Job report sent. The owner will review it.");
     void load();
   }
@@ -852,7 +867,7 @@ export default function CrewPage() {
 
         {tab === "reports" && (
           <section className="space-y-3">
-            <button type="button" data-testid="report-open" onClick={() => { if (!reportOpen && !form.workDate) { const d = new Date(); setForm((f) => ({ ...f, workDate: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` })); } setReportOpen(!reportOpen); }} className={`min-h-11 w-full rounded-xl px-4 py-3 font-semibold transition ${reportOpen ? "border border-teal-700/40 hover:bg-teal-500/10 dark:border-teal-500/40" : "bg-teal-500 text-slate-950! shadow-sm hover:bg-teal-400"}`}>{reportOpen ? "Close" : "New job report"}</button>
+            <button type="button" data-testid="report-open" onClick={() => { if (!reportOpen) { try { const kept = JSON.parse(window.localStorage.getItem(draftKey) || "null"); if (kept?.form) { setForm(kept.form); if (Array.isArray(kept.costLines) && kept.costLines.length) setCostLines(kept.costLines); setMessage("Your saved draft is back. Send it when ready."); } } catch { /* none */ } } if (!reportOpen && !form.workDate) { const d = new Date(); setForm((f) => ({ ...f, workDate: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` })); } setReportOpen(!reportOpen); }} className={`min-h-11 w-full rounded-xl px-4 py-3 font-semibold transition ${reportOpen ? "border border-teal-700/40 hover:bg-teal-500/10 dark:border-teal-500/40" : "bg-teal-500 text-slate-950! shadow-sm hover:bg-teal-400"}`}>{reportOpen ? "Close" : "New job report"}</button>
             {reportOpen && (
               <form onSubmit={saveDraft} className={`${cardClass} space-y-3`}>
                 <label className="block space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Client</span><select id="report-savedClient" name="savedClient" aria-label="Saved client" className={input} onChange={(event) => { const client = clients.find((item) => item.id === event.target.value); if (client) setForm({ ...form, clientName: client.name, clientPhone: client.phone || "", clientAddress: client.address || "" }); }}>
@@ -896,6 +911,7 @@ export default function CrewPage() {
                 <label className="block space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Notes</span><textarea id="report-notes" name="notes" className={`${input} min-h-16`} placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>
                 <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-teal-700/30 px-3 py-2 text-sm font-medium dark:border-teal-500/20"><input id="report-finished" name="finished" className="h-6 w-6 accent-teal-600" type="checkbox" checked={form.finished} onChange={(event) => setForm({ ...form, finished: event.target.checked })} /> Job is finished</label>
                 <button type="submit" data-testid="report-submit" disabled={busy !== ""} className="mt-2 min-h-12 w-full rounded-xl bg-teal-500 px-4 py-3 font-semibold text-slate-950! shadow-lg transition hover:bg-teal-400">Send job report</button>
+                <button type="button" data-testid="report-save-draft" onClick={saveReportDraft} className="mt-2 min-h-11 w-full rounded-xl border border-teal-500/40 px-4 py-2.5 font-medium">Save as draft (not sent)</button>
               </form>
             )}
             <h2 className="pt-2 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Reports you sent</h2>
