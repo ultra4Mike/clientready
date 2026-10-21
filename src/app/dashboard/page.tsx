@@ -91,6 +91,10 @@ export default function DashboardPage() {
   // Needs Review items still open (null until NeedsReview has loaded and reported).
   const [reviewCount, setReviewCount] = useState<number | null>(null);
   const [loaded, setLoaded] = useState(false);
+  // Clock-dependent text (greeting, chart months) renders after mount only: the server runs in UTC, the
+  // owner's browser in their own zone, so rendering them on the server caused React #418 in the evening.
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => setNow(new Date()), []);
   const recurringReady = recurringDraftsReady(documents);
 
   useEffect(() => {
@@ -113,8 +117,8 @@ export default function DashboardPage() {
   }, []);
 
   const invoices = documents.filter((doc) => doc.type === "invoice");
-  const hour = new Date().getHours();
-  const hello =
+  const hour = now ? now.getHours() : -1;
+  const hello = hour < 0 ? "Hello" :
     hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
   const stats = useMemo(() => {
@@ -137,9 +141,8 @@ export default function DashboardPage() {
   }, [invoices]);
 
   const chart = useMemo(() => {
-    const now = new Date();
-    const points = [];
-    for (let i = 5; i >= 0; i -= 1) {
+    const points: { key: string; label: string; total: number }[] = [];
+    for (let i = 5; now && i >= 0; i -= 1) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
       const total = invoices
@@ -156,7 +159,7 @@ export default function DashboardPage() {
     }
     const max = Math.max(...points.map((item) => item.total), 1);
     return { points, max };
-  }, [invoices]);
+  }, [invoices, now]);
 
   const width = 1000;
   const height = 180;
