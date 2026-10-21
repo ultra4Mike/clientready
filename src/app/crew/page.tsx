@@ -171,6 +171,14 @@ export default function CrewPage() {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [tab, setTab] = useState<Tab>("today");
+  // Redesign 5: /crew?job=<doc id> opens one job's detail screen (no prices or pay).
+  const [detailId, setDetailId] = useState("");
+  useEffect(() => {
+    const read = () => setDetailId(new URLSearchParams(window.location.search).get("job") || "");
+    read();
+    window.addEventListener("popstate", read);
+    return () => window.removeEventListener("popstate", read);
+  }, []);
   const [now, setNow] = useState(0);
   const [today, setToday] = useState("");
   const [message, setMessage] = useState("");
@@ -523,7 +531,8 @@ export default function CrewPage() {
     void load();
   }
 
-  function jobCard(card: Card) {
+  function jobCard(card: Card) { return jobCardView(card, false); }
+  function jobCardView(card: Card, detail: boolean) {
     const status = (card.schedule_status || "scheduled") as JobStatus;
     const mine = clock.filter((entry) => entry.doc_id === card.doc_id);
     const running = mine.find((entry) => !entry.ended_at);
@@ -541,6 +550,7 @@ export default function CrewPage() {
               {card.start_time ? ` · ${timeLabel(card.start_time)}${card.end_time ? `–${timeLabel(card.end_time)}` : ""}` : ""}
             </p>
             <h3 className="mt-0.5 truncate text-lg font-bold tracking-tight">{card.client_name || card.invoice_number || "Job"}</h3>
+            {!detail && <a href={`/crew?job=${encodeURIComponent(card.doc_id)}`} data-testid={`crew-open-detail-${card.doc_id}`} className="cr-btn cr-btn-text -ml-2">Job details</a>}
           </div>
           {card.scheduled && <span data-testid={`job-state-${card.doc_id}`} className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${STATUS_CLASS[status]}`}>{status === "done" ? (card.done_confirmed ? "Done · confirmed" : "Done · awaiting confirmation") : STATUS_LABEL[status]}</span>}
         </div>
@@ -711,7 +721,7 @@ export default function CrewPage() {
           )}
         </div>
 
-        {card.payRow && (
+        {card.payRow && !detail && (
           <p className="mt-3 text-xs text-[var(--cr-muted)]">
             {card.payRow.hours ? `${card.payRow.hours} hrs on your pay sheet · ` : ""}
             {card.payRow.status === "paid" ? `Your pay $${Number(card.payRow.pay || 0).toFixed(2)}` : "Pay not confirmed yet"}
@@ -787,7 +797,35 @@ export default function CrewPage() {
           );
         })(offline)}
 
-        {tab === "today" && (
+        {detailId && (() => {
+          const card = cards.find((item) => item.doc_id === detailId);
+          if (!card) return <p className={cardClass} data-testid="crew-detail-missing">This job is not on your list. <a href="/crew" className="underline">Back to my jobs</a></p>;
+          const running = clock.find((entry) => entry.doc_id === card.doc_id && !entry.ended_at);
+          const otherOpen = clock.find((entry) => entry.doc_id !== card.doc_id && !entry.ended_at);
+          const phone = String(card.client_phone || "").replace(/[^0-9+]/g, "");
+          const mapUrl = card.client_address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(card.client_address)}` : "";
+          return (
+            <section className="space-y-3" data-testid="crew-detail" data-doc-id={card.doc_id}>
+              <a href="/crew" data-testid="crew-detail-back" className="cr-btn cr-btn-text">‹ My jobs</a>
+              <div className={cardClass}>
+                <h2 className="text-xl font-bold tracking-tight">{card.client_name || "Job"}</h2>
+                <p className="text-sm text-[var(--cr-muted)]">{card.job_date ? dayLabel(card.job_date) : "No date yet"}{card.start_time ? ` · ${timeLabel(card.start_time)}${card.end_time ? `–${timeLabel(card.end_time)}` : ""}` : ""}</p>
+                {card.client_address && <p className="mt-1 text-sm">{card.client_address}</p>}
+                {running
+                  ? <button type="button" disabled={busy !== ""} data-testid="crew-detail-clock-out" onClick={() => clockTap("clock-out", card.doc_id)} className="cr-btn mt-3 w-full bg-amber-500 py-4 text-lg text-slate-950!" style={{ minHeight: "3.75rem" }}>Clock out</button>
+                  : <button type="button" disabled={busy !== "" || Boolean(otherOpen) || Boolean(card.done_confirmed)} data-testid="crew-detail-start" onClick={() => clockTap("clock-in", card.doc_id)} className="cr-btn cr-btn-primary mt-3 w-full py-4 text-lg" style={{ minHeight: "3.75rem" }}>Start · Clock in</button>}
+                {otherOpen && !running && <p className="mt-1 text-xs text-[var(--cr-muted)]" data-testid="crew-detail-other-open">Clock out of your other job first.</p>}
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {mapUrl ? <a href={mapUrl} target="_blank" rel="noreferrer" data-testid="crew-detail-map" className="cr-btn cr-btn-secondary">Map</a> : <span className="cr-btn cr-btn-secondary opacity-50" aria-disabled="true">Map</span>}
+                  {phone ? <a href={`tel:${phone}`} data-testid="crew-detail-call" className="cr-btn cr-btn-secondary">Call</a> : <span className="cr-btn cr-btn-secondary opacity-50" aria-disabled="true">Call</span>}
+                  {phone ? <a href={`sms:${phone}`} data-testid="crew-detail-text" className="cr-btn cr-btn-secondary">Text</a> : <span className="cr-btn cr-btn-secondary opacity-50" aria-disabled="true">Text</span>}
+                </div>
+              </div>
+              {jobCardView(card, true)}
+            </section>
+          );
+        })()}
+        {!detailId && tab === "today" && (
           <section className="space-y-3">
             <h2 className="text-xl font-bold tracking-tight">{today ? dayLabel(today) : "Today"}</h2>
             {todayCards.length === 0 && <EmptyState icon={<Icon name="sun" className="h-6 w-6" />} title="Nothing scheduled for you today." className={`${cardClass} border-dashed`} />}
@@ -815,7 +853,7 @@ export default function CrewPage() {
                   <div className={cardClass} data-testid="crew-next-job" data-doc-id={next?.doc_id || ""}>
                     <h3 className="font-semibold">Next job</h3>
                     {next ? (
-                      <a href={`/crew/job?id=${encodeURIComponent(next.doc_id)}`} data-testid="crew-next-open" className="mt-1 flex min-h-11 flex-wrap items-center justify-between gap-2 text-sm">
+                      <a href={`/crew?job=${encodeURIComponent(next.doc_id)}`} data-testid="crew-next-open" className="mt-1 flex min-h-11 flex-wrap items-center justify-between gap-2 text-sm">
                         <span>{dayLabel(next.job_date)}{next.start_time ? ` · ${timeLabel(next.start_time)}` : ""} · {next.client_name}</span>
                         <span className="cr-btn cr-btn-secondary">Open</span>
                       </a>
@@ -825,7 +863,7 @@ export default function CrewPage() {
                     <h3 className="font-semibold">Recent jobs</h3>
                     {recent.length === 0 ? <p className="mt-1 text-sm text-[var(--cr-muted)]">No recent jobs yet.</p> : (
                       <ul className="mt-1 divide-y divide-teal-500/10 text-sm">
-                        {recent.map((row) => <li key={row.id} data-testid="crew-recent-job" data-doc-id={row.doc_id}><a href={`/crew/job?id=${encodeURIComponent(row.doc_id)}`} className="flex min-h-11 items-center justify-between gap-2"><span>{dayLabel(row.job_date)} · {row.client_name}</span><span className="text-xs text-[var(--cr-muted)]">{STATUS_LABEL[(row.schedule_status || "scheduled") as JobStatus] || ""}</span></a></li>)}
+                        {recent.map((row) => <li key={row.id} data-testid="crew-recent-job" data-doc-id={row.doc_id}><a href={`/crew?job=${encodeURIComponent(row.doc_id)}`} className="flex min-h-11 items-center justify-between gap-2"><span>{dayLabel(row.job_date)} · {row.client_name}</span><span className="text-xs text-[var(--cr-muted)]">{STATUS_LABEL[(row.schedule_status || "scheduled") as JobStatus] || ""}</span></a></li>)}
                       </ul>
                     )}
                   </div>
@@ -835,7 +873,7 @@ export default function CrewPage() {
           </section>
         )}
 
-        {tab === "week" && (
+        {!detailId && tab === "week" && (
           <section className="space-y-4">
             {weekDays.map((day) => {
               const list = weekCards.filter((card) => card.job_date === day);
@@ -879,7 +917,7 @@ export default function CrewPage() {
           </section>
         )}
 
-        {tab === "hours" && (
+        {!detailId && tab === "hours" && (
           <section className={cardClass} data-testid="my-hours">
             <h2 className="text-lg font-bold tracking-tight">My hours this week</h2>
             <p className="text-xs text-[var(--cr-muted)]">Clocked is from your clock in/out. Pay sheet is what your boss logged for pay.</p>
@@ -906,9 +944,9 @@ export default function CrewPage() {
           </section>
         )}
 
-        {tab === "hours" && <CrewDaysOff />}
+        {!detailId && tab === "hours" && <CrewDaysOff />}
 
-        {tab === "reports" && (
+        {!detailId && tab === "reports" && (
           <section className="space-y-3">
             <button type="button" data-testid="report-open" onClick={() => { if (!reportOpen) { try { const kept = JSON.parse(window.localStorage.getItem(draftKey) || "null"); if (kept?.form) { setForm(kept.form); if (Array.isArray(kept.costLines) && kept.costLines.length) setCostLines(kept.costLines); setMessage("Your saved draft is back. Send it when ready."); } } catch { /* none */ } } if (!reportOpen && !form.workDate) { const d = new Date(); setForm((f) => ({ ...f, workDate: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` })); } setReportOpen(!reportOpen); }} className={`min-h-11 w-full rounded-xl px-4 py-3 font-semibold transition ${reportOpen ? "border border-teal-700/40 hover:bg-teal-500/10 dark:border-teal-500/40" : "bg-teal-500 text-slate-950! shadow-sm hover:bg-teal-400"}`}>{reportOpen ? "Close" : "New job report"}</button>
             {reportOpen && (
