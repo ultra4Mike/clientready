@@ -32,6 +32,8 @@ import { currentDocId } from "@/lib/doc-sync";
 import { isQuotaError, readPhotos, type JobPhoto } from "@/lib/photos";
 import LineSplit from "@/components/LineSplit";
 import PayOptions from "@/components/PayOptions";
+import { mileage, saveInvoiceTrip } from "@/lib/mileage";
+import { readHoursApprovals, type HoursApproval } from "@/lib/hours-approval";
 import { markPaidChoices, readLocalPaymentMethods, type PaymentMethodsConfig } from "@/lib/payments/providers";
 import { completeMessage, mailHref, scheduledMessage } from "@/lib/job-messages";
 import { clientFromRow, readCachedClients } from "@/lib/client-rows";
@@ -172,6 +174,8 @@ export default function NewInvoicePage() {
   const [invoiceDate, setInvoiceDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [jobStart, setJobStart] = useState("");
+  const [jobMiles, setJobMiles] = useState("");
+  const [hoursApprovals, setHoursApprovals] = useState<Record<string, HoursApproval>>({});
   const [jobEnd, setJobEnd] = useState("");
   const [notes, setNotes] = useState("Payment is due within 14 days.");
   const [taxPercent, setTaxPercent] = useState("0");
@@ -378,6 +382,8 @@ export default function NewInvoicePage() {
       setInvoiceDate(data.invoiceDate || ymd(new Date()));
       setDueDate(data.dueDate || plusDays(14));
       setJobStart(data.jobStart || "");
+      setJobMiles(String((data as Record<string, unknown>).jobMiles ?? ""));
+      setHoursApprovals(readHoursApprovals((data as Record<string, unknown>).hoursApprovals));
       setJobEnd(data.jobEnd || "");
       setNotes(data.notes || (kind === "proposal" ? "This proposal is valid for 14 days." : "Payment is due within 14 days."));
       setTaxPercent(data.taxPercent || "0");
@@ -655,7 +661,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(stored?.data?.schedule ? { schedule: stored.data.schedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew, ...(crewReport ? { crewReport } : {}) },
+      data: { clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(stored?.data?.schedule ? { schedule: stored.data.schedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew, ...(crewReport ? { crewReport } : {}) },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -670,6 +676,12 @@ export default function NewInvoicePage() {
     }
     setDocId(cloudId);
     window.history.replaceState(null, "", `/invoice?id=${encodeURIComponent(cloudId)}`);
+    // Miles on this invoice feed the Mileage log as one trip (updated or removed with the invoice's value).
+    if (!isProposal) {
+      const tripDate = (stored?.data?.schedule as { date?: string } | undefined)?.date || invoiceDate || ymd(new Date());
+      saveInvoiceTrip(cloudId, { miles: jobMiles, date: tripDate, label: `Job ${invoiceNumber || "invoice"}${clientName ? ` · ${clientName}` : ""}`, previousId: localId });
+      void mileage.sync().catch(() => {});
+    }
     await saveCrewJobs(cloudId, {
       invoiceNumber,
       clientName,
@@ -944,7 +956,8 @@ export default function NewInvoicePage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="text-sm text-slate-600">{isProposal ? "Proposal date" : "Invoice date"}<input type="date" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} /></label>
               <label className="text-sm text-slate-600">{isProposal ? "Valid until" : "Due date"}<input type="date" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></label>
-              <label className="text-sm text-slate-600">Job start<input type="time" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={jobStart} onChange={(event) => setJobStart(event.target.value)} /></label>
+{!isProposal && <label className="text-sm text-slate-600">Miles driven for this job<input name="jobMiles" data-testid="job-miles" inputMode="decimal" placeholder="0" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500" value={jobMiles} onChange={(event) => setJobMiles(event.target.value)} /><span className="mt-1 block text-xs text-slate-500">Added to your Mileage log as one trip.</span></label>}
+                            <label className="text-sm text-slate-600">Job start<input type="time" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={jobStart} onChange={(event) => setJobStart(event.target.value)} /></label>
               <label className="text-sm text-slate-600">Job end<input type="time" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={jobEnd} onChange={(event) => setJobEnd(event.target.value)} /></label>
             </div>
             </Section>
@@ -1109,6 +1122,35 @@ export default function NewInvoicePage() {
                               <button type="button" onClick={() => setClockFix(null)} className="underline">Cancel</button>
                             </div>
                           )}
+                        </div>
+                      );
+                    })()}
+                    {(() => {
+                      // Hours approval: scheduled vs clocked vs paid. Approving a different number puts it in the pay hours (owner tap); nothing else changes.
+                      const mine = clockEntries.filter((entry) => entry.doc_id === docId && entry.employee_id === row.employeeId && entry.ended_at);
+                      const clocked = Math.round(mine.reduce((sum, entry) => sum + entryHours(entry), 0) * 100) / 100;
+                      const scheduled = Number(hoursBetween(schedule?.startTime || row.startTime, schedule?.endTime || row.endTime)) || 0;
+                      const paid = Number(row.hours) || 0;
+                      const approval = hoursApprovals[row.employeeId];
+                      const state = approval && !approval.revokedAt ? (Math.abs(approval.hours - paid) < 0.005 ? "approved" : "changed") : "pending";
+                      const approve = (hours: number, basis: HoursApproval["basis"]) => {
+                        if (Math.abs(hours - paid) >= 0.005) updateCrew(row.id, { hours: hours.toFixed(2) });
+                        setHoursApprovals((current) => ({ ...current, [row.employeeId]: { hours: Math.round(hours * 100) / 100, basis, at: new Date().toISOString() } }));
+                        setSaveMessage("Hours approved. Save the document to keep it.");
+                      };
+                      return (
+                        <div className="rounded-lg border border-slate-200 p-2 text-xs" data-testid={`hours-approval-${row.employeeId}`} data-state={state}>
+                          <table className="w-full"><tbody>
+                            <tr><td>Scheduled</td><td className="text-right tabular-nums" data-testid="hours-scheduled">{scheduled ? `${scheduled.toFixed(2)} h` : "—"}</td></tr>
+                            <tr><td>Clocked</td><td className="text-right tabular-nums" data-testid="hours-clocked">{mine.length ? `${clocked.toFixed(2)} h` : "—"}</td></tr>
+                            <tr><td>Paid (hours above)</td><td className="text-right tabular-nums" data-testid="hours-paid">{paid.toFixed(2)} h</td></tr>
+                          </tbody></table>
+                          <p className="mt-1 font-medium" data-testid="hours-approval-status">{state === "approved" ? `Approved ${approval!.hours.toFixed(2)} h (${approval!.basis}) · ${new Date(approval!.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : state === "changed" ? `Hours changed since you approved ${approval!.hours.toFixed(2)} h. Approve again.` : "Hours not approved yet"}</p>
+                          <div className="mt-1 flex flex-wrap gap-2">
+                            {mine.length > 0 && <button type="button" data-testid="approve-clocked" onClick={() => approve(clocked, "clocked")} className="min-h-11 rounded-md border border-teal-500/40 px-2 sm:min-h-8">Approve clocked</button>}
+                            {scheduled > 0 && <button type="button" data-testid="approve-scheduled" onClick={() => approve(scheduled, "scheduled")} className="min-h-11 rounded-md border border-teal-500/40 px-2 sm:min-h-8">Approve scheduled</button>}
+                            {paid > 0 && <button type="button" data-testid="approve-paid" onClick={() => approve(paid, "paid hours")} className="min-h-11 rounded-md border border-teal-500/40 px-2 sm:min-h-8">Approve paid hours</button>}
+                          </div>
                         </div>
                       );
                     })()}

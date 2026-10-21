@@ -1,3 +1,4 @@
+import { mergeHoursApprovals } from "@/lib/hours-approval";
 import { supabase } from "./supabase";
 import { allTombstones, flushDeletes, recordDelete } from "./doc-tombstones";
 import { markSynced, markUnsynced } from "./sync-status";
@@ -101,6 +102,12 @@ export async function saveCloudDocument(doc: CloudDoc) {
       const cloudSchedule = (current.data as Record<string, unknown> | null)?.schedule as { updatedAt?: string } | undefined;
       const mine = doc.data.schedule as { updatedAt?: string } | undefined;
       if (cloudSchedule && (!mine || Date.parse(cloudSchedule.updatedAt || "") > Date.parse(mine.updatedAt || ""))) doc.data.schedule = cloudSchedule;
+      // Hours approvals: newer decision per worker wins; an older offline copy can't undo one (Help R27).
+      const cloudApprovals = (current.data as Record<string, unknown> | null)?.hoursApprovals;
+      if (cloudApprovals || doc.data.hoursApprovals) {
+        const merged = mergeHoursApprovals(doc.data.hoursApprovals, cloudApprovals);
+        if (Object.keys(merged).length) doc.data.hoursApprovals = merged;
+      }
       // Card payments recorded by Stripe on the server are never dropped by a save from an older copy.
       const withStripe = keepStripePayments(doc.data, current.data as Record<string, unknown> | null);
       if (withStripe !== doc.data) Object.assign(doc.data, withStripe);
