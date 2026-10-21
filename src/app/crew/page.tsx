@@ -157,6 +157,8 @@ export default function CrewPage() {
   const [userId, setUserId] = useState("");
   const [email, setEmail] = useState("");
   const [offline, setOffline] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [name, setName] = useState("");
   const [ownerId, setOwnerId] = useState("");
@@ -402,6 +404,15 @@ export default function CrewPage() {
     }, navigator.onLine ? "Marked done. Your boss will confirm it." : "Saved on this phone with the photos. It will send when you're back online.");
   }
 
+  /** One tap: camera first, then the expense form opens with the receipt attached and the amount box focused. */
+  async function snapReceipt(docId: string, file: File | undefined) {
+    if (!file) return;
+    setSpend({ kind: "parts", amount: "", note: "", receipt: "" });
+    setSpendOpen(docId);
+    await pickReceipt(file);
+    window.setTimeout(() => document.querySelector<HTMLInputElement>(`[data-testid="expense-form-${docId}"] input[aria-label="Amount"]`)?.focus(), 0);
+  }
+
   async function pickReceipt(file: File | undefined) {
     if (!file) return;
     try {
@@ -627,9 +638,15 @@ export default function CrewPage() {
               </div>
             </div>
           ) : (
+            <div className="flex flex-wrap gap-2">
             <button type="button" data-testid={`add-expense-${card.doc_id}`} onClick={() => { setSpend({ kind: "parts", amount: "", note: "", receipt: "" }); setSpendOpen(card.doc_id); }} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-teal-800 transition hover:bg-teal-500/10 dark:text-teal-300">
               <Icon name="receipt" />Add expense / receipt
             </button>
+            <label data-testid={`snap-receipt-${card.doc_id}`} className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl border border-teal-500/30 px-3 text-sm font-medium transition hover:border-teal-400 hover:bg-teal-500/10">
+              <Icon name="camera" />Snap receipt
+              <input aria-label="Snap receipt for this job" type="file" accept="image/*" capture="environment" className="sr-only" data-testid={`snap-receipt-input-${card.doc_id}`} onClick={nativePhotoClick((files) => snapReceipt(card.doc_id, files[0]))} onChange={(event) => { void snapReceipt(card.doc_id, event.target.files?.[0]); event.target.value = ""; }} />
+            </label>
+            </div>
           )}
           {jobSpend.length > 0 && (
             <ul className="mt-2 space-y-1 text-sm text-[var(--cr-muted)]">
@@ -678,18 +695,41 @@ export default function CrewPage() {
 
       <div className="mx-auto max-w-3xl space-y-5 px-4 pt-5">
         {message && <p className="rounded-xl border border-teal-500/30 px-3 py-2 text-sm" role="status" data-testid="crew-message">{message}</p>}
-        {offline && <p className="cr-tone-warn flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-50 px-3 py-2.5 text-sm text-amber-900" role="status" data-testid="crew-offline"><span aria-hidden="true" className="mt-1.5 h-2 w-2 shrink-0 cr-dot-warn rounded-full bg-amber-500" /><span><strong className="font-semibold">Offline.</strong> Showing what was saved on this phone. Photos and expenses you add will send when you&apos;re back online.</span></p>}
-        {queue.length > 0 && (
-          <div className="space-y-2 rounded-xl border border-teal-500/30 bg-[var(--cr-panel)] p-3 text-sm" data-testid="crew-queue" data-count={queue.filter((item) => !item.lastError).length}>
-            {queue.some((item) => !item.lastError) && <p className="flex flex-wrap items-center gap-2"><span className="cr-tone-teal inline-flex items-center gap-1.5 rounded-full border border-teal-500/40 bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800"><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-teal-500" />{queue.filter((item) => !item.lastError).length} waiting to upload</span>{offline && <span className="text-xs opacity-75">Sends when back online</span>}{!offline && <button type="button" className="ml-auto inline-flex min-h-11 min-w-11 items-center rounded-lg bg-teal-600 px-4 font-semibold text-white hover:bg-teal-500" data-testid="crew-queue-retry" onClick={() => flush()}>Send now</button>}</p>}
+        {/* Backlog 7: one clear sync status for the phone: offline or not, and how much is still on this phone. */}
+        {((offlineFlag: boolean) => {
+          // The browser's own signal too, so a tap made after losing signal never shows "Send now".
+          const offline = offlineFlag || (mounted && navigator.onLine === false);
+          const waiting = queue.filter((item) => !item.lastError).length;
+          // Clock taps, checklist ticks, photos, expenses and reports all wait in the same phone queue.
+          const onPhone = waiting;
+          if (!offline && !queue.length) return null;
+          const state = offline ? "offline" : onPhone ? "waiting" : "failed";
+          const statusLine = offline || onPhone > 0 ? (
+                <p className="flex flex-wrap items-center gap-2">
+                  <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${offline ? "cr-dot-warn bg-amber-500" : "bg-teal-500"}`} />
+                  {offline
+                    ? <span data-testid="crew-offline"><strong className="font-semibold">Offline.</strong> Showing what was saved on this phone.{onPhone > 0 ? ` ${onPhone} item${onPhone === 1 ? "" : "s"} saved here will send when you're back online.` : " Anything you add will send when you're back online."}</span>
+                    : <span className="font-semibold" data-testid="crew-sync-waiting">{onPhone} waiting to send</span>}
+                  {!offline && waiting > 0 && <button type="button" className="ml-auto inline-flex min-h-11 min-w-11 items-center rounded-lg bg-teal-600 px-4 font-semibold text-white hover:bg-teal-500" data-testid="crew-queue-retry" onClick={() => flush()}>Send now</button>}
+                </p>
+              ) : null;
+          return (
+            <div role="status" data-testid="crew-sync" data-state={state} data-waiting={onPhone} className={`space-y-2 rounded-xl border p-3 text-sm ${offline ? "cr-tone-warn border-amber-500/40 bg-amber-50 text-amber-900" : "border-teal-500/30 bg-[var(--cr-panel)]"}`}>
+              {!queue.length && statusLine}
+              {queue.length > 0 && (
+                <div className="space-y-2" data-testid="crew-queue" data-count={waiting}>
+                {statusLine}
             {queue.filter((item) => item.lastError).map((item) => (
               <p key={item.id} className="cr-tone-bad flex flex-wrap items-center gap-2 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-rose-800" data-testid="crew-queue-failed" data-doc-id={item.docId}>
                 <span className="min-w-0 flex-1 basis-48">{item.kind === "done" ? "Done photos" : item.kind === "report" ? "Job report" : "Expense"} for {cards.find((card) => card.doc_id === item.docId)?.client_name || "a job"} couldn&apos;t be sent: {item.lastError}</span>
                 <button type="button" className="ml-auto inline-flex min-h-11 min-w-11 items-center rounded-lg border border-rose-400/60 px-4 font-semibold" data-testid="crew-queue-discard" onClick={() => removeQueued(item.id).then(() => refreshQueue())}>Discard</button>
               </p>
             ))}
-          </div>
-        )}
+                </div>
+              )}
+            </div>
+          );
+        })(offline)}
 
         {tab === "today" && (
           <section className="space-y-3">
