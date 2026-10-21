@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { clearLocalBusiness } from "@/lib/account-cache";
 import { disablePush } from "@/lib/push";
 import { isCrewUser } from "@/lib/crew";
+import ConflictToast from "@/components/ConflictToast";
 import SyncPill from "@/components/SyncPill";
 import { flushClientContactQueue } from "@/lib/client-sync";
 import MobileNav, { BOTTOM_LINKS, NAV_GROUPS } from "@/components/MobileNav";
@@ -153,6 +154,7 @@ export default function AppShell({
         </div>
       </div>
       <MobileNav onLogOut={logOut} />
+      <ConflictToast />
     </div>
   );
 }

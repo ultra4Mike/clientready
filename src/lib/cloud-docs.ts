@@ -1,3 +1,4 @@
+import { clockText, conflictsForDoc } from "./conflicts";
 import { mergeHoursApprovals } from "@/lib/hours-approval";
 import { supabase } from "./supabase";
 import { allTombstones, flushDeletes, recordDelete } from "./doc-tombstones";
@@ -70,6 +71,15 @@ export async function saveCloudDocument(doc: CloudDoc) {
   doc.data = doc.data || {};
   doc.data.updatedAt = new Date().toISOString();
   await materializeSchedule(doc);
+  // R112: every path that saves a time or crew (recurring, crew draft, duplicate/change order, API sync...)
+  // gets the same double-booking check; it is reported, never silently ignored.
+  try {
+    if (typeof window !== "undefined") {
+      const others = JSON.parse(window.localStorage.getItem("clientready-documents") || "[]") as { id: string; data?: Record<string, unknown> }[];
+      const clash = conflictsForDoc(others, doc as { id: string; data?: Record<string, unknown> });
+      if (clash.length) window.dispatchEvent(new CustomEvent("clientready-conflict", { detail: { docId: doc.id, lines: clash.map((c) => `${c.title} ${clockText(c.start)}–${clockText(c.end)}`) } }));
+    }
+  } catch { /* the check never blocks a save */ }
   const userId = await getUserId();
   if (!userId) {
     // Signed in but unreachable (offline / network error): remember to upload it later.
