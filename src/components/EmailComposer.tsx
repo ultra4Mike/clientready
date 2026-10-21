@@ -139,6 +139,17 @@ export default function EmailComposer(props: Props) {
       </div>
       {!ready && <p className="text-xs text-[var(--cr-muted)]">Add a valid email address, a subject and a message.</p>}
       {message && <p className="text-xs" data-testid="email-message" role="status">{message}</p>}
+      {enabled === false && (
+        <details className="rounded-lg border border-amber-400/50 bg-amber-400/10 p-3 text-sm" data-testid="email-setup-guide">
+          <summary className="min-h-11 cursor-pointer font-medium">Send from ClientReady instead? Set up app email</summary>
+          <ol className="mt-2 list-decimal space-y-1 pl-5">
+            <li>Make a free account at resend.com and add your domain (it shows the DNS records to add).</li>
+            <li>Create an API key in Resend.</li>
+            <li>In Vercel → Project → Settings → Environment Variables, add <code>RESEND_API_KEY</code> (the key) and <code>EMAIL_FROM</code> (e.g. <code>Your Business &lt;billing@yourdomain.com&gt;</code>), then redeploy.</li>
+          </ol>
+          <p className="mt-2 text-xs text-[var(--cr-muted)]">Until then, &quot;send in your email app&quot; works: it opens your own email with everything filled in.</p>
+        </details>
+      )}
       <p className="text-xs text-[var(--cr-muted)]">Nothing is sent until you click {enabled ? "Send email" : "send in your email app"}.{enabled === false ? " (Sending from the app is not set up, so this opens your email app.)" : ""}</p>
       {props.log.length > 0 && (
         <div className="border-t border-teal-500/20 pt-2 text-xs" data-testid="email-log">
