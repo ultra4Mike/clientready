@@ -9,7 +9,7 @@ import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { loadAccountIntoCache } from "@/lib/account-cache";
 import { amountOf, documentTotals } from "@/lib/discount";
-import { collectedOn } from "@/lib/doc-stage";
+import { cashCollected } from "@/lib/money";
 import { balanceDue, isOpenBalance, invoicePastDue, paidTotal, readPayments } from "@/lib/payments";
 import { uniqueDocs } from "@/lib/change-orders";
 import FollowUps from "@/components/FollowUps";
@@ -130,9 +130,16 @@ export default function DashboardPage() {
   const hello = hour < 0 ? "Hello" :
     hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
+  // R104: clients = saved clients plus names typed only on invoices/proposals (case-insensitive, once each).
+  const clientCount = useMemo(() => {
+    const names = new Set(clients.map((client) => String((client as { name?: string }).name || "").trim().toLowerCase()).filter(Boolean));
+    for (const doc of documents) { const name = String(doc.clientName || (doc.data as Record<string, unknown> | undefined)?.clientName || "").trim().toLowerCase(); if (name && name !== "no client") names.add(name); }
+    return names.size;
+  }, [clients, documents]);
+
   const stats = useMemo(() => {
     const paidDocs = invoices.filter((doc) => doc.data?.status === "paid");
-    const paid = invoices.reduce((sum, doc) => sum + collectedOn(doc), 0);
+    const paid = cashCollected(documents);
     const overdueDocs = invoices.filter((doc) => invoicePastDue(doc.data as Record<string, unknown>, invoiceTotal(doc), balance(doc)));
     const overdue = overdueDocs.reduce((sum, doc) => sum + balance(doc), 0);
     const outstanding = invoices.filter((doc) => isOpenBalance(doc.data?.status, balance(doc))).reduce((sum, doc) => sum + balance(doc), 0);
@@ -268,9 +275,9 @@ export default function DashboardPage() {
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Clients</p>
             <IconWrap>☺</IconWrap>
           </div>
-          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight group-data-[loading=true]:w-24 group-data-[loading=true]:rounded-md group-data-[loading=true]:bg-teal-500/15 group-data-[loading=true]:text-transparent sm:text-3xl">{loaded ? clients.length : "—"}</p>
+          <p className="mt-3 text-xl font-bold tabular-nums tracking-tight group-data-[loading=true]:w-24 group-data-[loading=true]:rounded-md group-data-[loading=true]:bg-teal-500/15 group-data-[loading=true]:text-transparent sm:text-3xl">{loaded ? clientCount : "—"}</p>
           <p className="mt-2 text-xs text-[var(--cr-muted)]">
-            {!loaded ? "Loading…" : clients.length === 0 ? "No clients added" : "Saved clients"}
+            {!loaded ? "Loading…" : clientCount === 0 ? "No clients added" : clientCount > clients.length ? "Saved + on invoices" : "Saved clients"}
           </p>
         </Link>
       </div>

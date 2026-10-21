@@ -1,5 +1,6 @@
 import { docAmounts } from "@/lib/doc-stage";
 import { jobWhen } from "@/lib/job-when";
+import { cashEntries } from "@/lib/money";
 import { readPayments } from "@/lib/payments";
 import { isPendingRecurringDraft } from "@/lib/recurring";
 import { uniqueDocs } from "@/lib/change-orders";
@@ -53,16 +54,6 @@ export function buildReport(allDocs: Doc[], crewExpenses: CrewExpense[], year: s
     if (doc.type !== "invoice" || isPendingRecurringDraft(doc)) continue;
     const data = doc.data || {};
     const { total } = docAmounts(doc);
-    const payments = readPayments(data).filter((payment) => money(payment.amount) > 0);
-    for (const payment of payments) {
-      const when = yearMonth(payment.date || data.invoiceDate || doc.createdAt);
-      if (when?.year === year) months[when.month].collected += money(payment.amount);
-    }
-    if (!payments.length && data.status === "paid") {
-      // Older invoices marked paid without an amount: the whole total, as on the year packet.
-      const when = yearMonth(data.paymentDate || data.invoiceDate || doc.createdAt);
-      if (when?.year === year) months[when.month].collected += total;
-    }
     if (String(data.status || "draft") === "draft") continue;
     const when = yearMonth(data.invoiceDate || doc.createdAt);
     if (when?.year !== year) continue;
@@ -72,6 +63,11 @@ export function buildReport(allDocs: Doc[], crewExpenses: CrewExpense[], year: s
     months[when.month].billed += total;
     months[when.month].jobCosts += cost;
     jobs.push({ id: doc.id, type: doc.type, number: String(data.invoiceNumber || doc.title || "Invoice"), client: doc.clientName || "No client", date: String(data.invoiceDate || doc.createdAt || ""), month: when.month, total, cost: all.cost, profit: all.profit, jobDate: scheduledDay(data), lines: all.lines });
+  }
+  // R104: collected = the shared cash-basis entries (refunds, deposits, legacy paid), by payment date.
+  for (const entry of cashEntries(docs)) {
+    const when = yearMonth(entry.date);
+    if (when?.year === year) months[when.month].collected += entry.amount;
   }
   for (const item of crewExpenses) {
     const when = yearMonth(item.created_at);

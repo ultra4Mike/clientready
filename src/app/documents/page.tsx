@@ -15,7 +15,8 @@ import DuplicateNumbers from "@/components/DuplicateNumbers";
 import { copyDocData } from "@/lib/doc-copy";
 import { nextFreeNumber } from "@/lib/doc-numbers";
 import { documentTotals } from "@/lib/discount";
-import { collectedOn, documentStage, NEXT_LABEL, STAGE_LABEL } from "@/lib/doc-stage";
+import { cashCollected } from "@/lib/money";
+import { documentStage, NEXT_LABEL, STAGE_LABEL } from "@/lib/doc-stage";
 import { displayStatus } from "@/lib/doc-status";
 import PeriodToggle from "@/components/PeriodToggle";
 import { inPeriod, periodRange, type PeriodRange } from "@/lib/period";
@@ -218,9 +219,10 @@ export default function DocumentsPage() {
       const info = factsById.get(doc.id) || facts(doc);
       const status = String(doc.data?.status || "draft");
       if (status === "draft" || !inPeriod(info.date, from, to)) continue;
-      count += 1; billed += info.total; owed += info.owed; paid += collectedOn(doc);
+      count += 1; billed += info.total; owed += info.owed; 
       if (invoicePastDue(doc.data, info.total, info.owed)) overdue += info.owed;
     }
+    paid = cashCollected(documents, from, to); // R104: cash basis, by payment date
     return { count, billed, owed, overdue, paid };
   }, [documents, factsById, fromDate, toDate]);
 
