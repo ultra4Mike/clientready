@@ -139,9 +139,11 @@ export function isOpenBalance(status: unknown, owed: number) {
 export const METHOD_LABEL: Record<string, string> = { Bank: "Bank transfer (ACH)", Card: "Credit/debit card", "Card (Stripe)": "Card (Stripe)" };
 export const methodLabel = (method: unknown) => METHOD_LABEL[String(method || "")] || String(method || "");
 
-export function paymentRequirement(status: unknown, payments: Payment[], legacyPaid = false) {
+export function paymentRequirement(status: unknown, payments: Payment[], legacyPaid = false, saved: Payment[] = []) {
   const withAmount = payments.filter((payment) => (Number(payment.amount) || 0) > 0);
-  if (withAmount.some((payment) => !String(payment.method || "").trim())) return "Choose how each payment was made (Method) before saving.";
+  // Rows already saved without a method (older invoices, the server's legacy card row) are left alone unless edited (Help R30).
+  const untouched = (payment: Payment) => saved.some((old) => old.id === payment.id && String(old.amount) === String(payment.amount) && !String(old.method || "").trim());
+  if (withAmount.some((payment) => !String(payment.method || "").trim() && !untouched(payment))) return "Choose how each payment was made (Method) before saving.";
   if (String(status) === "paid" && !legacyPaid && !withAmount.length) return "To mark this invoice Paid, add a payment with the amount and how it was paid, or use Mark paid.";
   return "";
 }
