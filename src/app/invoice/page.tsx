@@ -354,20 +354,42 @@ export default function NewInvoicePage() {
         setInvoiceDate(ymd(new Date()));
         setDueDate(plusDays(14));
         setNotes(kind === "proposal" ? "This proposal is valid for 14 days." : "Payment is due within 14 days.");
-        // Crew job report opened from /drafts. Costs are NOT copied into job costs; they show next to the estimate.
+        // Crew job report opened from /drafts (R82: costs go into Job costs; client carried; one invoice per report).
         const draftRaw = window.localStorage.getItem("clientready-open-draft");
         if (draftRaw) {
           window.localStorage.removeItem("clientready-open-draft");
           const draft = JSON.parse(draftRaw) as Record<string, unknown>;
           const text = (key: string) => String(draft[key] || "");
+          // R82: one crew report makes one invoice. If it was opened before, open that invoice again.
+          const savedDocs = raw ? (JSON.parse(raw) as SavedDocument[]) : [];
+          const linked = savedDocs.find((item) => (text("opened_doc_id") && item.id === text("opened_doc_id")) || ((item.data as Record<string, unknown> | undefined)?.crewReport as { draftId?: string } | undefined)?.draftId === text("id"));
+          if (linked) { window.location.replace(`/invoice?id=${encodeURIComponent(linked.id)}`); return; }
           setClientName(text("client_name")); setClientSearch(text("client_name")); setClientPhone(text("client_phone")); setClientAddress(text("client_address"));
+          // R82: carry the saved client (by name, else phone) so the invoice is linked to them.
+          const key = (value: unknown) => String(value || "").trim().toLowerCase();
+          const digits = (value: unknown) => String(value || "").replace(/\D/g, "");
+          const known = readCachedClients().find((client) => key(client.name) && key(client.name) === key(text("client_name"))) || readCachedClients().find((client) => digits(client.phone).length >= 7 && digits(client.phone) === digits(text("client_phone")));
+          if (known?.id) {
+            setClientId(known.id); setClientName(known.name || text("client_name")); setClientSearch(known.name || text("client_name"));
+            setClientCompany(known.company || ""); setClientEmail(known.email || "");
+            setClientPhone(text("client_phone") || known.phone || ""); setClientAddress(text("client_address") || known.address || "");
+          }
           if (text("work_date")) setInvoiceDate(text("work_date"));
           setJobStart(text("start_time")); setJobEnd(text("end_time"));
           setItems([{ ...emptyItem, description: text("work_done") || "Job", qty: "1", rate: "" }]);
-          setCosts((current) => ({ ...current, driveHours: text("drive_hours"), driveMinutes: text("drive_minutes"), notes: [text("notes"), text("collected_amount") ? `Collected ${text("collected_amount")} ${text("collected_method")}` : ""].filter(Boolean).join("\n") }));
           const lines = readCostLines(draft);
-          if (lines.length) setCrewReport({ draftId: text("id"), worker: text("worker_name"), lines: lines.map(({ receipt, ...line }) => ({ ...line, ...(receipt ? { hasReceipt: true } : {}) })) });
-          setSaveMessage("Crew report loaded. Set the price, then save. Crew costs are listed under Job costs for you to use or skip.");
+          // R82: crew-reported costs go straight into Job costs (same math as "Use crew amounts").
+          const byKind = new Map<CrewKind, number>();
+          for (const line of lines) byKind.set(line.kind as CrewKind, (byKind.get(line.kind as CrewKind) || 0) + Number(line.amount || 0));
+          let n = 0;
+          let applied: CostFields & { otherFees: OtherFee[] } = { ...emptyCosts, otherFees: [] };
+          for (const [kind, amount] of byKind) if (amount > 0) applied = applyCrewAmount(applied, kind, amount, () => `${Date.now()}-${n++}`) as typeof applied;
+          const { otherFees: crewFees, ...crewCosts } = applied;
+          setCosts((current) => ({ ...current, ...crewCosts, driveHours: text("drive_hours"), driveMinutes: text("drive_minutes"), notes: [text("notes"), text("collected_amount") ? `Collected ${text("collected_amount")} ${text("collected_method")}` : ""].filter(Boolean).join("\n") }));
+          if (crewFees.length) setOtherFees(crewFees as OtherFee[]);
+          // Always remember the report (even with no costs), so saving links it and a retry can't duplicate it.
+          setCrewReport({ draftId: text("id"), worker: text("worker_name"), lines: lines.map(({ receipt, ...line }) => ({ ...line, ...(receipt ? { hasReceipt: true } : {}) })) });
+          setSaveMessage("Crew report loaded. Crew costs are in Job costs. Set the price, then save.");
         }
         return;
       }
@@ -1242,7 +1264,7 @@ export default function NewInvoicePage() {
                 {jobAlerts.map((alert) => (
                   <p key={alert.kind} role="status" data-testid="profit-alert" data-kind={alert.kind} className={`rounded-lg border px-3 py-2 text-sm ${alert.kind === "loss" ? "border-rose-400/60 bg-rose-50 text-rose-800" : "border-amber-400/60 bg-amber-50 text-amber-900"}`}>⚠ {alert.text}</p>
                 ))}
-                <CrewSpend docId={docId} estimate={{ ...costs, otherFees }} report={crewReport} locked={locked} onUse={useCrewAmounts} />
+                <CrewSpend docId={docId} estimate={{ ...costs, otherFees }} report={crewReport?.lines.length ? crewReport : null} locked={locked} onUse={useCrewAmounts} />
               </div>
             </Section>
             <Section id="schedule" label="Schedule" className="print-hide space-y-3 rounded-xl border border-slate-200 p-4 text-sm sm:p-5" testId="schedule-section">
@@ -1492,7 +1514,7 @@ function readCrewReport(value: unknown): CrewReport | null {
   const raw = (value || null) as Partial<CrewReport> | null;
   if (!raw || !Array.isArray(raw.lines)) return null;
   const lines = raw.lines.filter((line) => line && isCrewKind(line.kind) && Number(line.amount) > 0).map((line) => ({ kind: line.kind, amount: String(line.amount), note: String(line.note || ""), ...(line.hasReceipt ? { hasReceipt: true } : {}) }));
-  return lines.length ? { draftId: String(raw.draftId || ""), worker: String(raw.worker || ""), lines } : null;
+  return lines.length || raw.draftId ? { draftId: String(raw.draftId || ""), worker: String(raw.worker || ""), lines } : null;
 }
 
 /** Owner only: what the crew spent per category next to the cost estimate. Changes job costs only when the owner taps "Use crew amount" / "Add all". */

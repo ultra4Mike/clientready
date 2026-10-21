@@ -53,6 +53,9 @@ export default function DraftsPage() {
   }
 
   function openAsInvoice(draft: Draft) {
+    // R82: never a second invoice from the same report.
+    const existing = existingInvoice(draft);
+    if (existing?.id) { window.location.href = `/invoice?id=${encodeURIComponent(existing.id)}`; return; }
     // Receipts stay on the report (too big to hand over); the invoice only notes that one exists.
     const lines = readCostLines(draft).map(({ receipt, ...line }) => ({ ...line, ...(receipt ? { receipt: "1" } : {}) }));
     window.localStorage.setItem("clientready-open-draft", JSON.stringify({ ...draft, costs: lines }));
