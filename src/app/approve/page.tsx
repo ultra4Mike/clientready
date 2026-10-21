@@ -31,6 +31,14 @@ const text = (value: unknown) => (typeof value === "string" ? value : "");
  * Public, no-login page behind an approval link (?t=) or a client portal link (?p=&d=).
  * Read-only, plus Approve (portal: with an optional drawn/typed signature) and card payment.
  */
+/** R52: "14:30" -> "2:30 PM" on customer links. */
+function time12(value: string) {
+  const m = /^(\d{1,2}):(\d{2})/.exec(value);
+  if (!m) return value;
+  const h = Number(m[1]);
+  return `${h % 12 || 12}:${m[2]} ${h < 12 ? "AM" : "PM"}`;
+}
+
 export default function ApprovePage() {
   const [token, setToken] = useState("");
   const [doc, setDoc] = useState<PublicDoc | null>(null);
@@ -223,7 +231,7 @@ export default function ApprovePage() {
 
           {visit && visit.date && (
             <p data-testid="link-visit" data-status={visit.status} className="mt-4 rounded-lg border border-teal-500/30 bg-teal-50 px-3 py-2 text-sm text-slate-800">
-              <span className="font-semibold">{visit.status === "done" ? "Visit done" : "Your visit"}:</span> {new Date(`${visit.date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}{visit.startTime ? ` · ${visit.startTime}${visit.endTime ? `–${visit.endTime}` : ""}` : ""}
+              <span className="font-semibold">{visit.status === "done" ? "Visit done" : "Your visit"}:</span> {new Date(`${visit.date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}{visit.startTime ? ` · ${time12(visit.startTime)}${visit.endTime ? `–${time12(visit.endTime)}` : ""}` : ""}
             </p>
           )}
           <div className="mt-6 divide-y divide-slate-100 border-t border-slate-200" data-testid="approve-items">

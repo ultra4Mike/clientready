@@ -1,71 +1,56 @@
 /**
- * Backlog 13: optional automations. Every switch is OFF until the owner turns it on in Profile.
- * There is no server cron: they run when the owner's app opens the dashboard (like recurring drafts).
- * Each send goes through the owner's email setup (/api/email/send) and is logged on the invoice
- * (emailLog + autoSent), so it never repeats by accident. Money fields are never changed.
+ * Backlog 13: optional automations, every switch OFF until the owner turns it on in Profile. They run
+ * when the owner's app opens the dashboard. The app only asks; /api/email/send rebuilds the templated
+ * email from the saved invoice, claims (doc, kind, period) on the server first (R46: two devices or a
+ * reload can't double send), checks limits, and sends only to the invoice's client.
  */
-import { sendEmail, logEmail, emailSendingEnabled } from "@/lib/email";
-import { docAmounts } from "@/lib/doc-stage";
-import { invoicePastDue } from "@/lib/payments";
-import { reviewMessage } from "@/lib/review-request";
-import { clientOptedOut } from "@/lib/review-request";
+import { supabase } from "@/lib/supabase";
+import { logEmail, emailSendingEnabled } from "@/lib/email";
+import { planOne, sentKeys, type AutoDoc, type AutoPlan, type Automations } from "@/lib/automation-email";
+export { AUTOMATIONS_OFF, readAutomations, LATE_REMINDER_DAYS, LATE_REMINDER_MAX } from "@/lib/automation-email";
+export type { Automations, AutoPlan } from "@/lib/automation-email";
+import { readAutomations } from "@/lib/automation-email";
 
-export type Automations = { doneEmailInvoice: boolean; doneIncludeReview: boolean; lateReminderEmail: boolean };
-export const AUTOMATIONS_OFF: Automations = { doneEmailInvoice: false, doneIncludeReview: false, lateReminderEmail: false };
-export const LATE_REMINDER_DAYS = 7;
-export const LATE_REMINDER_MAX = 3;
+type Client = { id?: string; name?: string; reviewOptOut?: boolean; autoEmailOptOut?: boolean };
 
-export function readAutomations(value: unknown): Automations {
-  const v = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
-  return { doneEmailInvoice: v.doneEmailInvoice === true, doneIncludeReview: v.doneIncludeReview === true, lateReminderEmail: v.lateReminderEmail === true };
+function localToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-type Doc = { id: string; type: string; title?: string; clientName?: string; data?: Record<string, unknown> };
-export type AutoSent = { done?: string; late?: string[] };
-export type AutoPlan = { docId: string; kind: "done" | "late"; to: string; subject: string; text: string };
-
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-export function readAutoSent(value: unknown): AutoSent {
-  const v = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
-  return { ...(typeof v.done === "string" ? { done: v.done } : {}), ...(Array.isArray(v.late) ? { late: v.late.map(String) } : {}) };
+export function clientFor(clients: Client[], data: Record<string, unknown>, name: string) {
+  const id = String(data.clientId || ""); const n = name.trim().toLowerCase();
+  return clients.find((c) => (id && c.id === id) || (!id && n && String(c.name || "").trim().toLowerCase() === n)) || null;
 }
 
 /** Pure: which emails the switches would send now. */
-export function planAutomations(docs: Doc[], settings: Automations, ctx: { business: string; reviewLink: string; origin: string; now?: Date }): AutoPlan[] {
-  const now = ctx.now || new Date();
+export function planAutomations(docs: AutoDoc[], settings: Automations, ctx: { business: string; reviewLink: string; origin: string; today?: string; clients?: Client[] }): AutoPlan[] {
   const out: AutoPlan[] = [];
   for (const doc of docs) {
-    if (doc.type !== "invoice" || !UUID.test(doc.id)) continue;
-    const data = doc.data || {};
-    const to = String(data.clientEmail || "").trim();
-    if (!EMAIL.test(to)) continue;
-    const { total, owed } = docAmounts(doc as never);
-    if (!(owed > 0.004) || String(data.status || "draft") === "paid") continue;
-    const sent = readAutoSent(data.autoSent);
-    const number = String(data.invoiceNumber || doc.title || "your invoice");
-    const token = String(((data.approval || {}) as { token?: unknown }).token || "");
-    const link = token ? `${ctx.origin}/approve?t=${encodeURIComponent(token)}` : "";
-    const first = String(doc.clientName || data.clientName || "").trim().split(/\s+/)[0] || "there";
-    const schedule = (data.schedule || {}) as { status?: unknown; confirmedAt?: unknown };
-    if (settings.doneEmailInvoice && schedule.status === "done" && schedule.confirmedAt && !sent.done) {
-      const review = settings.doneIncludeReview && ctx.reviewLink.trim() && !clientOptedOut(String(data.clientId || ""), String(doc.clientName || ""))
-        ? `\n\n${reviewMessage(String(doc.clientName || ""), ctx.business, ctx.reviewLink, false)}` : "";
-      out.push({ docId: doc.id, kind: "done", to, subject: `Invoice ${number} from ${ctx.business}`,
-        text: `Hi ${first},\n\nThe job is done. Invoice ${number} is $${owed.toFixed(2)}${owed < total - 0.004 ? ` (remaining balance of $${total.toFixed(2)})` : ""}.${link ? `\nView and pay: ${link}` : ""}\n\nThank you,\n${ctx.business}${review}` });
-      continue;
-    }
-    if (settings.lateReminderEmail && invoicePastDue(data, total, owed)) {
-      const late = sent.late || [];
-      const last = late.length ? Date.parse(late[late.length - 1]) : 0;
-      if (late.length < LATE_REMINDER_MAX && (!last || now.getTime() - last >= LATE_REMINDER_DAYS * 86400000)) {
-        out.push({ docId: doc.id, kind: "late", to, subject: `Reminder: invoice ${number} is past due`,
-          text: `Hi ${first},\n\nA friendly reminder that invoice ${number} ($${owed.toFixed(2)} owed) was due ${String(data.dueDate || "")}.${link ? `\nView and pay: ${link}` : ""}\n\nThank you,\n${ctx.business}` });
-      }
-    }
+    const client = clientFor(ctx.clients || [], doc.data || {}, String(doc.clientName || doc.data?.clientName || ""));
+    const item = planOne(doc, settings, { business: ctx.business, reviewLink: ctx.reviewLink, origin: ctx.origin, today: ctx.today || localToday(), reviewOptOut: Boolean(client?.reviewOptOut), autoOptOut: Boolean(client?.autoEmailOptOut) });
+    if (item) out.push(item);
   }
   return out;
+}
+
+function stamp(docId: string, key: string, at: string) {
+  const all: AutoDoc[] = JSON.parse(window.localStorage.getItem("clientready-documents") || "[]");
+  const doc = all.find((d) => d.id === docId);
+  if (!doc) return;
+  const prev = ((doc.data || {}).autoSent || {}) as Record<string, unknown>;
+  const keys = Array.from(new Set([...sentKeys(doc.data), key]));
+  doc.data = { ...(doc.data || {}), autoSent: { ...prev, keys, ...(key === "done:once" && !prev.done ? { done: at } : {}) } };
+  window.localStorage.setItem("clientready-documents", JSON.stringify(all));
+}
+
+/** R46 sync merge: server claims (any device) are added to each invoice's sent log before planning. */
+async function mergeServerClaims() {
+  try {
+    const { data, error } = await supabase.from("automation_sends").select("doc_id,kind,period,claimed_at");
+    if (error || !Array.isArray(data)) return;
+    for (const row of data as { doc_id: string; kind: string; period: string; claimed_at: string }[]) stamp(row.doc_id, `${row.kind}:${row.period}`, row.claimed_at);
+  } catch { /* offline: the server claim still blocks repeats */ }
 }
 
 /** Runs the plan (owner's app, dashboard load). Returns what was sent. Nothing runs when every switch is off. */
@@ -75,23 +60,27 @@ export async function runAutomations(): Promise<{ sent: AutoPlan[]; errors: stri
   const settings = readAutomations(profile.automations);
   if (!settings.doneEmailInvoice && !settings.lateReminderEmail) return { sent: [], errors: [] };
   if (!(await emailSendingEnabled())) return { sent: [], errors: ["Automatic emails are on, but email sending is not set up."] };
-  let docs: Doc[] = [];
+  const { data: auth } = await supabase.auth.getSession();
+  const token = auth.session?.access_token;
+  if (!token) return { sent: [], errors: ["Automatic emails are on: sign in so they can send."] };
+  await mergeServerClaims();
+  let docs: AutoDoc[] = []; let clients: Client[] = [];
   try { docs = JSON.parse(window.localStorage.getItem("clientready-documents") || "[]") || []; } catch { docs = []; }
-  const plan = planAutomations(docs, settings, { business: String(profile.businessName || "Your business"), reviewLink: String(profile.reviewLink || ""), origin: window.location.origin });
+  try { clients = JSON.parse(window.localStorage.getItem("clientready-clients") || "[]") || []; } catch { clients = []; }
+  const plan = planAutomations(docs, settings, { business: String(profile.businessName || "Your business"), reviewLink: String(profile.reviewLink || ""), origin: window.location.origin, clients });
   const sent: AutoPlan[] = []; const errors: string[] = [];
   for (const item of plan) {
-    const result = await sendEmail(item.docId, item.to, item.subject, item.text);
-    if (result.error) { errors.push(`${item.subject}: ${result.error}`); continue; }
+    const response = await fetch("/api/email/send", {
+      method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ docId: item.docId, automation: { kind: item.kind, period: item.period }, today: localToday() }),
+    }).catch(() => null);
+    const result = (await response?.json().catch(() => ({}))) as { id?: string; error?: string; to?: string; subject?: string; text?: string };
+    const key = `${item.kind}:${item.period}`;
+    if (response?.status === 409) { stamp(item.docId, key, new Date().toISOString()); continue; } // already sent elsewhere
+    if (!response?.ok) { errors.push(`${item.subject}: ${result.error || "not sent"}`); continue; }
     const at = new Date().toISOString();
-    // Stamp first, then log (logEmail saves the document to the account).
-    const all: Doc[] = JSON.parse(window.localStorage.getItem("clientready-documents") || "[]");
-    const doc = all.find((d) => d.id === item.docId);
-    if (doc) {
-      const prev = readAutoSent(doc.data?.autoSent);
-      doc.data = { ...(doc.data || {}), autoSent: item.kind === "done" ? { ...prev, done: at } : { ...prev, late: [...(prev.late || []), at] } };
-      window.localStorage.setItem("clientready-documents", JSON.stringify(all));
-    }
-    await logEmail(item.docId, { sentAt: at, to: item.to, subject: item.subject, kind: item.kind === "done" ? "invoice" : "reminder", via: "email", id: result.id }, item.kind === "done");
+    stamp(item.docId, key, at);
+    await logEmail(item.docId, { sentAt: at, to: result.to || item.to, subject: result.subject || item.subject, kind: item.kind === "done" ? "invoice" : "reminder", via: "email", id: String(result.id || "") }, item.kind === "done");
     sent.push(item);
   }
   return { sent, errors };
