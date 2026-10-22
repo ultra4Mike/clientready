@@ -49,6 +49,21 @@ export async function syncTimesheetCutover(): Promise<string> {
   } catch { return local; }
 }
 
+export const UNALLOCATED_SALARY_KEY = "clientready-salary-unallocated";
+/** Weekly salary with no hours: kept per worker+week so the Year packet and pay totals count it once. */
+export function recordUnallocatedSalary(employeeId: string, week: string, pays: DayPay[]) {
+  try {
+    if (typeof window === "undefined" || !week) return;
+    const cutover = window.localStorage.getItem(CUTOVER_KEY) || "";
+    const all = JSON.parse(window.localStorage.getItem(UNALLOCATED_SALARY_KEY) || "{}") as Record<string, number>;
+    const key = `${employeeId}|${weekOf(week)}`;
+    const cents = pays.filter((p) => p.unallocated).reduce((s, p) => s + p.cents, 0);
+    if (cents > 0 && cutover && addDays(weekOf(week), 6) >= cutover && weekOf(week) <= localYmd(new Date().toISOString())) all[key] = cents; else delete all[key];
+    window.localStorage.setItem(UNALLOCATED_SALARY_KEY, JSON.stringify(all));
+  } catch { /* storage off */ }
+}
+export function readUnallocatedSalary(): Record<string, number> { try { return JSON.parse(window.localStorage.getItem(UNALLOCATED_SALARY_KEY) || "{}"); } catch { return {}; } }
+
 export function readDocs(): Doc[] { try { return JSON.parse(window.localStorage.getItem(DOCS_KEY) || "[]"); } catch { return []; } }
 function readOwnerClockSafe() { try { return readOwnerClock(); } catch { return []; } }
 const rowDate = (row: { workDate?: string }, doc: Doc) => String(row.workDate || readSchedule(doc.data)?.date || "").slice(0, 10);
@@ -80,7 +95,7 @@ export function weekSheets(input: { workers: Worker[]; docs: Doc[]; events: TapE
 }
 
 /** Per worker: the week's day pay and job shares from sheets + approvals. */
-export function weekShares(input: { workers: Worker[]; docs: Doc[]; days: string[]; sheets: Map<string, DaySheet>; approvals: DayApproval[] }) {
+export function weekShares(input: { workers: Worker[]; docs: Doc[]; days: string[]; sheets: Map<string, DaySheet>; approvals: DayApproval[]; settings?: { halfDayHours?: number } }) {
   const pays = new Map<string, DayPay[]>();
   const shares = new Map<string, JobShare>(); // employeeId|date|docId
   for (const w of input.workers) {
@@ -90,7 +105,8 @@ export function weekShares(input: { workers: Worker[]; docs: Doc[]; days: string
       const fallbackDocIds = input.docs.filter((doc) => ((doc.data?.crew || []) as { employeeId?: string; workDate?: string }[]).some((r) => r.employeeId === w.id && rowDate(r, doc) === date)).map((doc) => doc.id);
       return { date, sheet: input.sheets.get(`${w.id}|${date}`), approved, approvedMinutes: a?.editedMinutes != null ? a.editedMinutes : approved ? a!.paidMinutes : null, fallbackDocIds };
     });
-    const week = allocateWeek(list, w.paySettings, w.rate || "");
+    const week = allocateWeek(list, w.paySettings, w.rate || "", { halfDayHours: input.settings?.halfDayHours });
+    recordUnallocatedSalary(w.id, input.days[0], week);
     pays.set(w.id, week);
     for (const day of week) for (const s of day.shares) shares.set(`${w.id}|${s.date}|${s.docId}`, s);
   }
@@ -152,7 +168,7 @@ export async function refreshTimesheetPay(date: string, opts: { approvals?: DayA
   const docs = readDocs();
   const approvals = opts.approvals || data.approvals;
   const { days, sheets } = weekSheets({ workers, docs, events: data.events, fixes: data.fixes, settings: data.settings, week, now: opts.now || new Date().toISOString() });
-  const { pays, shares } = weekShares({ workers, docs, days, sheets, approvals });
+  const { pays, shares } = weekShares({ workers, docs, days, sheets, approvals, settings: data.settings });
   const applied = applyWeekToDocs(docs, shares, cutover);
   void pushChangedDocs(applied.changed);
   return { ...applied, pays, sheets, approvals };

@@ -23,7 +23,7 @@ export type TapEvent = {
   notAtSite?: boolean;
 };
 export type ScheduledJob = { docId: string; start: string; end: string; label?: string; lat?: number; lng?: number }; // ISO start/end
-export type DayFlag = "from_schedule" | "not_at_site" | "long_drive" | "auto_ended" | "fix_requested" | "edited";
+export type DayFlag = "from_schedule" | "not_at_site" | "long_drive" | "auto_ended" | "fix_requested" | "edited" | "changed_since_approved";
 export type TimesheetSettings = { gapMinutes: number; transitTimeoutMinutes: number; halfDayHours: number };
 export const DEFAULT_TIMESHEET_SETTINGS: TimesheetSettings = { gapMinutes: 60, transitTimeoutMinutes: 120, halfDayHours: 4 };
 
@@ -71,6 +71,8 @@ export function dayState(events: TapEvent[]): { state: "OFF_DUTY" | "WORKING" | 
  * Build one worker's day. `now` is used only to decide whether open transit / an open shift timed out;
  * a day in the past with no End shift is always closed at the last real stop.
  */
+const OPEN_JOB_MAX_MS = 12 * 3600000;
+
 export function buildDay(input: {
   employeeId: string;
   date: string;
@@ -120,7 +122,11 @@ export function buildDay(input: {
     const job = openJob as { docId: string; start: string; notAtSite: boolean };
     const plannedEnd = sched.get(job.docId)?.end;
     if (plannedEnd && ms(plannedEnd) > ms(job.start) && nowMs > ms(plannedEnd)) { closeJob(plannedEnd, true); flags.add("auto_ended"); }
-    else if (!plannedEnd && nowMs - ms(job.start) > settings.transitTimeoutMinutes * 60000 * 6) { closeJob(job.start, true); flags.add("auto_ended"); }
+    else if (!plannedEnd && nowMs - ms(job.start) > OPEN_JOB_MAX_MS) {
+      // No schedule: end at his last real tap after the start, else start + 12 h; flag Auto-ended for review.
+      const later = events.filter((e) => ms(e.at) > ms(job.start)).map((e) => e.at).pop();
+      closeJob(later || new Date(ms(job.start) + OPEN_JOB_MAX_MS).toISOString(), true); flags.add("auto_ended");
+    }
     else if (input.now) closeJob(input.now); // still working: count up to now
   }
   // Fill scheduled jobs with no taps at all.

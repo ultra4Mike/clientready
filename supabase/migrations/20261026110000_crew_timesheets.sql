@@ -56,6 +56,8 @@ create table if not exists public.crew_timesheet_settings (
   half_day_hours numeric not null default 4,
   updated_at timestamptz not null default now()
 );
+-- Edited or fixed after approval: approval cleared, the owner approves again.
+alter table public.crew_day_approvals add column if not exists changed_at timestamptz;
 -- First day crew pay comes from the approved day timesheet: one per owner, shared by every device.
 alter table public.crew_timesheet_settings add column if not exists pay_cutover date;
 
@@ -149,3 +151,4 @@ grant execute on function public.crew_request_time_fix(text, date, text, timesta
 -- select to_regprocedure('public.crew_add_day_event(text,text,timestamptz,date,text,double precision,double precision,boolean)') is not null and to_regprocedure('public.crew_request_time_fix(text,date,text,timestamptz,text,text,text)') is not null as functions_exist;
 -- select not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name in ('crew_day_events', 'crew_time_fixes') and column_name ~ '(rate|pay|price|amount)') as no_price_columns_for_workers;
 -- select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'crew_timesheet_settings' and column_name = 'pay_cutover' and data_type = 'date') and to_regprocedure('public.crew_claim_pay_cutover(date)') is not null as pay_cutover_ready;
+-- select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'crew_day_approvals' and column_name = 'changed_at') as approval_changed_at_ready;

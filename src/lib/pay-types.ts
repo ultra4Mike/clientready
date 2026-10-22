@@ -128,10 +128,10 @@ export function dayPayOnce<T extends PayRow & { employeeId: string; date: string
   });
 }
 
-/** Sunday-start week key for a YYYY-MM-DD date. */
+/** Monday-start week key (Mon-Sun, same as Period views, timesheet CSV and overtime) for a YYYY-MM-DD date. */
 export function weekOf(date: string) {
   const d = new Date(`${date}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() - d.getUTCDay());
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
   return d.toISOString().slice(0, 10);
 }
 

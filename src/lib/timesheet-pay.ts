@@ -36,7 +36,8 @@ export type DayInput = {
   fallbackDocIds?: string[];
 };
 export type JobShare = { date: string; docId: string; cents: number; minutes: number; dayCents: number; dayMinutes: number; approved: boolean };
-export type DayPay = { date: string; cents: number; workMinutes: number; driveMinutes: number; approved: boolean; shares: JobShare[] };
+/** unallocated: weekly salary with no hours that week, paid once as labor not tied to a job. */
+export type DayPay = { date: string; cents: number; workMinutes: number; driveMinutes: number; approved: boolean; shares: JobShare[]; unallocated?: boolean };
 
 /** Minutes of the day after an owner edit: drive stays as logged (capped), the rest is work. */
 function dayMinutes(day: DayInput) {
@@ -47,12 +48,14 @@ function dayMinutes(day: DayInput) {
 }
 
 /**
- * One worker's week (days of ONE Sunday-start week or several; weeks are handled separately).
+ * One worker's week (days of ONE Monday-start week or several; weeks are handled separately).
  * Returns each day's pay in cents and its per-job shares. The cents of all days in a week add up to the week pay
  * (base + overtime premium, or the weekly salary once).
  */
-export function allocateWeek(days: DayInput[], payRaw: PaySettings | unknown, rate: string): DayPay[] {
-  const pay = readPaySettings(payRaw);
+export function allocateWeek(days: DayInput[], payRaw: PaySettings | unknown, rate: string, defaults: { halfDayHours?: number } = {}): DayPay[] {
+  const read = readPaySettings(payRaw);
+  // The Timesheet rule "Half day under (h)" is the default when the worker has no half-day hours of his own.
+  const pay: PaySettings = read.type === "day" && !(num(read.halfDayHours) > 0) && num(defaults.halfDayHours) > 0 ? { ...read, halfDayHours: String(defaults.halfDayHours) } : read;
   const byWeek = new Map<string, DayInput[]>();
   for (const d of [...days].sort((a, b) => a.date.localeCompare(b.date))) byWeek.set(weekOf(d.date), [...(byWeek.get(weekOf(d.date)) || []), d]);
   const out: DayPay[] = [];
@@ -64,6 +67,12 @@ export function allocateWeek(days: DayInput[], payRaw: PaySettings | unknown, ra
       const parts = splitCents(Math.round(num(pay.salaryWeekly) * 100), mins.map((m) => m.work + m.drive));
       const allZero = mins.every((m) => m.work + m.drive <= 0);
       parts.forEach((c, i) => { base[i] = allZero ? 0 : c / 100; });
+      // No hours this week: the salary is still paid once, as unallocated labor (no job to cost it to).
+      if (allZero && num(pay.salaryWeekly) > 0 && list.length) {
+        const all = Math.round(num(pay.salaryWeekly) * 100);
+        list.forEach((d, i) => out.push({ date: d.date, cents: i === 0 ? all : 0, workMinutes: 0, driveMinutes: 0, approved: d.approved, shares: [], unallocated: i === 0 }));
+        continue;
+      }
     }
     // Overtime premium per day: cumulative premium after this day minus before (weekly + daily rules).
     const entries: { date: string; hours: number; rate: number }[] = [];

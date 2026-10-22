@@ -16,7 +16,7 @@ import { type DaySheet, type FixRequest, type TapEvent, type TimesheetSettings }
 import { addDays, applyWeekToDocs, pushChangedDocs, readDocs, syncTimesheetCutover, weekShares, weekSheets } from "@/lib/timesheet-sync";
 import type { DayPay } from "@/lib/timesheet-pay";
 
-const FLAG_LABEL: Record<string, string> = { from_schedule: "From schedule", not_at_site: "Not at site", long_drive: "Long drive", auto_ended: "Auto-ended", fix_requested: "Fix requested", edited: "Edited" };
+const FLAG_LABEL: Record<string, string> = { from_schedule: "From schedule", not_at_site: "Not at site", long_drive: "Long drive", auto_ended: "Auto-ended", fix_requested: "Fix requested", edited: "Edited", changed_since_approved: "Changed since approved, approve again" };
 const localYmd = (iso: string) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const h = (m: number) => (m / 60).toFixed(2);
 
@@ -28,7 +28,9 @@ export default function TimesheetPage() {
   const [fixes, setFixes] = useState<FixRequest[]>([]);
   const [approvals, setApprovals] = useState<DayApproval[]>([]);
   const [settings, setSettings] = useState<TimesheetSettings>(() => ({ gapMinutes: 60, transitTimeoutMinutes: 120, halfDayHours: 4 }));
-  const [undo, setUndo] = useState<DayApproval[] | null>(null);
+  // Undo history per week (newest last, up to 20 steps): each step is the approvals as they were before it.
+  const [history, setHistory] = useState<Record<string, DayApproval[][]>>({});
+  const undoSteps = history[week] || [];
   const [editing, setEditing] = useState<{ key: string; hours: string } | null>(null);
   const [message, setMessage] = useState("");
   const [now, setNow] = useState("");
@@ -50,7 +52,7 @@ export default function TimesheetPage() {
     void loadOwnerTimesheet(week, addDays(week, 6)).then((data) => { setEvents(data.events); setFixes(data.fixes); setApprovals(data.approvals); setSettings(data.settings); });
   }, [week]);
   const { days, sheets } = useMemo(() => (week && now ? weekSheets({ workers, docs, events, fixes, settings, week, now }) : { days: [] as string[], sheets: new Map<string, DaySheet>() }), [workers, docs, events, fixes, settings, week, now]);
-  const { pays, shares } = useMemo(() => weekShares({ workers, docs, days, sheets, approvals }), [workers, docs, days, sheets, approvals]);
+  const { pays, shares } = useMemo(() => weekShares({ workers, docs, days, sheets, approvals, settings }), [workers, docs, days, sheets, approvals, settings]);
   // Keep the jobs in step with the week (estimates for unapproved days, the approved day's split otherwise).
   useEffect(() => {
     if (!week || !now || !cutover || !shares.size) return;
@@ -60,37 +62,53 @@ export default function TimesheetPage() {
   const approvalOf = (id: string, date: string) => approvals.find((a) => a.employeeId === id && a.date === date);
   const minutesOf = (id: string, date: string) => { const a = approvalOf(id, date); const s = sheets.get(`${id}|${date}`); return a?.editedMinutes != null ? a.editedMinutes : a?.approvedAt ? a.paidMinutes : s?.paidMinutes || 0; };
 
-  async function commit(rows: DayApproval[], before: DayApproval[]) {
+  async function commit(rows: DayApproval[], before: DayApproval[], record = true) {
     const keys = new Set(rows.map((r) => `${r.employeeId}|${r.date}`));
     setApprovals((list) => [...list.filter((a) => !keys.has(`${a.employeeId}|${a.date}`)), ...rows]);
+    if (record && before.length) setHistory((all) => ({ ...all, [week]: [...(all[week] || []), before].slice(-20) }));
     await saveApprovals(rows);
-    setUndo(before);
   }
+  const blank = (employeeId: string, date: string): DayApproval => ({ employeeId, date, paidMinutes: 0, driveMinutes: 0, editedMinutes: null, approvedAt: null, changedAt: null });
   async function approveAll() {
     const rows: DayApproval[] = [], before: DayApproval[] = [];
     for (const w of workers) for (const date of days) {
       const s = sheets.get(`${w.id}|${date}`); const prev = approvalOf(w.id, date);
       if (!s || (!s.paidMinutes && prev?.editedMinutes == null) || prev?.approvedAt) continue;
-      before.push(prev || { employeeId: w.id, date, paidMinutes: 0, driveMinutes: 0, editedMinutes: null, approvedAt: null });
-      rows.push({ employeeId: w.id, date, paidMinutes: prev?.editedMinutes ?? s.paidMinutes, driveMinutes: s.driveMinutes, editedMinutes: prev?.editedMinutes ?? null, approvedAt: new Date().toISOString() });
+      before.push(prev || blank(w.id, date));
+      rows.push({ employeeId: w.id, date, paidMinutes: prev?.editedMinutes ?? s.paidMinutes, driveMinutes: s.driveMinutes, editedMinutes: prev?.editedMinutes ?? null, approvedAt: new Date().toISOString(), changedAt: null });
     }
     if (!rows.length) { setMessage("Nothing new to approve this week."); return; }
     await commit(rows, before);
     setMessage(`Approved ${rows.length} day${rows.length === 1 ? "" : "s"}.`);
   }
-  async function undoLast() { if (!undo) return; await commit(undo, []); setUndo(null); setMessage("Undone."); }
+  async function undoLast() {
+    const step = undoSteps[undoSteps.length - 1];
+    if (!step) return;
+    setHistory((all) => ({ ...all, [week]: (all[week] || []).slice(0, -1) }));
+    await commit(step, [], false);
+    setMessage(`Undone. ${undoSteps.length - 1} more step${undoSteps.length - 1 === 1 ? "" : "s"} to undo.`);
+  }
   async function saveEdit() {
     if (!editing) return;
     const [id, date] = editing.key.split("|");
     const mins = Math.max(0, Number(editing.hours) * 60 || 0);
     const prev = approvalOf(id, date); const s = sheets.get(editing.key);
-    await commit([{ employeeId: id, date, paidMinutes: mins, driveMinutes: s?.driveMinutes || 0, editedMinutes: mins, approvedAt: prev?.approvedAt ?? null }], [prev || { employeeId: id, date, paidMinutes: 0, driveMinutes: 0, editedMinutes: null, approvedAt: null }]);
+    // Editing an approved day clears its approval: pay goes back to the estimate until approved again.
+    const wasApproved = Boolean(prev?.approvedAt) || Boolean(prev?.changedAt);
+    await commit([{ employeeId: id, date, paidMinutes: mins, driveMinutes: s?.driveMinutes || 0, editedMinutes: mins, approvedAt: null, changedAt: wasApproved ? new Date().toISOString() : null }], [prev || blank(id, date)]);
+    if (prev?.approvedAt) setMessage("Changed since approved, approve again.");
     setEditing(null);
   }
   async function decide(fix: FixRequest, status: "approved" | "denied") {
     const error = await decideFix(fix.id, status);
     if (error) { setMessage(error); return; }
     setFixes((list) => list.map((f) => (f.id === fix.id ? { ...f, status, decidedAt: new Date().toISOString() } : f)));
+    // An approved fix changes that day: clear its approval so the owner approves the new hours.
+    const prev = approvalOf(fix.employeeId, fix.date);
+    if (status === "approved" && prev?.approvedAt) {
+      await commit([{ ...prev, approvedAt: null, changedAt: new Date().toISOString() }], [prev]);
+      setMessage("Changed since approved, approve again.");
+    }
   }
 
   return (
@@ -101,7 +119,7 @@ export default function TimesheetPage() {
         <span className="font-semibold" data-testid="ts-week">Week of {week}</span>
         <button className="min-h-11 rounded-lg border px-3" onClick={() => setWeek(addDays(week, 7))} data-testid="ts-next">Next ›</button>
         <button className="min-h-11 rounded-lg bg-teal-600 px-4 font-semibold text-white" data-testid="ts-approve-all" onClick={approveAll}>Approve all</button>
-        {undo && <button className="min-h-11 rounded-lg border px-3" data-testid="ts-undo" onClick={undoLast}>Undo</button>}
+        {undoSteps.length > 0 && <button className="min-h-11 rounded-lg border px-3" data-testid="ts-undo" onClick={undoLast}>Undo ({undoSteps.length})</button>}
         {message && <span role="status" data-testid="ts-message" className="text-sm">{message}</span>}
       </div>
       <div className="overflow-x-auto">
@@ -117,7 +135,7 @@ export default function TimesheetPage() {
                   <td className="p-2 font-semibold">{w.name}</td>
                   {days.map((date) => {
                     const key = `${w.id}|${date}`; const s = sheets.get(key); const a = approvalOf(w.id, date); const mins = minutesOf(w.id, date);
-                    const flags = [...(s?.flags || []), ...(a?.editedMinutes != null ? ["edited"] : [])];
+                    const flags = [...(s?.flags || []), ...(a?.editedMinutes != null ? ["edited"] : []), ...(a?.changedAt && !a?.approvedAt ? ["changed_since_approved"] : [])];
                     return (
                       <td key={date} className="p-2" data-testid={`ts-cell-${w.id}-${date}`}>
                         {editing?.key === key ? (
@@ -133,7 +151,7 @@ export default function TimesheetPage() {
                       </td>
                     );
                   })}
-                  <td className="p-2 text-right tabular-nums" data-testid={`ts-week-${w.id}`}>{h(total)} h<span className="block text-xs" data-testid={`ts-week-pay-${w.id}`}>${(wkCents / 100).toFixed(2)}{wkDays.some((d) => !d.approved && d.cents) ? " (part estimate)" : ""}</span></td>
+                  <td className="p-2 text-right tabular-nums" data-testid={`ts-week-${w.id}`}>{h(total)} h<span className="block text-xs" data-testid={`ts-week-pay-${w.id}`}>${(wkCents / 100).toFixed(2)}{wkDays.some((d) => !d.approved && d.cents) ? " (part estimate)" : ""}</span>{wkDays.some((d) => d.unallocated) && <span className="block text-xs" data-testid={`ts-unallocated-${w.id}`}>Salary, no jobs this week (unallocated labor)</span>}</td>
                 </tr>
               );
             })}

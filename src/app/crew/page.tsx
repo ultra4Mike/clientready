@@ -375,7 +375,7 @@ export default function CrewPage() {
   const open = clock.find((entry) => !entry.ended_at);
   const openCard = open ? cards.find((card) => card.doc_id === open.doc_id) : undefined;
   const openLabel = open ? `${openCard ? [openCard.invoice_number, openCard.client_name].filter(Boolean).join(" · ") || "another job" : "another job"} since ${clockTime(open.started_at)}` : "";
-  const weekStart = today ? addDays(today, -new Date(`${today}T00:00:00`).getDay()) : "";
+  const weekStart = today ? addDays(today, -((new Date(`${today}T00:00:00`).getDay() + 6) % 7)) : "";
   const weekDays = weekStart ? Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)) : [];
   const todayCards = cards.filter((card) => card.job_date === today);
   const weekCards = cards.filter((card) => weekDays.includes(card.job_date));

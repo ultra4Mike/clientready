@@ -82,7 +82,7 @@ export async function loadMyFixes(email: string): Promise<FixRequest[]> {
   return [...server, ...local.filter((f) => !ids.has(f.id))];
 }
 
-export type DayApproval = { employeeId: string; date: string; paidMinutes: number; driveMinutes: number; editedMinutes?: number | null; approvedAt?: string | null };
+export type DayApproval = { employeeId: string; date: string; paidMinutes: number; driveMinutes: number; editedMinutes?: number | null; approvedAt?: string | null; changedAt?: string | null };
 export type OwnerTimesheet = { events: TapEvent[]; fixes: FixRequest[]; approvals: DayApproval[]; settings: TimesheetSettings; cloud: boolean };
 
 /** Owner: everything for the days [from, to] (YYYY-MM-DD). */
@@ -96,7 +96,7 @@ export async function loadOwnerTimesheet(from: string, to: string): Promise<Owne
     supabase.from("crew_timesheet_settings").select("*").maybeSingle(),
   ]);
   const cloud = !ev.error;
-  const approvals = ap.error ? localApprovals : ((ap.data || []) as Record<string, unknown>[]).map((r) => ({ employeeId: String(r.employee_id), date: String(r.work_date).slice(0, 10), paidMinutes: Number(r.paid_minutes) || 0, driveMinutes: Number(r.drive_minutes) || 0, editedMinutes: r.edited_minutes == null ? null : Number(r.edited_minutes), approvedAt: (r.approved_at as string) || null }));
+  const approvals = ap.error ? localApprovals : ((ap.data || []) as Record<string, unknown>[]).map((r) => ({ employeeId: String(r.employee_id), date: String(r.work_date).slice(0, 10), paidMinutes: Number(r.paid_minutes) || 0, driveMinutes: Number(r.drive_minutes) || 0, editedMinutes: r.edited_minutes == null ? null : Number(r.edited_minutes), approvedAt: (r.approved_at as string) || null, changedAt: (r.changed_at as string) || null }));
   const s = st.data as Record<string, unknown> | null;
   return {
     events: ev.error ? [] : ((ev.data || []) as EventRow[]).map(fromRow),
@@ -126,7 +126,7 @@ export async function saveApprovals(rows: DayApproval[]) {
   const { data } = await supabase.auth.getUser();
   if (!data.user) return;
   const uid = data.user.id;
-  await supabase.from("crew_day_approvals").upsert(rows.map((r) => ({ owner_id: uid, employee_id: r.employeeId, work_date: r.date, paid_minutes: r.paidMinutes, drive_minutes: r.driveMinutes, edited_minutes: r.editedMinutes ?? null, approved_at: r.approvedAt ?? null, updated_at: new Date().toISOString() })));
+  await supabase.from("crew_day_approvals").upsert(rows.map((r) => ({ owner_id: uid, employee_id: r.employeeId, work_date: r.date, paid_minutes: r.paidMinutes, drive_minutes: r.driveMinutes, edited_minutes: r.editedMinutes ?? null, approved_at: r.approvedAt ?? null, changed_at: r.changedAt ?? null, updated_at: new Date().toISOString() })));
 }
 
 export async function decideFix(id: string, status: "approved" | "denied") {
