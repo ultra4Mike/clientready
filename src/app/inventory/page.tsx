@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import FormDraft from "@/components/FormDraft";
-import { clearDraft, draftKey } from "@/lib/drafts";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";

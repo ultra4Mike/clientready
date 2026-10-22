@@ -7,7 +7,6 @@ import TimesheetExport from "@/components/TimesheetExport";
 import EmptyState from "@/components/EmptyState";
 import { FormEvent, useEffect, useState } from "react";
 import FormDraft from "@/components/FormDraft";
-import { clearDraft, draftKey } from "@/lib/drafts";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import ScheduleReconcile from "@/components/ScheduleReconcile";

@@ -576,8 +576,8 @@ export default function NewInvoicePage() {
   // Never lose typed work: the editor's fields are kept as a draft until Save (schedule has its own autosave).
   const draftValue = { clientName, clientCompany, contactName, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, notes, items, taxPercent, discountType, discountValue, payments };
   const draft = useAutosaveDraft("doc", docId || `new-${docKind}`, draftValue, { enabled: formReady && notFound === "" });
-  function restoreDraft() {
-    const v = draft.accept() as Partial<typeof draftValue> | null;
+  function restoreDraft() { restoreFrom(draft.accept() as Partial<typeof draftValue> | null); }
+  function restoreFrom(v: Partial<typeof draftValue> | null) {
     if (!v) return;
     if (v.clientName !== undefined) setClientName(v.clientName); if (v.clientCompany !== undefined) setClientCompany(v.clientCompany);
     if (v.contactName !== undefined) setContactName(v.contactName); if (v.clientEmail !== undefined) setClientEmail(v.clientEmail);
@@ -883,7 +883,7 @@ export default function NewInvoicePage() {
       const changedSchedule = !same(storedSchedule, schedule);
       setSchedule(storedSchedule); setJobStart(storedSchedule.startTime || jobStart); setJobEnd(storedSchedule.endTime || ""); setCrew(savedCrew); if (changedSchedule) setScheduleKey((key) => key + 1); }
     setSaveMessage(isProposal ? `Proposal saved${carried}` : "Invoice saved");
-    draft.clear(`doc:${cloudId}`);
+    draft.clear(cloudId);
     return cloudId;
   }
 
@@ -1095,7 +1095,7 @@ export default function NewInvoicePage() {
   return (
     <SectionDefaults.Provider value={sectionDefaults}>
     <AppShell title={isProposal ? "New proposal" : "New invoice"}>
-      <RestoreDraftBanner draft={draft.restorable} onRestore={restoreDraft} onDiscard={draft.discard} />
+      <RestoreDraftBanner draft={draft.restorable} onRestore={restoreDraft} onDiscard={draft.discard} status={draft.status} conflict={Boolean(draft.conflict)} onResolve={(choice) => { void draft.resolve(choice).then((theirs) => { if (theirs) restoreFrom(theirs as never); }); }} />
       <FormDraft form="job-message" id={docId} enabled={formReady && Boolean(docId)} value={jobMsg || { kind: "", text: "" }} blank={{ kind: "", text: "" }} onRestore={(v) => setJobMsg(v.kind ? v : null)} what="message to the client" />
       <div className="print-hide mb-6 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">

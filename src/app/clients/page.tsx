@@ -10,7 +10,6 @@ import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import EmptyState from "@/components/EmptyState";
 import FormDraft from "@/components/FormDraft";
-import { clearDraft, draftKey } from "@/lib/drafts";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import PortalShare from "@/components/PortalShare";

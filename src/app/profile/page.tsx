@@ -12,7 +12,7 @@ import { INTEGRATIONS } from "@/lib/flags";
 import { supabase } from "@/lib/supabase";
 import StripeSetup from "@/components/StripeSetup";
 import FormDraft from "@/components/FormDraft";
-import { clearDraft, draftKey } from "@/lib/drafts";
+import { clearDraft } from "@/lib/drafts";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 
@@ -177,7 +177,7 @@ export default function ProfilePage() {
       // Business timezone (card payment dates). Ignored quietly before migration 20261015130000 adds the column.
       await supabase.from("profiles").update({ timezone }).eq("id", user.id);
       setMessage("Saved on this computer and in your account." + overtimeNote);
-      void clearDraft(draftKey("profile", ""));
+      void clearDraft("profile", "");
     } else {
       setMessage("Saved on this computer. Log in to save to your account.");
     }
