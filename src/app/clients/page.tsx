@@ -364,6 +364,10 @@ export default function ClientsPage() {
               <div className="flex min-w-0 flex-wrap gap-2 text-sm text-slate-600 md:block md:space-y-0.5">
                 {client.phone && <a href={`tel:${client.phone.replace(/[^\d+]/g, "")}`} className="inline-flex min-h-11 min-w-0 max-w-full items-center gap-1.5 rounded-lg border border-teal-500/30 px-3 font-medium transition hover:border-teal-400 md:flex md:min-h-0 md:border-0 md:px-0 md:font-normal md:hover:text-teal-600"><span aria-hidden="true">📞</span><span className="truncate">{client.phone}</span></a>}
                 {client.email && <a href={`mailto:${client.email}`} className="inline-flex min-h-11 min-w-0 max-w-full items-center gap-1.5 rounded-lg border border-teal-500/30 px-3 font-medium transition hover:border-teal-400 md:flex md:min-h-0 md:border-0 md:px-0 md:font-normal md:hover:text-teal-600"><span aria-hidden="true">✉️</span><span className="truncate">{client.email}</span></a>}
+                {(client.phone.replace(/[^\d]/g, "") || client.address.trim()) && <span className="flex flex-wrap gap-2 md:mt-1">
+                  {client.phone.replace(/[^\d]/g, "") && <a href={`sms:${client.phone.replace(/[^\d+]/g, "")}`} data-testid="client-text" className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-teal-500/30 px-3 font-medium transition hover:border-teal-400"><span aria-hidden="true">💬</span>Text</a>}
+                  {client.address.trim() && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.address.trim())}`} target="_blank" rel="noopener noreferrer" data-testid="client-map" className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-teal-500/30 px-3 font-medium transition hover:border-teal-400"><span aria-hidden="true">📍</span>Map</a>}
+                </span>}
               </div>
               <div className="text-sm">
                 {client.nextVisit ? <p className="font-medium"><span className="md:hidden">Next visit: </span>{client.nextVisit}</p> : <p className="hidden text-slate-500 md:block">—</p>}
