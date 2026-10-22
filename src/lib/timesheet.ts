@@ -230,3 +230,80 @@ export function applyFixes(events: TapEvent[], fixes: FixRequest[]): TapEvent[] 
   }
   return out;
 }
+
+/** Flags that need the owner's eye before a day is "ready" (an owner edit counts as reviewed). */
+export const REVIEW_FLAGS: DayFlag[] = ["from_schedule", "not_at_site", "long_drive", "auto_ended", "fix_requested"];
+export const needsReview = (flags: string[], edited = false) => !edited && flags.some((f) => (REVIEW_FLAGS as string[]).includes(f));
+
+const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+/** "2 h 10 m" / "40 m". */
+export function hm(minutes: number) {
+  const m = Math.round(minutes || 0), hh = Math.floor(m / 60), mm = m % 60;
+  return hh ? `${hh} h${mm ? ` ${mm} m` : ""}` : `${mm} m`;
+}
+
+/** Plain-English reason for each flag on a day (shown on the day detail). */
+export function flagReasons(day: DaySheet | undefined, extra: string[] = [], settings: Partial<TimesheetSettings> = {}): { flag: string; text: string }[] {
+  const s = { ...DEFAULT_TIMESHEET_SETTINGS, ...settings };
+  const flags = [...new Set([...(day?.flags || []), ...extra])];
+  return flags.map((flag) => {
+    switch (flag) {
+      case "from_schedule": {
+        const missed = (day?.jobs || []).filter((j) => j.fromSchedule).map((j) => j.label || "a job");
+        return { flag, text: `No tap was recorded for ${missed.length ? missed.join(", ") : "part of the day"}, so the scheduled time was used. Check it's right.` };
+      }
+      case "not_at_site": return { flag, text: "A tap was made with GPS off or more than 200 m from the job site." };
+      case "long_drive": {
+        const leg = (day?.drives || []).find((d) => d.longDrive);
+        return { flag, text: leg ? `A drive took ${hm(leg.paidMinutes || leg.minutes)}, but about ${hm(leg.expectedMinutes || 0)} was expected.` : "A drive took much longer than expected." };
+      }
+      case "auto_ended": return { flag, text: `The day was never ended (or "Still driving?" went unanswered after ${s.transitTimeoutMinutes} min), so it was ended at the last real stop.` };
+      case "fix_requested": return { flag, text: "The worker asked for a time fix. Approve or deny it below." };
+      case "edited": return { flag, text: "You edited this day's hours." };
+      case "changed_since_approved": return { flag, text: "Hours changed after you approved them. Approve again." };
+      default: return { flag, text: flag };
+    }
+  });
+}
+
+/** Timeline rows for a day: job starts/ends, drives and gaps (paid or unpaid), in time order. */
+export type TimelineRow = { at: string; kind: "start" | "end" | "gap"; text: string; paid?: boolean; minutes?: number; docId?: string; fromSchedule?: boolean };
+export function dayTimeline(day: DaySheet | undefined): TimelineRow[] {
+  if (!day || !day.jobs.length) return [];
+  const rows: TimelineRow[] = [];
+  day.jobs.forEach((job, i) => {
+    rows.push({ at: job.start, kind: "start", docId: job.docId, fromSchedule: job.fromSchedule, text: `${fmtTime(job.start)} Started ${job.label || "job"}${job.fromSchedule ? " (from schedule)" : ""}` });
+    const leg = day.drives.find((d) => d.fromDocId === job.docId && d.start === job.end);
+    if (leg && i < day.jobs.length - 1) {
+      rows.push({ at: job.end, kind: "end", docId: job.docId, text: `${fmtTime(job.end)} Finished ${job.label || "job"}` });
+      const unpaid = leg.minutes - leg.paidMinutes;
+      rows.push({ at: leg.start, kind: "gap", minutes: leg.minutes, paid: unpaid < 0.5,
+        text: unpaid < 0.5 ? `Drive ${hm(leg.paidMinutes)} (paid)` : leg.paidMinutes > 0 ? `Gap ${hm(leg.minutes)}: drive ${hm(leg.paidMinutes)} paid, ${hm(unpaid)} unpaid` : `Gap ${hm(leg.minutes)} (unpaid)` });
+    } else if (i < day.jobs.length - 1) rows.push({ at: job.end, kind: "end", docId: job.docId, text: `${fmtTime(job.end)} Finished ${job.label || "job"}` });
+  });
+  const last = day.jobs[day.jobs.length - 1];
+  rows.push({ at: last.end, kind: "end", docId: last.docId, text: `${fmtTime(last.end)} Day ended${day.autoEnded ? " (auto-ended at the last stop)" : ""}` });
+  return rows;
+}
+
+/** "Paid 7 h 30 m = jobs 6 h 50 m + drive 40 m. Unpaid gap 2 h 10 m." */
+export function daySummary(day: DaySheet | undefined, paidOverride?: number | null) {
+  if (!day) return "No hours.";
+  const paid = paidOverride ?? day.paidMinutes;
+  const base = `Paid ${hm(paid)} = jobs ${hm(day.workMinutes)} + drive ${hm(day.driveMinutes)}.`;
+  const edited = paidOverride != null && Math.round(paidOverride) !== Math.round(day.paidMinutes) ? ` (You set ${hm(paidOverride)}; taps show ${hm(day.paidMinutes)}.)` : "";
+  return `${paidOverride != null && edited ? `Paid ${hm(paid)}.${edited}` : base}${day.unpaidGapMinutes >= 0.5 ? ` Unpaid gap ${hm(day.unpaidGapMinutes)}.` : ""}`;
+}
+
+/** A worker's week status from his days: Needs review (n) / Ready to approve / Approved / No hours. */
+export type WeekStatus = { kind: "none" | "review" | "ready" | "approved"; review: number; ready: number; approved: number; label: string };
+export function weekStatus(days: { hasHours: boolean; approved: boolean; flagged: boolean }[]): WeekStatus {
+  const worked = days.filter((d) => d.hasHours);
+  const approved = worked.filter((d) => d.approved).length;
+  const review = worked.filter((d) => !d.approved && d.flagged).length;
+  const ready = worked.filter((d) => !d.approved && !d.flagged).length;
+  if (!worked.length) return { kind: "none", review, ready, approved, label: "No hours" };
+  if (review) return { kind: "review", review, ready, approved, label: `Needs review (${review})` };
+  if (ready) return { kind: "ready", review, ready, approved, label: "Ready to approve" };
+  return { kind: "approved", review, ready, approved, label: "Approved ✓" };
+}

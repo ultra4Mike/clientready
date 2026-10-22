@@ -63,6 +63,16 @@ export function readDocs(): Doc[] { try { return JSON.parse(window.localStorage.
 function readOwnerClockSafe() { try { return readOwnerClock(); } catch { return []; } }
 const rowDate = (row: { workDate?: string }, doc: Doc) => String(row.workDate || readSchedule(doc.data)?.date || "").slice(0, 10);
 
+/** The scheduled jobs for one worker on one day (what missing taps fill from). */
+export function scheduleFor(docs: Doc[], workerId: string, date: string): ScheduledJob[] {
+  return docs.flatMap((doc) => {
+    const s = readSchedule(doc.data);
+    if (!s || s.date !== date || !s.workerIds.includes(workerId)) return [];
+    const start = toIso(s.date, s.startTime), end = toIso(s.date, s.endTime || "");
+    return start && end ? [{ docId: doc.id, start, end, label: String(doc.data?.invoiceNumber || doc.clientName || "Job") }] : [];
+  });
+}
+
 /** Every worker's day sheets for the 7 days from `week` (old clock entries count as taps). */
 export function weekSheets(input: { workers: Worker[]; docs: Doc[]; events: TapEvent[]; fixes: FixRequest[]; settings: TimesheetSettings; week: string; now: string }) {
   const clockTaps: TapEvent[] = readOwnerClockSafe().flatMap((c) => [
@@ -73,12 +83,7 @@ export function weekSheets(input: { workers: Worker[]; docs: Doc[]; events: TapE
   const days = Array.from({ length: 7 }, (_, i) => addDays(input.week, i));
   const sheets = new Map<string, DaySheet>();
   for (const worker of input.workers) for (const date of days) {
-    const schedule: ScheduledJob[] = input.docs.flatMap((doc) => {
-      const s = readSchedule(doc.data);
-      if (!s || s.date !== date || !s.workerIds.includes(worker.id)) return [];
-      const start = toIso(s.date, s.startTime), end = toIso(s.date, s.endTime || "");
-      return start && end ? [{ docId: doc.id, start, end, label: String(doc.data?.invoiceNumber || doc.clientName || "Job") }] : [];
-    });
+    const schedule = scheduleFor(input.docs, worker.id, date);
     const mine = events.filter((e) => e.employeeId === worker.id && e.date === date);
     const coords = new Map(mine.filter((e) => e.lat != null && e.docId).map((e) => [e.docId!, { lat: e.lat!, lng: e.lng! }]));
     const sheet = buildDay({ employeeId: worker.id, date, events: mine, schedule, settings: input.settings, now: input.now,

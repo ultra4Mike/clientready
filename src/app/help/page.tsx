@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import LegalLinks from "@/components/LegalLinks";
@@ -26,6 +26,12 @@ export default function HelpPage() {
     setOpen(id);
     requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
+
+  // Deep link: /help?a=<article id> opens that article.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("a");
+    if (id && byId.has(id)) { const t = setTimeout(() => jump(id), 0); return () => clearTimeout(t); }
+  }, []);
 
   return (
     <AppShell title="Help">
