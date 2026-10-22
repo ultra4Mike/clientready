@@ -1,3 +1,4 @@
+import { crewKindLabel } from "@/lib/cost-categories";
 import { csvText } from "@/lib/csv";
 import { documentTotals, amountOf } from "@/lib/discount";
 import { docAmounts } from "@/lib/doc-stage";
@@ -14,7 +15,7 @@ import { countedTrips, milesOf, totalMiles, type Trip } from "@/lib/mileage";
  * payments by date received, owner job costs by invoice date), so the numbers match the screen.
  */
 type Doc = { id: string; type: string; title?: string; clientName?: string; createdAt?: string; data?: Record<string, unknown> };
-type CrewExpense = { amount?: unknown; created_at?: string; kind?: string; note?: string; worker_name?: string; doc_id?: string };
+type CrewExpense = { id?: string; amount?: unknown; created_at?: string; kind?: string; note?: string; worker_name?: string; doc_id?: string };
 
 const r2 = (n: number) => (Math.round(n * 100) / 100).toFixed(2);
 const day = (value: unknown) => {
@@ -70,7 +71,9 @@ export function accountantFiles(allDocs: Doc[], crew: CrewExpense[], trips: Trip
   const byId = new Map(docs.map((doc) => [doc.id, doc]));
   const crewRows = crew.filter((item) => yearMonth(item.created_at)?.year === year).map((item) => {
     const doc = item.doc_id ? byId.get(item.doc_id) : undefined;
-    return [day(item.created_at), doc ? numberOf(doc) : "", item.worker_name || "", item.kind || "", r2(amountOf(item.amount)), item.note || ""];
+    // The owner's type fix on the invoice (crewKindFix) wins, so the receipt lands under the right category.
+    const fixed = item.id ? ((doc?.data as { crewKindFix?: Record<string, string> } | undefined)?.crewKindFix || {})[item.id] : "";
+    return [day(item.created_at), doc ? numberOf(doc) : "", item.worker_name || "", crewKindLabel(fixed || item.kind || "other"), r2(amountOf(item.amount)), item.note || ""];
   }).sort((a, b) => a[0].localeCompare(b[0]));
 
   const yearTrips = countedTrips(trips).filter((trip) => String(trip.date || "").startsWith(year)).sort((a, b) => a.date.localeCompare(b.date));
