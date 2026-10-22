@@ -359,9 +359,9 @@ export default function DashboardPage() {
         </div>
       )}
       </div>
-      <div data-testid="dash-grid" className="mt-4 grid items-start gap-4 lg:grid-cols-2 lg:gap-5 lg:mt-5">
-          <div className="min-w-0 lg:order-1" data-testid="dash-cell-today"><TodayJobsBlock docs={documents as never} loaded={loaded || cacheShown} /></div>
-          <section className="min-w-0 space-y-3 lg:order-3" data-testid="dash-cell-attention" aria-label="Needs attention">
+      <div data-testid="dash-grid" className="mt-4 grid items-start gap-4 md:grid-cols-2 md:gap-5 lg:mt-5">
+          <div className="min-w-0 md:order-1" data-testid="dash-cell-today"><TodayJobsBlock docs={documents as never} loaded={loaded || cacheShown} /></div>
+          <section className="min-w-0 space-y-3 md:order-3" data-testid="dash-cell-attention" aria-label="Needs attention">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Needs attention</h2>
           {(auto.sent.length > 0 || auto.errors.length > 0) && (
             <div className={`space-y-2 rounded-xl border px-4 py-3 text-sm ${auto.errors.length ? "border-rose-300/70" : "cr-tone-good border-emerald-300 bg-emerald-50 text-emerald-800"}`} data-testid="auto-sent" data-count={auto.sent.length}>
@@ -378,7 +378,6 @@ export default function DashboardPage() {
       )}
       <ProfitAlertsCard loaded={loaded} documents={documents} />
       <GettingStarted loading={!loaded} documents={documents} />
-      <NeedsReview loading={!loaded} onCount={setReviewCount} documents={documents} onDocuments={(docs) => setDocuments(uniqueDocs(docs as SavedDocument[]))} />
           {loaded && reviewCount === 0 && recurringReady === 0 && stats.overdueCount === 0 && (
             <div data-testid="all-caught-up" className="flex items-center gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm">
               <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">✓</span>
@@ -386,7 +385,12 @@ export default function DashboardPage() {
             </div>
           )}
           </section>
-          <div className="min-w-0 rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] shadow-sm lg:order-2" data-testid="recent-docs">
+          {/* User: Needs review sits beside Needs attention (equal columns, top-aligned) on desktop/tablet; stacks under it on phones. */}
+          <section className="min-w-0 space-y-3 md:order-4 [&>[data-testid=needs-review]]:mb-0" data-testid="dash-cell-review" aria-label="Needs review">
+          <p aria-hidden="true" className="invisible hidden text-xs font-semibold uppercase tracking-wider md:block">Needs review</p>
+          <NeedsReview loading={!loaded} onCount={setReviewCount} documents={documents} onDocuments={(docs) => setDocuments(uniqueDocs(docs as SavedDocument[]))} />
+          </section>
+          <div className="min-w-0 rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] shadow-sm md:order-2" data-testid="recent-docs">
             <div className="flex items-center gap-3 border-b border-teal-500/15 px-4 py-2 min-[900px]:justify-between">
               <h2 className="text-base font-semibold">Recent documents</h2>
               <a href="/documents" className="inline-flex min-h-11 items-center text-sm font-medium text-teal-600 hover:underline dark:text-teal-300">View all</a>
@@ -420,7 +424,7 @@ export default function DashboardPage() {
             ))}
           </div>
 
-        <aside className="min-w-0 space-y-3 lg:order-5 lg:col-span-2" data-testid="dash-cell-actions">
+        <aside className="min-w-0 space-y-3 md:order-5 md:col-span-2" data-testid="dash-cell-actions">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Quick actions</h2>
       <div className="grid gap-2 sm:grid-cols-3">
         <a href="/invoice" className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] flex items-center gap-3 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md">
