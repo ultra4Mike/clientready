@@ -34,7 +34,7 @@ export function stripLinks<T>(value: T): T {
   return walk(value) as T;
 }
 
-export function exportFiles(raw: { profile: Row | null; clients: Row[]; documents: Row[]; employees: Row[] }) {
+export function exportFiles(raw: { profile: Row | null; clients: Row[]; documents: Row[]; employees: Row[]; ownerId?: string }) {
   const input = stripLinks(raw);
   const docs = uniqueDocs(input.documents as never) as unknown as { id: string; type: string; title?: string; clientName?: string; createdAt?: string; data?: Row }[];
   const clients = toCsv(["Name", "Company", "Email", "Phone", "Address", "Notes", "Preferences", "Contact method"], input.clients.map((c) => [c.name, c.company, c.email, c.phone, c.address, c.notes, c.preferences, c.contactMethod]));
@@ -44,9 +44,9 @@ export function exportFiles(raw: { profile: Row | null; clients: Row[]; document
     return [d.type, data.invoiceNumber || d.title, d.clientName || data.clientName, data.status || "draft", data.invoiceDate || d.createdAt, data.dueDate, total.toFixed(2), paid.toFixed(2), owed.toFixed(2), (data.schedule as Row | undefined)?.date];
   }));
   const items = toCsv(["Number", "Client", "Description", "Qty", "Rate"], docs.flatMap((d) => (Array.isArray(d.data?.items) ? (d.data?.items as Row[]) : []).map((i) => [d.data?.invoiceNumber || d.title, d.clientName, i.description, i.qty, i.rate])));
-  const payments = toCsv(["Number", "Client", "Date", "Amount", "Method", "Reference", "Tip"], docs.flatMap((d) => readPayments(d.data || {}).filter((p) => Number(p.amount) > 0).map((p) => [d.data?.invoiceNumber || d.title, d.clientName, p.date, p.amount, p.method ? methodLabel(p.method) : "", p.ref, p.tip])));
+  const payments = toCsv(["Number", "Client", "Date", "Amount", "Method", "Reference", "Tip"], docs.flatMap((d) => readPayments(d.data || {}).filter((p) => (Number(p.amount) || 0) !== 0).map((p) => [d.data?.invoiceNumber || d.title, d.clientName, p.date, p.amount, p.method ? methodLabel(p.method) : "", p.ref, p.tip])));
   const employees = toCsv(["Name", "Type", "Phone", "Role", "Rate", "Hire date", "Active"], input.employees.map((e) => [e.name, e.kind, e.phone, e.role, e.rate, e.hireDate, e.active === false ? "no" : "yes"]));
-  const backup = JSON.stringify({ savedAt: new Date().toISOString(), profile: input.profile, clients: input.clients, documents: input.documents, employees: input.employees }, null, 2);
+  const backup = JSON.stringify({ savedAt: new Date().toISOString(), ...(raw.ownerId ? { ownerId: raw.ownerId } : {}), profile: input.profile, clients: input.clients, documents: input.documents, employees: input.employees }, null, 2);
   return [
     { name: "clients.csv", text: clients }, { name: "documents.csv", text: documents }, { name: "line-items.csv", text: items },
     { name: "payments.csv", text: payments }, { name: "employees.csv", text: employees }, { name: "backup.json", text: backup },

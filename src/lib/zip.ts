@@ -61,3 +61,21 @@ export function downloadBytes(name: string, bytes: Uint8Array, type = "applicati
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/** Backup gaps: read one file from a stored (uncompressed) ZIP made by zipFiles(); null if missing/compressed. */
+export function readZipEntry(bytes: Uint8Array, name: string): string | null {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let at = 0;
+  while (at + 30 <= bytes.length && view.getUint32(at, true) === 0x04034b50) {
+    const method = view.getUint16(at + 8, true);
+    const size = view.getUint32(at + 18, true);
+    const nameLen = view.getUint16(at + 26, true);
+    const extra = view.getUint16(at + 28, true);
+    const entry = new TextDecoder().decode(bytes.subarray(at + 30, at + 30 + nameLen));
+    const start = at + 30 + nameLen + extra;
+    if (entry === name) return method === 0 ? new TextDecoder().decode(bytes.subarray(start, start + size)) : null;
+    at = start + size;
+  }
+  return null;
+}
+export const isZip = (bytes: Uint8Array) => bytes.length > 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 3 && bytes[3] === 4;
