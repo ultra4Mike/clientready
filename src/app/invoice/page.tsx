@@ -208,6 +208,8 @@ export default function NewInvoicePage() {
   const [jobStart, setJobStart] = useState("");
   const [jobMiles, setJobMiles] = useState("");
   const [hoursApprovals, setHoursApprovals] = useState<Record<string, HoursApproval>>({});
+  const [hoursEdit, setHoursEdit] = useState<Record<string, boolean>>({});
+  const [hoursUndo, setHoursUndo] = useState<Record<string, string>>({});
   const [visitNotes, setVisitNotes] = useState<VisitNote[]>([]);
   const [jobEnd, setJobEnd] = useState("");
   const [notes, setNotes] = useState("Payment is due within 14 days.");
@@ -1465,34 +1467,48 @@ export default function NewInvoicePage() {
                       );
                     })()}
                     {(() => {
-                      // Hours approval: scheduled vs clocked vs paid. Approving a different number puts it in the pay hours (owner tap); nothing else changes.
+                      // Hours approval (Jobber/HCP style): clocked is the main number, scheduled is a hint. One Approve pays clocked
+                      // (or scheduled when nobody clocked in); Edit hours lets the owner type a number and approve that. Stored fields unchanged.
                       const mine = clockEntries.filter((entry) => entry.doc_id === docId && entry.employee_id === row.employeeId && entry.ended_at);
                       const clocked = Math.round(mine.reduce((sum, entry) => sum + entryHours(entry), 0) * 100) / 100;
                       const scheduled = Number(hoursBetween(schedule?.startTime || row.startTime, schedule?.endTime || row.endTime)) || 0;
                       const paid = Number(row.hours) || 0;
                       const approval = hoursApprovals[row.employeeId];
                       const state = approval && !approval.revokedAt ? (Math.abs(approval.hours - paid) < 0.005 ? "approved" : "changed") : "pending";
+                      const editing = !!hoursEdit[row.employeeId];
                       const approve = (hours: number, basis: HoursApproval["basis"]) => {
+                        setHoursUndo((current) => ({ ...current, [row.employeeId]: row.hours }));
                         if (Math.abs(hours - paid) >= 0.005) updateCrew(row.id, { hours: hours.toFixed(2) });
                         setHoursApprovals((current) => ({ ...current, [row.employeeId]: { hours: Math.round(hours * 100) / 100, basis, at: new Date().toISOString() } }));
+                        setHoursEdit((current) => ({ ...current, [row.employeeId]: false }));
                         setSaveMessage("Hours approved. Save the document to keep it.");
                       };
+                      const undo = () => {
+                        const before = hoursUndo[row.employeeId];
+                        if (before !== undefined) updateCrew(row.id, { hours: before });
+                        setHoursApprovals((current) => current[row.employeeId] ? ({ ...current, [row.employeeId]: { ...current[row.employeeId], revokedAt: new Date().toISOString() } }) : current);
+                        setSaveMessage("Approval undone. Save the document to keep it.");
+                      };
+                      const primary: [number, HoursApproval["basis"], string] | null = editing ? [paid, "paid hours", `Approve ${paid.toFixed(2)} h`] : mine.length ? [clocked, "clocked", "Approve"] : scheduled > 0 ? [scheduled, "scheduled", "Approve scheduled (no clock-in)"] : paid > 0 ? [paid, "paid hours", "Approve"] : null;
+                      const tFmt = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+                      const span = mine.length ? `${tFmt(mine.reduce((m, e) => (e.started_at < m ? e.started_at : m), mine[0].started_at))}–${tFmt(mine.reduce((m, e) => (String(e.ended_at) > m ? String(e.ended_at) : m), String(mine[0].ended_at)))}` : "";
+                      const differs = mine.length > 0 && scheduled > 0 && Math.abs(clocked - scheduled) > 0.25 && Math.abs(clocked - scheduled) / scheduled > 0.25;
+                      const day = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
                       return (
-                        <div className={`rounded-xl border p-3 text-sm ${state === "changed" ? "cr-tone-warn border-amber-400 bg-amber-50" : state === "approved" ? "border-emerald-300 dark:border-emerald-700/70" : "border-slate-200"}`} data-testid={`hours-approval-${row.employeeId}`} data-state={state}>
-                          <table className="w-full [&_td]:py-1 [&_tr+tr]:border-t [&_tr+tr]:border-slate-200/60"><tbody>
-                            <tr><td>Scheduled</td><td className="text-right tabular-nums" data-testid="hours-scheduled">{scheduled ? `${scheduled.toFixed(2)} h` : "—"}</td></tr>
-                            <tr><td>Clocked</td><td className="text-right tabular-nums" data-testid="hours-clocked">{mine.length ? `${clocked.toFixed(2)} h` : "—"}</td></tr>
-                            {mine.filter((entry) => crewFixReason(entry)).map((entry) => (
-                              <tr key={`why-${entry.id}`} data-testid="hours-fix-reason"><td colSpan={2} className="pt-1.5"><span className="cr-tone-warn block rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs leading-relaxed text-amber-900"><span className="font-semibold">Crew fixed the time:</span> “{crewFixReason(entry)}”</span></td></tr>
-                            ))}
-                            {(row.payType === "day" || row.payType === "job" || String(row.payOverride ?? "").trim()) && <tr data-testid="hours-pay-type"><td colSpan={2} className="text-xs">{String(row.payOverride ?? "").trim() ? `Pay overridden for this job: $${rowPay(row).toFixed(2)}` : row.payType === "day" ? `Fixed day: $${Number(row.fixedPay || 0).toFixed(2)} whatever the clock says` : `Set amount per job: $${Number(row.fixedPay || 0).toFixed(2)}`}. Hours are kept for records.</td></tr>}
-                            <tr><td>Paid (hours above)</td><td className="text-right tabular-nums" data-testid="hours-paid">{paid.toFixed(2)} h</td></tr>
-                          </tbody></table>
-                          <p className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${state === "approved" ? "cr-tone-good bg-emerald-50 text-emerald-800" : state === "changed" ? "bg-amber-200/70 text-amber-900 dark:bg-amber-500/25 dark:text-amber-100" : "bg-slate-100 text-slate-600 dark:bg-white/10"}`} data-testid="hours-approval-status">{state === "approved" ? `Approved ${approval!.hours.toFixed(2)} h (${approval!.basis}) · ${new Date(approval!.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : state === "changed" ? `Hours changed since you approved ${approval!.hours.toFixed(2)} h. Approve again.` : "Hours not approved yet"}</p>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {mine.length > 0 && <button type="button" data-testid="approve-clocked" onClick={() => approve(clocked, "clocked")} className="min-h-11 rounded-lg border border-teal-500/50 px-3 font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">Approve clocked</button>}
-                            {scheduled > 0 && <button type="button" data-testid="approve-scheduled" onClick={() => approve(scheduled, "scheduled")} className="min-h-11 rounded-lg border border-teal-500/50 px-3 font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">Approve scheduled</button>}
-                            {paid > 0 && <button type="button" data-testid="approve-paid" onClick={() => approve(paid, "paid hours")} className="min-h-11 rounded-lg border border-teal-500/50 px-3 font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">Approve paid hours</button>}
+                        <div className={`min-w-0 rounded-xl border p-3 text-sm ${state === "changed" ? "cr-tone-warn border-amber-400 bg-amber-50" : state === "approved" ? "border-emerald-300 dark:border-emerald-700/70" : "border-slate-200"}`} data-testid={`hours-approval-${row.employeeId}`} data-state={state}>
+                          <p className="text-base font-semibold tabular-nums" data-testid="hours-clocked">{mine.length ? `${clocked.toFixed(2)} h clocked` : "No clock-in"}{span && <span className="font-normal text-slate-600 dark:text-slate-300">, {span}</span>}</p>
+                          <p className="text-xs text-slate-500" data-testid="hours-scheduled">{scheduled ? `Scheduled ${scheduled.toFixed(2)} h` : "Not scheduled"}</p>
+                          {differs && <p className="mt-1 text-xs text-amber-800 dark:text-amber-200" data-testid="hours-differ">Clocked time is quite different from the schedule. Check it before approving.</p>}
+                          {mine.filter((entry) => crewFixReason(entry)).map((entry) => (
+                            <p key={`why-${entry.id}`} data-testid="hours-fix-reason" className="cr-tone-warn mt-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs leading-relaxed text-amber-900"><span className="font-semibold">Crew fixed the time:</span> “{crewFixReason(entry)}”</p>
+                          ))}
+                          {(row.payType === "day" || row.payType === "job" || String(row.payOverride ?? "").trim()) && <p data-testid="hours-pay-type" className="mt-1 text-xs">{String(row.payOverride ?? "").trim() ? `Pay overridden for this job: $${rowPay(row).toFixed(2)}` : row.payType === "day" ? `Fixed day: $${Number(row.fixedPay || 0).toFixed(2)} whatever the clock says` : `Set amount per job: $${Number(row.fixedPay || 0).toFixed(2)}`}. Hours are kept for records.</p>}
+                          <p className={`mt-2 inline-flex max-w-full flex-wrap rounded-full px-2.5 py-1 text-xs font-semibold ${state === "approved" ? "cr-tone-good bg-emerald-50 text-emerald-800" : state === "changed" ? "bg-amber-200/70 text-amber-900 dark:bg-amber-500/25 dark:text-amber-100" : "bg-slate-100 text-slate-600 dark:bg-white/10"}`} data-testid="hours-approval-status">{state === "approved" ? `Approved ${approval!.hours.toFixed(2)} h · $${rowPay(row).toFixed(2)} · ${day(approval!.at)}` : state === "changed" ? `Hours changed since you approved ${approval!.hours.toFixed(2)} h. Approve again.` : "Hours not approved yet"}</p>
+                          {editing && <label className="mt-2 block text-xs">Hours to pay<input data-testid="hours-edit-input" inputMode="decimal" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900" value={row.hours} onChange={(event) => updateCrew(row.id, { hours: event.target.value })} /></label>}
+                          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+                            {state !== "approved" && primary && <button type="button" data-testid="approve-hours" onClick={() => approve(primary[0], primary[1])} className="min-h-11 rounded-lg bg-teal-500 px-4 font-semibold text-slate-950! transition hover:bg-teal-400 max-sm:w-full">{primary[2]}</button>}
+                            {state === "approved" && <button type="button" data-testid="approve-undo" onClick={undo} className="min-h-11 bg-transparent px-1 font-medium text-teal-700 underline dark:text-teal-300">Undo</button>}
+                            {state !== "approved" && <button type="button" data-testid="hours-edit" onClick={() => setHoursEdit((current) => ({ ...current, [row.employeeId]: !editing }))} className="min-h-11 bg-transparent px-1 font-medium text-teal-700 underline dark:text-teal-300">{editing ? "Cancel edit" : "Edit hours"}</button>}
                           </div>
                         </div>
                       );
