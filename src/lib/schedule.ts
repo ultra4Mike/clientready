@@ -35,7 +35,7 @@ export type Worker = { id: string; name: string; email?: string; phone?: string;
 export type CrewRow = {
   id: string; employeeId: string; name: string; rate: string; hours: string; startTime: string; endTime: string;
   workDate: string; note: string; bonus: string; paidToWorker: boolean; paidDate: string;
-  payType?: "hourly" | "day" | "job"; fixedPay?: string; payOverride?: string;
+  payType?: import("@/lib/pay-types").PayType; fixedPay?: string; payOverride?: string;
 };
 
 export const STATUS_LABEL: Record<JobStatus, string> = { scheduled: "Scheduled", in_progress: "In progress", done: "Done" };

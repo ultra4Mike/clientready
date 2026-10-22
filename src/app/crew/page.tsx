@@ -9,6 +9,7 @@ import { nextJob, recentJobs } from "@/lib/crew-next";
 import CrewDaysOff from "@/components/CrewDaysOff";
 import { CREW_KINDS, EXTRA_PREFIX, crewKindLabel, legacySummary, type CostLine, type CrewKind } from "@/lib/cost-categories";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import MyDay from "@/components/crew/MyDay";
 import { supabase } from "@/lib/supabase";
 import { crewMarkDone, crewCheckItem, crewOnMyWay, omwTime, crewSetJobStatus, onMyWaySmsHref, STATUS_CLASS, STATUS_LABEL, type JobStatus } from "@/lib/schedule";
 import { compressPhoto } from "@/lib/photos";
@@ -854,6 +855,7 @@ export default function CrewPage() {
         {!detailId && tab === "today" && (
           <section className="space-y-3">
             <h2 className="text-xl font-bold tracking-tight">{today ? dayLabel(today) : "Today"}</h2>
+            {email && <MyDay email={email} employeeId={employeeId} jobs={todayCards.map((card) => ({ docId: card.doc_id, label: [card.client_name, card.invoice_number].filter(Boolean).join(" · ") || "Job", address: card.client_address || "", date: card.job_date, startTime: card.start_time || "", endTime: card.end_time || "" }))} />}
             {todayCards.length === 0 && <EmptyState icon={<Icon name="sun" className="h-6 w-6" />} title="Nothing scheduled for you today." className={`${cardClass} border-dashed`} />}
             {(() => {
               const route = routeStops(todayCards);
