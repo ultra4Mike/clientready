@@ -33,6 +33,22 @@ export function timesheetCutover(today = addDays(localYmd(new Date().toISOString
   return today;
 }
 
+/**
+ * One cutover per owner (crew_timesheet_settings.pay_cutover): the earliest day any device saved wins and is
+ * written back here, so every device pays the same. Without the migration this device's value stays.
+ */
+export async function syncTimesheetCutover(): Promise<string> {
+  const local = timesheetCutover();
+  try {
+    const { supabase } = await import("@/lib/supabase");
+    const { data, error } = await supabase.rpc("crew_claim_pay_cutover", { p_date: local });
+    const cloud = typeof data === "string" ? data.slice(0, 10) : "";
+    if (error || !/^\d{4}-\d{2}-\d{2}$/.test(cloud)) return local;
+    try { window.localStorage.setItem(CUTOVER_KEY, cloud); } catch { /* private mode */ }
+    return cloud;
+  } catch { return local; }
+}
+
 export function readDocs(): Doc[] { try { return JSON.parse(window.localStorage.getItem(DOCS_KEY) || "[]"); } catch { return []; } }
 function readOwnerClockSafe() { try { return readOwnerClock(); } catch { return []; } }
 const rowDate = (row: { workDate?: string }, doc: Doc) => String(row.workDate || readSchedule(doc.data)?.date || "").slice(0, 10);
@@ -131,13 +147,13 @@ export async function pushChangedDocs(changed: Doc[]) {
 /** Recompute the shares for the week containing `date` and write them on the jobs. Used by Timesheet and the invoice. */
 export async function refreshTimesheetPay(date: string, opts: { approvals?: DayApproval[]; now?: string } = {}) {
   const week = weekOf(date);
-  const data = await loadOwnerTimesheet(week, addDays(week, 6));
+  const [data, cutover] = await Promise.all([loadOwnerTimesheet(week, addDays(week, 6)), syncTimesheetCutover()]);
   const workers = readWorkers();
   const docs = readDocs();
   const approvals = opts.approvals || data.approvals;
   const { days, sheets } = weekSheets({ workers, docs, events: data.events, fixes: data.fixes, settings: data.settings, week, now: opts.now || new Date().toISOString() });
   const { pays, shares } = weekShares({ workers, docs, days, sheets, approvals });
-  const applied = applyWeekToDocs(docs, shares, timesheetCutover());
+  const applied = applyWeekToDocs(docs, shares, cutover);
   void pushChangedDocs(applied.changed);
   return { ...applied, pays, sheets, approvals };
 }

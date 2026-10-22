@@ -56,6 +56,8 @@ create table if not exists public.crew_timesheet_settings (
   half_day_hours numeric not null default 4,
   updated_at timestamptz not null default now()
 );
+-- First day crew pay comes from the approved day timesheet: one per owner, shared by every device.
+alter table public.crew_timesheet_settings add column if not exists pay_cutover date;
 
 do $$
 declare t text; pol record;
@@ -121,6 +123,20 @@ begin
   return true;
 end $$;
 
+-- Owner: keep the EARLIEST pay cutover any device saved, and return it so every device uses the same day.
+create or replace function public.crew_claim_pay_cutover(p_date date)
+returns date language plpgsql security definer set search_path = public as $$
+declare result date;
+begin
+  if auth.uid() is null then raise exception 'not signed in' using errcode = 'P0001'; end if;
+  insert into public.crew_timesheet_settings (owner_id, pay_cutover) values (auth.uid(), p_date)
+  on conflict (owner_id) do update set pay_cutover = least(coalesce(crew_timesheet_settings.pay_cutover, excluded.pay_cutover), excluded.pay_cutover), updated_at = now()
+  returning pay_cutover into result;
+  return result;
+end $$;
+revoke all on function public.crew_claim_pay_cutover(date) from public, anon;
+grant execute on function public.crew_claim_pay_cutover(date) to authenticated;
+
 revoke all on function public.crew_add_day_event(text, text, timestamptz, date, text, double precision, double precision, boolean) from public, anon;
 revoke all on function public.crew_request_time_fix(text, date, text, timestamptz, text, text, text) from public, anon;
 grant execute on function public.crew_add_day_event(text, text, timestamptz, date, text, double precision, double precision, boolean) to authenticated;
@@ -132,3 +148,4 @@ grant execute on function public.crew_request_time_fix(text, date, text, timesta
 -- select count(*) = 6 as policies_exist from pg_policies where schemaname = 'public' and tablename in ('crew_day_events', 'crew_time_fixes', 'crew_day_approvals', 'crew_timesheet_settings');
 -- select to_regprocedure('public.crew_add_day_event(text,text,timestamptz,date,text,double precision,double precision,boolean)') is not null and to_regprocedure('public.crew_request_time_fix(text,date,text,timestamptz,text,text,text)') is not null as functions_exist;
 -- select not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name in ('crew_day_events', 'crew_time_fixes') and column_name ~ '(rate|pay|price|amount)') as no_price_columns_for_workers;
+-- select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'crew_timesheet_settings' and column_name = 'pay_cutover' and data_type = 'date') and to_regprocedure('public.crew_claim_pay_cutover(date)') is not null as pay_cutover_ready;

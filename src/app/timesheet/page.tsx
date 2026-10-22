@@ -13,7 +13,7 @@ import { readWorkers, type Worker } from "@/lib/schedule";
 import { weekOf } from "@/lib/pay-types";
 import { decideFix, loadOwnerTimesheet, readLocalTimesheetSettings, saveApprovals, saveTimesheetSettings, type DayApproval } from "@/lib/day-events";
 import { type DaySheet, type FixRequest, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
-import { addDays, applyWeekToDocs, pushChangedDocs, readDocs, timesheetCutover, weekShares, weekSheets } from "@/lib/timesheet-sync";
+import { addDays, applyWeekToDocs, pushChangedDocs, readDocs, syncTimesheetCutover, weekShares, weekSheets } from "@/lib/timesheet-sync";
 import type { DayPay } from "@/lib/timesheet-pay";
 
 const FLAG_LABEL: Record<string, string> = { from_schedule: "From schedule", not_at_site: "Not at site", long_drive: "Long drive", auto_ended: "Auto-ended", fix_requested: "Fix requested", edited: "Edited" };
@@ -32,7 +32,19 @@ export default function TimesheetPage() {
   const [editing, setEditing] = useState<{ key: string; hours: string } | null>(null);
   const [message, setMessage] = useState("");
   const [now, setNow] = useState("");
-  useEffect(() => { const q = new URLSearchParams(window.location.search).get("date"); setWeek(weekOf(q && /^\d{4}-\d{2}-\d{2}$/.test(q) ? q : localYmd(new Date().toISOString()))); setWorkers(readWorkers()); setDocs(readDocs()); setSettings(readLocalTimesheetSettings()); setNow(new Date().toISOString()); }, []);
+  const [cutover, setCutover] = useState("");
+  // Browser-only data, loaded once after the owner's shared pay cutover is synced (async, so no setState during the effect).
+  useEffect(() => {
+    let live = true;
+    void syncTimesheetCutover().then((day) => {
+      if (!live) return;
+      const q = new URLSearchParams(window.location.search).get("date");
+      setCutover(day);
+      setWeek(weekOf(q && /^\d{4}-\d{2}-\d{2}$/.test(q) ? q : localYmd(new Date().toISOString())));
+      setWorkers(readWorkers()); setDocs(readDocs()); setSettings(readLocalTimesheetSettings()); setNow(new Date().toISOString());
+    });
+    return () => { live = false; };
+  }, []);
   useEffect(() => {
     if (!week) return;
     void loadOwnerTimesheet(week, addDays(week, 6)).then((data) => { setEvents(data.events); setFixes(data.fixes); setApprovals(data.approvals); setSettings(data.settings); });
@@ -41,10 +53,10 @@ export default function TimesheetPage() {
   const { pays, shares } = useMemo(() => weekShares({ workers, docs, days, sheets, approvals }), [workers, docs, days, sheets, approvals]);
   // Keep the jobs in step with the week (estimates for unapproved days, the approved day's split otherwise).
   useEffect(() => {
-    if (!week || !now || !shares.size) return;
-    const res = applyWeekToDocs(readDocs(), shares, timesheetCutover());
+    if (!week || !now || !cutover || !shares.size) return;
+    const res = applyWeekToDocs(readDocs(), shares, cutover);
     if (res.changed.length) void pushChangedDocs(res.changed);
-  }, [shares, week, now]);
+  }, [shares, week, now, cutover]);
   const approvalOf = (id: string, date: string) => approvals.find((a) => a.employeeId === id && a.date === date);
   const minutesOf = (id: string, date: string) => { const a = approvalOf(id, date); const s = sheets.get(`${id}|${date}`); return a?.editedMinutes != null ? a.editedMinutes : a?.approvedAt ? a.paidMinutes : s?.paidMinutes || 0; };
 
@@ -141,6 +153,7 @@ export default function TimesheetPage() {
       )}
       <details className="mt-4 rounded-lg border p-3 text-sm" data-testid="ts-settings">
         <summary className="font-semibold">Timesheet rules</summary>
+        {cutover && <p className="mt-2 text-gray-600" data-testid="ts-cutover">Timesheet pay starts on {new Date(`${cutover}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>}
         <div className="mt-2 grid gap-2 sm:grid-cols-3">
           <label>Unpaid gap over (min)<input data-testid="ts-gap" className="mt-1 block min-h-11 w-full rounded border px-2" inputMode="numeric" value={settings.gapMinutes} onChange={(e) => setSettings({ ...settings, gapMinutes: Number(e.target.value) || 0 })} /></label>
           <label>“Still driving?” after (min)<input className="mt-1 block min-h-11 w-full rounded border px-2" inputMode="numeric" value={settings.transitTimeoutMinutes} onChange={(e) => setSettings({ ...settings, transitTimeoutMinutes: Number(e.target.value) || 0 })} /></label>

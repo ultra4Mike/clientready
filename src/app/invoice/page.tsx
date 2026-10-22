@@ -319,8 +319,8 @@ export default function NewInvoicePage() {
     const dates = [...new Set(rows.map((row) => row.workDate || scheduleDate).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)))];
     if (!id || !dates.length) return;
     try {
-      const { refreshTimesheetPay, timesheetCutover } = await import("@/lib/timesheet-sync");
-      const cutover = timesheetCutover();
+      const { refreshTimesheetPay, syncTimesheetCutover } = await import("@/lib/timesheet-sync");
+      const cutover = await syncTimesheetCutover();
       const weeks = new Map<string, string>();
       for (const d of dates) if (d >= cutover || rows.some((row) => row.paySource === "timesheet")) weeks.set(weekOf(d), d);
       let stored: unknown = null;
