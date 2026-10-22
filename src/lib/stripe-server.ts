@@ -3,7 +3,7 @@ import { payNowAmount, readStages, todayYmd } from "@/lib/stages";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { amountOf, documentTotals } from "@/lib/discount";
-import { balanceDue, paidTotal, readPayments } from "@/lib/payments";
+import { owedAfterRefunds, readPayments } from "@/lib/payments";
 
 export function stripeConfig() {
   const secretKey = process.env.STRIPE_SECRET_KEY || "";
@@ -34,7 +34,7 @@ function amountsFor(data: Record<string, unknown>) {
   const items = Array.isArray(data.items) ? (data.items as { qty?: unknown; rate?: unknown }[]) : [];
   const subtotal = items.reduce((sum, item) => sum + amountOf(item.qty) * amountOf(item.rate), 0);
   const totals = documentTotals(subtotal, String(data.taxPercent ?? ""), String(data.discountType ?? ""), String(data.discountValue ?? ""));
-  return { total: totals.total, owed: balanceDue(totals.total, paidTotal(readPayments(data)), data.status) };
+  return { total: totals.total, owed: owedAfterRefunds(totals.total, readPayments(data), data.status, data.rebillRefund) }; // refund never reopens a balance
 }
 
 /** What to charge now: the current payment stage's remainder, or the full balance (no stages / full=true). */

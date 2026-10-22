@@ -6,10 +6,33 @@ import { stageName, depositRemainderStages, installmentStages, STAGE_KIND_LABEL,
 const STATE_LABEL = { paid: "Paid", due: "Due now", overdue: "Overdue", upcoming: "Upcoming" } as const;
 const STATE_CLASS = { paid: "cr-tone-good border-emerald-300 bg-emerald-50 text-emerald-700", due: "cr-tone-teal border-teal-300 bg-teal-50 font-semibold text-teal-700", overdue: "cr-tone-bad border-rose-300 bg-rose-50 font-semibold text-red-600", upcoming: "border-slate-300 text-slate-500" } as const;
 
+/** "2026-10-19" -> "Oct 19, 2026" (no time zone shift: the date is a calendar day). */
+export function niceDate(ymd: string) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  if (!m) return ymd;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+/**
+ * R128: when a row is due, in plain words. Always a date, or (no date) "On approval" for a deposit,
+ * "When the job is done" for the final payment, "As work progresses" otherwise. Never "no due date",
+ * and never a second "Due now" (that is only the one pill on the current row).
+ */
+export function whenDue(row: { dueDate: string; kind: Stage["kind"]; state: string }, awaitingApproval = false) {
+  if (row.state === "paid") return "Paid";
+  if (row.dueDate) return `Due ${niceDate(row.dueDate)}`;
+  if (row.kind === "deposit") return awaitingApproval ? "On approval" : "On approval";
+  return row.kind === "final" ? "When the job is done" : "As work progresses";
+}
+
 /** Customer-facing payment schedule (also on the owner's preview/print). */
-export function StageSchedule({ stages, total, balance, muted = "text-slate-600" }: { stages: Stage[]; total: number; balance: number; muted?: string }) {
+export function StageSchedule({ stages, total, balance, muted = "text-slate-600", awaitingApproval = false, jobDone = false }: { stages: Stage[]; total: number; balance: number; muted?: string; awaitingApproval?: boolean; jobDone?: boolean }) {
   if (!stages.length) return null;
-  const plan = stagePlan(total, balance, stages, todayYmd());
+  const plan = stagePlan(total, balance, stages, todayYmd(), { jobDone });
+  // At most one "Due now": only the current row, and never while the document still waits for approval.
+  const isNow = (row: { id: string; state: string }) => row.state === "due" && row.id === plan.current?.id && !awaitingApproval;
+  const pillLabel = (row: (typeof plan.rows)[number]) => (isNow(row) ? STATE_LABEL.due : row.state === "due" ? (row.kind === "deposit" ? "On approval" : "Upcoming") : STATE_LABEL[row.state]);
+  const pillClass = (row: (typeof plan.rows)[number]) => (isNow(row) ? STATE_CLASS.due : row.state === "due" ? STATE_CLASS.upcoming : STATE_CLASS[row.state]);
   return (
     <div className="print-keep mt-4 border-t border-slate-300 pt-3 text-sm" data-testid="stage-schedule">
       <p className="mb-1 text-xs font-semibold uppercase tracking-wide">Payment schedule</p>
@@ -19,17 +42,17 @@ export function StageSchedule({ stages, total, balance, muted = "text-slate-600"
             <tr key={row.id} data-testid="stage-row" data-state={row.state} className="border-t border-slate-200 first:border-0">
               <td className="py-2 pr-2">
                 {stageName(row)}
-                <span className={`block text-xs ${muted}`}>{row.mode === "percent" && row.value ? `${row.value}% · ` : ""}{row.dueDate ? `due ${row.dueDate}` : "no due date"}</span>
+                <span className={`block text-xs ${muted}`}>{row.mode === "percent" && row.value ? `${row.value}% · ` : ""}{whenDue(row, awaitingApproval)}</span>
               </td>
-              <td className="py-2 pr-2 text-right tabular-nums">${row.amount.toFixed(2)}{row.paid > 0 && row.remaining > 0 && <span className="cr-tone-warn mt-1 inline-flex whitespace-nowrap rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800" data-testid="stage-partial">${row.paid.toFixed(2)} paid · ${row.remaining.toFixed(2)} left</span>}</td>
-              <td className="py-2 text-right"><span className={`inline-flex whitespace-nowrap rounded-full border px-2 py-0.5 text-xs ${STATE_CLASS[row.state]}`}>{STATE_LABEL[row.state]}</span></td>
+              <td className="py-2 pr-2 text-right tabular-nums">${row.amount.toFixed(2)}{row.paid > 0 && row.remaining > 0 && <span className="cr-tone-warn mt-1 inline-flex whitespace-nowrap rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800" data-testid="stage-partial">${row.paid.toFixed(2)} paid · ${row.remaining.toFixed(2)} left</span>}{row.state !== "paid" && !(row.paid > 0) && row.id !== plan.current?.id && <span className={`block text-xs ${muted}`} data-testid="stage-remaining">${row.remaining.toFixed(2)} to pay</span>}</td>
+              <td className="py-2 text-right"><span className={`inline-flex whitespace-nowrap rounded-full border px-2 py-0.5 text-xs ${pillClass(row)}`}>{pillLabel(row)}</span></td>
             </tr>
           ))}
         </tbody>
       </table>
       {plan.current && plan.current.remaining > 0 && (
         <p className="mt-1 font-semibold" data-testid="stage-due-now">
-          {plan.current.state === "upcoming" ? "Next payment" : "Due now"}: ${plan.current.remaining.toFixed(2)} ({plan.current.label || STAGE_KIND_LABEL[plan.current.kind]}{plan.current.dueDate ? `, ${plan.current.dueDate}` : ""})
+          {awaitingApproval ? "Due when you approve" : plan.current.state === "upcoming" ? "Next payment" : plan.current.state === "overdue" ? "Overdue" : "Pay today"}: ${plan.current.remaining.toFixed(2)} ({stageName(plan.current)}{plan.current.dueDate ? `, ${niceDate(plan.current.dueDate)}` : `, ${whenDue(plan.current).toLowerCase()}`})
         </p>
       )}
     </div>

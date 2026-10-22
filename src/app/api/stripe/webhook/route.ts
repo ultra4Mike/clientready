@@ -57,7 +57,8 @@ export async function POST(request: Request) {
   if (session.payment_status !== "paid" || !session.id || !session.amount_total) {
     return Response.json({ received: true, recorded: false });
   }
-  const paidAt = new Date((session.created || Math.floor(Date.now() / 1000)) * 1000).toISOString();
+  // R128: the payment date is when it was paid (the event), not when checkout was opened (could be the day before).
+  const paidAt = new Date((event.created || Math.floor(Date.now() / 1000)) * 1000).toISOString();
   const ref = String(session.payment_intent || session.id);
   const client = serviceClient();
   const park = async (reason: string, amount: number) => {

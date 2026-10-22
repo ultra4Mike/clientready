@@ -54,6 +54,8 @@ export function jobProfit(input: { total: number; data: Record<string, unknown> 
     { key: "meals", label: "Meals", amount: money(costs.lunch) },
     { key: "fees", label: "Other fees", amount: fees.reduce((sum, fee) => sum + money(fee.amount), 0) },
     { key: "card", label: collected > 0 ? `Card fees (est., after $${collected.toFixed(2)} collected)` : "Card fees (est. 2.9% + 30¢)", amount: netCard },
+    // R128: money refunded to the client lowers this job's profit (card fees are not returned by Stripe).
+    { key: "refund", label: "Refunded to client", amount: payments.filter((p) => String((p as { id?: unknown }).id || "").startsWith("refund_") && money(p.amount) < 0).reduce((sum, p) => sum - money(p.amount), 0) },
     { key: "mileage", label: `Mileage (${miles} mi × $${irsMileageRate(day).toFixed(3).replace(/0$/, "")})`, amount: mileage },
   ].map((line) => ({ ...line, amount: r2(line.amount) })).filter((line) => line.amount > 0);
   const cost = r2(lines.reduce((sum, line) => sum + line.amount, 0));
