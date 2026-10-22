@@ -8,7 +8,7 @@ import PageHeader from "@/components/PageHeader";
 import StuckPayments from "@/components/StuckPayments";
 import { saveCloudDocument } from "@/lib/cloud-docs";
 import { amountOf, documentTotals } from "@/lib/discount";
-import { balanceDue, invoicePastDue, methodLabel, isOpenBalance, paidTotal, paymentFields, paymentMethods, readPayments } from "@/lib/payments";
+import { balanceDue, invoicePastDue, methodLabel, isOpenBalance, isVoidStatus, paidTotal, paymentFields, paymentMethods, readPayments } from "@/lib/payments";
 import { uniqueDocs } from "@/lib/change-orders";
 import { isPendingRecurringDraft } from "@/lib/recurring";
 import ReminderPanel from "@/components/ReminderPanel";
@@ -56,6 +56,7 @@ function amountPaid(doc: SavedDocument) {
 }
 
 function balance(doc: SavedDocument) {
+  if (isVoidStatus(doc.data?.status) || (doc.data as { deleted?: unknown } | undefined)?.deleted) return 0; // void never counts as owed
   return balanceDue(invoiceTotal(doc), amountPaid(doc), doc.data?.status);
 }
 

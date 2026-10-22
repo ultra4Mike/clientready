@@ -354,7 +354,12 @@ export default function NewInvoicePage() {
       // The document to open comes from the URL (?id=..., survives reloads and is per-tab) or,
       // for older links, the one-shot "open-document" handoff key.
       const urlId = new URLSearchParams(window.location.search).get("id");
-      const openId = urlId || window.localStorage.getItem("clientready-open-document");
+      // Help retest (INV-1015): a left-over "open this doc" note must never open an unrelated invoice on a reload
+      // of a new form. It is read once and removed at once; a reload only follows the URL.
+      const isReload = (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined)?.type === "reload";
+      const stashedId = window.localStorage.getItem("clientready-open-document");
+      window.localStorage.removeItem("clientready-open-document");
+      const openId = urlId || (isReload ? "" : stashedId);
       const raw = window.localStorage.getItem("clientready-documents");
       const wanted = window.localStorage.getItem("clientready-new-type");
       if (!openId) {
@@ -575,6 +580,8 @@ export default function NewInvoicePage() {
 
   // Never lose typed work: the editor's fields are kept as a draft until Save (schedule has its own autosave).
   const draftValue = { clientName, clientCompany, contactName, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, notes, items, taxPercent, discountType, discountValue, payments };
+  const [saveToast, setSaveToast] = useState(false);
+  useEffect(() => { if (!saveToast) return; const t = window.setTimeout(() => setSaveToast(false), 6000); return () => window.clearTimeout(t); }, [saveToast, saveMessage]);
   const draft = useAutosaveDraft("doc", docId || `new-${docKind}`, draftValue, { enabled: formReady && notFound === "" });
   function restoreDraft() { restoreFrom(draft.accept() as Partial<typeof draftValue> | null); }
   function restoreFrom(v: Partial<typeof draftValue> | null) {
@@ -786,6 +793,7 @@ export default function NewInvoicePage() {
   function clearForm() {
     if (locked) return;
     window.history.replaceState(null, "", "/invoice");
+    draft.clear(`new-${docKind}`); // Clear form also drops the autosaved draft (no "Restore unsaved changes?" for cleared work)
     setDocId(""); setClientSearch(""); setClientName(""); setClientId(""); setClientCompany(""); setContactName(""); setStockUsed([]); setDepositPercent(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
     setInvoiceNumber(nextNumber(docKind)); setInvoiceDate(ymd(new Date())); setDueDate(plusDays(isProposal ? 14 : defaultInvoiceTerms().days)); setJobStart(""); setJobEnd("");
     setNotes(isProposal ? "This proposal is valid for 14 days." : defaultInvoiceTerms().notes);
@@ -793,8 +801,21 @@ export default function NewInvoicePage() {
     setStyle("clean"); setJobTime(""); setCosts(emptyCosts); setCrew([]); setOtherFees([]); setCrewReport(null);
   }
 
-  /** `cash` (from "Mark paid in cash") saves with that payment list and status instead of the form's. */
+  /** Help retest: Save never fails silently. Errors show a message, and every result also shows as a toast at the bottom of the screen. */
   async function saveDocument(cash?: unknown) {
+    try {
+      const id = await saveDocumentInner(cash);
+      setSaveToast(true);
+      return id;
+    } catch {
+      setSaveMessage("Could not save this document. Check your connection and press Save again. Nothing you typed was lost.");
+      setSaveToast(true);
+      return undefined;
+    }
+  }
+
+  /** `cash` (from "Mark paid in cash") saves with that payment list and status instead of the form's. */
+  async function saveDocumentInner(cash?: unknown) {
     const over = cash && typeof cash === "object" && Array.isArray((cash as { payments?: unknown }).payments) ? (cash as { payments: Payment[]; status: string }) : null;
     const savePayments = over ? over.payments : payments;
     const saveStatus = over ? over.status : status;
@@ -818,6 +839,7 @@ export default function NewInvoicePage() {
       if (required) {
         setSaveMessage(required);
         setPaymentProblem(required);
+        document.querySelector('[data-testid="payment-method"]')?.scrollIntoView({ block: "center", behavior: "smooth" });
         return;
       }
     }
@@ -1171,6 +1193,7 @@ export default function NewInvoicePage() {
               <option value="sent">Sent</option>
               {isProposal ? <option value="accepted">Accepted</option> : <><option value="paid">Paid</option><option value="overdue">Overdue</option><option value="void">Void</option></>}
             </select>
+            {!isProposal && status === "paid" && !payments.some((row) => amountOf(row.amount) > 0) && !legacyPaymentIds.length && <p className="text-xs font-medium text-amber-700 dark:text-amber-300" data-testid="paid-needs-payment">To save as Paid, add the payment below (amount and how it was paid), or use Mark paid.</p>}
             <select className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={style} onChange={(event) => setStyle(event.target.value)}>
               <option value="clean">Clean professional</option><option value="bold">Bold modern</option>
             </select>
@@ -1494,6 +1517,7 @@ export default function NewInvoicePage() {
               )}
               {!locked && <button type="button" onClick={clearForm} className="cr-btn cr-btn-text">Clear form</button>}
             </div>
+            {saveMessage && saveToast && <p role="status" aria-live="polite" onClick={() => setSaveToast(false)} className="print-hide fixed bottom-24 left-1/2 z-50 w-[min(92vw,32rem)] -translate-x-1/2 cursor-pointer rounded-lg border border-teal-500/40 bg-[var(--cr-card)] px-4 py-3 text-sm font-medium shadow-lg" data-testid="save-toast" data-kind={paymentProblem && saveMessage === paymentProblem ? "payment-required" : undefined}>{saveMessage}</p>}
             {saveMessage && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-slate-600" data-testid="save-message" data-kind={paymentProblem && saveMessage === paymentProblem ? "payment-required" : undefined}>{saveMessage}</p>}
           </fieldset>
         </form>

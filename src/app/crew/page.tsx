@@ -193,7 +193,9 @@ export default function CrewPage() {
   const [doneFor, setDoneFor] = useState("");
   const [donePhotos, setDonePhotos] = useState<string[]>([]);
   const [spend, setSpend] = useState<{ kind: string; amount: string; note: string; receipt: string }>({ kind: "parts", amount: "", note: "", receipt: "" });
-  const [fixing, setFixing] = useState<{ id: string; start: string; end: string; reason: string } | null>(null);
+  const [fixing, setFixingRaw] = useState<{ id: string; start: string; end: string; reason: string } | null>(null);
+  const [fixError, setFixError] = useState("");
+  const setFixing = (next: { id: string; start: string; end: string; reason: string } | null) => { setFixError(""); setFixingRaw(next); };
 
   async function load() {
     const { data, error: userError } = await supabase.auth.getUser();
@@ -470,11 +472,12 @@ export default function CrewPage() {
 
   async function saveFix() {
     if (!fixing) return;
-    if (fixing.reason.trim().length < 3) return setMessage("Say why you're changing the time (for your boss).");
+    // Help retest R121: the warning shows inside the Fix time form (the page message was off screen).
+    if (fixing.reason.trim().length < 3) { setFixError("Say why you're changing the time (for your boss)."); return; }
     // R121: never save a fix that makes the entry 0 minutes, negative, or unreadable.
     const fixStart = new Date(fixing.start).getTime(), fixEnd = new Date(fixing.end).getTime();
     const problem = fixTimeProblem(Number.isFinite(fixStart) ? new Date(fixStart).toISOString() : "", Number.isFinite(fixEnd) ? new Date(fixEnd).toISOString() : "");
-    if (problem) return setMessage(problem);
+    if (problem) { setFixError(problem); return; }
     if (fixEnd - fixStart > 16 * 3600000 && !window.confirm(`That is ${Math.round((fixEnd - fixStart) / 3600000)} hours. Save anyway?`)) return;
     await act(`fix-${fixing.id}`, () => crewEditClock(fixing.id, new Date(fixing.start).toISOString(), new Date(fixing.end).toISOString(), fixing.reason), "Time corrected. Your boss will see the reason.");
     setFixing(null);
@@ -678,6 +681,7 @@ export default function CrewPage() {
                 <label className="space-y-1 text-xs font-medium">End<input type="datetime-local" className={input} value={fixing.end} onChange={(event) => setFixing({ ...fixing, end: event.target.value })} /></label>
               </div>
               <input className={input} placeholder="Reason, e.g. forgot to clock out" value={fixing.reason} onChange={(event) => setFixing({ ...fixing, reason: event.target.value })} aria-label="Reason" />
+              {fixError && <p role="alert" data-testid="clock-fix-error" className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-700 dark:text-red-300">{fixError}</p>}
               <div className="flex gap-2">
                 <button type="button" onClick={saveFix} className="flex-1 rounded-xl bg-teal-500 px-3 py-2.5 font-semibold text-slate-950! transition hover:bg-teal-400 sm:flex-none">Save time</button>
                 <button type="button" onClick={() => setFixing(null)} className="flex-1 rounded-xl border border-teal-500/30 px-3 py-2.5 font-medium transition hover:border-teal-400 sm:flex-none">Cancel</button>
