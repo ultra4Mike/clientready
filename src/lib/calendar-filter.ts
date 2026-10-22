@@ -4,8 +4,10 @@
  *
  * approved: an accepted/approved proposal, or an invoice that is sent/paid/overdue or was made from a proposal.
  * pending:  a proposal that was sent but is not approved yet.
- * draft:    a draft invoice or draft proposal.
+ * draft:    an unsent draft invoice or proposal.
  */
+import { hiddenFromCalendar, isUnsentDraft, needsApproval } from "@/lib/doc-status";
+
 type Doc = { id: string; type?: string; data?: Record<string, unknown> };
 export type Approval = "approved" | "pending" | "draft";
 export type CalendarFilter = { approved: boolean; pending: boolean; drafts: boolean; invoices: boolean; proposals: boolean };
@@ -17,24 +19,24 @@ export const PRESETS: Record<Preset, CalendarFilter> = {
   drafts: { approved: false, pending: false, drafts: true, invoices: true, proposals: true },
   proposals: { approved: true, pending: true, drafts: true, invoices: false, proposals: true },
 };
-export const PRESET_LABEL: Record<Preset, string> = { approved: "Approved only", drafts: "Drafts only", proposals: "Proposals only", all: "All" };
+export const PRESET_LABEL: Record<Preset, string> = { approved: "Approved only", drafts: "Unsent drafts", proposals: "Proposals only", all: "All" };
 
-export function approvalOf(doc: Doc): Approval {
-  const data = doc.data || {};
-  const status = String(data.status || "draft");
-  if (doc.type === "proposal") {
-    const approval = data.approval as { status?: string } | undefined;
-    if (status === "accepted" || approval?.status === "approved") return "approved";
-    return status === "draft" ? "draft" : "pending";
-  }
-  if ((data.fromProposal as { id?: string } | undefined)?.id) return "approved";
-  return status === "draft" ? "draft" : "approved";
+/**
+ * Help live check: buckets use the shared rules in lib/doc-status. "draft" = unsent draft (any type);
+ * "pending" = a proposal / change order sent and still waiting on approval; everything else is approved work.
+ */
+export function approvalOf(doc: Doc, allDocs: Doc[] = []): Approval {
+  if (isUnsentDraft(doc)) return "draft";
+  return needsApproval(doc, allDocs) ? "pending" : "approved";
 }
-export const isTentative = (doc: Doc) => approvalOf(doc) !== "approved";
+/** NOT APPROVED tag: only unapproved proposals and change orders sent for approval (never a plain invoice). */
+export const isTentative = (doc: Doc, allDocs: Doc[] = []) => needsApproval(doc, allDocs);
 
-export function visibleOnCalendar(doc: Doc, f: CalendarFilter) {
+/** Void docs and proposals that already have an invoice never show (so "Proposals only" excludes converted ones). */
+export function visibleOnCalendar(doc: Doc, f: CalendarFilter, allDocs: Doc[] = []) {
+  if (hiddenFromCalendar(doc, allDocs)) return false;
   if (doc.type === "proposal" ? !f.proposals : !f.invoices) return false;
-  const a = approvalOf(doc);
+  const a = approvalOf(doc, allDocs);
   return a === "approved" ? f.approved : a === "pending" ? f.pending : f.drafts;
 }
 export function presetOf(f: CalendarFilter): Preset | "" {

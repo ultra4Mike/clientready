@@ -51,7 +51,7 @@ export default function TodayPage() {
       });
   }, []);
 
-  const jobs = today ? scheduledJobs(docs).filter((job) => job.schedule.date === today && visibleOnCalendar(job.doc, filter)) : [];
+  const jobs = today ? scheduledJobs(docs).filter((job) => job.schedule.date === today && visibleOnCalendar(job.doc, filter, docs)) : [];
   // "Any time" jobs (no start time) go after timed jobs.
   jobs.sort((a, b) => (a.schedule.startTime || "99:99").localeCompare(b.schedule.startTime || "99:99"));
 
@@ -99,7 +99,7 @@ export default function TodayPage() {
             const people = schedule.workerIds.map((id) => workers.get(id)).filter(Boolean).join(", ");
             const tone = schedule.status === "done" ? (done === "awaiting" ? "border-l-amber-400" : "border-l-emerald-500") : schedule.status === "in_progress" ? "border-l-sky-400" : "border-l-teal-500";
             return (
-              <li key={doc.id} data-testid="today-job" data-doc-id={doc.id} data-time={schedule.startTime || ""} data-status={schedule.status} data-done={done || undefined} data-tentative={isTentative(doc) || undefined} className={`grid grid-cols-[4.5rem_minmax(0,1fr)] gap-3 rounded-2xl border border-l-4 border-teal-500/20 bg-[var(--cr-card)] p-4 text-sm shadow-sm sm:grid-cols-[6rem_minmax(0,1fr)] sm:gap-5 sm:p-5 ${tone}${isTentative(doc) ? " cr-tentative border-dashed opacity-60" : ""}`}>
+              <li key={doc.id} data-testid="today-job" data-doc-id={doc.id} data-time={schedule.startTime || ""} data-status={schedule.status} data-done={done || undefined} data-tentative={isTentative(doc, docs) || undefined} className={`grid grid-cols-[4.5rem_minmax(0,1fr)] gap-3 rounded-2xl border border-l-4 border-teal-500/20 bg-[var(--cr-card)] p-4 text-sm shadow-sm sm:grid-cols-[6rem_minmax(0,1fr)] sm:gap-5 sm:p-5 ${tone}${isTentative(doc, docs) ? " cr-tentative border-dashed opacity-60" : ""}`}>
                 <div className="font-semibold tabular-nums leading-tight">
                   <span data-testid="today-time">{schedule.startTime ? timeLabel(schedule.startTime) : "Any time"}{schedule.endTime ? ` – ${timeLabel(schedule.endTime)}` : ""}</span>
                 </div>
@@ -107,7 +107,7 @@ export default function TodayPage() {
                   <p className="text-base font-semibold">
                     <a href={`/invoice?id=${encodeURIComponent(doc.id)}`} className="underline-offset-2 hover:underline">{text(doc.data?.clientName) || doc.clientName || doc.title}</a>
                   </p>
-                  {isTentative(doc) && <span data-testid="not-approved-tag" className="inline-block rounded border border-dashed border-current px-1.5 text-[11px] font-semibold uppercase tracking-wide">Not approved</span>}
+                  {isTentative(doc, docs) && <span data-testid="not-approved-tag" className="inline-block rounded border border-dashed border-current px-1.5 text-[11px] font-semibold uppercase tracking-wide">Not approved</span>}
                   <OverlapBadge docs={docs} doc={doc} onMoved={read} />
                   <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--cr-muted)]" data-testid="today-status"><span className={`inline-block shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold ${schedule.status === "done" ? (done === "awaiting" ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300" : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300") : schedule.status === "in_progress" ? "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300" : "border-teal-500/30 bg-teal-500/10 text-teal-700 dark:text-teal-300"}`}>{statusLabel(schedule)}</span><span className="min-w-0 break-words"><span className="whitespace-nowrap">{doc.title}</span>{people ? ` · ${people}` : ""}</span></p>
                   {schedule.checklist && schedule.checklist.length > 0 && (

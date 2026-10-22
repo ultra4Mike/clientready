@@ -6,6 +6,7 @@ import PageHeader from "@/components/PageHeader";
 import { amountOf, documentTotals } from "@/lib/discount";
 import { uniqueDocs } from "@/lib/change-orders";
 import { loadAccountIntoCache } from "@/lib/account-cache";
+import { hiddenFromCalendar, isDueInvoice, jobRowLabel } from "@/lib/doc-status";
 import { addDaysYmd, localYmd, niceYmd, scheduledJobs, timeLabel } from "@/lib/scheduled-jobs";
 import { doneState, statusLabel } from "@/lib/schedule";
 
@@ -60,14 +61,14 @@ export default function UpcomingPage() {
   const today = localYmd();
   const last = addDaysYmd(today, 6);
   const jobs = useMemo(
-    () => scheduledJobs(documents).filter(({ schedule }) => schedule.date >= today && schedule.date <= last),
+    () => scheduledJobs(documents).filter(({ doc, schedule }) => !hiddenFromCalendar(doc, documents) && schedule.date >= today && schedule.date <= last),
     [documents, today, last],
   );
   const upcoming = useMemo(() => {
     const scheduled = new Set(jobs.map(({ doc }) => doc.id));
     return documents
       .filter((doc) => doc.type === "invoice" && !scheduled.has(doc.id) && /^\d{4}-\d{2}-\d{2}$/.test(doc.data?.dueDate || ""))
-      .filter((doc) => doc.data?.status !== "paid" && (doc.data?.dueDate || "") >= today && (doc.data?.dueDate || "") <= last)
+      .filter((doc) => isDueInvoice(doc) && (doc.data?.dueDate || "") >= today && (doc.data?.dueDate || "") <= last)
       .sort((a, b) => String(a.data?.dueDate).localeCompare(String(b.data?.dueDate)));
   }, [documents, jobs, today, last]);
 
@@ -101,7 +102,7 @@ export default function UpcomingPage() {
                 {doc.title} · {doc.clientName}
               </p>
               <p className="mt-0.5 text-sm text-slate-600">
-                {niceYmd(schedule.date)} · <span data-done={doneState(schedule) || undefined}>Job {statusLabel(schedule).toLowerCase()}</span>
+                {niceYmd(schedule.date)} · <span data-testid="upcoming-status" data-done={doneState(schedule) || undefined}>{jobRowLabel(doc, documents, statusLabel(schedule))}</span>
               </p>
             </a>
           ))}

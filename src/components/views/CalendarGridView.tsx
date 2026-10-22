@@ -10,6 +10,7 @@ import { uniqueDocs } from "@/lib/change-orders";
 import { scheduledJobs } from "@/lib/scheduled-jobs";
 import { allConflicts, bookingConflicts, clockText, nextOpenSlot, readOverrides, splitConflicts } from "@/lib/conflicts";
 import { ignoresTentative, isTentative, PRESETS, readCalendarFilter, saveCalendarFilter, visibleOnCalendar, type CalendarFilter } from "@/lib/calendar-filter";
+import { belongsInUnscheduled, isDueInvoice } from "@/lib/doc-status";
 import CalendarFilterBar from "@/components/CalendarFilterBar";
 import { confirmRemovalFor, moveSchedule, omwTime, readSchedule, readWorkers, saveSchedule, DONE_CLASS, DONE_LABEL, doneState, STATUS_CLASS, STATUS_LABEL, statusClass, statusLabel, type DoneState, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
 
@@ -77,12 +78,12 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
   const workerName = useMemo(() => new Map(workers.map((person) => [person.id, person.name])), [workers]);
 
   const jobDocs = docs.filter((doc) => doc.type === "invoice" || doc.type === "proposal");
-  const jobs: Job[] = scheduledJobs(jobDocs).filter((job) => visibleOnCalendar(job.doc, filter));
+  const jobs: Job[] = scheduledJobs(jobDocs).filter((job) => visibleOnCalendar(job.doc, filter, jobDocs));
   const skipTentative = ignoresTentative(filter);
   const clashList = allConflicts(jobDocs);
   const clashing = new Set(clashList.filter((c) => !c.tentative).flatMap((c) => [c.docId, c.otherDocId]));
   const softClashing = new Set(clashList.filter((c) => c.tentative).flatMap((c) => [c.docId, c.otherDocId]).filter((id) => !clashing.has(id))); // R127
-  const unscheduled = jobDocs.filter((doc) => !readSchedule(doc.data) && text(doc.data?.status) !== "paid");
+  const unscheduled = jobDocs.filter((doc) => belongsInUnscheduled(doc, jobDocs, Boolean(readSchedule(doc.data))));
 
   async function save(docId: string, schedule: Schedule | null, options?: { keepOpen?: boolean; confirmed?: string[] }) {
     try {
@@ -169,12 +170,12 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
         draggable
         data-testid={`${tid}job-${job.doc.id}`}
         data-status={job.schedule.status}
-        data-tentative={isTentative(job.doc) || undefined}
+        data-tentative={isTentative(job.doc, jobDocs) || undefined}
         data-state={clashing.has(job.doc.id) ? "blocked" : undefined}
         data-done={doneState(job.schedule) || undefined}
         onDragStart={(event) => event.dataTransfer.setData("text/plain", job.doc.id)}
         onClick={(event) => { event.stopPropagation(); setEditing({ docId: job.doc.id }); }}
-        className={agenda ? `flex min-h-11 cursor-pointer flex-col justify-center rounded-lg border border-l-4 px-3 py-2 text-left text-sm font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc) ? " cr-tentative border-dashed opacity-60" : ""}` : `cr-chip2 cursor-grab min-w-0 break-words rounded-md border border-l-4 px-1.5 py-1 text-left text-xs font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc) ? " cr-tentative border-dashed opacity-60" : ""}`}
+        className={agenda ? `flex min-h-11 cursor-pointer flex-col justify-center rounded-lg border border-l-4 px-3 py-2 text-left text-sm font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc, jobDocs) ? " cr-tentative border-dashed opacity-60" : ""}` : `cr-chip2 cursor-grab min-w-0 break-words rounded-md border border-l-4 px-1.5 py-1 text-left text-xs font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc, jobDocs) ? " cr-tentative border-dashed opacity-60" : ""}`}
         title={`${job.doc.title} · ${job.doc.clientName} · ${statusLabel(job.schedule)}${job.schedule.onMyWayAt && job.schedule.status !== "done" ? ` · ${job.schedule.onMyWayBy || "Crew"} on the way` : ""}${people ? ` · ${people}` : ""}`}
       >
         {agenda ? (
@@ -188,7 +189,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
             {job.doc.clientName || job.doc.title}
           </>
         )}
-        {isTentative(job.doc) && <span data-testid="not-approved-tag" className="mt-0.5 inline-block rounded border border-dashed border-current px-1 text-[10px] font-semibold uppercase tracking-wide">Not approved</span>}
+        {isTentative(job.doc, jobDocs) && <span data-testid="not-approved-tag" className="mt-0.5 inline-block rounded border border-dashed border-current px-1 text-[10px] font-semibold uppercase tracking-wide">Not approved</span>}
         {!compact && people && <span className="block truncate opacity-80">{people}</span>}
         {compact && softClashing.has(job.doc.id) && <span data-testid="overlap-dot" data-soft="true" title="A job that isn't approved yet holds this time" className="block text-amber-700/80 dark:text-amber-300/80">Pending overlap</span>}
         {compact && clashing.has(job.doc.id) && <span data-testid="overlap-dot" title="Overlap: same worker on another job at this time" className="block font-semibold text-amber-700 dark:text-amber-300">⚠ Overlap</span>}
@@ -325,13 +326,13 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
 
             {(view === "week" || view === "month") && (() => {
               const days = (view === "week" ? weekDays : monthCells.filter((day): day is string => Boolean(day)))
-                .filter((day) => view === "week" || day === today || jobs.some((job) => job.schedule.date === day) || docs.some((doc) => doc.type === "invoice" && doc.data?.dueDate === day && text(doc.data?.status) !== "paid"));
+                .filter((day) => view === "week" || day === today || jobs.some((job) => job.schedule.date === day) || docs.some((doc) => isDueInvoice(doc) && doc.data?.dueDate === day));
               return (
                 <div className="space-y-3 min-[900px]:hidden" data-testid="agenda-list">
                   {days.length === 0 && <p className="py-8 text-center text-sm text-[var(--cr-muted)]">No jobs this month.</p>}
                   {days.map((day) => {
                     const dayJobs = jobs.filter((job) => job.schedule.date === day).sort((a, b) => a.schedule.startTime.localeCompare(b.schedule.startTime));
-                    const due = view === "month" ? docs.filter((doc) => doc.type === "invoice" && doc.data?.dueDate === day && text(doc.data?.status) !== "paid") : [];
+                    const due = view === "month" ? docs.filter((doc) => isDueInvoice(doc) && doc.data?.dueDate === day) : [];
                     return (
                       <section key={day} data-testid={`agenda-day-${day}`}>
                         <h2 className={`sticky top-[env(safe-area-inset-top)] z-10 -mx-2 mb-1.5 max-sm:mx-0 max-sm:rounded-lg max-sm:border max-sm:border-teal-500/15 flex items-center gap-2 px-3 py-2 text-sm font-semibold backdrop-blur sm:-mx-3 ${day === today ? "bg-teal-500/15 text-teal-700 dark:text-teal-300" : "bg-[var(--cr-card)]/95"}`}>
@@ -368,7 +369,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
                       {day && <div className={`mb-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${day === today ? "bg-teal-500 text-slate-950!" : ""}`}>{parse(day).getDate()}</div>}
                       <div className="space-y-0.5">
                         {day && jobs.filter((job) => job.schedule.date === day).sort((a, b) => a.schedule.startTime.localeCompare(b.schedule.startTime)).map((job) => chip(job, true))}
-                        {day && docs.filter((doc) => doc.type === "invoice" && doc.data?.dueDate === day && text(doc.data?.status) !== "paid").map((doc) => (
+                        {day && docs.filter((doc) => isDueInvoice(doc) && doc.data?.dueDate === day).map((doc) => (
                           <a key={`due-${doc.id}`} href={`/invoice-view?id=${encodeURIComponent(doc.id)}`} onClick={(event) => event.stopPropagation()} className="block truncate opacity-70" data-testid={`due-${doc.id}`}>Due: {doc.title}</a>
                         ))}
                       </div>

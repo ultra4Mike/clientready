@@ -27,7 +27,10 @@ export function suggestRenumber<T extends Doc>(list: T[]): T {
 
 /** Next free number with the same prefix ("INV-" -> INV-<max+1>). */
 export function nextFreeNumber(docs: Doc[], type: string, like: string) {
-  const prefix = (like.match(/^(.*?)\d+\s*$/)?.[1]) || (type === "proposal" ? "PROP-" : "INV-");
+  const own = type === "proposal" ? "PROP-" : "INV-";
+  const liked = like.match(/^(.*?)\d+\s*$/)?.[1] || "";
+  // Help live check: never carry the other type's prefix (a proposal copied from INV-1021 must not get INV-1022).
+  const prefix = !liked || (type === "proposal" ? /^INV-?$/i : /^PROP-?$/i).test(liked) ? own : liked;
   let max = 1000;
   for (const doc of docs) {
     if (doc.type !== type) continue;
@@ -38,3 +41,15 @@ export function nextFreeNumber(docs: Doc[], type: string, like: string) {
 }
 
 export const isSentDoc = sent;
+
+/**
+ * Help live check (INV-1022 on a draft proposal): the number prefix must match the document type.
+ * An unsent doc whose number has the other type's prefix (INV- on a proposal, PROP- on an invoice)
+ * gets the next free number of its own type; anything else (sent docs, custom prefixes) is kept.
+ */
+export function numberForKind(docs: Doc[], type: string, current: string, status: string, selfId = "") {
+  const value = String(current || "").trim();
+  const wrong = type === "proposal" ? /^INV-?\d+$/i : /^PROP-?\d+$/i;
+  if (!wrong.test(value) || !["", "draft"].includes(status)) return value;
+  return nextFreeNumber(docs.filter((doc) => doc.id !== selfId), type, type === "proposal" ? "PROP-1000" : "INV-1000");
+}

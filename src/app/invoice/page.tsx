@@ -7,7 +7,7 @@ import Section, { SectionDefaults, useOpenedExisting } from "@/components/Sectio
 import EmailComposer from "@/components/EmailComposer";
 import StageBar from "@/components/StageBar";
 import { applyCrewAmount, applyFeeAmount, customCostLineNames, customFeeEstimates, isCostKey, isFeeKind, type CostKey, CREW_KINDS, CREW_TYPE_CHOICES, crewApplySnapshot, crewTypeLabel, crewTypeMismatch, estimateByKind, extraName, isExtraItem, isCrewKind, readCostLines, readCrewUndo, undoCrewApply, type CostFields, type CostLine, type CrewApplyUndo, type CrewKind } from "@/lib/cost-categories";
-import { docAmounts, documentStage, NEXT_LABEL, STAGE_LABEL, STAGES } from "@/lib/doc-stage";
+import { docAmounts, NEXT_LABEL, STAGE_LABEL, STAGES } from "@/lib/doc-stage";
 import { readEmailLog, type EmailLogEntry } from "@/lib/email";
 import { clientIdFor } from "@/lib/portal";
 import JobDonePanel from "@/components/JobDonePanel";
@@ -15,7 +15,7 @@ import { StageEditor, StageSchedule } from "@/components/StageSchedule";
 import { balanceLabel, readStages, type Stage } from "@/lib/stages";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { saveCloudDocument } from "@/lib/cloud-docs";
-import { displayStatus } from "@/lib/doc-status";
+import { displayStatus, jobMessageKind, rowStage } from "@/lib/doc-status";
 import InventoryUse, { type StockUse } from "@/components/InventoryUse";
 import { OwnerVisitNotes } from "@/components/CrewVisitNote";
 import { refreshEmployeesCache } from "@/lib/account-cache";
@@ -63,7 +63,8 @@ import { createClientFromInvoice } from "@/lib/client-create";
 import { defaultInvoiceTerms } from "@/lib/terms";
 import OverlapBadge from "@/components/OverlapBadge";
 import { bookingConflicts, clockText, readOverrides, type Conflict, type Override } from "@/lib/conflicts";
-import { readApproval, refreshApproval, type Approval } from "@/lib/approval";
+import { approvalBadgeApplies, readApproval, refreshApproval, type Approval } from "@/lib/approval";
+import { numberForKind } from "@/lib/doc-numbers";
 import { generateNextNow, readRecurring, readRecurringFrom, scheduleFromForm, type Frequency, type RecurringFrom } from "@/lib/recurring";
 import PayQr from "@/components/PayQr";
 import { invoiceQrUrl, payUrlFor } from "@/lib/pay-link";
@@ -658,8 +659,8 @@ export default function NewInvoicePage() {
   // Picked client's id, else the one saved client with exactly this name (else none: match by name).
   const docClientId = clientId || clientIdFor({ clientName }, savedClients);
   // Read-only stage of what is on screen (never changes status).
-  const docStage = documentStage(
-    { id: docId, type: isProposal ? "proposal" : "invoice", data: { status, approval, schedule, items, payments, taxPercent, discountType, discountValue } },
+  const docStage = rowStage(
+    { id: docId, type: isProposal ? "proposal" : "invoice", data: { status, approval, schedule, items, payments, taxPercent, discountType, discountValue, dueDate, ...(changeOrderOf ? { changeOrderOf } : {}) } },
     madeInvoices.length ? [{ type: "invoice", data: { fromProposal: { id: docId } } }] : []
   );
   // StageBar's button runs the existing screen action for the next step (owner click only; nothing automatic).
@@ -717,6 +718,8 @@ export default function NewInvoicePage() {
     if (locked) return;
     setDocKind(kind);
     if (!docId) setInvoiceNumber(nextNumber(kind));
+    // Help live check: an unsent saved doc switched to the other type also takes that type's prefix.
+    else setInvoiceNumber((current) => numberForKind(JSON.parse(window.localStorage.getItem("clientready-documents") || "[]"), kind, current, approval ? "sent" : status, docId));
     if (kind === "proposal" && (status === "paid" || status === "overdue")) setStatus("sent");
     setNotes(kind === "proposal" ? "This proposal is valid for 14 days." : defaultInvoiceTerms().notes);
   }
@@ -912,6 +915,9 @@ export default function NewInvoicePage() {
     const over = cash && typeof cash === "object" && Array.isArray((cash as { payments?: unknown }).payments) ? (cash as { payments: Payment[]; status: string }) : null;
     const savePayments = over ? over.payments : payments;
     const saveStatus = over ? over.status : status;
+    // Help live check: a draft proposal is never saved with an INV- number (or an invoice with PROP-).
+    const fixedNumber = numberForKind(JSON.parse(window.localStorage.getItem("clientready-documents") || "[]"), isProposal ? "proposal" : "invoice", invoiceNumber, approval ? "sent" : saveStatus, docId);
+    if (fixedNumber !== invoiceNumber) setInvoiceNumber(fixedNumber);
     if (locked) {
       setSaveMessage("Trial ended. Old documents stay viewable; saving new work needs a plan. Plan details coming soon (see Plans).");
       return;
@@ -953,7 +959,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, ...(linkedClientId ? { clientId: linkedClientId } : {}), clientCompany, ...(contactName.trim() ? { contactName: contactName.trim() } : {}), ...(stockUsed.length ? { stockUsed } : {}), ...(isProposal && Number(depositPercent) > 0 ? { depositPercent: String(Math.min(Number(depositPercent), 100)) } : {}), clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), ...(rebillRefund ? { rebillRefund: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(storedSchedule && (stored?.data?.schedule || !isProposal) ? { schedule: storedSchedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.autoSent ? { autoSent: (stored?.data as Record<string, unknown>).autoSent } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviewAskedAt ? { reviewAskedAt: (stored?.data as Record<string, unknown>).reviewAskedAt } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew: savedCrew, ...(crewReport ? { crewReport } : {}), ...(Object.keys(crewKindFix).length ? { crewKindFix } : {}), ...(crewUndo.length ? { crewUndo } : {}) },
+      data: { clientName, ...(linkedClientId ? { clientId: linkedClientId } : {}), clientCompany, ...(contactName.trim() ? { contactName: contactName.trim() } : {}), ...(stockUsed.length ? { stockUsed } : {}), ...(isProposal && Number(depositPercent) > 0 ? { depositPercent: String(Math.min(Number(depositPercent), 100)) } : {}), clientEmail, clientPhone, clientAddress, invoiceNumber: fixedNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), ...(rebillRefund ? { rebillRefund: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(storedSchedule && (stored?.data?.schedule || !isProposal) ? { schedule: storedSchedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.autoSent ? { autoSent: (stored?.data as Record<string, unknown>).autoSent } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviewAskedAt ? { reviewAskedAt: (stored?.data as Record<string, unknown>).reviewAskedAt } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew: savedCrew, ...(crewReport ? { crewReport } : {}), ...(Object.keys(crewKindFix).length ? { crewKindFix } : {}), ...(crewUndo.length ? { crewUndo } : {}) },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -975,7 +981,7 @@ export default function NewInvoicePage() {
       void mileage.sync().catch(() => {});
     }
     await saveCrewJobs(cloudId, {
-      invoiceNumber,
+      invoiceNumber: fixedNumber,
       clientName,
       clientPhone,
       clientAddress,
@@ -1673,8 +1679,9 @@ export default function NewInvoicePage() {
                 Customer rating: <span className="text-base tracking-wider text-amber-500" aria-label={`${rating.stars} of 5 stars`}>{starsText(rating.stars)}</span>{rating.comment ? <> · “{rating.comment}”</> : null}
               </p>
             )}
-            {!isProposal && schedule?.date && (() => {
-              const kind = schedule.status === "done" ? "complete" : "scheduled";
+            {!isProposal && schedule?.date && jobMessageKind(status, schedule.status) && (() => {
+              // Help live check: no "you're scheduled" draft on a void doc; a paid one offers the job-complete note.
+              const kind = jobMessageKind(status, schedule.status);
               const draft = kind === "complete" ? completeMessage(clientName, businessName, invoiceNumber) : scheduledMessage(clientName, businessName, schedule);
               const body = jobMsg && jobMsg.kind === `${kind}:${draft}` ? jobMsg.text : draft;
               const sms = reviewSmsHref(clientPhone, body);
@@ -1772,7 +1779,7 @@ export default function NewInvoicePage() {
                 <p>{[ownerName, businessEmail, businessPhone].filter(Boolean).join(" · ")}</p>
               </div>
               <div className="sm:shrink-0 sm:text-right">
-                {approval && <div className="mb-1"><ApprovalBadge approval={approval} /></div>}
+                {approval && approvalBadgeApplies({ type: isProposal ? "proposal" : "invoice", data: { status, ...(changeOrderOf ? { changeOrderOf } : {}) } }, approval) && <div className="mb-1"><ApprovalBadge approval={approval} /></div>}
                 {recurringFrom && !isProposal && <p className="change-order-badge mb-1 mr-1 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide" data-testid="recurring-badge">Recurring</p>}
                 {changeOrderOf && !isProposal && <p className="change-order-badge mb-1 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide" data-testid="change-order-badge">Change order</p>}
                 <p className={`text-xs uppercase tracking-wide ${labelClass}`}>{isProposal ? "Proposal" : "Invoice"}</p>

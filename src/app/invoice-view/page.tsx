@@ -19,7 +19,7 @@ import { printOrigin } from "@/lib/site";
 import { SignatureBlock } from "@/components/SignaturePad";
 import { readSignature, type Signature } from "@/lib/signature";
 import { ApprovalBadge } from "@/components/Approval";
-import { readApproval, refreshApproval, type Approval } from "@/lib/approval";
+import { approvalBadgeApplies, readApproval, refreshApproval, type Approval } from "@/lib/approval";
 import { amountOf, documentTotals, discountLabel } from "@/lib/discount";
 
 type LineItem = {
@@ -252,9 +252,9 @@ export default function InvoiceViewPage() {
               {jobTime && <p>Scheduled time: {jobTime}</p>}
             </div>
             <div className="shrink-0 text-right">
-              {approval && <div className="mb-1"><ApprovalBadge approval={approval} /></div>}
+              {approvalBadgeApplies({ type: "invoice", data: { status, ...(changeOrderOf ? { changeOrderOf } : {}) } }, approval) && approval && <div className="mb-1"><ApprovalBadge approval={approval} /></div>}
               {changeOrderOf && <p className="change-order-badge mb-1 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide" data-testid="change-order-badge">Change order</p>}
-              <p className="text-xs uppercase tracking-wide text-slate-500">Invoice · <span data-testid="invoice-status-pill" className={`inline-flex items-center rounded-full border px-2.5 py-0.5 font-semibold ${status === "paid" ? "cr-tone-good border-emerald-200 bg-emerald-100 text-emerald-800" : "cr-tone-warn border-amber-200 bg-amber-100 text-amber-800"}`}>{status === "paid" ? "✓ paid" : status}</span></p>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Invoice · <span data-testid="invoice-status-pill" className={`inline-flex items-center rounded-full border px-2.5 py-0.5 font-semibold ${status === "paid" ? "cr-tone-good border-emerald-200 bg-emerald-100 text-emerald-800" : "cr-tone-warn border-amber-200 bg-amber-100 text-amber-800"}`}>{status === "paid" ? "✓ paid" : ["void", "voided"].includes(status) ? "void" : status}</span></p>
               <h1 className="mt-0.5 text-2xl font-bold leading-tight tracking-tight">{invoiceNumber || "Invoice"}</h1>
               <p className="text-sm text-slate-600">Date: {invoiceDate || "-"} · Due: {dueDate || "-"}</p>
               {changeOrderOf && (

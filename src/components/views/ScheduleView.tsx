@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { loadAccountIntoCache } from "@/lib/account-cache";
 import { uniqueDocs } from "@/lib/change-orders";
+import { hiddenFromCalendar } from "@/lib/doc-status";
 import { localYmd, niceYmd, scheduledJobs, timeLabel, type ScheduledJob } from "@/lib/scheduled-jobs";
 import { doneState, statusLabel } from "@/lib/schedule";
 import PageHeader from "@/components/PageHeader";
@@ -46,7 +47,8 @@ export default function SchedulePage() {
     const readJobs = () => {
       const raw = window.localStorage.getItem("clientready-documents");
       const today = localYmd();
-      setJobs(scheduledJobs(raw ? uniqueDocs(JSON.parse(raw) as ScheduledJob["doc"][]) : []).filter(({ schedule }) => schedule.date >= today));
+      const all = raw ? uniqueDocs(JSON.parse(raw) as ScheduledJob["doc"][]) : [];
+      setJobs(scheduledJobs(all).filter(({ doc, schedule }) => !hiddenFromCalendar(doc, all) && schedule.date >= today));
     };
     Promise.resolve().then(readJobs);
     loadAccountIntoCache().catch(() => false).then(() => { readJobs(); setLoaded(true); });

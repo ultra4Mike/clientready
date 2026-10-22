@@ -41,9 +41,11 @@ export function approvalUrl(token: string) {
 /** Help retest: "Awaiting approval" only on proposals and change orders; a plain invoice never needs approval. */
 export function approvalBadgeApplies(doc: { type?: string; data?: Record<string, unknown> | null }, approval: Approval | null) {
   if (!approval) return false;
+  if (["void", "voided"].includes(String(doc.data?.status || ""))) return false;
   if (doc.type !== "invoice") return true;
+  // Help live check: a plain invoice (even one made from an approved proposal) shows no approval badge.
   const of = doc.data?.changeOrderOf as { id?: string; number?: string } | undefined;
-  return Boolean(of?.id || of?.number) || approval.status === "approved";
+  return Boolean(of?.id || of?.number);
 }
 
 export function approvalLabel(approval: Approval | null) {

@@ -18,8 +18,8 @@ import { saveCloudDocument } from "@/lib/cloud-docs";
 import { nextFreeNumber } from "@/lib/doc-numbers";
 import { documentTotals } from "@/lib/discount";
 import { billedOutstanding, cashCollected } from "@/lib/money";
-import { documentStage, NEXT_LABEL, STAGE_LABEL } from "@/lib/doc-stage";
-import { displayStatus } from "@/lib/doc-status";
+import { NEXT_LABEL, STAGE_LABEL } from "@/lib/doc-stage";
+import { displayStatus, isChangeOrder, isVoidDoc, rowStage } from "@/lib/doc-status";
 import PeriodToggle from "@/components/PeriodToggle";
 import { inPeriod, periodRange, type PeriodRange } from "@/lib/period";
 import { isOpenBalance, isVoidStatus, invoicePastDue, owedAfterRefunds, paidTotal, readPayments } from "@/lib/payments";
@@ -38,6 +38,12 @@ type SavedDocument = {
     [key: string]: unknown;
   };
 };
+
+/** Help live check: a change order shows its own total (a credit reads -$X), never a bare dash. */
+export function totalText(doc: { type?: string; data?: Record<string, unknown> }, total: number) {
+  if (Math.abs(total) > 0.004) return `${total < 0 ? "-" : ""}$${Math.abs(total).toFixed(2)}`;
+  return isChangeOrder(doc) ? "$0.00" : "—";
+}
 
 function num(value: unknown) {
   return Number(String(value ?? "").replace(/[^0-9.-]/g, "")) || 0;
@@ -72,8 +78,9 @@ export default function DocumentsPage({ initialView = "all" }: { initialView?: "
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkMessage, setBulkMessage] = useState("");
   const deferredSearch = useDeferredValue(search);
-  const stages = useMemo(() => new Map(documents.map((doc) => [doc.id, documentStage(doc, documents)])), [documents]);
-  const stageOf = (doc: SavedDocument) => stages.get(doc.id) || documentStage(doc, documents);
+  const stages = useMemo(() => new Map(documents.map((doc) => [doc.id, rowStage(doc, documents)])), [documents]);
+  const stageOf = (doc: SavedDocument) => stages.get(doc.id) || rowStage(doc, documents);
+  const stageText = (doc: SavedDocument) => (stageOf(doc).void ? "Void" : STAGE_LABEL[stageOf(doc).stage]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -195,7 +202,7 @@ export default function DocumentsPage({ initialView = "all" }: { initialView?: "
         if (doc.type !== "invoice" || !invoicePastDue(doc.data, info.total, info.owed)) return false;
       } else if (statusFilter === "paid") {
         // R80: Paid = nothing owed (payments, not just the status box).
-        if (!(doc.type === "invoice" && status !== "draft" && info.total > 0 && info.owed <= 0.004)) return false;
+        if (!(doc.type === "invoice" && !isVoidDoc(doc) && status !== "draft" && info.total > 0 && info.owed <= 0.004)) return false;
       } else if (statusFilter === "accepted") {
         // R80: "Accepted" = proposals the client approved (approval link) or marked accepted.
         if (!(doc.type === "proposal" && (status === "accepted" || (doc.data?.approval as { status?: string } | undefined)?.status === "approved"))) return false;
@@ -368,7 +375,7 @@ export default function DocumentsPage({ initialView = "all" }: { initialView?: "
             data-testid="doc-row"
             data-stage={stageOf(doc).stage}
             data-next-action={stageOf(doc).next}
-            title={`${STAGE_LABEL[stageOf(doc).stage]}${NEXT_LABEL[stageOf(doc).next] ? ` · Next: ${NEXT_LABEL[stageOf(doc).next]}` : ""}`}
+            title={`${stageText(doc)}${NEXT_LABEL[stageOf(doc).next] ? ` · Next: ${NEXT_LABEL[stageOf(doc).next]}` : ""}`}
             className="grid grid-cols-2 gap-x-4 gap-y-2 border-b border-teal-500/10 px-4 py-4 transition last:border-b-0 hover:bg-teal-500/5 md:items-center md:px-5 md:py-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_6.5rem_minmax(6.5rem,auto)_auto] md:gap-x-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_6.5rem_6.5rem_minmax(6.5rem,auto)_auto]"
           >
             {selecting && <label className="col-span-2 flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium md:hidden"><input type="checkbox" className="h-6 w-6 accent-teal-500" data-testid="doc-select" checked={selected.has(doc.id)} onChange={() => toggleSelected(doc.id)} aria-label={`Select ${doc.title || "document"}`} /> Select</label>}
@@ -380,7 +387,7 @@ export default function DocumentsPage({ initialView = "all" }: { initialView?: "
               <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-[var(--cr-muted)]">
                 <span className="capitalize">{doc.type}</span>
                 <span aria-hidden="true">·</span>
-                <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${({ draft: "border-slate-400/40 bg-slate-400/10", sent: "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300", approved: "border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300", scheduled: "border-teal-500/40 bg-teal-500/10 text-teal-700 dark:text-teal-300", invoiced: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300", paid: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" } as Record<string, string>)[stageOf(doc).stage] || "border-slate-400/40"}`}>{STAGE_LABEL[stageOf(doc).stage]}</span>
+                <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${({ draft: "border-slate-400/40 bg-slate-400/10", sent: "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300", approved: "border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300", scheduled: "border-teal-500/40 bg-teal-500/10 text-teal-700 dark:text-teal-300", invoiced: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300", paid: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" } as Record<string, string>)[stageOf(doc).stage] || "border-slate-400/40"}`}>{stageText(doc)}</span>
                 {NEXT_LABEL[stageOf(doc).next] ? <span className="text-teal-700 dark:text-teal-300">Next: {NEXT_LABEL[stageOf(doc).next]}</span> : null}
               </p>
               {(() => { const approval = readApproval(doc.data?.approval); return approvalBadgeApplies(doc, approval) ? <ApprovalBadge approval={approval} className="mt-1" /> : null; })()}
@@ -394,7 +401,7 @@ export default function DocumentsPage({ initialView = "all" }: { initialView?: "
             <p className="text-right text-sm tabular-nums text-[var(--cr-muted)] md:hidden xl:block xl:text-left">{doc.createdAt}</p>
             <div>{(() => { const shown = displayStatus(doc, documents); return <span data-testid="doc-status" data-status={shown.key} className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${({ paid: "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300", draft: "border-slate-400/40 bg-slate-400/15", sent: "border-sky-500/40 bg-sky-500/15 text-sky-700 dark:text-sky-300", overdue: "border-red-500/40 bg-red-500/15 text-red-700 dark:text-red-300", approved: "border-teal-500/40 bg-teal-500/15 text-teal-700 dark:text-teal-300", scheduled: "border-teal-500/40 bg-teal-500/15 text-teal-700 dark:text-teal-300" } as Record<string, string>)[shown.key] || "border-teal-500/30"}`}>{shown.label}</span>; })()}</div>
             <div className="whitespace-nowrap text-right text-sm tabular-nums">
-              <p className="font-semibold">{(factsById.get(doc.id)?.total || 0) > 0 ? `$${(factsById.get(doc.id)?.total || 0).toFixed(2)}` : "—"}</p>
+              <p className="font-semibold" data-testid="doc-total">{totalText(doc, factsById.get(doc.id)?.total || 0)}</p>
               {(factsById.get(doc.id)?.owed || 0) > 0 && doc.data?.status !== "draft" ? <p className="text-xs text-amber-600 dark:text-amber-300">${(factsById.get(doc.id)?.owed || 0).toFixed(2)} owed</p> : null}
             </div>
             <div className="tap-row col-span-2 flex justify-end gap-2 border-t border-teal-500/10 pt-3 md:col-span-1 md:w-[14rem] md:shrink-0 xl:w-[15.5rem] md:gap-1.5 md:border-0 md:pt-0">
