@@ -1,12 +1,20 @@
 /* ClientReady service worker: offline app shell + push display. Never caches API calls, Supabase
    responses or anything cross-origin, so business data only lives in the app's own storage. */
-const VERSION = "cr-v2";
+const VERSION = "cr-v3";
 const SHELL = `${VERSION}-shell`;
 const STATIC = `${VERSION}-static`;
 const PRECACHE = ["/offline", "/icons/icon-192.png"];
-// Field pages kept ready for no-signal use even if never opened online on this device (best effort:
+// Every app page is kept ready for no-signal use even if never opened online on this device (best effort:
 // a failure here never blocks install). Their /_next/static scripts and styles are cached too.
-const WARM_PAGES = ["/today", "/schedule", "/crew", "/calendar"];
+// Field pages go first. Excluded: NO_CACHE_PAGES (token pages), /auth/callback and /reset-password (one-time
+// auth links), /offline (in PRECACHE) and dynamic /clients/[id] (cached when opened).
+// tests/sw-routes.test.ts fails if a page in src/app is missing here and not excluded.
+const WARM_PAGES = [
+  "/today", "/schedule", "/crew", "/calendar", "/week", "/upcoming", "/route", "/report", "/receipt", "/mileage",
+  "/", "/dashboard", "/invoice", "/proposal", "/documents", "/drafts", "/clients", "/employees", "/collect",
+  "/history", "/reports", "/year", "/backup", "/inventory", "/email", "/integrations", "/settings", "/profile",
+  "/plans", "/subscribe", "/help", "/developers", "/privacy", "/terms", "/login", "/signup",
+];
 
 async function warm(path) {
   try {
@@ -21,11 +29,15 @@ async function warm(path) {
     // offline during install: the page is cached the first time it is opened online instead
   }
 }
+// Six at a time so a phone on a weak signal isn't flooded during install.
+async function warmAll() {
+  for (let i = 0; i < WARM_PAGES.length; i += 6) await Promise.all(WARM_PAGES.slice(i, i + 6).map(warm));
+}
 // Public token pages show someone else's document; don't keep copies of them.
 const NO_CACHE_PAGES = ["/approve", "/portal", "/invoice-view", "/account/delete"];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(SHELL).then((cache) => cache.addAll(PRECACHE)).then(() => Promise.all(WARM_PAGES.map(warm))).then(() => self.skipWaiting()));
+  event.waitUntil(caches.open(SHELL).then((cache) => cache.addAll(PRECACHE)).then(() => warmAll()).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (event) => {
