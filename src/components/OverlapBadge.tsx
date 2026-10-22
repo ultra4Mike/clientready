@@ -24,6 +24,13 @@ export default function OverlapBadge({ docs, doc, onMoved }: { docs: Doc[]; doc:
     setState(saved ? `Moved to ${clockText(Number(slot.startTime.slice(0, 2)) * 60 + Number(slot.startTime.slice(3)))}` : "Could not move. Try again.");
     onMoved?.();
   }
+  // R127: when every clash involves a job that isn't approved, it's a soft "pending" heads-up, not a hard overlap.
+  if (clash.every((c) => c.tentative)) return (
+    <span data-testid="overlap-badge" data-soft="true" data-doc={doc.id} className="inline-flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-amber-400/60 px-2 py-1 text-xs text-amber-800 dark:text-amber-200">
+      <span>Pending: {text} (not approved yet)</span>
+      {slot && <button type="button" data-testid="overlap-move" onClick={move} className="min-h-11 rounded-md border border-amber-500/60 px-3 font-medium">Move to next open time</button>}
+    </span>
+  );
   return (
     <span data-testid="overlap-badge" data-doc={doc.id} className="inline-flex flex-wrap items-center gap-2 rounded-lg border border-amber-400/60 bg-amber-50 px-2 py-1 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
       <span>⚠ Overlap: {text}</span>
