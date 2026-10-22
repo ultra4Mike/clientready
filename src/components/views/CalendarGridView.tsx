@@ -132,7 +132,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
       if (!clash.length && soft.length) {
         const who = soft.map((c) => `${workerName.get(c.workerId) || "Worker"} on ${c.title} ${clockText(c.start)}–${clockText(c.end)}`).join("\n");
         const slot = nextOpenSlot(docs, docId, date, next.workerIds, softLen, next.startTime ? toMin(next.startTime) : undefined, { ignoreTentative: skipTentative });
-        if (slot && slot !== next.startTime && window.confirm(`A pending proposal holds this time (not approved yet):\n${who}\n\nMove it to the next open time, ${clockText(toMin(slot))}? Cancel keeps it here.`)) {
+        if (slot && slot !== next.startTime && window.confirm(`Tentative booking here (unapproved proposal, pending change order or unsent draft):\n${who}\n\nMove it to the next open time, ${clockText(toMin(slot))}? Cancel keeps it here.`)) {
           setConflictNote({ state: "moved", text: `Moved to the next open time, ${clockText(toMin(slot))}.` });
           return save(docId, moveSchedule(next, date, slot));
         }

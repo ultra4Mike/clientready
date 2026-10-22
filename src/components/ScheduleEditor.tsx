@@ -212,7 +212,7 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
         )}
         {conflicts.length === 0 && softConflicts.length > 0 && (
           <div role="status" data-testid="booking-soft" data-state="warn" className="mt-2 space-y-2 rounded-xl border border-dashed border-amber-400 px-3 py-3 text-sm text-amber-900 dark:text-amber-200">
-            <p>A pending proposal holds this time: {softConflicts.map((c) => `${names.get(c.workerId) || "Worker"} on ${c.title} ${clockText(c.start)}–${clockText(c.end)}`).join("; ")} (not approved yet). You can still save.</p>
+            <p>Tentative booking here (not confirmed yet): {softConflicts.map((c) => `${names.get(c.workerId) || "Worker"} on ${c.title} ${clockText(c.start)}–${clockText(c.end)}`).join("; ")}. It's an unapproved proposal, pending change order or unsent draft. You can still save.</p>
             {suggestion && <button type="button" data-testid="soft-next-open" data-time={suggestion} onClick={() => applySlot(suggestion)} className="cr-btn cr-btn-secondary">Move to next open time: {clockText(toMin(suggestion))}</button>}
           </div>
         )}
