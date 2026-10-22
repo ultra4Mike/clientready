@@ -606,10 +606,9 @@ html.dark .cr-section-head > h2,
 html.dark .cr-section-head > p,
 html.dark .cr-section-head > div > p:first-child,
 html.dark .cr-section-label { color: #5eead4; }
-/* Your costs: standard dark card with a subtle amber left accent (beats html.dark .owner-costs at 0,2,1). */
+/* Your costs: standard dark card, no accent (beats html.dark .owner-costs at 0,2,1). */
 html.dark .cr-section.owner-costs[data-section="costs"] {
   background-color: transparent !important;
   border-color: rgba(45, 212, 191, 0.25) !important;
-  border-left-color: #f59e0b !important;
 }
 html.dark .cr-section.owner-costs[data-section="costs"] > .cr-section-head > h2 { color: #5eead4 !important; }
