@@ -18,6 +18,8 @@ export const clockText = (total: number) => {
 export const hhmmOf = (total: number) => `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 
 function sched(doc: Doc): Sched | null {
+  // R119: void / deleted jobs never clash.
+  if (["void", "voided", "deleted"].includes(String(doc.data?.status || "")) || doc.data?.deleted) return null;
   const raw = doc.data?.schedule as Sched | undefined;
   if (raw && typeof raw === "object" && /^\d{4}-\d{2}-\d{2}$/.test(String(raw.date || ""))) {
     // R112: people added with "+ Add crew" (crew rows) count too, not only schedule.workerIds.
@@ -40,14 +42,23 @@ export function readOverrides(value: unknown): Override[] {
   return value.filter((o) => o && typeof o === "object" && (o as Override).workerId && (o as Override).otherDocId)
     .map((o) => ({ workerId: String((o as Override).workerId), otherDocId: String((o as Override).otherDocId), at: String((o as Override).at || "") }));
 }
+const fromId = (doc?: Doc) => String((doc?.data?.fromProposal as { id?: string } | undefined)?.id || "");
+/** R119: a proposal and the invoice made from it, or a device/cloud copy of one number, are one job, not a clash. */
+function sameJob(a: Doc, b?: Doc) {
+  if (!b) return false;
+  if (fromId(a) === b.id || fromId(b) === a.id) return true;
+  const n = (d: Doc) => String(d.data?.invoiceNumber || "").trim().toLowerCase();
+  return Boolean(n(a)) && n(a) === n(b) && (a as { type?: string }).type === (b as { type?: string }).type && (a as { clientName?: string }).clientName === (b as { clientName?: string }).clientName;
+}
 const titleOf = (doc: Doc) => String(doc.data?.invoiceNumber || doc.title || "another job");
 
 /** Other jobs that day for these people (their booked blocks), sorted by start. */
 export function bookedBlocks(docs: Doc[], docId: string, date: string, workerIds: string[]): Block[] {
   const out: Block[] = [];
   if (!date || !workerIds.length) return out;
+  const byId = new Map(docs.map((doc) => [doc.id, doc]));
   for (const doc of docs) {
-    if (!doc || doc.id === docId) continue;
+    if (!doc || doc.id === docId || sameJob(doc, byId.get(docId))) continue;
     const s = sched(doc);
     if (!s || s.date !== date || s.status === "done") continue;
     const t = span(s);
@@ -99,7 +110,7 @@ export function allConflicts(docs: Doc[]) {
 /** R112: overlaps for one job as it is saved now (any path that sets a time or crew). */
 export function conflictsForDoc(docs: Doc[], doc: Doc): Conflict[] {
   const s = sched(doc);
-  return s ? bookingConflicts(docs.filter((item) => item.id !== doc.id), doc.id, s) : [];
+  return s ? bookingConflicts([...docs.filter((item) => item.id !== doc.id), doc], doc.id, s) : [];
 }
 
 /** R112: same job moved to the next open time for its people (same date and length), or null. */

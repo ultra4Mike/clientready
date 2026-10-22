@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
+import OverlapBadge from "@/components/OverlapBadge";
 import PageHeader from "@/components/PageHeader";
 import { loadAccountIntoCache } from "@/lib/account-cache";
 import { docAmounts } from "@/lib/doc-stage";
@@ -83,6 +84,7 @@ export default function JobPage() {
                 {s ? (
                   <>
                     <p data-testid="job-when">{niceYmd(s.date)} · {s.startTime ? `${timeLabel(s.startTime)}${s.endTime ? `–${timeLabel(s.endTime)}` : ""}` : "Any time"} · <span data-testid="job-status">{statusLabel(s)}</span></p>
+                    {chain.scheduleDoc && <OverlapBadge docs={docs} doc={chain.scheduleDoc} onMoved={() => window.location.reload()} />}
                     <p data-testid="job-crew">{crew.length ? crew.map((id) => workers.get(id) || "Unknown worker").join(", ") : "No crew assigned"}</p>
                   </>
                 ) : <p data-testid="job-unscheduled">Not scheduled yet.</p>}

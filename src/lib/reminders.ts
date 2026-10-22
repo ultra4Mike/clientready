@@ -30,7 +30,10 @@ export function greetingName(clientName: string, contactName = "", clientCompany
   if (!name || name === "No client") return "there";
   if (clientCompany.trim() && name.toLowerCase() === clientCompany.trim().toLowerCase()) return "there";
   if (BUSINESS.test(name)) return "there";
-  return name.split(/\s+/)[0];
+  const first = name.split(/\s+/)[0];
+  // R119: not a person's first name: an acronym ("QA job 2"), a number, or a job/test label.
+  if (/\d/.test(name) || /^[A-Z]{2,5}$/.test(first) || /\b(job|test|demo|sample|unit|lot|site)\b/i.test(name)) return "there";
+  return first;
 }
 
 function firstName(name: string, contact?: string, company?: string) {
