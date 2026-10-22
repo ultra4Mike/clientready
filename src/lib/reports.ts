@@ -3,7 +3,7 @@ import { jobWhen } from "@/lib/job-when";
 import { cashEntries } from "@/lib/money";
 import { isVoidStatus, readPayments } from "@/lib/payments";
 import { isPendingRecurringDraft } from "@/lib/recurring";
-import { uniqueDocs } from "@/lib/change-orders";
+import { dedupeCopies } from "@/lib/doc-dedupe";
 import { jobProfit, type ProfitLine } from "@/lib/job-profit";
 
 type Doc = { id: string; type: string; title?: string; clientName?: string; createdAt?: string; data?: Record<string, unknown> };
@@ -47,7 +47,7 @@ export type JobRow = { id: string; type: string; number: string; client: string;
  * costs, as on the year packet). Jobs: each billed invoice's total minus its owner job cost.
  */
 export function buildReport(allDocs: Doc[], crewExpenses: CrewExpense[], year: string) {
-  const docs = uniqueDocs(allDocs);
+  const docs = dedupeCopies(allDocs); // R117: device + cloud copy of one number counts once
   const months: MonthRow[] = MONTHS.map((_, month) => ({ month, billed: 0, collected: 0, jobCosts: 0, crewReceipts: 0 }));
   const jobs: JobRow[] = [];
   for (const doc of docs) {

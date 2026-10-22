@@ -1168,7 +1168,7 @@ export default function NewInvoicePage() {
             <select className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={status} onChange={(event) => setStatus(event.target.value)}>
               <option value="draft">Draft</option>
               <option value="sent">Sent</option>
-              {isProposal ? <option value="accepted">Accepted</option> : <><option value="paid">Paid</option><option value="overdue">Overdue</option></>}
+              {isProposal ? <option value="accepted">Accepted</option> : <><option value="paid">Paid</option><option value="overdue">Overdue</option><option value="void">Void</option></>}
             </select>
             <select className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={style} onChange={(event) => setStyle(event.target.value)}>
               <option value="clean">Clean professional</option><option value="bold">Bold modern</option>

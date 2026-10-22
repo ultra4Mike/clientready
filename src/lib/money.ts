@@ -6,6 +6,7 @@
  */
 import { docAmounts } from "./doc-stage";
 import { readPayments, isRefundRow } from "./payments";
+import { dedupeCopies } from "./doc-dedupe";
 
 type Doc = { id: string; type: string; title?: string; createdAt?: string; data?: Record<string, unknown> };
 export type CashEntry = { docId: string; date: string; amount: number };
@@ -22,17 +23,19 @@ const ymd = (value: unknown) => {
 const voided = (doc: Doc) => ["void", "voided", "deleted"].includes(String(doc.data?.status || "")) || Boolean(doc.data?.deleted) || doc.data?.recurringReview === "pending";
 
 export function cashEntries(allDocs: Doc[]): CashEntry[] {
-  const seen = new Set<string>();
-  const docs = allDocs.filter((doc) => { if (seen.has(doc.id)) return false; seen.add(doc.id); return !voided(doc); });
+  const docs = dedupeCopies(allDocs).filter((doc) => !voided(doc)); // R117: ids and device/cloud copies once
   const out: CashEntry[] = [];
   const invoiceKeys = new Map<string, Set<string>>(); // proposal id -> payment keys already on its invoices
-  for (const doc of docs) {
+  const carrierFirst = [...docs].sort((a, b) => Number(Boolean((b.data?.fromProposal as { depositApplied?: boolean } | undefined)?.depositApplied)) - Number(Boolean((a.data?.fromProposal as { depositApplied?: boolean } | undefined)?.depositApplied)));
+  for (const doc of carrierFirst) {
     if (doc.type !== "invoice") continue;
     const data = doc.data || {};
-    const payments = readPayments(data).filter((p) => !(p as { voided?: unknown }).voided && (isRefundRow(p) ? num(p.amount) < 0 : num(p.amount) > 0));
+    const from = (data.fromProposal as { id?: string } | undefined)?.id;
+    const already = from ? invoiceKeys.get(from) : undefined;
+    // R126: a deposit copied onto a second invoice from the same proposal counts once (on the first).
+    const payments = readPayments(data).filter((p) => !(p as { voided?: unknown }).voided && (isRefundRow(p) ? num(p.amount) < 0 : num(p.amount) > 0) && !(already && (already.has(`id:${p.id}`) || already.has(`k:${num(p.amount)}|${p.date}`))));
     for (const p of payments) out.push({ docId: doc.id, date: ymd(p.date) || ymd(data.invoiceDate) || ymd(doc.createdAt), amount: num(p.amount) });
     if (!payments.length && data.status === "paid") out.push({ docId: doc.id, date: ymd(data.paymentDate) || ymd(data.invoiceDate) || ymd(doc.createdAt), amount: docAmounts(doc).total });
-    const from = (data.fromProposal as { id?: string } | undefined)?.id;
     if (from) {
       const keys = invoiceKeys.get(from) || new Set<string>();
       for (const p of payments) { keys.add(`id:${p.id}`); keys.add(`k:${num(p.amount)}|${p.date}`); }
@@ -61,11 +64,8 @@ export function cashCollected(docs: Doc[], from = "", to = "") {
  * or pending recurring drafts. Outstanding is refund-aware (docAmounts). Optional invoice-date range.
  */
 export function billedOutstanding(allDocs: Doc[], from = "", to = "") {
-  const seen = new Set<string>();
   let count = 0, billed = 0, outstanding = 0;
-  for (const doc of allDocs) {
-    if (seen.has(doc.id)) continue;
-    seen.add(doc.id);
+  for (const doc of dedupeCopies(allDocs)) {
     if (doc.type !== "invoice" || voided(doc) || String(doc.data?.status || "draft") === "draft") continue;
     const date = ymd(doc.data?.invoiceDate) || ymd(doc.createdAt);
     if ((from && date < from) || (to && date > to)) continue;
