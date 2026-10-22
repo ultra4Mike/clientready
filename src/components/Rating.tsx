@@ -34,16 +34,19 @@ export default function RatingBox({ target }: { target: RatingTarget }) {
   return (
     <div className="print-hide mt-4 rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-800 shadow-sm sm:p-5" data-testid="rating-box">
       <p className="font-semibold">How did we do?</p>
+      {!stars && <p className="mt-1 text-xs text-slate-600" data-testid="rating-hint">Tap a star to rate.</p>}
       <div className="mt-2 flex gap-1" role="radiogroup" aria-label="Rating">
         {[1, 2, 3, 4, 5].map((n) => (
-          <button key={n} type="button" role="radio" aria-checked={stars === n} aria-label={`${n} star${n > 1 ? "s" : ""}`} data-testid={`rating-star-${n}`} onClick={() => { setStars(n); setSaved(false); }} className={`min-h-11 min-w-11 text-2xl leading-none ${n <= stars ? "text-amber-500" : "text-slate-400 dark:text-slate-500"}`}>★</button>
+          // R128: amber fill on every star up to the pick (data-on drives the CSS, inline color as a fallback);
+          // touch-action: manipulation + no hover-only state so one tap selects on Android Chrome and iOS.
+          <button key={n} type="button" role="radio" aria-checked={stars === n} aria-label={`${n} star${n > 1 ? "s" : ""}`} data-testid={`rating-star-${n}`} data-on={n <= stars ? "1" : "0"} onClick={() => { setStars(n); setSaved(false); setError(""); }} style={{ color: n <= stars ? "#f59e0b" : "#94a3b8", touchAction: "manipulation", position: "relative", zIndex: 1 }} className="cr-star min-h-12 min-w-12 cursor-pointer select-none rounded-lg text-4xl leading-none">★</button>
         ))}
       </div>
       <label className="mt-2 block">Anything to add? (optional)
         <textarea name="ratingComment" maxLength={1000} rows={2} value={comment} onChange={(event) => { setComment(event.target.value); setSaved(false); }} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
       </label>
       <div className="mt-2 flex items-center gap-3">
-        <button type="button" data-testid="rating-send" disabled={busy} onClick={send} className="min-h-11 rounded-lg bg-teal-600 px-4 font-semibold text-white disabled:opacity-60">{saved ? "Update rating" : "Send rating"}</button>
+        <button type="button" data-testid="rating-send" disabled={busy || !stars} onClick={send} className="min-h-11 rounded-lg bg-teal-600 px-4 font-semibold text-white disabled:opacity-60">{saved ? "Update rating" : "Send rating"}</button>
         {saved && <span data-testid="rating-saved" className="text-emerald-700">Thank you for your feedback!</span>}
         {error && <span className="text-red-600">{error}</span>}
       </div>

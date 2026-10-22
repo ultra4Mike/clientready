@@ -9,7 +9,7 @@ import { fetchPortal, portalDocUrl, type PortalBusiness, type PortalDoc } from "
 import { amountOf, documentTotals } from "@/lib/discount";
 import { portalTimeline } from "@/lib/portal-timeline";
 import { payNowAmount, readStages, stagePlan, todayYmd } from "@/lib/stages";
-import { balanceDue, paidTotal, readPayments } from "@/lib/payments";
+import { owedAfterRefunds, paidTotal, readPayments } from "@/lib/payments";
 import { readApproval } from "@/lib/approval";
 
 const text = (value: unknown) => (typeof value === "string" ? value : "");
@@ -19,7 +19,7 @@ function figures(doc: PortalDoc) {
   const subtotal = items.reduce((sum, item) => sum + amountOf(item.qty) * amountOf(item.rate), 0);
   const total = documentTotals(subtotal, text(doc.data.taxPercent), text(doc.data.discountType), text(doc.data.discountValue)).total;
   const paid = paidTotal(readPayments(doc.data));
-  const owed = doc.type === "invoice" ? balanceDue(total, paid, doc.data.status) : 0;
+  const owed = doc.type === "invoice" ? owedAfterRefunds(total, readPayments(doc.data), doc.data.status, doc.data.rebillRefund) : 0; // R128: refund-aware
   // Payment plan / stages: only the current payment is due now.
   const stages = readStages(doc.data.stages);
   const dueNow = owed > 0 && stages.length ? payNowAmount(total, owed, stages, todayYmd()) : owed;
@@ -93,13 +93,13 @@ export default function PortalPage() {
                 <span className="block font-semibold">{text(doc.data.invoiceNumber) || doc.title}</span>
                 <span className="block text-xs text-slate-600">
                   {text(doc.data.invoiceDate)}{text(doc.data.dueDate) ? ` · ${doc.type === "proposal" ? "valid until" : "due"} ${text(doc.data.dueDate)}` : ""}
-                  {approval?.status === "approved" ? " · Approved" : approval ? " · Waiting for your approval" : ""}
-                  {plan && <span className="block font-semibold text-teal-700" data-testid="portal-plan-next">{plan.state === "upcoming" ? "Next payment" : plan.state === "overdue" ? "Overdue" : "Due now"}: ${plan.remaining.toFixed(2)}{plan.dueDate ? ` on ${plan.dueDate}` : ""} ({plan.label || "payment"})</span>}
+                  {doc.type !== "proposal" ? "" : approval?.status === "approved" ? " · Approved" : approval ? " · Waiting for your approval" : ""}
+                  {plan && <span className="block font-semibold text-teal-700" data-testid="portal-plan-next">{plan.state === "upcoming" ? "Next payment" : plan.state === "overdue" ? "Overdue" : "Due now"}: ${plan.remaining.toFixed(2)}{plan.dueDate ? ` on ${plan.dueDate}` : plan.kind === "final" ? " when the job is done" : ""} ({plan.label || "payment"})</span>}
                 </span>
               </span>
               <span className="shrink-0 text-right text-sm">
                 <span className="block font-semibold tabular-nums">${total.toFixed(2)}</span>
-                {doc.type === "invoice" && <span className={`mt-0.5 inline-block text-xs font-semibold ${rowOwed > 0 ? "text-amber-700 cr-text-warn" : "text-emerald-700 cr-text-good"}`}>{rowOwed > 0 ? (paid > 0.004 ? <span data-testid="portal-remaining">${paid.toFixed(2)} paid · ${rowOwed.toFixed(2)} remaining</span> : `$${rowOwed.toFixed(2)} owed`) : paid > 0 ? "Paid" : ""}</span>}
+                {doc.type === "invoice" && <span className={`mt-0.5 inline-block text-xs font-semibold ${rowOwed > 0 ? "text-amber-700 cr-text-warn" : "text-emerald-700 cr-text-good"}`}>{rowOwed > 0 ? (paid > 0.004 ? <span data-testid="portal-remaining">${paid.toFixed(2)} paid · ${rowOwed.toFixed(2)} remaining</span> : `$${rowOwed.toFixed(2)} owed`) : total > 0 ? <span data-testid="portal-paid">Paid</span> : ""}</span>}
               </span>
               <span aria-hidden="true" className="shrink-0 text-xl text-slate-400">›</span>
             </a>

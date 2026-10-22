@@ -7,7 +7,7 @@ import Section, { SectionDefaults, useOpenedExisting } from "@/components/Sectio
 import EmailComposer from "@/components/EmailComposer";
 import StageBar from "@/components/StageBar";
 import { applyCrewAmount, CREW_KINDS, CREW_TYPE_CHOICES, crewApplySnapshot, crewTypeLabel, crewTypeMismatch, estimateByKind, extraName, isExtraItem, isCrewKind, readCostLines, readCrewUndo, undoCrewApply, type CostFields, type CostLine, type CrewApplyUndo, type CrewKind } from "@/lib/cost-categories";
-import { documentStage, NEXT_LABEL, STAGE_LABEL, STAGES } from "@/lib/doc-stage";
+import { docAmounts, documentStage, NEXT_LABEL, STAGE_LABEL, STAGES } from "@/lib/doc-stage";
 import { readEmailLog, type EmailLogEntry } from "@/lib/email";
 import { clientIdFor } from "@/lib/portal";
 import JobDonePanel from "@/components/JobDonePanel";
@@ -540,7 +540,9 @@ export default function NewInvoicePage() {
       });
       setItems(loadedItems);
       setClientSearch(data.clientName || "");
-      setStatus(doc.type === "proposal" && readApproval(data.approval)?.status === "approved" && (!data.status || data.status === "draft" || data.status === "sent") ? "accepted" : data.status || "draft");
+      // R128: a card-paid invoice (nothing owed) shows Paid in the dropdown, same as the header.
+      const fullyPaid = doc.type === "invoice" && ["sent", "overdue"].includes(String(data.status || "")) && docAmounts(doc as never).total > 0 && docAmounts(doc as never).owed <= 0.004;
+      setStatus(doc.type === "proposal" && readApproval(data.approval)?.status === "approved" && (!data.status || data.status === "draft" || data.status === "sent") ? "accepted" : fullyPaid ? "paid" : data.status || "draft");
       setStyle(data.style || "clean");
       setJobTime(data.jobTime || "");
       setCosts({ ...emptyCosts, ...(data.jobCosts || {}), otherFees: loadedFees });

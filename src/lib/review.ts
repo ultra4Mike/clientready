@@ -1,6 +1,7 @@
 import { crewKindLabel } from "@/lib/cost-categories";
 import { amountOf, documentTotals } from "@/lib/discount";
-import { balanceDue, isOpenBalance, paidTotal, readPayments } from "@/lib/payments";
+import { isOpenBalance, readPayments } from "@/lib/payments";
+import { docAmounts, documentStage, STAGE_LABEL } from "@/lib/doc-stage";
 import { readApproval } from "@/lib/approval";
 import { readSchedule } from "@/lib/schedule";
 import { allConflicts, clockText } from "@/lib/conflicts";
@@ -54,11 +55,13 @@ export function missingFields(doc: Doc): MissingField[] {
   if (doc.type !== "invoice" || status === "draft") return [];
   const text = (value: unknown) => String(value ?? "").trim();
   const out: MissingField[] = [];
-  if (!text(data.clientAddress)) out.push("address");
-  if (!text(data.clientEmail) && !text(data.clientPhone)) out.push("contact");
+  // R128: an address is only needed when there is no other way to reach or bill the client.
+  if (!text(data.clientEmail) && !text(data.clientPhone)) out.push(text(data.clientAddress) ? "contact" : "address", ...(text(data.clientAddress) ? [] : ["contact" as MissingField]));
   if (!text(data.dueDate) && status !== "paid") out.push("due-date");
   const done = readSchedule(data)?.status === "done" || status === "paid";
-  if (done && !data.signature) out.push("signature");
+  // Any signature on file counts: the invoice's own, the proposal's, or the client's approval signature.
+  const approvalSig = (data.approval as { signature?: unknown } | null | undefined)?.signature;
+  if (done && !data.signature && !data.proposalSignature && !approvalSig) out.push("signature");
   if (readPayments(data as never).some((payment) => (Number(payment.amount) || 0) > 0 && !text(payment.method))) out.push("payment-method");
   return out;
 }
@@ -122,12 +125,13 @@ export function reviewItems(docs: Doc[], expenses: ExpenseRow[], today = ymd(new
     const gaps = missingFields(doc);
     if (gaps.length) {
       all.push({ key: "missing", version: gaps.join(","), kind: "missing", docId: doc.id,
-        title: `${numberOf(doc)} is missing ${gaps.map((gap) => MISSING_LABEL[gap]).join(", ")}`, detail: `${status}${who(doc)}`, href: open(doc) });
+        title: `${numberOf(doc)} is missing ${gaps.map((gap) => MISSING_LABEL[gap]).join(", ")}`, detail: `${STAGE_LABEL[documentStage(doc, docs).stage]}${who(doc)}`, href: open(doc) });
     }
-    const owed = balanceDue(docTotal(doc), paidTotal(readPayments(data as never)), data.status);
+    // R128: the shared refund-aware owed amount (a refund never reopens a balance).
+    const owed = docAmounts(doc).owed;
     if (isOpenBalance(status, owed)) {
       all.push({ key: "balance", version: owed.toFixed(2), kind: "balance", docId: doc.id,
-        title: `${numberOf(doc)} has ${money(owed)} owed`, detail: `${status}${data.dueDate ? ` · due ${data.dueDate}` : ""}${who(doc)}`, href: open(doc) });
+        title: `${numberOf(doc)} has ${money(owed)} owed`, detail: `${STAGE_LABEL[documentStage(doc, docs).stage]}${data.dueDate ? ` · due ${data.dueDate}` : ""}${who(doc)}`, href: open(doc) });
     }
   }
   return all.filter((item) => readReviews(byId.get(item.docId)?.data)[item.key] !== item.version);

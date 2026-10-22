@@ -1,5 +1,6 @@
 "use client";
 
+import { docAmounts } from "@/lib/doc-stage";
 import { preferredContactFor } from "@/lib/contact-method";
 import EmptyState from "@/components/EmptyState";
 import { useEffect, useMemo, useState } from "react";
@@ -57,7 +58,8 @@ function amountPaid(doc: SavedDocument) {
 
 function balance(doc: SavedDocument) {
   if (isVoidStatus(doc.data?.status) || (doc.data as { deleted?: unknown } | undefined)?.deleted) return 0; // void never counts as owed
-  return balanceDue(invoiceTotal(doc), amountPaid(doc), doc.data?.status);
+  // R128: the shared refund-aware owed amount (same as dashboard, Documents, portal): a refund never reopens a balance.
+  return docAmounts(doc as never).owed;
 }
 
 /** Same rule as the dashboard and Documents (drafts excluded, balance > 0, per installment on payment plans). */

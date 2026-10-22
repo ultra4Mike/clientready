@@ -7,7 +7,7 @@ import { balanceLabel, readStages, type Stage } from "@/lib/stages";
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
-import { balanceDue, paidTotal, readPayments, tipTotal, type Payment } from "@/lib/payments";
+import { balanceDue, owedAfterRefunds, paidTotal, readPayments, tipTotal, type Payment } from "@/lib/payments";
 import { JobPhotoStrip } from "@/components/JobPhotos";
 import { readPhotos, type JobPhoto } from "@/lib/photos";
 import LineSplit from "@/components/LineSplit";
@@ -156,7 +156,7 @@ export default function InvoiceViewPage() {
     }, 0);
     const base = documentTotals(subtotal, taxPercent, discountType, discountValue);
     const paid = paidTotal(payments);
-    return { ...base, paid, balance: balanceDue(base.total, paid, status) };
+    return { ...base, paid, balance: owedAfterRefunds(base.total, payments, status) }; // R128: refund-aware
   }, [items, taxPercent, discountType, discountValue, payments, status]);
 
   function editInvoice() {
@@ -351,14 +351,14 @@ export default function InvoiceViewPage() {
           <StageSchedule stages={stages} total={totals.total} balance={totals.balance} />
           {notes && <p className="mt-6 whitespace-pre-line text-sm text-slate-600">{notes}</p>}
           <JobPhotoStrip photos={photos} />
-          {(invoiceQrUrl(approval?.token, printOrigin(), docPayLink, paymentLink) || signature || proposalSignature) && (
+          {((invoiceQrUrl(approval?.token, printOrigin(), docPayLink, paymentLink) && totals.balance > 0.004) || signature || proposalSignature) && (
             <div className="print-keep mt-3 grid grid-cols-1 items-end gap-6 sm:grid-cols-2 print:grid-cols-2 border-t border-slate-200 pt-3">
               <div className="space-y-3">
                 <SignatureBlock signature={proposalSignature} label="Proposal accepted" />
                 <SignatureBlock signature={signature} />
               </div>
               <div className="flex justify-start sm:justify-end print:justify-end">
-                <PayQr url={invoiceQrUrl(approval?.token, printOrigin(), docPayLink, paymentLink)} />
+                {totals.balance > 0.004 && <PayQr url={invoiceQrUrl(approval?.token, printOrigin(), docPayLink, paymentLink)} />}
               </div>
             </div>
           )}

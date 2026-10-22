@@ -667,7 +667,13 @@ html.dark [data-testid="card-pay"] button[data-testid="pay-card-full"] { border-
 html.dark [data-testid="card-pay"] > p.text-xs { color: #c7e5e1 !important; }
 /* Rating stars: pointer + hover highlight (selection stays in Rating.tsx). */
 [data-testid="rating-box"] button[role="radio"] { cursor: pointer; border-radius: 0.5rem; transition: transform 120ms, color 120ms, background-color 120ms; }
-[data-testid="rating-box"] button[role="radio"]:hover { color: #f59e0b !important; background-color: rgba(245, 158, 11, 0.12); transform: scale(1.12); }
+/* R128: hover only on real pointers (a sticky :hover on phones made a tap look ignored); the pick is an amber fill. */
+@media (hover: hover) and (pointer: fine) {
+  [data-testid="rating-box"] button[role="radio"]:hover { color: #f59e0b !important; background-color: rgba(245, 158, 11, 0.12); transform: scale(1.12); }
+}
+[data-testid="rating-box"] button[role="radio"] { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+[data-testid="rating-box"] button[role="radio"][data-on="1"] { color: #f59e0b !important; text-shadow: 0 0 0 #f59e0b; background-color: rgba(245, 158, 11, 0.14); }
+[data-testid="rating-box"] button[role="radio"][data-on="0"] { color: #94a3b8 !important; }
 [data-testid="rating-box"] button[role="radio"]:focus-visible { outline: 2px solid #14b8a6; outline-offset: 2px; }
 /* Small print on the signature/disclaimer. */
 [data-testid="signature-pad"] p.text-xs, [data-testid="approve-panel"] p.text-xs { font-size: 0.8125rem; }

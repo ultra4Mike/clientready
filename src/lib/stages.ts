@@ -72,7 +72,7 @@ export function stageName(row: { label: string; kind: StageKind; state?: string 
   return row.state === "paid" && row.kind === "deposit" && /^deposit$/i.test(base.trim()) ? "Deposit (paid)" : base;
 }
 
-export function stagePlan(total: number, balance: number, stages: Stage[], today: string) {
+export function stagePlan(total: number, balance: number, stages: Stage[], today: string, opts: { jobDone?: boolean } = {}) {
   const amounts = stageAmounts(total, stages);
   let pool = round(Math.max(total - balance, 0));
   let currentFound = false;
@@ -85,7 +85,9 @@ export function stagePlan(total: number, balance: number, stages: Stage[], today
     if (remaining <= 0.004) state = "paid";
     else if (!currentFound) {
       currentFound = true;
-      state = stage.dueDate && stage.dueDate < today ? "overdue" : !stage.dueDate || stage.dueDate <= today ? "due" : "upcoming";
+      // R128: a final payment with no date is due when the job is done, not "due now" before that.
+      const waitsForJob = !stage.dueDate && stage.kind === "final" && index > 0 && !opts.jobDone;
+      state = stage.dueDate && stage.dueDate < today ? "overdue" : waitsForJob ? "upcoming" : !stage.dueDate || stage.dueDate <= today ? "due" : "upcoming";
     } else if (stage.dueDate && stage.dueDate < today) state = "overdue";
     return { ...stage, amount, paid, remaining, state };
   });
@@ -95,9 +97,9 @@ export function stagePlan(total: number, balance: number, stages: Stage[], today
 }
 
 /** What a "pay now" should charge: the current stage's remainder (never above the balance), or the balance. */
-export function payNowAmount(total: number, balance: number, stages: Stage[], today: string, full = false) {
+export function payNowAmount(total: number, balance: number, stages: Stage[], today: string, full = false, opts: { jobDone?: boolean } = {}) {
   if (full || !stages.length) return balance;
-  const { current } = stagePlan(total, balance, stages, today);
+  const { current } = stagePlan(total, balance, stages, today, opts);
   return current ? round(Math.min(current.remaining, balance)) : balance;
 }
 

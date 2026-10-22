@@ -10,10 +10,14 @@ type Props = {
   value: Signature | null;
   onChange: (value: Signature | null) => void;
   defaultName?: string;
+  /** R128 (customer page): the page already asks for the name once, so the pad doesn't ask again. */
+  hideName?: boolean;
+  /** R128: save as you draw/type (no separate Sign press needed before Approve). */
+  autoCommit?: boolean;
 };
 
 /** Remount with a new `key` when a different document is opened or the form is cleared. */
-export default function SignaturePad({ value, onChange, defaultName = "" }: Props) {
+export default function SignaturePad({ value, onChange, defaultName = "", hideName = false, autoCommit = false }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const [mode, setMode] = useState<"drawn" | "typed">(value?.type || "drawn");
@@ -64,7 +68,9 @@ export default function SignaturePad({ value, onChange, defaultName = "" }: Prop
   }
 
   function end() {
+    const was = drawing.current;
     drawing.current = false;
+    if (was && autoCommit && canvasRef.current) onChange({ type: "drawn", dataUrl: canvasRef.current.toDataURL("image/png"), signerName: (signerName.trim() || defaultName.trim()), signedAt: new Date().toISOString() });
   }
 
   function clearCanvas() {
@@ -106,7 +112,7 @@ export default function SignaturePad({ value, onChange, defaultName = "" }: Prop
           <button type="button" className={tab(mode === "typed")} onClick={() => setMode("typed")}>Type</button>
         </div>
       </div>
-      <input className="min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder={defaultName ? `Signer name (${defaultName})` : "Signer name"} value={signerName} onChange={(event) => setSignerName(event.target.value)} />
+      {!hideName && <input className="min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder={defaultName ? `Signer name (${defaultName})` : "Signer name"} value={signerName} onChange={(event) => setSignerName(event.target.value)} />}
       {mode === "drawn" ? (
         <div className="sig-pad-surface w-full rounded-lg border-2 border-dashed border-teal-500/50 bg-white shadow-inner">
         <canvas
@@ -129,11 +135,14 @@ export default function SignaturePad({ value, onChange, defaultName = "" }: Prop
           style={{ fontFamily: scriptFont }}
           placeholder="Type signature"
           value={typed}
-          onChange={(event) => setTyped(event.target.value)}
+          onChange={(event) => {
+            setTyped(event.target.value);
+            if (autoCommit) onChange(event.target.value.trim() ? { type: "typed", text: event.target.value.trim(), signerName: (signerName.trim() || defaultName.trim()), signedAt: new Date().toISOString() } : null);
+          }}
         />
       )}
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" onClick={sign} className="min-h-11 flex-1 rounded-lg sm:flex-none bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white! shadow-md transition hover:bg-teal-500 disabled:opacity-50">Sign</button>
+        {!autoCommit && <button type="button" onClick={sign} className="min-h-11 flex-1 rounded-lg sm:flex-none bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white! shadow-md transition hover:bg-teal-500 disabled:opacity-50">Sign</button>}
         <button type="button" onClick={clearAll} className="min-h-11 flex-1 rounded-lg sm:flex-none border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Clear</button>
         {value && <span className="cr-tone-good w-full rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 sm:w-auto">Signed by {value.signerName} · {signedAtLabel(value.signedAt)}</span>}
       </div>

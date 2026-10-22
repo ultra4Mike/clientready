@@ -36,8 +36,11 @@ export async function POST(request: Request) {
     : await serviceClient().rpc("stripe_invoice_for_token", { p_token: token });
   const doc = Array.isArray(rows) ? rows[0] : rows;
   if (error || !doc) return Response.json({ error: "Link not found." }, { status: 404 });
-  if (doc.type !== "invoice") return Response.json({ error: "Only invoices can be paid online." }, { status: 400 });
+  if (doc.type !== "invoice") return Response.json({ error: doc.type === "proposal" ? "Approve the proposal first; the deposit is paid on its invoice." : "Only invoices can be paid online.", needsApproval: doc.type === "proposal" }, { status: doc.type === "proposal" ? 409 : 400 });
   const data = (doc.data || {}) as Record<string, unknown>;
+  // R128: plain invoices are payable right away; proposals are never charged here (their deposit is paid on
+  // the invoice made automatically at approval, see /api/approve/convert).
+  if (["void", "voided", "deleted"].includes(String(data.status || "")) || data.deleted) return Response.json({ error: "This invoice is void." }, { status: 400 });
   // Progress billing: the current stage's amount unless the customer chose to pay the full balance.
   const { charge, owed, staged } = amountToCharge(data, full);
   // Never charge more than the saved remaining balance.
@@ -93,7 +96,7 @@ export async function POST(request: Request) {
   const number = String(data.invoiceNumber || doc.title || "Invoice");
   const form = new URLSearchParams({
     mode: "payment",
-    success_url: `${back}&paid=1`,
+    success_url: `${back}&paid=1&cs={CHECKOUT_SESSION_ID}`,
     cancel_url: back,
     "line_items[0][quantity]": "1",
     "line_items[0][price_data][currency]": config.currency,
