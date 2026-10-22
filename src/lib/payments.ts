@@ -65,6 +65,16 @@ export function refundState(total: number, payments: Payment[]): "" | "refunded"
   if (refunded <= 0.004 || total <= 0 || grossPaid(payments) < total - 0.004) return "";
   return paidTotal(payments) <= 0.004 ? "refunded" : "partially_refunded";
 }
+/**
+ * Help retest: ONE refund wording for the owner and the client page. Paid in full then refunded:
+ * "Refunded $X" (all of it back) or "Partially refunded $X". Any other refund (e.g. a deposit given
+ * back before the job is paid): "Refunded $X" shown beside the normal status. "" when no refund.
+ */
+export function refundWording(total: number, payments: Payment[]) {
+  const refunded = refundedTotal(payments);
+  if (refunded <= 0.004) return "";
+  return `${refundState(total, payments) === "partially_refunded" ? "Partially refunded" : "Refunded"} $${refunded.toFixed(2)}`;
+}
 export const isVoidStatus = (status: unknown) => ["void", "voided", "deleted"].includes(String(status || ""));
 /**
  * R126: what is owed, refund-aware. A void invoice owes nothing. A refund on a paid-in-full invoice does

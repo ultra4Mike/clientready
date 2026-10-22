@@ -38,7 +38,9 @@ export function documentStage(doc: Doc, allDocs: Doc[] = []): { stage: DocStage;
   const schedule = readSchedule(data);
   if (doc.type === "proposal") {
     const invoiced = Boolean(doc.id) && allDocs.some((other) => other.type === "invoice" && (other.data?.fromProposal as { id?: string } | undefined)?.id === doc.id);
-    if (invoiced) return { stage: "invoiced", next: "none" };
+    // R128: the server marks an auto-converted proposal (status "invoiced" + invoicedAs), so it reads
+    // Invoiced even before this device has pulled the new invoice.
+    if (invoiced || status === "invoiced" || Boolean((data.invoicedAs as { id?: string } | undefined)?.id)) return { stage: "invoiced", next: "none" };
     if (approval?.status === "approved" || status === "approved" || status === "accepted") {
       return schedule ? { stage: "scheduled", next: "create-invoice" } : { stage: "approved", next: "schedule" };
     }
