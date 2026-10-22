@@ -1,5 +1,8 @@
 import { derivedWhen } from "./job-when";
-import { isTentative } from "./calendar-filter";
+import { isUnsentDraft, needsApproval } from "./doc-status";
+
+/** Clash rule: an unapproved proposal / pending change order or an unsent draft invoice is tentative (soft warning); approved or sent work is hard. */
+export const softClash = (doc: Doc, allDocs: Doc[] = []) => { const d = doc as Doc & { type?: string }; return needsApproval(d, allDocs) || (d.type !== "proposal" && isUnsentDraft(d)); };
 // Double-booking rules. The same person on two jobs whose times overlap is blocked unless the owner taps
 // "Book anyway" (recorded on the job as schedule.overrides). Different people may overlap freely.
 // Jobs without a start time ("Any time") and done jobs are never compared. A job with no end time counts as 1 hour.
@@ -62,7 +65,7 @@ export function bookedBlocks(docs: Doc[], docId: string, date: string, workerIds
     if (!doc || doc.id === docId || sameJob(doc, byId.get(docId))) continue;
     const s = sched(doc);
     if (!s || s.date !== date || s.status === "done") continue;
-    const tentative = isTentative(doc as Doc & { type?: string });
+    const tentative = softClash(doc, docs);
     if (ignoreTentative && tentative) continue;
     const t = span(s);
     if (!t) continue;
@@ -81,7 +84,7 @@ export function bookingConflicts(docs: Doc[], docId: string, mine: Sched, extraO
     .filter((b) => b.start < t.end && t.start < b.end)
     .filter((b) => !own.some((o) => o.workerId === b.workerId && o.otherDocId === b.docId))
     .filter((b) => !readOverrides(sched(byId.get(b.docId) || { id: "" })?.overrides).some((o) => o.workerId === b.workerId && o.otherDocId === docId))
-    .map((b) => ({ ...b, tentative: Boolean(b.tentative || (byId.get(docId) && isTentative(byId.get(docId) as Doc & { type?: string }))), mine: t }));
+    .map((b) => ({ ...b, tentative: Boolean(b.tentative || (byId.get(docId) && softClash(byId.get(docId) as Doc, docs))), mine: t }));
 }
 
 /** Earliest start (15-minute steps, 7 AM to 8 PM end) with no overlap for any of these people, or "". */

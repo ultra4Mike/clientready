@@ -44,7 +44,7 @@ export function isConvertedProposal(doc: AnyDoc, allDocs: AnyDoc[] = []) {
   if (doc.type !== "proposal") return false;
   const data = dataOf(doc);
   if (statusOf(doc) === "invoiced" || (data.invoicedAs as { id?: string } | undefined)?.id) return true;
-  return Boolean(doc.id) && allDocs.some((other) => other.type === "invoice" && !isVoidDoc(other) && !dataOf(other).deleted
+  return Boolean(doc.id) && Array.isArray(allDocs) && allDocs.some((other) => other.type === "invoice" && !isVoidDoc(other) && !dataOf(other).deleted
     && (dataOf(other).fromProposal as { id?: string } | undefined)?.id === doc.id);
 }
 
