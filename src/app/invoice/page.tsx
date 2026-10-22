@@ -53,6 +53,9 @@ import { normalizeCategory, type LineCategory } from "@/lib/line-split";
 import { appendChangeOrderNote, changeOrderData, changeOrdersFor, mergeChangeOrderNotes, readChangeOrderNotes, readChangeOrderOf, type ChangeOrderNote, type ChangeOrderOf } from "@/lib/change-orders";
 import ChangeOrderNotes from "@/components/ChangeOrderNotes";
 import { ApprovalBadge, ApprovalShare } from "@/components/Approval";
+import { useAutosaveDraft } from "@/hooks/useAutosaveDraft";
+import RestoreDraftBanner from "@/components/RestoreDraftBanner";
+import FormDraft from "@/components/FormDraft";
 import ScheduleEditor from "@/components/ScheduleEditor";
 import { entryHours, fmtHours, hoursByWorker, ownerEditClock, crewFixReason, refreshOwnerClock, type ClockEntry } from "@/lib/clock";
 import { confirmRemoval, jobDonePhotos, crewForWorkers, followSchedule, jobScheduleFromForm, crewIds, workLogged, clockHoursFor, dedupeWorkerIds, readSchedule, readWorkers, saveAssignment, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
@@ -235,6 +238,10 @@ export default function NewInvoicePage() {
   const [scheduleKey, setScheduleKey] = useState(0);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [notFound, setNotFound] = useState<"" | "checking" | "missing">(""); // R102
+  // Autosave plan: nothing saves (or creates a new doc) before the opened document has loaded into the form.
+  const [formReady, setFormReady] = useState(false);
+  const formReadyRef = useRef(false);
+  useEffect(() => { formReadyRef.current = formReady; }, [formReady]);
   // R101: a new doc whose number was already used gets the next free number from the server.
   useEffect(() => {
     const onRenumber = (event: Event) => { const { from, to } = (event as CustomEvent<{ from: string; to: string }>).detail || {}; if (!to) return; setInvoiceNumber((current) => (current === from ? to : current)); setSaveMessage(`${from} was already used, so this one is ${to}.`); };
@@ -542,6 +549,9 @@ export default function NewInvoicePage() {
       setSaveMessage("Could not open that document.");
     }
   }, []);
+  // Runs right after the load effect above (same commit): the form now holds the opened/new document.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setFormReady(true); }, []);
 
   useEffect(() => {
     if (!crew.length) return;
@@ -562,6 +572,23 @@ export default function NewInvoicePage() {
     return { ...base, paid, balance: isProposal ? balanceDue(base.total, paid, status) : owedAfterRefunds(base.total, payments, status, rebillRefund) };
   }, [items, taxPercent, discountType, discountValue, payments, status, rebillRefund, isProposal]);
   const refund = isProposal ? "" : refundState(totals.total, payments);
+
+  // Never lose typed work: the editor's fields are kept as a draft until Save (schedule has its own autosave).
+  const draftValue = { clientName, clientCompany, contactName, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, notes, items, taxPercent, discountType, discountValue, payments };
+  const draft = useAutosaveDraft("doc", docId || `new-${docKind}`, draftValue, { enabled: formReady && notFound === "" });
+  function restoreDraft() {
+    const v = draft.accept() as Partial<typeof draftValue> | null;
+    if (!v) return;
+    if (v.clientName !== undefined) setClientName(v.clientName); if (v.clientCompany !== undefined) setClientCompany(v.clientCompany);
+    if (v.contactName !== undefined) setContactName(v.contactName); if (v.clientEmail !== undefined) setClientEmail(v.clientEmail);
+    if (v.clientPhone !== undefined) setClientPhone(v.clientPhone); if (v.clientAddress !== undefined) setClientAddress(v.clientAddress);
+    if (v.invoiceNumber !== undefined) setInvoiceNumber(v.invoiceNumber); if (v.invoiceDate !== undefined) setInvoiceDate(v.invoiceDate);
+    if (v.dueDate !== undefined) setDueDate(v.dueDate); if (v.notes !== undefined) setNotes(v.notes);
+    if (Array.isArray(v.items)) setItems(v.items); if (v.taxPercent !== undefined) setTaxPercent(v.taxPercent);
+    if (v.discountType !== undefined) setDiscountType(v.discountType); if (v.discountValue !== undefined) setDiscountValue(v.discountValue);
+    if (Array.isArray(v.payments)) setPayments(v.payments);
+    setSaveMessage("Restored your unsaved changes. Press Save to keep them.");
+  }
 
   // Picked client's id, else the one saved client with exactly this name (else none: match by name).
   const docClientId = clientId || clientIdFor({ clientName }, savedClients);
@@ -856,6 +883,7 @@ export default function NewInvoicePage() {
       const changedSchedule = !same(storedSchedule, schedule);
       setSchedule(storedSchedule); setJobStart(storedSchedule.startTime || jobStart); setJobEnd(storedSchedule.endTime || ""); setCrew(savedCrew); if (changedSchedule) setScheduleKey((key) => key + 1); }
     setSaveMessage(isProposal ? `Proposal saved${carried}` : "Invoice saved");
+    draft.clear(`doc:${cloudId}`);
     return cloudId;
   }
 
@@ -863,6 +891,9 @@ export default function NewInvoicePage() {
     try {
       // R53: a new invoice can be scheduled right away; the draft is saved first (no "save the document first").
       let id = docId;
+      // The whole-doc save must never race the first load: an opened ?id= doc that is not in the form yet
+      // would otherwise be saved as a NEW document with what was just typed (misrouted typing).
+      if (!formReadyRef.current || (!id && new URLSearchParams(window.location.search).get("id"))) return;
       if (!id) {
         id = (await saveDocument()) || "";
         if (!id) return;
@@ -1064,6 +1095,8 @@ export default function NewInvoicePage() {
   return (
     <SectionDefaults.Provider value={sectionDefaults}>
     <AppShell title={isProposal ? "New proposal" : "New invoice"}>
+      <RestoreDraftBanner draft={draft.restorable} onRestore={restoreDraft} onDiscard={draft.discard} />
+      <FormDraft form="job-message" id={docId} enabled={formReady && Boolean(docId)} value={jobMsg || { kind: "", text: "" }} blank={{ kind: "", text: "" }} onRestore={(v) => setJobMsg(v.kind ? v : null)} what="message to the client" />
       <div className="print-hide mb-6 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0" data-testid="doc-stage" data-stage={docStage.stage} data-next-action={docStage.next}>

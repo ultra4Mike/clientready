@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import FormDraft from "@/components/FormDraft";
 import type { ContactMethod } from "@/lib/contact-method";
 import { mailtoHref, reminderSubject, reminderText, smsHref, type ReminderInput, type ReminderTone } from "@/lib/reminders";
 
@@ -27,6 +28,7 @@ export default function ReminderPanel({ input, phone, email, prefer = "", onClos
   const button = "rounded-lg border border-teal-500/30 px-3 py-2 text-center text-sm font-medium transition hover:border-teal-400";
   return (
     <div className="mt-4 space-y-3 rounded-xl border border-teal-500/20 p-4" data-testid="reminder-panel">
+      <FormDraft form="reminder" id={input.invoiceNumber} value={edited} blank={{}} onRestore={setEdited} what="reminder text" />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-semibold">Payment reminder</p>
         <div className="inline-flex rounded-lg border border-teal-500/30 p-0.5" role="tablist">

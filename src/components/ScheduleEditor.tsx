@@ -136,7 +136,10 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
     const at = new Date().toISOString();
     const overrides: Override[] = [...readOverrides(value?.overrides), ...(bookAnyway ? conflicts.map((c) => ({ workerId: c.workerId, otherDocId: c.docId, at })) : [])];
     const confirmed = confirmedRef.current; confirmedRef.current = [];
-    onSave({ date, startTime, ...(endTime ? { endTime } : {}), workerIds, status, updatedAt: value?.updatedAt || "", ...(overrides.length ? { overrides } : {}), ...(crewNote.trim() ? { crewNote: crewNote.trim() } : {}), ...(checklistFromLines(checklistText, value?.checklist).length ? { checklist: checklistFromLines(checklistText, value?.checklist) } : {}) }, auto || autoSave ? { keepOpen: true, confirmed } : undefined);
+    // Autosave plan: a start is never saved without an end (default job length when none is set yet).
+    const end = endTime || (startTime && /^\d\d:\d\d$/.test(startTime) ? toHhmm(toMin(startTime) + DEFAULT_JOB_MINUTES) : "");
+    if (end !== endTime) setEndTime(end);
+    onSave({ date, startTime, ...(end ? { endTime: end } : {}), workerIds, status, updatedAt: value?.updatedAt || "", ...(overrides.length ? { overrides } : {}), ...(crewNote.trim() ? { crewNote: crewNote.trim() } : {}), ...(checklistFromLines(checklistText, value?.checklist).length ? { checklist: checklistFromLines(checklistText, value?.checklist) } : {}) }, auto || autoSave ? { keepOpen: true, confirmed } : undefined);
     if (auto || autoSave) { first.current = fingerprint; setAutoState("saved"); }
   }  useEffect(() => { saveRef.current = save; });
 

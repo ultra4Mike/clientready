@@ -4,6 +4,7 @@ import { checklistProgress, readChecklist, type ChecklistItem } from "@/lib/chec
 import { nativePhotoClick } from "@/lib/native-camera";
 import { confirmLogoutWithQueue, enqueue, flushQueue, isNetworkError, newUploadKey, queued, removeQueued, retryQueued, type QueueItem, type QueueKind } from "@/lib/photo-queue";
 import EmptyState from "@/components/EmptyState";
+import FormDraft from "@/components/FormDraft";
 import { nextJob, recentJobs } from "@/lib/crew-next";
 import CrewDaysOff from "@/components/CrewDaysOff";
 import { CREW_KINDS, legacySummary, type CostLine, type CrewKind } from "@/lib/cost-categories";
@@ -762,6 +763,7 @@ export default function CrewPage() {
 
       <div className="mx-auto max-w-3xl space-y-5 px-4 pt-5">
         {message && <p className="rounded-xl border border-teal-500/30 px-3 py-2 text-sm" role="status" data-testid="crew-message">{message}</p>}
+        <FormDraft form="crew-fix-time" value={fixing || { id: "", start: "", end: "", reason: "" }} blank={{ id: "", start: "", end: "", reason: "" }} onRestore={(v) => { setFixing(v); setTab("hours"); }} what="time fix" />
         {/* Backlog 7: one clear sync status for the phone: offline or not, and how much is still on this phone. */}
         {((offlineFlag: boolean) => {
           // The browser's own signal too, so a tap made after losing signal never shows "Send now".

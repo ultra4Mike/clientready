@@ -11,6 +11,8 @@ import { AUTOMATIONS_OFF, readAutomations, type Automations } from "@/lib/automa
 import { INTEGRATIONS } from "@/lib/flags";
 import { supabase } from "@/lib/supabase";
 import StripeSetup from "@/components/StripeSetup";
+import FormDraft from "@/components/FormDraft";
+import { clearDraft, draftKey } from "@/lib/drafts";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 
@@ -39,6 +41,7 @@ const emptyProfile = {
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState(emptyProfile);
+  const [profileLoaded, setProfileLoaded] = useState(false); // drafts start after the saved profile is in the form
   const [saved, setSaved] = useState(false);
   const [message, setMessage] = useState("");
   const [loginEmail, setLoginEmail] = useState("");
@@ -102,7 +105,7 @@ export default function ProfilePage() {
       });
     }
 
-    load();
+    load().finally(() => setProfileLoaded(true));
   }, []);
 
   function update(field: keyof typeof emptyProfile, value: string) {
@@ -174,6 +177,7 @@ export default function ProfilePage() {
       // Business timezone (card payment dates). Ignored quietly before migration 20261015130000 adds the column.
       await supabase.from("profiles").update({ timezone }).eq("id", user.id);
       setMessage("Saved on this computer and in your account." + overtimeNote);
+      void clearDraft(draftKey("profile", ""));
     } else {
       setMessage("Saved on this computer. Log in to save to your account.");
     }
@@ -210,6 +214,7 @@ export default function ProfilePage() {
   return (
     <AppShell title="Settings">
       <PageHeader title="Settings" subtitle="Your business details, how customers pay you, and your login." />
+      <FormDraft form="profile" enabled={profileLoaded} value={{ ...profile, logo: "" }} blank={{ ...emptyProfile, logo: "" }} onRestore={(v) => setProfile((cur) => ({ ...cur, ...v, logo: cur.logo }))} what="settings" />
       <div className="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)]">
         <nav className="print-hide hidden lg:block">
           <div className="sticky top-20 space-y-1 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-2 text-sm font-medium">

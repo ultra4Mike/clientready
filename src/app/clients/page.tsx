@@ -9,6 +9,8 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import EmptyState from "@/components/EmptyState";
+import FormDraft from "@/components/FormDraft";
+import { clearDraft, draftKey } from "@/lib/drafts";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import PortalShare from "@/components/PortalShare";
@@ -295,6 +297,7 @@ export default function ClientsPage() {
           onChange={(event) => setSearch(event.target.value)}
         />
 
+        <FormDraft form="client" id={editingId} value={form} blank={emptyClient} onRestore={(v) => { setForm(v); setShowForm(true); }} what="client details" />
         {showForm && (
           <form
             id="client-form"

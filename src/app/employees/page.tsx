@@ -6,6 +6,8 @@ import { mailtoHref } from "@/lib/reminders";
 import TimesheetExport from "@/components/TimesheetExport";
 import EmptyState from "@/components/EmptyState";
 import { FormEvent, useEffect, useState } from "react";
+import FormDraft from "@/components/FormDraft";
+import { clearDraft, draftKey } from "@/lib/drafts";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import ScheduleReconcile from "@/components/ScheduleReconcile";
@@ -228,6 +230,7 @@ export default function EmployeesPage() {
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(340px,400px)_minmax(0,1fr)] xl:grid-cols-[minmax(360px,420px)_minmax(0,1fr)]">
       <div className="order-2 min-w-0 lg:order-none lg:sticky lg:top-20">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Add or edit a person</h2>
+      <FormDraft form="employee" id={editingId} value={form} blank={emptyForm} onRestore={setForm} what="team member details" />
       <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none sm:p-6">
         <div className="flex min-w-0 flex-col gap-3 rounded-xl border border-teal-500/20 p-4 [&>input]:w-full [&>select]:w-full">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-300">Person & role</h2>

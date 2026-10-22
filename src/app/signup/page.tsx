@@ -3,6 +3,7 @@
 import Link from "next/link";
 import LegalLinks from "@/components/LegalLinks";
 import { FormEvent, useState } from "react";
+import FormDraft from "@/components/FormDraft";
 import { supabase } from "@/lib/supabase";
 import { loadAccountIntoCache } from "@/lib/account-cache";
 import { afterAuthPath, asPlan, usePlanFromUrl, rememberPlan } from "@/lib/pending-plan";
@@ -71,6 +72,8 @@ export default function SignupPage() {
       <h1 className="text-2xl font-bold tracking-tight">Create your account</h1>
       <p className="mt-2 text-sm text-[var(--cr-muted)]">14-day trial. No card to start. Crew use the email your boss saved.</p>
       {planName && <p className="mt-3 rounded-lg border border-teal-500/30 bg-teal-500/5 px-3 py-2 text-sm" data-testid="signup-plan" data-plan={plan}>Plan: <strong>{planName}</strong>. Create your account first; checkout opens next.</p>}
+      {/* The email only; a password is never kept as a draft. */}
+      <FormDraft form="signup" value={{ email }} blank={{ email: "" }} onRestore={(v) => setEmail(v.email)} what="sign-up" />
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <input type="email" required placeholder="Email" className="w-full min-h-11 rounded-lg border border-slate-300 bg-transparent px-3 py-2.5 text-base shadow-sm sm:text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={email} onChange={(event) => setEmail(event.target.value)} />
         <input type="password" required minLength={6} placeholder="Password" className="w-full min-h-11 rounded-lg border border-slate-300 bg-transparent px-3 py-2.5 text-base shadow-sm sm:text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={password} onChange={(event) => setPassword(event.target.value)} />

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import FormDraft from "@/components/FormDraft";
+import { clearDraft, draftKey } from "@/lib/drafts";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
@@ -37,6 +39,7 @@ export default function InventoryPage() {
     <AppShell title="Inventory" showTitle={false}>
       <PageHeader title="Parts inventory" subtitle={<>Stock value ${stockValue(parts).toFixed(2)}{lowCount ? <span data-testid="inventory-low-count" className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 cr-tone-warn"> · {lowCount} low</span> : null}</>} actions={
         <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" name="lowOnly" checked={lowOnly} onChange={(e) => setLowOnly(e.target.checked)} /> Low stock only</label>} />
+      <FormDraft form="inventory" value={form} blank={blank} onRestore={setForm} what="part" />
       <div className="space-y-5">
         <div className="grid gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:grid-cols-6 sm:p-5" data-testid="inventory-form">
           <label className="text-sm sm:col-span-2">Part<input name="name" className={input} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>

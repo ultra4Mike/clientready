@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import FormDraft from "@/components/FormDraft";
+import { clearDraft, draftKey } from "@/lib/drafts";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
@@ -63,6 +65,7 @@ export default function MileagePage() {
           <select aria-label="Year" name="year" className={input} value={year} onChange={(event) => setYear(event.target.value)}>{years.map((y) => <option key={y}>{y}</option>)}</select>
           <button type="button" data-testid="mileage-csv" disabled={!shown.length} onClick={download} className="min-h-11 whitespace-nowrap rounded-lg border border-teal-500/40 px-3 text-sm font-medium disabled:opacity-50">Download CSV</button>
         </div>} />
+      <FormDraft form="mileage" value={{ miles: form.miles, to: form.to, purpose: form.purpose }} blank={{ miles: "", to: "", purpose: "" }} onRestore={(v) => setForm((f) => ({ ...f, ...v }))} what="trip" />
       <div className="space-y-5">
         <div className="grid gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:grid-cols-6 sm:p-5" data-testid="mileage-form">
           <label className="text-sm">Date<input type="date" name="date" className={input} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label>
