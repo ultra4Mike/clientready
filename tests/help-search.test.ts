@@ -39,3 +39,16 @@ test("Deploy 5/6 help: new articles found, related ids real, no hidden autosave 
   assert.ok(hay("this week").includes("calendar-views"));
   assert.ok(hay("net 30").includes("payment-terms"));
 });
+test("R128 help: refunds, approval and hours articles match the shipped wording", async () => {
+  const { UPCOMING_HELP_ARTICLES } = await import("@/lib/help/upcoming");
+  const by = Object.fromEntries(HELP_ARTICLES.map((a) => [a.id, [a.question, a.summary || "", ...a.steps, ...(a.tips || [])].join(" ")]));
+  assert.ok(by["approval-proposals-only"]);
+  assert.ok(!UPCOMING_HELP_ARTICLES.some((a) => a.id === "approval-proposals-only"));
+  assert.match(by["ts-refund"], /never reopens a balance/);
+  assert.match(by["ts-refund"], /Partially refunded \$X/);
+  assert.doesNotMatch(by["crew-hours-approval"], /Approve clocked|Approve paid hours/);
+  assert.match(by["crew-hours-approval"], /Edit hours/);
+  assert.ok(hay("receipt number").includes("receipt"));
+  const ids = new Set(HELP_ARTICLES.map((a) => a.id));
+  for (const a of HELP_ARTICLES) for (const r of a.related || []) assert.ok(ids.has(r), `${a.id} → ${r}`);
+});
