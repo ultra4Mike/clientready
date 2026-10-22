@@ -38,6 +38,14 @@ export function approvalUrl(token: string) {
   return `${linkOrigin()}/approve?t=${encodeURIComponent(token)}`;
 }
 
+/** Help retest: "Awaiting approval" only on proposals and change orders; a plain invoice never needs approval. */
+export function approvalBadgeApplies(doc: { type?: string; data?: Record<string, unknown> | null }, approval: Approval | null) {
+  if (!approval) return false;
+  if (doc.type !== "invoice") return true;
+  const of = doc.data?.changeOrderOf as { id?: string; number?: string } | undefined;
+  return Boolean(of?.id || of?.number) || approval.status === "approved";
+}
+
 export function approvalLabel(approval: Approval | null) {
   if (!approval) return "";
   if (approval.status === "approved") {
