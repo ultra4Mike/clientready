@@ -82,6 +82,10 @@ export type PayRow = {
   payOverride?: string;
   /** Day pay already counted on another job that day (set by dayPayOnce). */
   dayCounted?: boolean;
+  /** "timesheet": base pay is this job's share of the approved (or estimated) day timesheet (lib/timesheet-pay). */
+  paySource?: "timesheet";
+  timesheetPay?: string;
+  timesheetApproved?: boolean;
 };
 
 /** Hours used for an hourly row: exact clocked minutes when the hours came from the clock (R55). */
@@ -93,6 +97,8 @@ export function rowHours(row: PayRow) {
 export function rowPayExact(row: PayRow) {
   const extra = num(row.bonus || "");
   if (String(row.payOverride ?? "").trim() !== "") return num(row.payOverride) + extra;
+  // From the cutover on: the job's share of the day timesheet (already includes drive, overtime, salary, day rules).
+  if (row.paySource === "timesheet" && row.timesheetPay !== undefined) return num(row.timesheetPay) + extra;
   if (row.payType === "job") return num(row.fixedPay) + extra;
   if (row.payType === "day") return (row.dayCounted ? 0 : num(row.fixedPay)) + extra;
   // salary: fixedPay = hourly equivalent (weekly / 40) for job costing only; week pay totals use weekPay once.
@@ -114,7 +120,7 @@ export function paySnapshot(pay: PaySettings, rate: string): Pick<PayRow, "payTy
 export function dayPayOnce<T extends PayRow & { employeeId: string; date: string }>(rows: T[]): T[] {
   const seen = new Set<string>();
   return rows.map((row) => {
-    if (row.payType !== "day" || String(row.payOverride ?? "").trim() !== "") return row;
+    if (row.payType !== "day" || isTimesheetRow(row) || String(row.payOverride ?? "").trim() !== "") return row;
     const key = `${row.employeeId}|${row.date}`;
     if (seen.has(key)) return { ...row, dayCounted: true };
     seen.add(key);
@@ -214,3 +220,6 @@ export function payLabel(pay: PaySettings, rate: string) {
   if (pay.type === "day") return `$${dayPay(pay, rate).toFixed(2)}/day`;
   return `$${num(rate).toFixed(2)}/hr`;
 }
+
+/** A row paid from the day timesheet (its share is final money; no per-row overtime/salary/day-once adjustments). */
+export const isTimesheetRow = (row: PayRow) => row.paySource === "timesheet" && row.timesheetPay !== undefined && String(row.payOverride ?? "").trim() === "";

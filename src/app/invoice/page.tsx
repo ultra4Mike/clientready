@@ -19,7 +19,7 @@ import { displayStatus } from "@/lib/doc-status";
 import InventoryUse, { type StockUse } from "@/components/InventoryUse";
 import { OwnerVisitNotes } from "@/components/CrewVisitNote";
 import { refreshEmployeesCache } from "@/lib/account-cache";
-import { paySnapshot, readPaySettings, rowPayMoney, type PayType } from "@/lib/pay-types";
+import { paySnapshot, readPaySettings, rowPayMoney, weekOf, type PayType } from "@/lib/pay-types";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
 import { getTrialState } from "@/lib/trial";
@@ -108,7 +108,26 @@ type CrewRow = {
   payType?: PayType;
   fixedPay?: string;
   payOverride?: string;
+  /** From the cutover on: this job's share of the worker's day timesheet (lib/timesheet-pay). */
+  paySource?: "timesheet";
+  timesheetPay?: string;
+  timesheetMinutes?: number;
+  timesheetDayPay?: string;
+  timesheetDayMinutes?: number;
+  timesheetApproved?: boolean;
 };
+const TS_FIELDS = ["paySource", "timesheetPay", "timesheetMinutes", "timesheetDayPay", "timesheetDayMinutes", "timesheetApproved"] as const;
+/** Copy only the timesheet fields from the stored doc's crew rows (never the owner's unsaved edits). */
+function mergeTimesheetFields(current: CrewRow[], stored: unknown): CrewRow[] {
+  const rows = (Array.isArray(stored) ? stored : []) as CrewRow[];
+  return current.map((row) => {
+    const from = rows.find((item) => item.id === row.id);
+    if (!from || from.paySource !== "timesheet") return row;
+    const next = { ...row } as Record<string, unknown>;
+    for (const key of TS_FIELDS) next[key] = (from as Record<string, unknown>)[key];
+    return next as CrewRow;
+  });
+}
 type DocKind = "invoice" | "proposal";
 
 const emptyItem: LineItem = { description: "", qty: "1", rate: "" };
@@ -294,6 +313,34 @@ export default function NewInvoicePage() {
   const [minMargin, setMinMargin] = useState(20);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [crew, setCrew] = useState<CrewRow[]>([]);
+  const [tsBusy, setTsBusy] = useState("");
+  /** Pull this job's share of each worker's day timesheet into the crew rows (labor follows via rowPay). */
+  async function refreshJobTimesheet(id: string, rows: CrewRow[], scheduleDate: string) {
+    const dates = [...new Set(rows.map((row) => row.workDate || scheduleDate).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)))];
+    if (!id || !dates.length) return;
+    try {
+      const { refreshTimesheetPay, timesheetCutover } = await import("@/lib/timesheet-sync");
+      const cutover = timesheetCutover();
+      const weeks = new Map<string, string>();
+      for (const d of dates) if (d >= cutover || rows.some((row) => row.paySource === "timesheet")) weeks.set(weekOf(d), d);
+      let stored: unknown = null;
+      for (const d of weeks.values()) { const res = await refreshTimesheetPay(d); stored = res.docs.find((item) => item.id === id)?.data?.crew ?? stored; }
+      if (stored) setCrew((current) => mergeTimesheetFields(current, stored));
+    } catch { /* timesheet not reachable: keep the stored pay */ }
+  }
+  /** Card shortcut: approve (or undo) the worker's whole day on the timesheet. */
+  async function approveTimesheetDay(row: CrewRow, approve: boolean) {
+    const date = row.workDate || schedule?.date || "";
+    if (!date) return;
+    setTsBusy(row.id);
+    try {
+      const { setWorkerDayApproved } = await import("@/lib/timesheet-sync");
+      const res = await setWorkerDayApproved(row.employeeId, date, approve);
+      const stored = res.docs.find((item) => item.id === docId)?.data?.crew;
+      if (stored) setCrew((current) => mergeTimesheetFields(current, stored));
+      setSaveMessage(approve ? "Day approved on the timesheet. Job labor updated." : "Day approval undone. Job labor is an estimate again.");
+    } finally { setTsBusy(""); }
+  }
   const [pickedEmployee, setPickedEmployee] = useState("");
   const [otherFees, setOtherFees] = useState<OtherFee[]>([]);
   /** Crew job report this invoice came from (cost lines by category). Shown next to the estimate; applied only by the owner's tap. */
@@ -558,6 +605,8 @@ export default function NewInvoicePage() {
         setClockEntries(entries);
         setCrew((current) => feedClockHours(current, entries, doc.id));
       });
+      // Crew pay from the day timesheet (from the cutover on): refresh this job's share of each worker's day.
+      void refreshJobTimesheet(doc.id, loadedCrew as CrewRow[], (data as Record<string, unknown>).schedule ? readSchedule(data as Record<string, unknown>)?.date || "" : "");
     } catch {
       window.localStorage.removeItem("clientready-open-document");
       setSaveMessage("Could not open that document.");
@@ -1466,7 +1515,19 @@ export default function NewInvoicePage() {
                         </div>
                       );
                     })()}
-                    {(() => {
+                    {row.paySource === "timesheet" && !String(row.payOverride ?? "").trim() && (
+                      <div className={`min-w-0 rounded-xl border p-3 text-sm ${row.timesheetApproved ? "border-emerald-300 dark:border-emerald-700/70" : "border-slate-200"}`} data-testid={`ts-share-${row.employeeId}`} data-state={row.timesheetApproved ? "approved" : "pending"}>
+                        <p className="text-base font-semibold tabular-nums" data-testid="ts-share-text">From timesheet: {((row.timesheetMinutes || 0) / 60).toFixed(2)} h · ${Number(row.timesheetPay || 0).toFixed(2)} <span className="font-normal text-slate-600 dark:text-slate-300">(share of day)</span></p>
+                        <p className="text-xs text-slate-500" data-testid="ts-share-day">His day: {((row.timesheetDayMinutes || 0) / 60).toFixed(2)} h · ${Number(row.timesheetDayPay || 0).toFixed(2)}, split by time on each job (drive time goes to the job he drove to).</p>
+                        <p className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${row.timesheetApproved ? "cr-tone-good bg-emerald-50 text-emerald-800" : "bg-slate-100 text-slate-600 dark:bg-white/10"}`} data-testid="ts-share-status">{row.timesheetApproved ? "Day approved on the timesheet" : "Not approved yet (estimate)"}</p>
+                        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+                          {!row.timesheetApproved && <button type="button" data-testid="ts-share-approve" disabled={tsBusy === row.id} onClick={() => approveTimesheetDay(row, true)} className="min-h-11 rounded-lg bg-teal-500 px-4 font-semibold text-slate-950! transition hover:bg-teal-400 max-sm:w-full">Approve his day</button>}
+                          {row.timesheetApproved && <button type="button" data-testid="ts-share-undo" disabled={tsBusy === row.id} onClick={() => approveTimesheetDay(row, false)} className="min-h-11 bg-transparent px-1 font-medium text-teal-700 underline dark:text-teal-300">Undo</button>}
+                          <a data-testid="ts-share-link" href={`/timesheet?date=${row.workDate || schedule?.date || ""}`} className="min-h-11 inline-flex items-center text-sm font-medium text-teal-700 underline dark:text-teal-300">Open the day timesheet</a>
+                        </div>
+                      </div>
+                    )}
+                    {row.paySource !== "timesheet" && (() => {
                       // Hours approval (Jobber/HCP style): clocked is the main number, scheduled is a hint. One Approve pays clocked
                       // (or scheduled when nobody clocked in); Edit hours lets the owner type a number and approve that. Stored fields unchanged.
                       const mine = clockEntries.filter((entry) => entry.doc_id === docId && entry.employee_id === row.employeeId && entry.ended_at);

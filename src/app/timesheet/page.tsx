@@ -3,57 +3,27 @@
  * Owner weekly timesheet: every worker, each day's paid hours (day engine), drive time and flags,
  * edit a day, Approve all for the week with Undo, fix-my-time requests, gap/timeout settings.
  * Old clock entries count as taps (clock in = Start job, clock out = End shift), so nothing recorded is lost.
- * Approvals store hours only; recorded job pay rows are not changed here.
+ * Pay comes from the APPROVED day (from the cutover date on): approving or undoing here rewrites each job's share of
+ * the day on its crew rows, so job labor/profit, Crew pay, Year packet and Reports follow. Unapproved days are estimates.
  */
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
-import { DOCS_KEY } from "@/lib/doc-sync";
-import { readOwnerClock } from "@/lib/clock";
-import { readSchedule, readWorkers, type Worker } from "@/lib/schedule";
-import { readPaySettings, weekPay, weekOf } from "@/lib/pay-types";
+import { readWorkers, type Worker } from "@/lib/schedule";
+import { weekOf } from "@/lib/pay-types";
 import { decideFix, loadOwnerTimesheet, readLocalTimesheetSettings, saveApprovals, saveTimesheetSettings, type DayApproval } from "@/lib/day-events";
-import { applyFixes, buildDay, estimateDriveMinutes, type DaySheet, type FixRequest, type ScheduledJob, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
+import { type DaySheet, type FixRequest, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
+import { addDays, applyWeekToDocs, pushChangedDocs, readDocs, timesheetCutover, weekShares, weekSheets } from "@/lib/timesheet-sync";
+import type { DayPay } from "@/lib/timesheet-pay";
 
 const FLAG_LABEL: Record<string, string> = { from_schedule: "From schedule", not_at_site: "Not at site", long_drive: "Long drive", auto_ended: "Auto-ended", fix_requested: "Fix requested", edited: "Edited" };
-const addDays = (date: string, n: number) => { const d = new Date(`${date}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const localYmd = (iso: string) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
-const toIso = (date: string, hm: string) => (date && /^\d{1,2}:\d{2}/.test(hm || "") ? new Date(`${date}T${hm.slice(0, 5)}:00`).toISOString() : "");
 const h = (m: number) => (m / 60).toFixed(2);
-
-type Doc = { id: string; type?: string; clientName?: string; data?: Record<string, unknown> };
-function readDocs(): Doc[] { try { return JSON.parse(window.localStorage.getItem(DOCS_KEY) || "[]"); } catch { return []; } }
-
-function weekSheets(input: { workers: Worker[]; docs: Doc[]; events: TapEvent[]; fixes: FixRequest[]; settings: TimesheetSettings; week: string; now: string }) {
-  const clockTaps: TapEvent[] = readOwnerClockSafe().flatMap((c) => [
-    { id: `clk-${c.id}-in`, employeeId: c.employee_id, date: localYmd(c.started_at), kind: "start_job" as const, at: c.started_at, docId: c.doc_id },
-    ...(c.ended_at ? [{ id: `clk-${c.id}-out`, employeeId: c.employee_id, date: localYmd(c.started_at), kind: "end_shift" as const, at: c.ended_at, docId: c.doc_id }] : []),
-  ]);
-  const events = applyFixes([...input.events, ...clockTaps], input.fixes);
-  const days = Array.from({ length: 7 }, (_, i) => addDays(input.week, i));
-  const out = new Map<string, DaySheet>();
-  for (const worker of input.workers) for (const date of days) {
-    const schedule: ScheduledJob[] = input.docs.flatMap((doc) => {
-      const s = readSchedule(doc.data);
-      if (!s || s.date !== date || !s.workerIds.includes(worker.id)) return [];
-      const start = toIso(s.date, s.startTime), end = toIso(s.date, s.endTime || "");
-      return start && end ? [{ docId: doc.id, start, end, label: String(doc.data?.invoiceNumber || doc.clientName || "Job") }] : [];
-    });
-    const mine = events.filter((e) => e.employeeId === worker.id && e.date === date);
-    const coords = new Map(mine.filter((e) => e.lat != null && e.docId).map((e) => [e.docId!, { lat: e.lat!, lng: e.lng! }]));
-    const sheet = buildDay({ employeeId: worker.id, date, events: mine, schedule, settings: input.settings, now: input.now,
-      expectedDriveMinutes: (a, b) => { const p = a && coords.get(a), q = b && coords.get(b); return p && q ? estimateDriveMinutes(p, q) : undefined; } });
-    if (input.fixes.some((f) => f.employeeId === worker.id && f.date === date && f.status === "pending")) sheet.flags.push("fix_requested");
-    out.set(`${worker.id}|${date}`, sheet);
-  }
-  return { days, sheets: out };
-}
-function readOwnerClockSafe() { try { return readOwnerClock(); } catch { return []; } }
 
 export default function TimesheetPage() {
   const [week, setWeek] = useState("");
   const [workers, setWorkers] = useState<Worker[]>([]);
-  const [docs, setDocs] = useState<Doc[]>([]);
+  const [docs, setDocs] = useState<ReturnType<typeof readDocs>>([]);
   const [events, setEvents] = useState<TapEvent[]>([]);
   const [fixes, setFixes] = useState<FixRequest[]>([]);
   const [approvals, setApprovals] = useState<DayApproval[]>([]);
@@ -68,6 +38,13 @@ export default function TimesheetPage() {
     void loadOwnerTimesheet(week, addDays(week, 6)).then((data) => { setEvents(data.events); setFixes(data.fixes); setApprovals(data.approvals); setSettings(data.settings); });
   }, [week]);
   const { days, sheets } = useMemo(() => (week && now ? weekSheets({ workers, docs, events, fixes, settings, week, now }) : { days: [] as string[], sheets: new Map<string, DaySheet>() }), [workers, docs, events, fixes, settings, week, now]);
+  const { pays, shares } = useMemo(() => weekShares({ workers, docs, days, sheets, approvals }), [workers, docs, days, sheets, approvals]);
+  // Keep the jobs in step with the week (estimates for unapproved days, the approved day's split otherwise).
+  useEffect(() => {
+    if (!week || !now || !shares.size) return;
+    const res = applyWeekToDocs(readDocs(), shares, timesheetCutover());
+    if (res.changed.length) void pushChangedDocs(res.changed);
+  }, [shares, week, now]);
   const approvalOf = (id: string, date: string) => approvals.find((a) => a.employeeId === id && a.date === date);
   const minutesOf = (id: string, date: string) => { const a = approvalOf(id, date); const s = sheets.get(`${id}|${date}`); return a?.editedMinutes != null ? a.editedMinutes : a?.approvedAt ? a.paidMinutes : s?.paidMinutes || 0; };
 
@@ -120,8 +97,8 @@ export default function TimesheetPage() {
           <thead><tr><th className="p-2 text-left">Worker</th>{days.map((d) => <th key={d} className="p-2 text-left">{new Date(`${d}T12:00:00`).toLocaleDateString([], { weekday: "short", day: "numeric" })}</th>)}<th className="p-2 text-right">Week</th></tr></thead>
           <tbody>
             {workers.map((w) => {
-              const pay = readPaySettings(w.paySettings);
-              const wk = weekPay(days.map((date) => { const s = sheets.get(`${w.id}|${date}`); const total = minutesOf(w.id, date); const drive = Math.min(total, s?.driveMinutes || 0); return { date, workMinutes: total - drive, driveMinutes: drive }; }), pay, w.rate || "");
+              const wkDays: DayPay[] = pays.get(w.id) || [];
+              const wkCents = wkDays.reduce((sum, d) => sum + d.cents, 0);
               const total = days.reduce((sum, d) => sum + minutesOf(w.id, d), 0);
               return (
                 <tr key={w.id} className="border-t align-top" data-testid={`ts-row-${w.id}`}>
@@ -144,7 +121,7 @@ export default function TimesheetPage() {
                       </td>
                     );
                   })}
-                  <td className="p-2 text-right tabular-nums" data-testid={`ts-week-${w.id}`}>{h(total)} h<span className="block text-xs">${wk.total.toFixed(2)}{wk.premium ? ` incl. OT $${wk.premium.toFixed(2)}` : ""}</span></td>
+                  <td className="p-2 text-right tabular-nums" data-testid={`ts-week-${w.id}`}>{h(total)} h<span className="block text-xs" data-testid={`ts-week-pay-${w.id}`}>${(wkCents / 100).toFixed(2)}{wkDays.some((d) => !d.approved && d.cents) ? " (part estimate)" : ""}</span></td>
                 </tr>
               );
             })}

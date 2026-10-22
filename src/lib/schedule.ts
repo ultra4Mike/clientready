@@ -382,7 +382,7 @@ export async function saveAssignment(docId: string, workerIds: string[], confirm
 }
 
 /** Re-writes the crew pay rows (existing saveCrewJobs) from the stored crew list. */
-async function syncCrewPayRows(doc: CloudDoc) {
+export async function syncCrewPayRows(doc: CloudDoc) {
   if (!isUuid(doc.id)) return;
   const data = doc.data || {};
   const { saveCrewJobs } = await import("@/lib/crew");

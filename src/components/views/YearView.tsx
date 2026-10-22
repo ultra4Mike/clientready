@@ -1,5 +1,5 @@
 "use client";
-import { overtimePremium, readPaySettings, rowHours, rowPayMoney, weekOf, type PayType } from "@/lib/pay-types";
+import { isTimesheetRow, overtimePremium, readPaySettings, rowHours, rowPayMoney, weekOf, type PayType } from "@/lib/pay-types";
 import { readSetAside } from "@/lib/profit-alerts";
 import { buildReport } from "@/lib/reports";
 
@@ -261,17 +261,19 @@ export default function YearPage() {
         const rowDate = rawRow.workDate || doc.data?.invoiceDate || doc.createdAt || "";
         // A fixed day is paid once per worker per day, even across two jobs that day.
         let row = rawRow;
-        if (rawRow.payType === "day" && !String(rawRow.payOverride ?? "").trim()) {
+        // Timesheet rows already carry their share of the day (day rule, overtime, salary once): no adjustments here.
+        const fromSheet = isTimesheetRow(rawRow);
+        if (!fromSheet && rawRow.payType === "day" && !String(rawRow.payOverride ?? "").trim()) {
           const key = `${rawRow.employeeId || rawRow.name}|${String(rowDate).slice(0, 10)}`;
           row = { ...rawRow, dayCounted: dayKeys.has(key) };
           dayKeys.add(key);
         }
-        if ((!row.payType || row.payType === "hourly") && !String(row.payOverride ?? "").trim() && String(rowDate).includes(year)) {
+        if (!fromSheet && (!row.payType || row.payType === "hourly") && !String(row.payOverride ?? "").trim() && String(rowDate).includes(year)) {
           const id = row.employeeId || row.name || "";
           hourly.set(id, [...(hourly.get(id) || []), { date: String(rowDate).slice(0, 10), hours: rowHours(row), rate: Number(row.rate) || 0, name: row.name || "Worker" }]);
         }
         const amount = crewPay(row);
-        if (row.payType === "salary" && !String(row.payOverride ?? "").trim() && String(rowDate).includes(year)) {
+        if (!fromSheet && row.payType === "salary" && !String(row.payOverride ?? "").trim() && String(rowDate).includes(year)) {
           const id = row.employeeId || row.name || "";
           const key = `${id}|${weekOf(String(rowDate).slice(0, 10))}`;
           const prev = salaryWeeks.get(key) || { id, name: row.name || "Worker", week: weekOf(String(rowDate).slice(0, 10)), rows: 0 };
