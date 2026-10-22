@@ -52,7 +52,7 @@ export function StageSchedule({ stages, total, balance, muted = "text-slate-600"
       </table>
       {plan.current && plan.current.remaining > 0 && (
         <p className="mt-1 font-semibold" data-testid="stage-due-now">
-          {awaitingApproval ? "Due when you approve" : plan.current.state === "upcoming" ? "Next payment" : plan.current.state === "overdue" ? "Overdue" : "Pay today"}: ${plan.current.remaining.toFixed(2)} ({stageName(plan.current)}{plan.current.dueDate ? `, ${niceDate(plan.current.dueDate)}` : `, ${whenDue(plan.current).toLowerCase()}`})
+          {awaitingApproval ? "Due when you approve" : plan.current.state === "upcoming" ? "Next payment" : plan.current.state === "overdue" ? "Overdue" : "Pay today"}: ${plan.current.remaining.toFixed(2)} ({stageName(plan.current)}{plan.current.dueDate ? `, ${niceDate(plan.current.dueDate)}` : stageName(plan.current).toLowerCase().includes(whenDue(plan.current).toLowerCase()) ? "" : `, ${whenDue(plan.current).toLowerCase()}`})
         </p>
       )}
     </div>

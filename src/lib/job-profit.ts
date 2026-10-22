@@ -4,6 +4,7 @@
  * Simple rules, no settings:
  * - Crew pay is the job's labor (hours × rate + bonus, or the labor box when there is no crew).
  * - Card fees: 2.9% + 30¢ on each payment made by card (Card (Stripe) or Credit/debit card), labeled "est.".
+ * - Refunds lower the job's revenue (not its costs).
  * - Mileage: miles on the job × the IRS business rate, only when no gas cost was entered (never both).
  */
 import { jobWhen } from "./job-when";
@@ -23,7 +24,7 @@ export function irsMileageRate(ymd = "") {
 }
 
 export type ProfitLine = { key: string; label: string; amount: number };
-export type JobProfit = { total: number; lines: ProfitLine[]; cost: number; profit: number; margin: number | null };
+export type JobProfit = { total: number; refunded: number; lines: ProfitLine[]; cost: number; profit: number; margin: number | null };
 
 // R37: only real card payments (Card (Stripe), Credit/debit card, legacy "Card"/"Stripe") get the estimate.
 const CARD_METHODS = new Set(["card", "stripe", "card (stripe)", "credit/debit card", "credit card", "debit card", "credit/debit"]);
@@ -41,7 +42,10 @@ export function jobProfit(input: { total: number; data: Record<string, unknown> 
   // R37/R40: a passed-through card fee line is not revenue; it offsets the estimated card fees (never counted twice).
   const items = Array.isArray(data.items) ? (data.items as { description?: unknown; qty?: unknown; rate?: unknown }[]) : [];
   const collected = items.filter((i) => String(i.description || "").startsWith(CARD_FEE_LINE_PREFIX)).reduce((sum, i) => sum + money(i.qty || 1) * money(i.rate), 0);
-  const revenue = input.total - collected;
+  // Help retest: a refund is money given back, so it lowers REVENUE (and collected), never job costs.
+  // Card fees are not returned by Stripe, so they stay a cost.
+  const refunded = r2(payments.filter((p) => String((p as { id?: unknown }).id || "").startsWith("refund_") && money(p.amount) < 0).reduce((sum, p) => sum - money(p.amount), 0));
+  const revenue = input.total - collected - refunded;
   const netCard = Math.max(0, cardFees - collected);
   const gas = money(costs.gas);
   const miles = money(data.jobMiles);
@@ -54,12 +58,10 @@ export function jobProfit(input: { total: number; data: Record<string, unknown> 
     { key: "meals", label: "Meals", amount: money(costs.lunch) },
     { key: "fees", label: "Other fees", amount: fees.reduce((sum, fee) => sum + money(fee.amount), 0) },
     { key: "card", label: collected > 0 ? `Card fees (est., after $${collected.toFixed(2)} collected)` : "Card fees (est. 2.9% + 30¢)", amount: netCard },
-    // R128: money refunded to the client lowers this job's profit (card fees are not returned by Stripe).
-    { key: "refund", label: "Refunded to client", amount: payments.filter((p) => String((p as { id?: unknown }).id || "").startsWith("refund_") && money(p.amount) < 0).reduce((sum, p) => sum - money(p.amount), 0) },
     { key: "mileage", label: `Mileage (${miles} mi × $${irsMileageRate(day).toFixed(3).replace(/0$/, "")})`, amount: mileage },
   ].map((line) => ({ ...line, amount: r2(line.amount) })).filter((line) => line.amount > 0);
   const cost = r2(lines.reduce((sum, line) => sum + line.amount, 0));
   // Customer paid the full total (fee line included); the business pays the full estimated card fees.
-  const profit = r2(input.total - (cost - r2(netCard)) - cardFees);
-  return { total: r2(revenue), lines, cost, profit, margin: revenue > 0 ? Math.round((profit / revenue) * 100) : null };
+  const profit = r2(input.total - refunded - (cost - r2(netCard)) - cardFees);
+  return { total: r2(revenue), refunded, lines, cost, profit, margin: revenue > 0 ? Math.round((profit / revenue) * 100) : null };
 }

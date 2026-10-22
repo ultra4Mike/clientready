@@ -45,7 +45,16 @@ export async function POST(request: Request) {
   const docs = (ownerDocs || []) as { id: string; type: string; title?: string; data?: Record<string, unknown> }[];
   const existing = docs.find((d) => d.type === "invoice" && (d.data?.fromProposal as { id?: string } | undefined)?.id === doc.id && !d.data?.deleted && d.data?.status !== "void");
   const linkOf = (d: { id: string; data?: Record<string, unknown> }) => ({ invoiceId: d.id, number: String(d.data?.invoiceNumber || ""), token: String((d.data?.approval as { token?: string } | undefined)?.token || "") });
+  // Mark the proposal itself as invoiced on the server so Documents (and every device's localStorage
+  // after sync) shows Invoiced, not "sent".
+  const markProposal = async (inv: { id: string; data?: Record<string, unknown> }) => {
+    const pd = (doc.data || {}) as Record<string, unknown>;
+    const already = (pd.invoicedAs as { id?: string } | undefined)?.id === inv.id && pd.status === "invoiced";
+    if (already) return;
+    await client.from("documents").update({ data: { ...pd, status: "invoiced", invoicedAs: { id: inv.id, number: String(inv.data?.invoiceNumber || "") }, updatedAt: new Date().toISOString() } }).eq("id", doc.id);
+  };
   if (existing) {
+    await markProposal(existing);
     const link = linkOf(existing);
     if (!link.token) {
       // A manually made invoice without a customer link gets one (already approved, via the proposal).
@@ -62,6 +71,16 @@ export async function POST(request: Request) {
   const { number, data } = invoiceFromProposal(doc, docs, { today: ymdIn(tz), token: fresh, approval: approvalPublic });
   data.updatedAt = new Date().toISOString();
   const { data: inserted, error: insertError } = await client.from("documents").insert({ user_id: userId, type: "invoice", title: number, client_name: String(doc.data?.clientName || "Client"), data }).select("id, data").single();
-  if (insertError || !inserted) return Response.json({ error: "Could not make the invoice." }, { status: 500 });
+  if (insertError || !inserted) {
+    // Two requests raced (double tap, page effect + button, webhook/confirm): the unique index
+    // documents_one_invoice_per_proposal let only one insert through. Hand back that invoice.
+    if ((insertError as { code?: string } | null)?.code === "23505") {
+      const { data: again } = await client.from("documents").select("id, type, data").eq("user_id", userId).eq("type", "invoice").eq("data->fromProposal->>id", doc.id);
+      const winner = ((again || []) as { id: string; data?: Record<string, unknown> }[]).find((d) => !d.data?.deleted && d.data?.status !== "void");
+      if (winner) { await markProposal(winner); return Response.json({ ...linkOf(winner), created: false }); }
+    }
+    return Response.json({ error: "Could not make the invoice." }, { status: 500 });
+  }
+  await markProposal(inserted as { id: string; data?: Record<string, unknown> });
   return Response.json({ ...linkOf(inserted as { id: string; data?: Record<string, unknown> }), created: true });
 }

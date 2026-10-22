@@ -94,7 +94,7 @@ export default function PortalPage() {
                 <span className="block text-xs text-slate-600">
                   {text(doc.data.invoiceDate)}{text(doc.data.dueDate) ? ` · ${doc.type === "proposal" ? "valid until" : "due"} ${text(doc.data.dueDate)}` : ""}
                   {doc.type !== "proposal" ? "" : approval?.status === "approved" ? " · Approved" : approval ? " · Waiting for your approval" : ""}
-                  {plan && <span className="block font-semibold text-teal-700" data-testid="portal-plan-next">{plan.state === "upcoming" ? "Next payment" : plan.state === "overdue" ? "Overdue" : "Due now"}: ${plan.remaining.toFixed(2)}{plan.dueDate ? ` on ${plan.dueDate}` : plan.kind === "final" ? " when the job is done" : ""} ({plan.label || "payment"})</span>}
+                  {plan && <span className="block font-semibold text-teal-700" data-testid="portal-plan-next">{plan.state === "upcoming" ? "Next payment" : plan.state === "overdue" ? "Overdue" : "Due now"}: ${plan.remaining.toFixed(2)}{plan.dueDate ? ` on ${plan.dueDate}` : plan.kind === "final" && !String(plan.label || "").toLowerCase().includes("when the job is done") ? " when the job is done" : ""} ({plan.label || "payment"})</span>}
                 </span>
               </span>
               <span className="shrink-0 text-right text-sm">

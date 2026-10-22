@@ -21,7 +21,7 @@ export function conversionStages(percent: number, today: string, stamp = `${Date
   if (!percent) return [];
   return [
     { id: `${stamp}-d`, label: "Deposit", kind: "deposit", mode: "percent", value: String(percent), dueDate: today },
-    { id: `${stamp}-f`, label: "Balance when the job is done", kind: "final", mode: "percent", value: "", dueDate: "" },
+    { id: `${stamp}-f`, label: "Balance", kind: "final", mode: "percent", value: "", dueDate: "" },
   ];
 }
 

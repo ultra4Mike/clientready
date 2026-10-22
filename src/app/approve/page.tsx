@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import LegalLinks from "@/components/LegalLinks";
 import { approveByTokenSigned, fetchApprovalDoc, fetchVisitByToken, readApproval, type Approval, type PublicVisit } from "@/lib/approval";
 import { amountOf, documentTotals, discountLabel } from "@/lib/discount";
-import { grossPaid, isRefundRow, owedAfterRefunds, paidTotal, readPayments, refundedTotal } from "@/lib/payments";
+import { grossPaid, isRefundRow, owedAfterRefunds, paidTotal, readPayments, refundedTotal, refundWording } from "@/lib/payments";
 import { readPhotos } from "@/lib/photos";
 import { readSignature } from "@/lib/signature";
 import { payUrlFor } from "@/lib/pay-link";
@@ -57,6 +57,7 @@ export default function ApprovePage() {
   const [visit, setVisit] = useState<PublicVisit | null>(null);
   // R128: the invoice made automatically when a proposal is approved (its own customer link).
   const [invoiceLink, setInvoiceLink] = useState<{ href: string; number: string } | null>(null);
+  const convertRun = useRef<Promise<{ target: Record<string, string>; href: string; number: string } | null> | null>(null);
   // R128: after Stripe sends the client back: confirming, then a receipt with a number.
   const [receiptState, setReceiptState] = useState<"" | "confirming" | "done" | "slow">("");
   const [receiptId, setReceiptId] = useState("");
@@ -146,7 +147,14 @@ export default function ApprovePage() {
   }
 
   /** R128: an approved proposal becomes an invoice on the server (once). Returns the invoice's own link. */
-  async function convertToInvoice(): Promise<{ target: Record<string, string>; href: string; number: string } | null> {
+  // One convert request at a time on this page (the Approve button and the page effect both ask);
+  // the server also allows only one invoice per proposal (unique index), so a double tap or a
+  // second tab gets the same invoice back.
+  function convertToInvoice(): Promise<{ target: Record<string, string>; href: string; number: string } | null> {
+    if (!convertRun.current) convertRun.current = convertOnce().then((link) => { if (!link) convertRun.current = null; return link; });
+    return convertRun.current;
+  }
+  async function convertOnce(): Promise<{ target: Record<string, string>; href: string; number: string } | null> {
     const response = await fetch("/api/approve/convert", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(portal ? { portal: portal.p, docId: portal.d } : { token }) }).catch(() => null);
     const result = (await response?.json().catch(() => ({}))) as { invoiceId?: string; token?: string; number?: string } | undefined;
     if (!response?.ok || !result?.invoiceId) return null;
@@ -234,7 +242,10 @@ export default function ApprovePage() {
   const refundRows = payments.filter((payment) => isRefundRow(payment) && amountOf(String(payment.amount).replace("-", "")) > 0);
   const receipt = receiptId ? payments.find((payment) => payment.id === receiptId) || null : null;
   const receiptNumber = (id: string) => `R-${number.replace(/[^A-Za-z0-9]/g, "")}-${(id.replace(/[^A-Za-z0-9]/g, "").slice(-6) || "1").toUpperCase()}`;
-  const statusLabel = !isProposal && paidInFull ? (totals.refunded > 0.004 ? "Paid · refund issued" : "Paid") : approved ? "Approved" : needsApproval && approval ? "Awaiting approval" : isProposal ? "" : totals.paid > 0.004 ? "Partly paid" : "Due";
+  const refundText = isProposal ? "" : refundWording(totals.total, payments);
+  const baseLabel = !isProposal && paidInFull ? "Paid" : approved ? "Approved" : needsApproval && approval ? "Awaiting approval" : isProposal ? "" : totals.paid > 0.004 ? "Partially paid" : "Due";
+  // Same refund words as the owner's Documents list (lib/payments refundWording).
+  const statusLabel = refundText ? (paidInFull ? refundText : `${baseLabel} · ${refundText}`) : baseLabel;
   // The rating comes after the work: once the invoice is paid or the visit is done.
   const showRating = !isProposal && (token || portal) && (paidInFull || jobDone);
   const visitLabel = visit?.status === "done" && visit.date <= today ? "Visit done" : visit && visit.date < today ? "Visit" : "Your visit";

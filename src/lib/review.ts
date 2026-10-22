@@ -57,13 +57,20 @@ export function missingFields(doc: Doc): MissingField[] {
   const out: MissingField[] = [];
   // R128: an address is only needed when there is no other way to reach or bill the client.
   if (!text(data.clientEmail) && !text(data.clientPhone)) out.push(text(data.clientAddress) ? "contact" : "address", ...(text(data.clientAddress) ? [] : ["contact" as MissingField]));
-  if (!text(data.dueDate) && status !== "paid") out.push("due-date");
+  // A schedule-driven due date counts: "due when the job is done" (auto-converted proposals) or a
+  // payment schedule whose rows carry the dates.
+  const stages = Array.isArray(data.stages) ? (data.stages as { dueDate?: string; kind?: string }[]) : [];
+  const scheduleDue = data.dueOnCompletion === true || stages.some((row) => text(row.dueDate) || row.kind === "final");
+  if (!text(data.dueDate) && !scheduleDue && status !== "paid") out.push("due-date");
   const done = readSchedule(data)?.status === "done" || status === "paid";
   // Any signature on file counts: the invoice's own, the proposal's, or the client's approval signature.
   const approvalSig = (data.approval as { signature?: unknown } | null | undefined)?.signature;
-  if (done && !data.signature && !data.proposalSignature && !approvalSig) out.push("signature");
+  // Only invoices that needed a client sign-off (made from a proposal, or the owner asked for one);
+  // a plain invoice never needs a signature (R128: only proposals need approval).
+  const needsSignature = Boolean((data.fromProposal as { id?: string } | undefined)?.id) || data.requireSignature === true;
+  if (done && needsSignature && !data.signature && !data.proposalSignature && !approvalSig) out.push("signature");
   if (readPayments(data as never).some((payment) => (Number(payment.amount) || 0) > 0 && !text(payment.method))) out.push("payment-method");
-  return out;
+  return [...new Set(out)];
 }
 
 export function reviewItems(docs: Doc[], expenses: ExpenseRow[], today = ymd(new Date())): ReviewItem[] {
@@ -134,7 +141,14 @@ export function reviewItems(docs: Doc[], expenses: ExpenseRow[], today = ymd(new
         title: `${numberOf(doc)} has ${money(owed)} owed`, detail: `${STAGE_LABEL[documentStage(doc, docs).stage]}${data.dueDate ? ` · due ${data.dueDate}` : ""}${who(doc)}`, href: open(doc) });
     }
   }
-  return all.filter((item) => readReviews(byId.get(item.docId)?.data)[item.key] !== item.version);
+  // One row per document + item (a document listed twice, e.g. local and cloud copy, shows once).
+  const seen = new Set<string>();
+  return all.filter((item) => {
+    const id = `${item.docId}|${item.key}`;
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return readReviews(byId.get(item.docId)?.data)[item.key] !== item.version;
+  });
 }
 
 /** Stores the reviewed version on the document (local + cloud). Only data.reviews changes. */
