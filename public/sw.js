@@ -10,9 +10,9 @@ const PRECACHE = ["/offline", "/icons/icon-192.png"];
 // auth links), /offline (in PRECACHE) and dynamic /clients/[id] (cached when opened).
 // tests/sw-routes.test.ts fails if a page in src/app is missing here and not excluded.
 const WARM_PAGES = [
-  "/today", "/schedule", "/crew", "/calendar", "/week", "/upcoming", "/route", "/report", "/receipt", "/mileage",
-  "/", "/dashboard", "/invoice", "/proposal", "/documents", "/drafts", "/clients", "/employees", "/collect",
-  "/history", "/reports", "/year", "/backup", "/inventory", "/email", "/integrations", "/settings", "/profile",
+  "/crew", "/calendar", "/job", "/route", "/report", "/receipt", "/mileage",
+  "/", "/dashboard", "/invoice", "/proposal", "/documents", "/clients", "/employees", "/collect",
+  "/reports", "/backup", "/inventory", "/email", "/integrations", "/settings", "/profile",
   "/plans", "/subscribe", "/help", "/developers", "/privacy", "/terms", "/login", "/signup",
 ];
 
@@ -97,13 +97,13 @@ self.addEventListener("push", (event) => {
     icon: "/icons/icon-192.png",
     badge: "/icons/icon-192.png",
     tag: data.tag ? String(data.tag) : undefined,
-    data: { url: typeof data.url === "string" && data.url.startsWith("/") && !data.url.startsWith("//") ? data.url : "/today" },
+    data: { url: typeof data.url === "string" && data.url.startsWith("/") && !data.url.startsWith("//") ? data.url : "/calendar?view=day" },
   }));
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = new URL(event.notification.data?.url || "/today", self.location.origin).href;
+  const target = new URL(event.notification.data?.url || "/calendar?view=day", self.location.origin).href;
   event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
     const open = windows.find((client) => client.url === target);
     return open ? open.focus() : self.clients.openWindow(target);
