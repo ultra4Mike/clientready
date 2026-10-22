@@ -1,5 +1,9 @@
-/** Removes every ClientReady key from this browser (business cache, parked docs, sync queue, prefs). */
+import { deleteDeviceDb } from "./device-store";
+
+/** Removes every ClientReady key from this browser (business cache, parked docs, sync queue, prefs)
+ *  and deletes the IndexedDB device store (autosave drafts, offline queue, mirror; DEVICE_DB "clientready-device"). */
 export function wipeThisDevice() {
+  void deleteDeviceDb();
   for (const store of [window.localStorage, window.sessionStorage]) {
     Object.keys(store).filter((key) => key.startsWith("clientready") || key.startsWith("sb-")).forEach((key) => store.removeItem(key));
   }
