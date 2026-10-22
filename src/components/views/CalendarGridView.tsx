@@ -8,7 +8,8 @@ import PageHeader from "@/components/PageHeader";
 import ScheduleEditor from "@/components/ScheduleEditor";
 import { uniqueDocs } from "@/lib/change-orders";
 import { scheduledJobs } from "@/lib/scheduled-jobs";
-import { allConflicts, bookingConflicts, clockText, nextOpenSlot, readOverrides } from "@/lib/conflicts";
+import { allConflicts, bookingConflicts, clockText, nextOpenSlot, readOverrides, splitConflicts } from "@/lib/conflicts";
+import { ignoresTentative, isTentative, PRESETS, PRESET_LABEL, presetOf, readCalendarFilter, saveCalendarFilter, visibleOnCalendar, type CalendarFilter, type Preset } from "@/lib/calendar-filter";
 import { confirmRemovalFor, moveSchedule, omwTime, readSchedule, readWorkers, saveSchedule, DONE_CLASS, DONE_LABEL, doneState, STATUS_CLASS, STATUS_LABEL, statusClass, statusLabel, type DoneState, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
 
 type SavedDocument = {
@@ -61,8 +62,13 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
   const [workerId, setWorkerId] = useState("");
   const [message, setMessage] = useState("");
 
+  // R127: approval filter, remembered per user on this device.
+  const [filter, setFilterState] = useState<CalendarFilter>(PRESETS.all);
+  const [filterOpen, setFilterOpen] = useState(false);
+  function setFilter(next: CalendarFilter) { setFilterState(next); saveCalendarFilter(next); }
   useEffect(() => {
     setState({ docs: readDocs(), workers: readWorkers(), today: ymd(new Date()) });
+    setFilterState(readCalendarFilter());
   }, []);
 
   const { docs, workers, today } = state;
@@ -71,7 +77,8 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
   const workerName = useMemo(() => new Map(workers.map((person) => [person.id, person.name])), [workers]);
 
   const jobDocs = docs.filter((doc) => doc.type === "invoice" || doc.type === "proposal");
-  const jobs: Job[] = scheduledJobs(jobDocs);
+  const jobs: Job[] = scheduledJobs(jobDocs).filter((job) => visibleOnCalendar(job.doc, filter));
+  const skipTentative = ignoresTentative(filter);
   const clashing = new Set(allConflicts(jobDocs).flatMap((c) => [c.docId, c.otherDocId]));
   const unscheduled = jobDocs.filter((doc) => !readSchedule(doc.data) && text(doc.data?.status) !== "paid");
 
@@ -116,11 +123,23 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
         ? moveSchedule(existing, date, startTime)
         : unscheduledDrop(doc.data, date, startTime);
       // Same double-booking check as the schedule editor: offer the next open time, else Book anyway (recorded).
-      const clash = bookingConflicts(docs, docId, next);
+      // R127: an approved job there blocks (below); a pending/draft one only warns, with a move option.
+      const { hard: clash, soft } = splitConflicts(bookingConflicts(docs, docId, next));
+      const softLen = next.startTime ? (next.endTime && next.endTime > next.startTime ? toMin(next.endTime) - toMin(next.startTime) : 60) : 60;
+      if (!clash.length && soft.length) {
+        const who = soft.map((c) => `${workerName.get(c.workerId) || "Worker"} on ${c.title} ${clockText(c.start)}–${clockText(c.end)}`).join("\n");
+        const slot = nextOpenSlot(docs, docId, date, next.workerIds, softLen, next.startTime ? toMin(next.startTime) : undefined, { ignoreTentative: skipTentative });
+        if (slot && slot !== next.startTime && window.confirm(`A pending proposal holds this time (not approved yet):\n${who}\n\nMove it to the next open time, ${clockText(toMin(slot))}? Cancel keeps it here.`)) {
+          setConflictNote({ state: "moved", text: `Moved to the next open time, ${clockText(toMin(slot))}.` });
+          return save(docId, moveSchedule(next, date, slot));
+        }
+        setConflictNote({ state: "soft", text: "Saved. A pending proposal also holds this time (not approved yet)." });
+        return save(docId, next);
+      }
       if (clash.length) {
         const who = clash.map((c) => `${workerName.get(c.workerId) || "Worker"} is already on ${c.title} ${clockText(c.start)}–${clockText(c.end)}`).join("\n");
         const length = next.startTime ? (next.endTime && next.endTime > next.startTime ? toMin(next.endTime) - toMin(next.startTime) : 60) : 60;
-        const slot = nextOpenSlot(docs, docId, date, next.workerIds, length, next.startTime ? toMin(next.startTime) : undefined) || nextOpenSlot(docs, docId, date, next.workerIds, length);
+        const slot = nextOpenSlot(docs, docId, date, next.workerIds, length, next.startTime ? toMin(next.startTime) : undefined, { ignoreTentative: skipTentative }) || nextOpenSlot(docs, docId, date, next.workerIds, length, undefined, { ignoreTentative: skipTentative });
         if (slot && window.confirm(`Double-booked:\n${who}\n\nMove it to the next open time, ${clockText(toMin(slot))}, instead?`)) {
           const moved = moveSchedule(next, date, slot);
           setConflictNote({ state: "moved", text: `Moved to the next open time, ${clockText(toMin(slot))}.` });
@@ -148,11 +167,12 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
         draggable
         data-testid={`${tid}job-${job.doc.id}`}
         data-status={job.schedule.status}
+        data-tentative={isTentative(job.doc) || undefined}
         data-state={clashing.has(job.doc.id) ? "blocked" : undefined}
         data-done={doneState(job.schedule) || undefined}
         onDragStart={(event) => event.dataTransfer.setData("text/plain", job.doc.id)}
         onClick={(event) => { event.stopPropagation(); setEditing({ docId: job.doc.id }); }}
-        className={agenda ? `flex min-h-11 cursor-pointer flex-col justify-center rounded-lg border border-l-4 px-3 py-2 text-left text-sm font-medium leading-snug shadow-sm ${statusClass(job.schedule)}` : `cr-chip2 cursor-grab min-w-0 break-words rounded-md border border-l-4 px-1.5 py-1 text-left text-xs font-medium leading-snug shadow-sm ${statusClass(job.schedule)}`}
+        className={agenda ? `flex min-h-11 cursor-pointer flex-col justify-center rounded-lg border border-l-4 px-3 py-2 text-left text-sm font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc) ? " cr-tentative border-dashed opacity-60" : ""}` : `cr-chip2 cursor-grab min-w-0 break-words rounded-md border border-l-4 px-1.5 py-1 text-left text-xs font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc) ? " cr-tentative border-dashed opacity-60" : ""}`}
         title={`${job.doc.title} · ${job.doc.clientName} · ${statusLabel(job.schedule)}${job.schedule.onMyWayAt && job.schedule.status !== "done" ? ` · ${job.schedule.onMyWayBy || "Crew"} on the way` : ""}${people ? ` · ${people}` : ""}`}
       >
         {agenda ? (
@@ -166,6 +186,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
             {job.doc.clientName || job.doc.title}
           </>
         )}
+        {isTentative(job.doc) && <span data-testid="not-approved-tag" className="mt-0.5 inline-block rounded border border-dashed border-current px-1 text-[10px] font-semibold uppercase tracking-wide">Not approved</span>}
         {!compact && people && <span className="block truncate opacity-80">{people}</span>}
         {compact && clashing.has(job.doc.id) && <span data-testid="overlap-dot" title="Overlap: same worker on another job at this time" className="block font-semibold text-amber-700 dark:text-amber-300">⚠ Overlap</span>}
         {!compact && clashing.has(job.doc.id) && <span className="block" onClick={(event) => event.stopPropagation()}><OverlapBadge docs={docs} doc={job.doc} onMoved={() => setState((prev) => ({ ...prev, docs: readDocs() }))} /></span>}
@@ -223,6 +244,21 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
           {(Object.keys(STATUS_LABEL) as JobStatus[]).filter((key) => key !== "done").map((key) => <span key={key} className={`whitespace-nowrap rounded-full border px-2.5 py-0.5 font-medium ${STATUS_CLASS[key]}`}>{STATUS_LABEL[key]}</span>)}
           {(Object.keys(DONE_LABEL) as DoneState[]).map((key) => <span key={key} data-testid={`legend-done-${key}`} className={`whitespace-nowrap rounded-full border px-2.5 py-0.5 font-medium ${DONE_CLASS[key]}`}>{DONE_LABEL[key]}</span>)}
           <span className="basis-full opacity-90 sm:basis-auto"><span className="hidden sm:inline">Drag a job to move it. Click a slot or job to edit.</span><span className="sm:hidden">Tap a job or time slot to edit or move it.</span></span>
+        </div>
+        {/* R127: show / hide by approval. Presets plus simple toggles; remembered per user. */}
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm" data-testid="calendar-filter" data-preset={presetOf(filter) || "custom"}>
+          <span className="text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Show</span>
+          {(["approved", "drafts", "proposals", "all"] as Preset[]).map((key) => (
+            <button key={key} type="button" data-testid={`filter-preset-${key}`} aria-pressed={presetOf(filter) === key} onClick={() => setFilter({ ...PRESETS[key] })} className={`cr-btn min-h-11 ${presetOf(filter) === key ? "cr-btn-primary" : "cr-btn-secondary"}`}>{PRESET_LABEL[key]}</button>
+          ))}
+          <button type="button" data-testid="filter-more" aria-expanded={filterOpen} onClick={() => setFilterOpen(!filterOpen)} className="cr-btn cr-btn-text min-h-11">{filterOpen ? "Fewer options" : "More options"}</button>
+          {filterOpen && (
+            <div className="flex basis-full flex-wrap gap-x-4 gap-y-1" data-testid="filter-toggles">
+              {([["approved", "Approved work"], ["pending", "Sent, not approved"], ["drafts", "Drafts"], ["invoices", "Invoices"], ["proposals", "Proposals"]] as [keyof CalendarFilter, string][]).map(([key, label]) => (
+                <label key={key} className="flex min-h-11 items-center gap-2"><input type="checkbox" data-testid={`filter-${key}`} checked={filter[key]} onChange={(event) => setFilter({ ...filter, [key]: event.target.checked })} className="h-5 w-5" />{label}</label>
+              ))}
+            </div>
+          )}
         </div>
         {message && <p role="status" className="pointer-events-none fixed bottom-24 left-1/2 z-40 -translate-x-1/2 rounded-lg border border-teal-500/30 bg-[var(--cr-card)] px-3 py-2 text-sm shadow-lg" data-testid="calendar-message">{message}</p>}
         {conflictNote && <p role="status" className={`mt-2 rounded-xl border px-3 py-2.5 text-sm font-medium ${conflictNote.state === "moved" ? "cr-tone-teal border-teal-400 bg-teal-50 text-teal-900" : "cr-tone-warn border-amber-400 bg-amber-50 text-amber-900"}`} data-testid="calendar-conflict" data-state={conflictNote.state}>{conflictNote.text}</p>}

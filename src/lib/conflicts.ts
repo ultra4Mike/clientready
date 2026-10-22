@@ -1,9 +1,10 @@
 import { derivedWhen } from "./job-when";
+import { isTentative } from "./calendar-filter";
 // Double-booking rules. The same person on two jobs whose times overlap is blocked unless the owner taps
 // "Book anyway" (recorded on the job as schedule.overrides). Different people may overlap freely.
 // Jobs without a start time ("Any time") and done jobs are never compared. A job with no end time counts as 1 hour.
 export type Override = { workerId: string; otherDocId: string; at: string };
-export type Block = { docId: string; title: string; workerId: string; start: number; end: number; date: string };
+export type Block = { docId: string; title: string; workerId: string; start: number; end: number; date: string; /** R127: the other job is not approved yet (soft warning). */ tentative?: boolean };
 export type Conflict = Block & { mine: { start: number; end: number } };
 type Sched = { date?: string; startTime?: string; endTime?: string; workerIds?: string[]; status?: string; overrides?: unknown };
 type Doc = { id: string; title?: string; data?: Record<string, unknown> };
@@ -53,7 +54,7 @@ function sameJob(a: Doc, b?: Doc) {
 const titleOf = (doc: Doc) => String(doc.data?.invoiceNumber || doc.title || "another job");
 
 /** Other jobs that day for these people (their booked blocks), sorted by start. */
-export function bookedBlocks(docs: Doc[], docId: string, date: string, workerIds: string[]): Block[] {
+export function bookedBlocks(docs: Doc[], docId: string, date: string, workerIds: string[], { ignoreTentative = false }: { ignoreTentative?: boolean } = {}): Block[] {
   const out: Block[] = [];
   if (!date || !workerIds.length) return out;
   const byId = new Map(docs.map((doc) => [doc.id, doc]));
@@ -61,9 +62,11 @@ export function bookedBlocks(docs: Doc[], docId: string, date: string, workerIds
     if (!doc || doc.id === docId || sameJob(doc, byId.get(docId))) continue;
     const s = sched(doc);
     if (!s || s.date !== date || s.status === "done") continue;
+    const tentative = isTentative(doc as Doc & { type?: string });
+    if (ignoreTentative && tentative) continue;
     const t = span(s);
     if (!t) continue;
-    for (const id of s.workerIds || []) if (workerIds.includes(String(id))) out.push({ docId: doc.id, title: titleOf(doc), workerId: String(id), ...t, date });
+    for (const id of s.workerIds || []) if (workerIds.includes(String(id))) out.push({ docId: doc.id, title: titleOf(doc), workerId: String(id), ...t, date, tentative });
   }
   return out.sort((a, b) => a.start - b.start);
 }
@@ -78,16 +81,21 @@ export function bookingConflicts(docs: Doc[], docId: string, mine: Sched, extraO
     .filter((b) => b.start < t.end && t.start < b.end)
     .filter((b) => !own.some((o) => o.workerId === b.workerId && o.otherDocId === b.docId))
     .filter((b) => !readOverrides(sched(byId.get(b.docId) || { id: "" })?.overrides).some((o) => o.workerId === b.workerId && o.otherDocId === docId))
-    .map((b) => ({ ...b, mine: t }));
+    .map((b) => ({ ...b, tentative: Boolean(b.tentative || (byId.get(docId) && isTentative(byId.get(docId) as Doc & { type?: string }))), mine: t }));
 }
 
 /** Earliest start (15-minute steps, 7 AM to 8 PM end) with no overlap for any of these people, or "". */
-export function nextOpenSlot(docs: Doc[], docId: string, date: string, workerIds: string[], duration: number, from = 7 * 60): string {
-  const blocks = bookedBlocks(docs, docId, date, workerIds);
+export function nextOpenSlot(docs: Doc[], docId: string, date: string, workerIds: string[], duration: number, from = 7 * 60, opts: { ignoreTentative?: boolean } = {}): string {
+  const blocks = bookedBlocks(docs, docId, date, workerIds, opts);
   for (let start = Math.ceil(from / 15) * 15; start + duration <= 20 * 60; start += 15) {
     if (!blocks.some((b) => b.start < start + duration && start < b.end)) return hhmmOf(start);
   }
   return "";
+}
+
+/** R127: approved clashes block (Book anyway / another time / worker); unapproved ones only warn. */
+export function splitConflicts<T extends { tentative?: boolean }>(list: T[]) {
+  return { hard: list.filter((c) => !c.tentative), soft: list.filter((c) => c.tentative) };
 }
 
 /** Every unresolved double-booking across all jobs, once per pair (re-checked after each sync; Help R26). */
