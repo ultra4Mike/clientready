@@ -11,7 +11,7 @@ const PRECACHE = ["/offline", "/icons/icon-192.png"];
 // tests/sw-routes.test.ts fails if a page in src/app is missing here and not excluded.
 const WARM_PAGES = [
   "/crew", "/calendar", "/job", "/route", "/report", "/receipt", "/mileage",
-  "/", "/dashboard", "/invoice", "/proposal", "/documents", "/clients", "/employees", "/collect",
+  "/", "/dashboard", "/invoice", "/proposal", "/documents", "/clients", "/employees", "/timesheet", "/collect",
   "/reports", "/backup", "/inventory", "/email", "/integrations", "/settings", "/profile",
   "/plans", "/subscribe", "/help", "/developers", "/privacy", "/terms", "/login", "/signup",
 ];
