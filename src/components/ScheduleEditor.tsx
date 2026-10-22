@@ -4,7 +4,8 @@ import { overLimit, ownerOvertimeHours, weekScheduledHours } from "@/lib/overtim
 import { checklistFromLines } from "@/lib/checklist";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { refreshOwnerUnavailable, unavailableOn, type Unavailable } from "@/lib/unavailable";
-import { bookedBlocks, bookingConflicts, clockText, DEFAULT_JOB_MINUTES, nextOpenSlot, readOverrides, type Override } from "@/lib/conflicts";
+import { bookedBlocks, bookingConflicts, clockText, DEFAULT_JOB_MINUTES, nextOpenSlot, readOverrides, splitConflicts, type Override } from "@/lib/conflicts";
+import { ignoresTentative, readCalendarFilter } from "@/lib/calendar-filter";
 import { STATUS_LABEL, TRAVEL_BUFFER_MINUTES, travelWarnings, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
 
 function readDocsSafe(): { id: string; title?: string; data?: Record<string, unknown> }[] {
@@ -61,12 +62,15 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
   const [bookAnyway, setBookAnyway] = useState(false);
   const allDocs = typeof window === "undefined" ? [] : readDocsSafe();
   const draft = { date, startTime, endTime, workerIds, status, overrides: value?.overrides };
-  const conflicts = bookingConflicts(allDocs, docId, draft);
+  // R127: approved clashes block (hard); a pending/draft job holding the time only warns (soft).
+  const { hard: conflicts, soft: softConflicts } = splitConflicts(bookingConflicts(allDocs, docId, draft));
+  const skipTentative = typeof window !== "undefined" && ignoresTentative(readCalendarFilter());
   const blocks = bookedBlocks(allDocs, docId, date, workerIds);
   const overtimeLimit = ownerOvertimeHours();
   const overtime = date && workerIds.length ? overLimit(weekScheduledHours(allDocs, docId, { date, startTime, endTime, workerIds }), overtimeLimit).filter((row) => workerIds.includes(row.id)) : [];
   const length = startTime ? (endTime && endTime > startTime ? toMin(endTime) - toMin(startTime) : 60) : 60;
-  const suggestion = conflicts.length ? nextOpenSlot(allDocs, docId, date, workerIds, length, startTime ? toMin(startTime) : undefined) || nextOpenSlot(allDocs, docId, date, workerIds, length) : "";
+  const slotOpts = { ignoreTentative: skipTentative };
+  const suggestion = conflicts.length || softConflicts.length ? nextOpenSlot(allDocs, docId, date, workerIds, length, startTime ? toMin(startTime) : undefined, slotOpts) || nextOpenSlot(allDocs, docId, date, workerIds, length, undefined, slotOpts) : "";
   function applySlot(slot: string) {
     const start = toMin(slot);
     setStartTime(slot);
@@ -93,7 +97,7 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
     setWorkerIds(next);
     if (autoSave) { confirmedRef.current = [...confirmedRef.current, ...removed]; changes.current += 1; return; }
     // Adding someone who is already booked then: wait for Save (and Book anyway) instead of saving now.
-    const clash = value ? bookingConflicts(readDocsSafe(), docId, { ...value, workerIds: next }) : [];
+    const clash = value ? splitConflicts(bookingConflicts(readDocsSafe(), docId, { ...value, workerIds: next })).hard : [];
     if (value && !clash.length) onSave({ ...value, workerIds: next }, { keepOpen: true, confirmed: removed });
   }
 
@@ -204,6 +208,12 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
             <p>Double-booked: {conflicts.map((c) => `${names.get(c.workerId) || "Worker"} is already on ${c.title} ${clockText(c.start)}–${clockText(c.end)}`).join("; ")}.</p>
             {suggestion && <button type="button" data-testid="next-open-slot" data-time={suggestion} onClick={() => applySlot(suggestion)} className="cr-slot-chip inline-flex min-h-11 items-center gap-1.5 rounded-full bg-teal-500 px-4 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">Use next open time: {clockText(toMin(suggestion))}</button>}
             <label className="cr-book-anyway flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-rose-400/60 px-3 py-2 text-sm font-medium text-rose-700"><input type="checkbox" data-testid="book-anyway" checked={bookAnyway} onChange={(event) => setBookAnyway(event.target.checked)} className="h-5 w-5" />Book anyway (they&apos;ll be on two jobs at once; this is saved on the job)</label>
+          </div>
+        )}
+        {conflicts.length === 0 && softConflicts.length > 0 && (
+          <div role="status" data-testid="booking-soft" data-state="warn" className="mt-2 space-y-2 rounded-xl border border-dashed border-amber-400 px-3 py-3 text-sm text-amber-900 dark:text-amber-200">
+            <p>A pending proposal holds this time: {softConflicts.map((c) => `${names.get(c.workerId) || "Worker"} on ${c.title} ${clockText(c.start)}–${clockText(c.end)}`).join("; ")} (not approved yet). You can still save.</p>
+            {suggestion && <button type="button" data-testid="soft-next-open" data-time={suggestion} onClick={() => applySlot(suggestion)} className="cr-btn cr-btn-secondary">Move to next open time: {clockText(toMin(suggestion))}</button>}
           </div>
         )}
         {travel.length > 0 && (
