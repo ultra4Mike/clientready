@@ -9,6 +9,7 @@ import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { loadAccountIntoCache } from "@/lib/account-cache";
 import { amountOf, documentTotals } from "@/lib/discount";
+import { documentStage, STAGE_LABEL } from "@/lib/doc-stage";
 import { billedOutstanding, cashCollected } from "@/lib/money";
 import { isOpenBalance, invoicePastDue, owedAfterRefunds, paidTotal, readPayments } from "@/lib/payments";
 import { uniqueDocs } from "@/lib/change-orders";
@@ -153,7 +154,8 @@ export default function DashboardPage() {
   }, [clients, documents]);
 
   const stats = useMemo(() => {
-    const paidDocs = invoices.filter((doc) => doc.data?.status === "paid");
+    // R128: "paid" means nothing is owed (card, cash or marked paid), not only the status field.
+    const paidDocs = invoices.filter((doc) => doc.data?.status === "paid" || (invoiceTotal(doc) > 0 && balance(doc) <= 0.004));
     const paid = cashCollected(documents);
     const overdueDocs = invoices.filter((doc) => invoicePastDue(doc.data as Record<string, unknown>, invoiceTotal(doc), balance(doc)));
     const overdue = overdueDocs.reduce((sum, doc) => sum + balance(doc), 0);
@@ -269,35 +271,8 @@ export default function DashboardPage() {
 
       {/* User: denser desktop. >=1024px two columns: Today | Recent, Needs attention | money (stats, chart under),
           quick actions across. Mobile keeps one column in priority order: Today, attention, stats, chart, recent, actions. */}
-      <div data-testid="dash-grid" className="mt-6 grid items-start gap-4 lg:grid-cols-2 lg:gap-5">
-          <div className="min-w-0 lg:order-1" data-testid="dash-cell-today"><TodayJobsBlock docs={documents as never} loaded={loaded || cacheShown} /></div>
-          <section className="min-w-0 space-y-3 lg:order-3" data-testid="dash-cell-attention" aria-label="Needs attention">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Needs attention</h2>
-          {(auto.sent.length > 0 || auto.errors.length > 0) && (
-            <div className={`space-y-2 rounded-xl border px-4 py-3 text-sm ${auto.errors.length ? "border-rose-300/70" : "cr-tone-good border-emerald-300 bg-emerald-50 text-emerald-800"}`} data-testid="auto-sent" data-count={auto.sent.length}>
-              {auto.sent.length > 0 && <p className="flex items-start gap-2 font-medium text-emerald-800 dark:text-emerald-200"><span aria-hidden="true">✓</span><span className="min-w-0 break-words">Sent automatically: {auto.sent.map((item) => `${item.kind === "done" ? "invoice" : "reminder"} to ${item.to}`).join("; ")}</span></p>}
-              {auto.errors.map((error) => <p key={error} className="cr-tone-bad rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-800" data-testid="auto-error">{error}</p>)}
-              <a href="/profile" className="inline-flex min-h-11 items-center text-xs font-medium underline">Automation settings</a>
-            </div>
-          )}
-          {loaded && <FollowUps docs={documents as never} today={todayYmd()} limit={5} testid="dashboard-reminders" />}
-      {recurringReady > 0 && (
-        <a href="/documents?q=draft" data-testid="recurring-ready" className="flex items-center justify-between rounded-xl border border-teal-500/40 bg-teal-500/10 px-4 py-3 text-sm font-medium text-teal-700 dark:text-teal-200 transition hover:bg-teal-500/15">
-          {recurringReady} recurring draft{recurringReady === 1 ? "" : "s"} ready for review
-        </a>
-      )}
-      <ProfitAlertsCard loaded={loaded} documents={documents} />
-      <GettingStarted loading={!loaded} documents={documents} />
-      <NeedsReview loading={!loaded} onCount={setReviewCount} documents={documents} onDocuments={(docs) => setDocuments(uniqueDocs(docs as SavedDocument[]))} />
-          {loaded && reviewCount === 0 && recurringReady === 0 && stats.overdueCount === 0 && (
-            <div data-testid="all-caught-up" className="flex items-center gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm">
-              <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">✓</span>
-              <span><span className="font-semibold">All caught up.</span> <span className="text-[var(--cr-muted)]">Nothing overdue or waiting on you.</span></span>
-            </div>
-          )}
-          </section>
-          {/* User: money stats and the overview chart sit right after Today / Needs attention, not at the bottom. */}
-      <div className="cr-dash-money min-w-0 space-y-4 lg:order-4" data-testid="dash-cell-money">
+      {/* User: stats (2x2, left) and the Invoice overview chart (right, same height) in one row at the very top; mobile: stats then chart, still first. */}
+      <div className="cr-dash-money mt-6 grid min-w-0 gap-4 lg:grid-cols-2 lg:items-stretch lg:gap-5" data-testid="dash-cell-money">
       <div className="cr-stat-row" data-testid="dashboard-stats" data-layout="stat-row">
         <a href="/documents?filter=outstanding" data-testid="stat-outstanding" data-loading={loaded ? undefined : "true"} className="group block data-[loading=true]:pointer-events-none data-[loading=true]:animate-pulse rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-3 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400">
           <div className="flex items-start justify-between">
@@ -341,12 +316,12 @@ export default function DashboardPage() {
         </Link>
       </div>
       {stats.invoiceCount > 0 && (
-        <div data-testid="dash-chart" className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5">
+        <div data-testid="dash-chart" className="flex min-w-0 flex-col rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5">
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 sm:mb-4">
             <h2 className="text-base font-semibold">Invoice overview</h2>
             <span className="text-xs text-[var(--cr-muted)]">Last 6 months · {stats.paidRate}% of invoices marked paid</span>
           </div>
-          <svg viewBox={`0 0 ${width} ${height + 28}`} className="h-auto w-full overflow-visible sm:h-56">
+          <svg viewBox={`0 0 ${width} ${height + 28}`} className="h-auto w-full overflow-visible sm:h-56 lg:h-auto lg:min-h-0 lg:flex-1">
             {[1, 2, 3, 4].map((line) => (
               <line
                 key={line}
@@ -384,6 +359,33 @@ export default function DashboardPage() {
         </div>
       )}
       </div>
+      <div data-testid="dash-grid" className="mt-4 grid items-start gap-4 lg:grid-cols-2 lg:gap-5 lg:mt-5">
+          <div className="min-w-0 lg:order-1" data-testid="dash-cell-today"><TodayJobsBlock docs={documents as never} loaded={loaded || cacheShown} /></div>
+          <section className="min-w-0 space-y-3 lg:order-3" data-testid="dash-cell-attention" aria-label="Needs attention">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Needs attention</h2>
+          {(auto.sent.length > 0 || auto.errors.length > 0) && (
+            <div className={`space-y-2 rounded-xl border px-4 py-3 text-sm ${auto.errors.length ? "border-rose-300/70" : "cr-tone-good border-emerald-300 bg-emerald-50 text-emerald-800"}`} data-testid="auto-sent" data-count={auto.sent.length}>
+              {auto.sent.length > 0 && <p className="flex items-start gap-2 font-medium text-emerald-800 dark:text-emerald-200"><span aria-hidden="true">✓</span><span className="min-w-0 break-words">Sent automatically: {auto.sent.map((item) => `${item.kind === "done" ? "invoice" : "reminder"} to ${item.to}`).join("; ")}</span></p>}
+              {auto.errors.map((error) => <p key={error} className="cr-tone-bad rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-800" data-testid="auto-error">{error}</p>)}
+              <a href="/profile" className="inline-flex min-h-11 items-center text-xs font-medium underline">Automation settings</a>
+            </div>
+          )}
+          {loaded && <FollowUps docs={documents as never} today={todayYmd()} limit={5} testid="dashboard-reminders" />}
+      {recurringReady > 0 && (
+        <a href="/documents?q=draft" data-testid="recurring-ready" className="flex items-center justify-between rounded-xl border border-teal-500/40 bg-teal-500/10 px-4 py-3 text-sm font-medium text-teal-700 dark:text-teal-200 transition hover:bg-teal-500/15">
+          {recurringReady} recurring draft{recurringReady === 1 ? "" : "s"} ready for review
+        </a>
+      )}
+      <ProfitAlertsCard loaded={loaded} documents={documents} />
+      <GettingStarted loading={!loaded} documents={documents} />
+      <NeedsReview loading={!loaded} onCount={setReviewCount} documents={documents} onDocuments={(docs) => setDocuments(uniqueDocs(docs as SavedDocument[]))} />
+          {loaded && reviewCount === 0 && recurringReady === 0 && stats.overdueCount === 0 && (
+            <div data-testid="all-caught-up" className="flex items-center gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm">
+              <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">✓</span>
+              <span><span className="font-semibold">All caught up.</span> <span className="text-[var(--cr-muted)]">Nothing overdue or waiting on you.</span></span>
+            </div>
+          )}
+          </section>
           <div className="min-w-0 rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] shadow-sm lg:order-2" data-testid="recent-docs">
             <div className="flex items-center gap-3 border-b border-teal-500/15 px-4 py-2 min-[900px]:justify-between">
               <h2 className="text-base font-semibold">Recent documents</h2>
@@ -413,7 +415,7 @@ export default function DashboardPage() {
                   })()}
                   <span className="block text-xs capitalize text-[var(--cr-muted)]">{doc.type} · {doc.createdAt}</span>
                 </span>
-                <span className="shrink-0 rounded-full border border-teal-500/30 px-2.5 py-0.5 text-xs font-semibold capitalize">{String(doc.data?.status || "draft")}</span>
+                <span className="shrink-0 rounded-full border border-teal-500/30 px-2.5 py-0.5 text-xs font-semibold capitalize" data-testid="recent-status">{STAGE_LABEL[documentStage(doc as never, documents as never).stage]}</span>
               </a>
             ))}
           </div>
