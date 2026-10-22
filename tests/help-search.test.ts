@@ -28,3 +28,14 @@ test("first-day guides link only to real articles", () => {
   assert.equal(ids.size, HELP_ARTICLES.length, "duplicate ids");
   for (const a of HELP_ARTICLES.filter((x) => x.id.startsWith("day1-"))) for (const r of a.related || []) assert.ok(ids.has(r), `${a.id} → ${r}`);
 });
+test("Deploy 5/6 help: new articles found, related ids real, no hidden autosave draft", async () => {
+  const { UPCOMING_HELP_ARTICLES } = await import("@/lib/help/upcoming");
+  const ids = new Set(HELP_ARTICLES.map((a) => a.id));
+  for (const id of ["invoice-layout", "autosave-drafts", "void-invoice", "payment-terms", "documents-views", "calendar-views", "fix-duplicate-numbers"]) assert.ok(ids.has(id), id);
+  for (const a of HELP_ARTICLES) for (const r of a.related || []) assert.ok(ids.has(r), `${a.id} → ${r}`);
+  assert.ok(!UPCOMING_HELP_ARTICLES.some((a) => a.id === "autosave-drafts" || ids.has(a.id)));
+  assert.ok(hay("void").includes("void-invoice"));
+  assert.ok(hay("restore unsaved").includes("autosave-drafts"));
+  assert.ok(hay("this week").includes("calendar-views"));
+  assert.ok(hay("net 30").includes("payment-terms"));
+});
