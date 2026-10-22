@@ -8,7 +8,7 @@ import { fetchCloudDocuments, deleteCloudDocument, getUserId } from "@/lib/cloud
 import { mergeDocs, OWNER_KEY } from "@/lib/doc-sync";
 import { runDueRecurring } from "@/lib/recurring";
 import { ApprovalBadge } from "@/components/Approval";
-import { readApproval } from "@/lib/approval";
+import { approvalBadgeApplies, readApproval } from "@/lib/approval";
 import { DocumentsViewTabs } from "@/components/ViewTabs";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
@@ -383,7 +383,7 @@ export default function DocumentsPage({ initialView = "all" }: { initialView?: "
                 <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${({ draft: "border-slate-400/40 bg-slate-400/10", sent: "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300", approved: "border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300", scheduled: "border-teal-500/40 bg-teal-500/10 text-teal-700 dark:text-teal-300", invoiced: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300", paid: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" } as Record<string, string>)[stageOf(doc).stage] || "border-slate-400/40"}`}>{STAGE_LABEL[stageOf(doc).stage]}</span>
                 {NEXT_LABEL[stageOf(doc).next] ? <span className="text-teal-700 dark:text-teal-300">Next: {NEXT_LABEL[stageOf(doc).next]}</span> : null}
               </p>
-              <ApprovalBadge approval={readApproval(doc.data?.approval)} className="mt-1" />
+              {(() => { const approval = readApproval(doc.data?.approval); return approvalBadgeApplies(doc, approval) ? <ApprovalBadge approval={approval} className="mt-1" /> : null; })()}
             </button>
             </span>
             <div className="min-w-0 text-sm">

@@ -22,5 +22,7 @@ export function displayStatus(doc: Doc, allDocs: Doc[] = [], today?: string) {
   if (doc.type === "invoice" && stage !== "paid" && stage !== "draft" && invoicePastDue(doc.data as Record<string, unknown>, total, owed, today)) return { key: "overdue", label: `Overdue${note}` };
   // R80: an invoice with some money in but not all reads "Partially paid".
   if (doc.type === "invoice" && stage !== "paid" && stage !== "draft" && owed > 0.004 && total - owed > 0.004) return { key: "partial", label: `Partially paid${note}` };
+  // Help retest: a refunded-but-owing invoice uses the same word as the client page ("Due · Refunded $X"), not the pipeline stage.
+  if (note && doc.type === "invoice" && stage === "invoiced" && owed > 0.004) return { key: "due", label: `Due${note}` };
   return { key: stage, label: `${STAGE_LABEL[stage]}${note}` };
 }

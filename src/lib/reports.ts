@@ -1,7 +1,7 @@
 import { docAmounts } from "@/lib/doc-stage";
 import { jobWhen } from "@/lib/job-when";
 import { cashEntries } from "@/lib/money";
-import { isVoidStatus, readPayments } from "@/lib/payments";
+import { isVoidStatus, readPayments, refundedTotal } from "@/lib/payments";
 import { isPendingRecurringDraft } from "@/lib/recurring";
 import { dedupeCopies } from "@/lib/doc-dedupe";
 import { jobProfit, type ProfitLine } from "@/lib/job-profit";
@@ -39,7 +39,7 @@ export function ownerJobCost(data: Record<string, unknown> = {}) {
 }
 
 export type MonthRow = { month: number; billed: number; collected: number; jobCosts: number; crewReceipts: number };
-export type JobRow = { id: string; type: string; number: string; client: string; date: string; month: number; total: number; cost: number; profit: number; jobDate: string; lines: ProfitLine[] };
+export type JobRow = { id: string; type: string; number: string; client: string; date: string; month: number; total: number; refunded: number; net: number; cost: number; profit: number; jobDate: string; lines: ProfitLine[] };
 
 /**
  * One year by month. Billed: sent invoices by invoice date. Collected: payments by the date received.
@@ -60,7 +60,7 @@ export function buildReport(allDocs: Doc[], crewExpenses: CrewExpense[], year: s
     const jobDay = scheduledDay(data);
     const jobAt = yearMonth(jobDay || data.invoiceDate || doc.createdAt);
     const all = jobProfit({ total, data });
-    if (jobAt?.year === year) jobs.push({ id: doc.id, type: doc.type, number: String(data.invoiceNumber || doc.title || "Invoice"), client: doc.clientName || "No client", date: jobDay || String(data.invoiceDate || doc.createdAt || ""), month: jobAt.month, total, cost: all.cost, profit: all.profit, jobDate: jobDay, lines: all.lines });
+    if (jobAt?.year === year) jobs.push({ id: doc.id, type: doc.type, number: String(data.invoiceNumber || doc.title || "Invoice"), client: doc.clientName || "No client", date: jobDay || String(data.invoiceDate || doc.createdAt || ""), month: jobAt.month, total, refunded: refundedTotal(readPayments(data)), net: Math.round((total - refundedTotal(readPayments(data))) * 100) / 100, cost: all.cost, profit: all.profit, jobDate: jobDay, lines: all.lines });
     if (when?.year !== year) continue;
     months[when.month].billed += total;
     // R128: the same cost as Profit by job (owner costs + card fees + mileage), so the two agree; refunds lower collected, never costs.
