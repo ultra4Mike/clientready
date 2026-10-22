@@ -89,3 +89,45 @@ export function applyCrewAmount<T extends CostFields>(costs: T, kind: CrewKind, 
   if (!matching.length) return { ...costs, otherFees: [...fees, { id: newId(), name, amount: value }] };
   return { ...costs, otherFees: [...fees, { id: newId(), name: `${name} (crew adjustment)`, amount: (amount - current).toFixed(2) }] };
 }
+
+/** Owner picker order (Materials first, type required). Labels match the owner's cost lines. */
+export const CREW_TYPE_CHOICES: { kind: CrewKind; label: string }[] = [
+  { kind: "parts", label: "Materials" },
+  { kind: "gas", label: "Fuel" },
+  { kind: "tools", label: "Equipment / supplies" },
+  { kind: "dump", label: "Dump fees" },
+  { kind: "lunch", label: "Meals" },
+  { kind: "other", label: "Other" },
+];
+export const crewTypeLabel = (kind: unknown) => CREW_TYPE_CHOICES.find((item) => item.kind === kind)?.label || "Other";
+
+/** "Check type": the note reads like materials/supplies but the line is filed as fuel (e.g. Gas + "shingles, nails"). */
+export function crewTypeMismatch(kind: unknown, note: unknown): CrewKind | null {
+  // Legacy / unknown types (and "Other") map to the closest owner line from the note, flagged until the owner confirms.
+  if (!isCrewKind(kind) || kind === "other") { const guess = inferCrewKind(note); return guess !== "other" ? guess : null; }
+  if (kind !== "gas") return null;
+  const text = String(note || "").toLowerCase();
+  if (/\bgas\b|diesel|fuel|gasoline/.test(text)) return null;
+  if (/shingle|nail|lumber|wood|plywood|board|screw|bolt|pipe|wire|cement|concrete|mortar|gravel|rock|sod|mulch|seed|fertili|paint|caulk|drywall|insulation|tile|brick|roofing|flashing|material|part\b|parts\b|hardware/.test(text)) return "parts";
+  if (/glove|blade|bag|tape|trimmer line|supplies|tool|rental/.test(text)) return "tools";
+  return null;
+}
+
+/** What one crew apply changed, so the owner can undo it (restores the owner's previous value). */
+export type CrewApplyUndo = { kind: CrewKind; at: string; /** set for "Extra item" lines added as their own cost line */ rowId?: string; before: { field?: string; otherFees?: Fee[] } };
+export function crewApplySnapshot(costs: CostFields, kind: CrewKind): CrewApplyUndo {
+  const plain = kind === "parts" || kind === "gas" || kind === "tools" || kind === "lunch";
+  return { kind, at: new Date().toISOString(), before: plain ? { field: String((costs as Record<string, unknown>)[kind] ?? "") } : { otherFees: (costs.otherFees || []).map((fee) => ({ ...fee })) } };
+}
+export function undoCrewApply<T extends CostFields>(costs: T, undo: CrewApplyUndo): T {
+  if (undo.before.otherFees) return { ...costs, otherFees: undo.before.otherFees.map((fee) => ({ ...fee })) };
+  return { ...costs, [undo.kind]: undo.before.field ?? "" };
+}
+export function readCrewUndo(value: unknown): CrewApplyUndo[] {
+  return Array.isArray(value) ? (value.filter((u) => u && typeof u === "object" && isCrewKind((u as CrewApplyUndo).kind) && (u as CrewApplyUndo).before) as CrewApplyUndo[]) : [];
+}
+
+/** Crew "Extra item (not in estimate)" purchases are saved with this note prefix (no new column needed). */
+export const EXTRA_PREFIX = "Extra item: ";
+export const isExtraItem = (note: unknown) => /^extra item:/i.test(String(note || "").trim());
+export const extraName = (note: unknown) => String(note || "").trim().replace(/^extra item:\s*/i, "") || "Extra item";

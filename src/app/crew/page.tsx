@@ -7,7 +7,7 @@ import EmptyState from "@/components/EmptyState";
 import FormDraft from "@/components/FormDraft";
 import { nextJob, recentJobs } from "@/lib/crew-next";
 import CrewDaysOff from "@/components/CrewDaysOff";
-import { CREW_KINDS, legacySummary, type CostLine, type CrewKind } from "@/lib/cost-categories";
+import { CREW_KINDS, EXTRA_PREFIX, legacySummary, type CostLine, type CrewKind } from "@/lib/cost-categories";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { crewMarkDone, crewCheckItem, crewOnMyWay, omwTime, crewSetJobStatus, onMyWaySmsHref, STATUS_CLASS, STATUS_LABEL, type JobStatus } from "@/lib/schedule";
@@ -193,6 +193,7 @@ export default function CrewPage() {
   const [doneFor, setDoneFor] = useState("");
   const [donePhotos, setDonePhotos] = useState<string[]>([]);
   const [spend, setSpend] = useState<{ kind: string; amount: string; note: string; receipt: string }>({ kind: "parts", amount: "", note: "", receipt: "" });
+  const [spendExtra, setSpendExtra] = useState(false); // "Extra item (not in estimate)": sent as a note prefix, the owner decides
   const [fixing, setFixingRaw] = useState<{ id: string; start: string; end: string; reason: string } | null>(null);
   const [fixError, setFixError] = useState("");
   const setFixing = (next: { id: string; start: string; end: string; reason: string } | null) => { setFixError(""); setFixingRaw(next); };
@@ -387,10 +388,11 @@ export default function CrewPage() {
 
   async function saveExpense(card: Card) {
     if (!spend.amount.trim()) return setMessage("Add the amount you spent.");
+    if (spendExtra && !spend.note.trim()) return setMessage("Name the extra item (what you bought).");
     await act(`spend-${card.doc_id}`, async () => {
-      const payload = { p_kind: spend.kind, p_amount: spend.amount, p_note: spend.note, p_receipt: spend.receipt };
+      const payload = { p_kind: spend.kind, p_amount: spend.amount, p_note: spendExtra ? `${EXTRA_PREFIX}${spend.note.trim()}`.slice(0, 300) : spend.note, p_receipt: spend.receipt };
       const result = await sendOrQueue("expense", card.doc_id, payload, (key) => addExpense(card.doc_id, payload, key));
-      if (!result.error) { setSpend({ kind: "parts", amount: "", note: "", receipt: "" }); setSpendOpen(""); }
+      if (!result.error) { setSpend({ kind: "parts", amount: "", note: "", receipt: "" }); setSpendExtra(false); setSpendOpen(""); }
       return result.queued ? "" : result.error;
     }, navigator.onLine ? "Expense added to this job." : "Saved on this phone. It will send when you're back online.");
   }
@@ -699,7 +701,8 @@ export default function CrewPage() {
                 </select>
                 <input aria-label="Amount" inputMode="decimal" className={input} placeholder="Amount $" value={spend.amount} onChange={(event) => setSpend({ ...spend, amount: event.target.value })} />
               </div>
-              <input aria-label="What it was" className={input} placeholder="What it was" value={spend.note} onChange={(event) => setSpend({ ...spend, note: event.target.value })} />
+              <input aria-label="What it was" className={input} placeholder={spendExtra ? "Extra item name (required)" : "What it was"} value={spend.note} onChange={(event) => setSpend({ ...spend, note: event.target.value })} />
+              <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" data-testid="spend-extra" checked={spendExtra} onChange={(event) => setSpendExtra(event.target.checked)} className="h-5 w-5" />Extra item (not in the estimate)</label>
               <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-teal-500/50 px-3 py-3 text-sm font-medium transition hover:bg-teal-500/10">
                 <Icon name="camera" />{spend.receipt ? "Retake receipt photo" : "Snap receipt"}
                 <input aria-label="Receipt photo" type="file" accept="image/*" capture="environment" className="sr-only" onClick={nativePhotoClick((files) => pickReceipt(files[0]))} onChange={(event) => pickReceipt(event.target.files?.[0])} />

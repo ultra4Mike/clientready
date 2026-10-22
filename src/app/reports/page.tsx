@@ -38,7 +38,7 @@ export default function ReportsPage() {
     // R120: crew receipts show "…" until they load (not $0).
     supabase.auth.getSession().then(({ data }) => {
       if (!data.session) return setCrewLoaded(true);
-      supabase.from("crew_expenses").select("amount, created_at, kind, note, worker_name, doc_id").then(({ data: rows, error }) => {
+      supabase.from("crew_expenses").select("id, amount, created_at, kind, note, worker_name, doc_id").then(({ data: rows, error }) => {
         if (!error && rows) setCrewExpenses(rows as CrewExpense[]);
         setCrewLoaded(true);
       });

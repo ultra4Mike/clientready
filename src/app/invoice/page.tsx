@@ -6,7 +6,7 @@ import PortalShare from "@/components/PortalShare";
 import Section, { SectionDefaults, useOpenedExisting } from "@/components/Section";
 import EmailComposer from "@/components/EmailComposer";
 import StageBar from "@/components/StageBar";
-import { applyCrewAmount, CREW_KINDS, crewKindLabel, estimateByKind, isCrewKind, readCostLines, type CostFields, type CostLine, type CrewKind } from "@/lib/cost-categories";
+import { applyCrewAmount, CREW_KINDS, CREW_TYPE_CHOICES, crewApplySnapshot, crewTypeLabel, crewTypeMismatch, estimateByKind, extraName, isExtraItem, isCrewKind, readCostLines, readCrewUndo, undoCrewApply, type CostFields, type CostLine, type CrewApplyUndo, type CrewKind } from "@/lib/cost-categories";
 import { documentStage, NEXT_LABEL, STAGE_LABEL, STAGES } from "@/lib/doc-stage";
 import { readEmailLog, type EmailLogEntry } from "@/lib/email";
 import { clientIdFor } from "@/lib/portal";
@@ -296,6 +296,9 @@ export default function NewInvoicePage() {
   const [otherFees, setOtherFees] = useState<OtherFee[]>([]);
   /** Crew job report this invoice came from (cost lines by category). Shown next to the estimate; applied only by the owner's tap. */
   const [crewReport, setCrewReport] = useState<CrewReport | null>(null);
+  // Crew expense type fixes by the owner (row id -> type) and undo info for each crew amount applied to job costs.
+  const [crewKindFix, setCrewKindFix] = useState<Record<string, CrewKind>>({});
+  const [crewUndo, setCrewUndo] = useState<CrewApplyUndo[]>([]);
   const [locked, setLocked] = useState(false);
   const [daysLeft, setDaysLeft] = useState(14);
 
@@ -543,6 +546,8 @@ export default function NewInvoicePage() {
       setCosts({ ...emptyCosts, ...(data.jobCosts || {}), otherFees: loadedFees });
       setOtherFees(loadedFees);
       setCrewReport(readCrewReport((data as Record<string, unknown>).crewReport));
+      { const fix = (data as Record<string, unknown>).crewKindFix; setCrewKindFix(fix && typeof fix === "object" ? Object.fromEntries(Object.entries(fix as Record<string, unknown>).filter(([, k]) => isCrewKind(k))) as Record<string, CrewKind> : {}); }
+      setCrewUndo(readCrewUndo((data as Record<string, unknown>).crewUndo));
       setCrew(loadedCrew.map((row) => followSchedule({ ...row, bonus: row.bonus || "" }, (data as Record<string, unknown>).schedule ? readSchedule(data as Record<string, unknown>) : null)));
       // Clock entries from the crew app feed each worker's hours (see feedClockHours).
       refreshOwnerClock().then((entries) => {
@@ -783,15 +788,50 @@ export default function NewInvoicePage() {
     if (locked) return;
     let next: CostFields & { otherFees: OtherFee[] } = { ...costs, otherFees };
     let n = 0;
-    for (const [kind, amount] of list) next = applyCrewAmount(next, kind, amount, () => `${Date.now()}-${n++}`) as typeof next;
+    const undo = [...crewUndo];
+    for (const [kind, amount] of list) {
+      // Keep the owner's ORIGINAL value (first apply) so Undo always goes back to what they had.
+      if (!undo.some((u) => u.kind === kind && !u.rowId)) undo.push(crewApplySnapshot(next, kind));
+      next = applyCrewAmount(next, kind, amount, () => `${Date.now()}-${n++}`) as typeof next;
+    }
+    setCrewUndo(undo);
     const { otherFees: fees, ...rest } = next;
     setCosts((current) => ({ ...current, ...rest }));
     setOtherFees(fees as OtherFee[]);
     setSaveMessage("Job costs updated from the crew amounts. Save to keep them.");
   }
 
+  /** Owner tap on a crew "Extra item": adds it to job costs as its own cost line (undo restores the fee list). */
+  function addExtraCost(rowId: string, name: string, amount: number) {
+    if (locked || crewUndo.some((u) => u.rowId === rowId)) return;
+    setCrewUndo([...crewUndo, { kind: "other", rowId, at: new Date().toISOString(), before: { otherFees: otherFees.map((fee) => ({ ...fee })) } }]);
+    setOtherFees([...otherFees, { id: `extra-${rowId}`, name: `Extra: ${name}`, amount: amount.toFixed(2) } as OtherFee]);
+    setSaveMessage("Extra item added to job costs. Save to keep it.");
+  }
+  function undoExtraCost(rowId: string) {
+    const entry = crewUndo.find((u) => u.rowId === rowId);
+    if (locked || !entry) return;
+    setOtherFees(otherFees.filter((fee) => (fee as { id?: string }).id !== `extra-${rowId}`));
+    setCrewUndo(crewUndo.filter((u) => u !== entry));
+    setSaveMessage("Extra item removed from job costs. Save to keep it.");
+  }
+
+  /** Owner tap: put one cost line back to the value it had before the crew amount was applied. */
+  function undoCrewAmount(kind: CrewKind) {
+    if (locked) return;
+    const entry = crewUndo.find((u) => u.kind === kind && !u.rowId);
+    if (!entry) return;
+    const restored = undoCrewApply({ ...costs, otherFees } as CostFields & { otherFees: OtherFee[] }, entry);
+    const { otherFees: fees, ...rest } = restored;
+    setCosts((current) => ({ ...current, ...rest }));
+    setOtherFees((fees || []) as OtherFee[]);
+    setCrewUndo(crewUndo.filter((u) => u !== entry));
+    setSaveMessage("Your previous cost was restored. Save to keep it.");
+  }
+
   function clearForm() {
     if (locked) return;
+    setCrewKindFix({}); setCrewUndo([]);
     window.history.replaceState(null, "", "/invoice");
     draft.clear(`new-${docKind}`); // Clear form also drops the autosaved draft (no "Restore unsaved changes?" for cleared work)
     setDocId(""); setClientSearch(""); setClientName(""); setClientId(""); setClientCompany(""); setContactName(""); setStockUsed([]); setDepositPercent(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
@@ -860,7 +900,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, ...(linkedClientId ? { clientId: linkedClientId } : {}), clientCompany, ...(contactName.trim() ? { contactName: contactName.trim() } : {}), ...(stockUsed.length ? { stockUsed } : {}), ...(isProposal && Number(depositPercent) > 0 ? { depositPercent: String(Math.min(Number(depositPercent), 100)) } : {}), clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), ...(rebillRefund ? { rebillRefund: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(storedSchedule && (stored?.data?.schedule || !isProposal) ? { schedule: storedSchedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.autoSent ? { autoSent: (stored?.data as Record<string, unknown>).autoSent } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviewAskedAt ? { reviewAskedAt: (stored?.data as Record<string, unknown>).reviewAskedAt } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew: savedCrew, ...(crewReport ? { crewReport } : {}) },
+      data: { clientName, ...(linkedClientId ? { clientId: linkedClientId } : {}), clientCompany, ...(contactName.trim() ? { contactName: contactName.trim() } : {}), ...(stockUsed.length ? { stockUsed } : {}), ...(isProposal && Number(depositPercent) > 0 ? { depositPercent: String(Math.min(Number(depositPercent), 100)) } : {}), clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), ...(rebillRefund ? { rebillRefund: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(storedSchedule && (stored?.data?.schedule || !isProposal) ? { schedule: storedSchedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.autoSent ? { autoSent: (stored?.data as Record<string, unknown>).autoSent } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviewAskedAt ? { reviewAskedAt: (stored?.data as Record<string, unknown>).reviewAskedAt } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew: savedCrew, ...(crewReport ? { crewReport } : {}), ...(Object.keys(crewKindFix).length ? { crewKindFix } : {}), ...(crewUndo.length ? { crewUndo } : {}) },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -953,16 +993,17 @@ export default function NewInvoicePage() {
   // R122: one change order per click; the button stays disabled until we navigate to it.
   const changeOrderBusy = useRef(false);
   const [creatingChangeOrder, setCreatingChangeOrder] = useState(false);
-  async function createChangeOrder() {
+  async function createChangeOrder(prefill?: unknown) {
     if (changeOrderBusy.current) return;
     changeOrderBusy.current = true; setCreatingChangeOrder(true);
     let leaving = false;
-    try { leaving = await createChangeOrderOnce(); } finally {
+    const line = prefill && typeof prefill === "object" && "description" in (prefill as object) ? (prefill as { description: string; amount: number }) : undefined;
+    try { leaving = await createChangeOrderOnce(line); } finally {
       // Stays disabled while the page goes to the new change order; unlocks only if it stopped early.
       if (!leaving) { changeOrderBusy.current = false; setCreatingChangeOrder(false); }
     }
   }
-  async function createChangeOrderOnce(): Promise<boolean> {
+  async function createChangeOrderOnce(line?: { description: string; amount: number }): Promise<boolean> {
     if (locked) {
       setSaveMessage("Trial ended. Old documents stay viewable; saving new work needs a plan. Plan details coming soon (see Plans).");
       return false;
@@ -980,7 +1021,8 @@ export default function NewInvoicePage() {
       title: `Change Order #${count} to ${originalNumber}`,
       clientName: original.clientName,
       createdAt: new Date().toLocaleDateString(),
-      data: changeOrderData(original, number, ymd(new Date()), plusDays(14)),
+      // Crew "Extra item": the owner's tap pre-fills one line (still a Draft change order they review and send).
+      data: line ? { ...changeOrderData(original, number, ymd(new Date()), plusDays(14)), items: [{ description: line.description, qty: "1", rate: line.amount.toFixed(2), category: "" }] } : changeOrderData(original, number, ymd(new Date()), plusDays(14)),
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -1469,7 +1511,7 @@ export default function NewInvoicePage() {
                   <p key={alert.kind} role="status" data-testid="profit-alert" data-kind={alert.kind} className={`rounded-lg border px-3 py-2 text-sm ${alert.kind === "loss" ? "border-rose-400/60 bg-rose-50 text-rose-800" : "border-amber-400/60 bg-amber-50 text-amber-900"}`}>⚠ {alert.text}</p>
                 ))}
                 {!isProposal && <InventoryUse used={stockUsed} onUsed={setStockUsed} fees={otherFees} onFees={(fees) => setOtherFees(fees as OtherFee[])} locked={locked} />}
-                <CrewSpend docId={docId} estimate={{ ...costs, otherFees }} report={crewReport?.lines.length ? crewReport : null} locked={locked} onUse={useCrewAmounts} />
+                <CrewSpend docId={docId} estimate={{ ...costs, otherFees }} report={crewReport?.lines.length ? crewReport : null} locked={locked} onUse={useCrewAmounts} kindFix={crewKindFix} onKindFix={(id, kind) => setCrewKindFix((current) => ({ ...current, [id]: kind }))} undo={crewUndo} onUndo={undoCrewAmount} onExtraCost={addExtraCost} onExtraUndo={undoExtraCost} onExtraChangeOrder={(name, amount) => { if (window.confirm(`Create a Draft change order for "${name}" ($${amount.toFixed(2)})? The client is billed only when you send it.`)) void createChangeOrder({ description: `Extra: ${name}`, amount }); }} />
               </div>
             </Section>
             {docId && !locked && <Section id="approval" className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5" label="Approval" headerFirst={false}><ApprovalShare docId={docId} approval={approval} onChange={setApproval} /></Section>}
@@ -1668,11 +1710,11 @@ export default function NewInvoicePage() {
               })}
             </div>
             <div className="mt-2 grid grid-cols-2 gap-6 border-t border-slate-500 pt-2 text-sm tabular-nums">
-              <div className={`space-y-0.5 ${mutedClass}`}>
+              <div className={`min-w-0 space-y-0.5 overflow-hidden ${mutedClass}`}>
                 <LineSplit items={items} labelClass={labelClass} />
                 {payments.filter((payment) => amountOf(payment.amount) > 0).length > 0 && <p className={`text-xs ${labelClass}`}>{isProposal ? "Deposit" : "Payments"}</p>}
                 {payments.filter((payment) => amountOf(payment.amount) > 0).map((payment) => (
-                  <div key={payment.id} className="flex justify-between gap-2"><span>{[payment.date, payment.method, payment.ref].filter(Boolean).join(" · ") || "Payment"}</span><span>${amountOf(payment.amount).toFixed(2)}</span></div>
+                  <div key={payment.id} className="flex min-w-0 justify-between gap-2" data-testid="preview-payment-line"><span className="min-w-0 truncate">{[payment.date, payment.method, /^(pi_|cs_|ch_)/.test(payment.ref) ? "" : payment.ref].filter(Boolean).join(" · ") || "Payment"}</span><span className="shrink-0">${amountOf(payment.amount).toFixed(2)}</span></div>
                 ))}
                 {!isProposal && paymentLink && <p className="break-all pt-1 text-xs">Pay here: {paymentLink}</p>}
               </div>
@@ -1691,16 +1733,16 @@ export default function NewInvoicePage() {
             {!isProposal && <StageSchedule stages={stages} total={totals.total} balance={totals.balance} muted={mutedClass} />}
             {notes && !(!isProposal && totals.total > 0 && totals.balance <= 0.004 && /\bdue\b/i.test(notes) && notes.length < 120) && <p className={`mt-3 text-sm ${mutedClass}`} data-testid="preview-notes">{notes}</p>}
             {showPhotos && <JobPhotoStrip photos={photos} muted={mutedClass} />}
-            {(qrUrl && !isProposal) || signature || (proposalSignature && !isProposal) ? (
+            {(qrUrl && !isProposal && totals.balance > 0.004) || signature || (proposalSignature && !isProposal) ? (
               <div className="print-keep mt-3 grid grid-cols-2 items-end gap-6 border-t border-slate-500 pt-3">
                 <div className="space-y-3">
                   {!isProposal && <SignatureBlock signature={proposalSignature} label="Proposal accepted" muted={mutedClass} onDark={style === "bold"} />}
                   <SignatureBlock signature={signature} label={isProposal ? "Customer acceptance" : "Customer signature"} muted={mutedClass} onDark={style === "bold"} />
                 </div>
-                <div className="flex justify-end">{!isProposal && <PayQr url={qrUrl} />}</div>
+                <div className="flex justify-end">{!isProposal && totals.balance > 0.004 && <PayQr url={qrUrl} />}</div>
               </div>
             ) : null}
-            {!isProposal && !qrUrl && <p className="cr-qr-hint print-hide mt-4 flex items-start gap-2 rounded-lg border border-dashed border-slate-400/60 bg-slate-500/5 px-3 py-2.5 text-xs leading-relaxed text-slate-500" data-testid="qr-hint">No QR code yet. Make a customer link under Approval (or add a pay link) and a Scan to pay QR appears here and on the PDF.</p>}
+            {!isProposal && !qrUrl && totals.balance > 0.004 && <p className="cr-qr-hint print-hide mt-4 flex items-start gap-2 rounded-lg border border-dashed border-slate-400/60 bg-slate-500/5 px-3 py-2.5 text-xs leading-relaxed text-slate-500" data-testid="qr-hint">No QR code yet. Make a customer link under Approval (or add a pay link) and a Scan to pay QR appears here and on the PDF.</p>}
           </div>
         </div>
       </section>
@@ -1718,18 +1760,27 @@ function readCrewReport(value: unknown): CrewReport | null {
 }
 
 /** Owner only: what the crew spent per category next to the cost estimate. Changes job costs only when the owner taps "Use crew amount" / "Add all". */
-function CrewSpend({ docId, estimate, report, locked, onUse }: { docId: string; estimate: CostEstimate; report: CrewReport | null; locked: boolean; onUse: (list: [CrewKind, number][]) => void }) {
+function CrewSpend({ docId, estimate, report, locked, onUse, kindFix = {}, onKindFix, undo = [], onUndo, onExtraCost, onExtraUndo, onExtraChangeOrder }: { docId: string; estimate: CostEstimate; report: CrewReport | null; locked: boolean; onUse: (list: [CrewKind, number][]) => void; kindFix?: Record<string, CrewKind>; onKindFix?: (id: string, kind: CrewKind) => void; undo?: CrewApplyUndo[]; onUndo?: (kind: CrewKind) => void; onExtraCost?: (rowId: string, name: string, amount: number) => void; onExtraUndo?: (rowId: string) => void; onExtraChangeOrder?: (name: string, amount: number) => void }) {
   const [rows, setRows] = useState<{ id: string; worker_name: string; kind: string; amount: string; note: string; receipt: string }[]>([]);
   useEffect(() => {
     if (!docId) return;
     supabase.from("crew_expenses").select("*").eq("doc_id", docId).then(({ data }) => setRows(data || []));
   }, [docId]);
   const reportRows = (report?.lines || []).map((line, index) => ({ id: `report-${index}`, worker_name: report?.worker || "Crew", kind: line.kind as string, amount: line.amount, note: line.note, receipt: "", fromReport: true, hasReceipt: Boolean(line.hasReceipt) }));
-  const all = [...rows.map((row) => ({ ...row, fromReport: false, hasReceipt: Boolean(row.receipt) })), ...reportRows];
+  // The owner's type fix wins over what the crew picked; every total and apply button uses the fixed type.
+  const all = [...rows.map((row) => ({ ...row, fromReport: false, hasReceipt: Boolean(row.receipt) })), ...reportRows].map((row) => ({ ...row, crewKind: row.kind, kind: kindFix[row.id] || row.kind }));
+  const flagged = (kind: string) => all.filter((row) => row.kind === kind && !kindFix[row.id] && crewTypeMismatch(row.kind, row.note));
+  // Never silently add materials to fuel: a flagged line must be confirmed (or its type fixed) first.
+  const use = (list: [CrewKind, number][]) => {
+    const bad = list.flatMap(([kind]) => flagged(kind));
+    if (bad.length && !window.confirm(`Check type: ${bad.map((row) => `$${Number(row.amount).toFixed(2)} "${row.note}"`).join(", ")} is filed as Fuel but sounds like materials. Fix the type below first, or press OK to add it to Fuel anyway.`)) return;
+    onUse(list);
+  };
   if (!all.length) return null;
   const num = (value: unknown) => Number(String(value ?? "").replace(/[^0-9.-]/g, "")) || 0;
   // Unknown kinds count as Other, so every crew dollar shows up in exactly one row.
-  const spent = (kind: string) => all.filter((row) => (isCrewKind(row.kind) ? row.kind : "other") === kind).reduce((sum, row) => sum + num(row.amount), 0);
+  // Extra items the owner added as their own cost line are already in job costs: not compared again.
+  const spent = (kind: string) => all.filter((row) => !undo.some((u) => u.rowId === row.id)).filter((row) => (isCrewKind(row.kind) ? row.kind : "other") === kind).reduce((sum, row) => sum + num(row.amount), 0);
   const byKind = estimateByKind(estimate);
   const groups = CREW_KINDS.map(({ kind, label }) => ({ kind, label, est: byKind[kind].amount, actual: spent(kind), source: byKind[kind].source }));
   const shown = groups.filter((group) => group.est > 0 || group.actual > 0);
@@ -1743,7 +1794,7 @@ function CrewSpend({ docId, estimate, report, locked, onUse }: { docId: string; 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-medium">Crew spend vs your estimate</p>
         {differing.length > 1 && !locked && (
-          <button type="button" data-testid="cve-use-all" className="min-h-11 rounded-lg bg-teal-500 px-3 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400" onClick={() => onUse(differing.map((group) => [group.kind, group.actual]))}>Add all crew amounts ({differing.length})</button>
+          <button type="button" data-testid="cve-use-all" className="min-h-11 rounded-lg bg-teal-500 px-3 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400" onClick={() => use(differing.map((group) => [group.kind, group.actual]))}>Add all crew amounts ({differing.length})</button>
         )}
       </div>
       <div className="-mx-3 mt-2 overflow-x-auto px-3 sm:mx-0 sm:px-0"><table className="w-full min-w-[30rem] text-left text-sm">
@@ -1757,7 +1808,7 @@ function CrewSpend({ docId, estimate, report, locked, onUse }: { docId: string; 
                 <td className="py-2 text-right tabular-nums">${est.toFixed(2)}</td>
                 <td className="py-2 text-right font-medium tabular-nums">${actual.toFixed(2)}</td>
                 <td className="py-2 text-right tabular-nums">{differs ? <span data-testid="cve-diff" className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold ${actual - est > 0 ? "cr-tone-bad border-rose-300 bg-rose-50 text-rose-800" : "cr-tone-warn border-amber-300 bg-amber-50 text-amber-900"}`}><span aria-hidden="true">{actual - est > 0 ? "▲" : "▼"}</span>{diffText(actual - est)}</span> : actual > 0 ? <span className="cr-tone-good inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800"><span aria-hidden="true">✓</span>on estimate</span> : <span className="text-[var(--cr-muted)]">—</span>}</td>
-                <td className="py-2 pl-2 text-right">{differs && !locked && <button type="button" data-testid={`cve-use-${kind}`} className="cve-btn min-h-11 whitespace-nowrap rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-900 font-semibold transition hover:border-teal-400 hover:bg-teal-500/10" onClick={() => onUse([[kind, actual]])}>{est > 0 ? "Use crew amount" : "Add to job costs"}</button>}</td>
+                <td className="py-2 pl-2 text-right">{differs && !locked && <button type="button" data-testid={`cve-use-${kind}`} className="cve-btn min-h-11 whitespace-nowrap rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-900 font-semibold transition hover:border-teal-400 hover:bg-teal-500/10" onClick={() => use([[kind, actual]])}>{est > 0 ? "Use crew amount" : "Add to job costs"}</button>}{!locked && undo.some((u) => u.kind === kind && !u.rowId) && <button type="button" data-testid={`cve-undo-${kind}`} className="mt-1 block min-h-11 whitespace-nowrap rounded-lg border border-amber-400 px-3 text-xs font-semibold text-amber-800 transition hover:bg-amber-50 sm:ml-auto" onClick={() => onUndo?.(kind)}>{kind === "gas" ? "Restore my fuel cost" : "Undo crew amount"}</button>}</td>
               </tr>
             );
           })}
@@ -1767,7 +1818,16 @@ function CrewSpend({ docId, estimate, report, locked, onUse }: { docId: string; 
       <p className="mt-2 text-xs text-[var(--cr-muted)]">From your crew&apos;s receipts and job report. Nothing changes until you tap a button, and then only your job costs (never the invoice).</p>
       {all.map((row) => (
         <div key={row.id} className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border border-slate-200 px-3 py-2" data-testid="cve-line" data-kind={row.kind} data-source={row.fromReport ? "report" : "expense"}>
-          <p className="min-w-0 flex-1">{row.worker_name} · <span className="font-medium">{crewKindLabel(row.kind)}</span> · <span className="tabular-nums">${num(row.amount).toFixed(2)}</span> · {row.note}{row.fromReport ? " · job report" : ""}</p>
+          <p className="min-w-0 flex-1" data-testid="cve-line-text"><span className="tabular-nums font-medium">${num(row.amount).toFixed(2)}</span> · <span className="font-medium">{crewTypeLabel(row.kind)}</span>{row.note ? <> · Note: {row.note}</> : null} <span className="text-xs text-[var(--cr-muted)]">({row.worker_name}{row.fromReport ? ", job report" : ""}{kindFix[row.id] && kindFix[row.id] !== row.crewKind ? `, crew picked ${crewTypeLabel(row.crewKind)}` : ""})</span>
+            {!kindFix[row.id] && crewTypeMismatch(row.kind, row.note) && <span data-testid="cve-check-type" className="cr-tone-warn ml-2 inline-flex rounded-full border border-amber-400 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900">⚠ Check type</span>}</p>
+          {isExtraItem(row.note) && <span className="flex w-full flex-wrap items-center gap-2" data-testid="cve-extra">
+            <span className="cr-tone-warn inline-flex rounded-full border border-amber-400 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900">Not in estimate</span>
+            {!locked && (undo.some((u) => u.rowId === row.id)
+              ? <button type="button" data-testid="cve-extra-undo" className="min-h-11 rounded-lg border border-amber-400 px-3 text-xs font-semibold text-amber-800" onClick={() => onExtraUndo?.(row.id)}>Undo (remove from job costs)</button>
+              : <button type="button" data-testid="cve-extra-add" className="min-h-11 rounded-lg bg-teal-500 px-3 text-xs font-semibold text-slate-950!" onClick={() => onExtraCost?.(row.id, extraName(row.note), num(row.amount))}>Add to job costs</button>)}
+            {!locked && <button type="button" data-testid="cve-extra-co" className="min-h-11 rounded-lg border border-teal-500/50 px-3 text-xs font-semibold text-teal-700" onClick={() => onExtraChangeOrder?.(extraName(row.note), num(row.amount))}>Bill client (change order)</button>}
+          </span>}
+          {!locked && onKindFix && <label className="text-xs">Type <select aria-label="Expense type" data-testid="cve-type" value={isCrewKind(row.kind) ? row.kind : "other"} onChange={(event) => onKindFix(row.id, event.target.value as CrewKind)} className="ml-1 min-h-11 rounded-lg border border-slate-300 px-2 text-sm">{CREW_TYPE_CHOICES.map((choice) => <option key={choice.kind} value={choice.kind}>{choice.label}</option>)}</select></label>}
           {row.receipt ? <a href={row.receipt} download={`receipt-${row.id}.jpg`} className="inline-flex min-h-11 items-center text-xs font-medium text-teal-700 underline">Save receipt</a> : row.hasReceipt ? <a href="/documents?view=crew-drafts" className="inline-flex min-h-11 items-center text-xs font-medium text-teal-700 underline">Receipt on Crew drafts</a> : null}
         </div>
       ))}
