@@ -92,6 +92,8 @@ export function accountantFiles(allDocs: Doc[], crew: CrewExpense[], trips: Trip
     ...tax.lines.map((line) => [`${line.line} ${line.label}`, r2(line.amount)]),
     ["", ""], ["Month", "Billed / Collected / Job costs / Crew receipts"],
     ...report.months.map((row) => [MONTHS[row.month], `${r2(row.billed)} / ${r2(row.collected)} / ${r2(row.jobCosts)} / ${r2(row.crewReceipts)}`]),
+    ["", ""], ["Expenses by category (owner job costs, each once; crew amounts count once you apply them)", "Amount"],
+    ...expensesByCategory(expenseRows).map(([label, amount]) => [label, r2(amount)]),
   ];
   const readme = [
     `ClientReady accountant package, ${year}${business ? `, ${business}` : ""}`,
@@ -114,4 +116,11 @@ export function accountantFiles(allDocs: Doc[], crew: CrewExpense[], trips: Trip
     { name: "crew-receipts.csv", text: csvText(["Date", "Invoice", "Worker", "Category", "Amount", "Note"], crewRows) },
     { name: "mileage.csv", text: csvText(["Date", "Miles", "From", "To", "Purpose"], yearTrips.map((trip) => [trip.date, String(milesOf(trip)), trip.from, trip.to, trip.purpose])) },
   ];
+}
+
+/** Year expenses by category from the job-cost rows (owner lines incl. their own named lines). Each cost once. */
+export function expensesByCategory(expenseRows: string[][]) {
+  const totals = new Map<string, number>();
+  for (const row of expenseRows) totals.set(row[3], (totals.get(row[3]) || 0) + (Number(row[5]) || 0));
+  return [...totals.entries()].sort((a, b) => b[1] - a[1]);
 }

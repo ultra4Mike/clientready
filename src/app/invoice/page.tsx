@@ -6,7 +6,7 @@ import PortalShare from "@/components/PortalShare";
 import Section, { SectionDefaults, useOpenedExisting } from "@/components/Section";
 import EmailComposer from "@/components/EmailComposer";
 import StageBar from "@/components/StageBar";
-import { applyCrewAmount, CREW_KINDS, CREW_TYPE_CHOICES, crewApplySnapshot, crewTypeLabel, crewTypeMismatch, estimateByKind, extraName, isExtraItem, isCrewKind, readCostLines, readCrewUndo, undoCrewApply, type CostFields, type CostLine, type CrewApplyUndo, type CrewKind } from "@/lib/cost-categories";
+import { applyCrewAmount, applyFeeAmount, customCostLineNames, customFeeEstimates, isCostKey, isFeeKind, type CostKey, CREW_KINDS, CREW_TYPE_CHOICES, crewApplySnapshot, crewTypeLabel, crewTypeMismatch, estimateByKind, extraName, isExtraItem, isCrewKind, readCostLines, readCrewUndo, undoCrewApply, type CostFields, type CostLine, type CrewApplyUndo, type CrewKind } from "@/lib/cost-categories";
 import { docAmounts, documentStage, NEXT_LABEL, STAGE_LABEL, STAGES } from "@/lib/doc-stage";
 import { readEmailLog, type EmailLogEntry } from "@/lib/email";
 import { clientIdFor } from "@/lib/portal";
@@ -297,7 +297,7 @@ export default function NewInvoicePage() {
   /** Crew job report this invoice came from (cost lines by category). Shown next to the estimate; applied only by the owner's tap. */
   const [crewReport, setCrewReport] = useState<CrewReport | null>(null);
   // Crew expense type fixes by the owner (row id -> type) and undo info for each crew amount applied to job costs.
-  const [crewKindFix, setCrewKindFix] = useState<Record<string, CrewKind>>({});
+  const [crewKindFix, setCrewKindFix] = useState<Record<string, CostKey>>({});
   const [crewUndo, setCrewUndo] = useState<CrewApplyUndo[]>([]);
   const [locked, setLocked] = useState(false);
   const [daysLeft, setDaysLeft] = useState(14);
@@ -548,7 +548,7 @@ export default function NewInvoicePage() {
       setCosts({ ...emptyCosts, ...(data.jobCosts || {}), otherFees: loadedFees });
       setOtherFees(loadedFees);
       setCrewReport(readCrewReport((data as Record<string, unknown>).crewReport));
-      { const fix = (data as Record<string, unknown>).crewKindFix; setCrewKindFix(fix && typeof fix === "object" ? Object.fromEntries(Object.entries(fix as Record<string, unknown>).filter(([, k]) => isCrewKind(k))) as Record<string, CrewKind> : {}); }
+      { const fix = (data as Record<string, unknown>).crewKindFix; setCrewKindFix(fix && typeof fix === "object" ? Object.fromEntries(Object.entries(fix as Record<string, unknown>).filter(([, k]) => isCostKey(k))) as Record<string, CostKey> : {}); }
       setCrewUndo(readCrewUndo((data as Record<string, unknown>).crewUndo));
       setCrew(loadedCrew.map((row) => followSchedule({ ...row, bonus: row.bonus || "" }, (data as Record<string, unknown>).schedule ? readSchedule(data as Record<string, unknown>) : null)));
       // Clock entries from the crew app feed each worker's hours (see feedClockHours).
@@ -786,7 +786,7 @@ export default function NewInvoicePage() {
   }
 
   /** Owner tap only: set the chosen job-cost categories to what the crew reported. */
-  function useCrewAmounts(list: [CrewKind, number][]) {
+  function useCrewAmounts(list: [CostKey, number][]) {
     if (locked) return;
     let next: CostFields & { otherFees: OtherFee[] } = { ...costs, otherFees };
     let n = 0;
@@ -794,7 +794,7 @@ export default function NewInvoicePage() {
     for (const [kind, amount] of list) {
       // Keep the owner's ORIGINAL value (first apply) so Undo always goes back to what they had.
       if (!undo.some((u) => u.kind === kind && !u.rowId)) undo.push(crewApplySnapshot(next, kind));
-      next = applyCrewAmount(next, kind, amount, () => `${Date.now()}-${n++}`) as typeof next;
+      next = (isFeeKind(kind) ? applyFeeAmount(next, kind, amount) : applyCrewAmount(next, kind as CrewKind, amount, () => `${Date.now()}-${n++}`)) as typeof next;
     }
     setCrewUndo(undo);
     const { otherFees: fees, ...rest } = next;
@@ -819,7 +819,7 @@ export default function NewInvoicePage() {
   }
 
   /** Owner tap: put one cost line back to the value it had before the crew amount was applied. */
-  function undoCrewAmount(kind: CrewKind) {
+  function undoCrewAmount(kind: CostKey) {
     if (locked) return;
     const entry = crewUndo.find((u) => u.kind === kind && !u.rowId);
     if (!entry) return;
@@ -1757,12 +1757,12 @@ type CrewReport = { draftId: string; worker: string; lines: (Omit<CostLine, "rec
 function readCrewReport(value: unknown): CrewReport | null {
   const raw = (value || null) as Partial<CrewReport> | null;
   if (!raw || !Array.isArray(raw.lines)) return null;
-  const lines = raw.lines.filter((line) => line && isCrewKind(line.kind) && Number(line.amount) > 0).map((line) => ({ kind: line.kind, amount: String(line.amount), note: String(line.note || ""), ...(line.hasReceipt ? { hasReceipt: true } : {}) }));
+  const lines = raw.lines.filter((line) => line && isCostKey(line.kind) && Number(line.amount) > 0).map((line) => ({ kind: line.kind, amount: String(line.amount), note: String(line.note || ""), ...(line.hasReceipt ? { hasReceipt: true } : {}) }));
   return lines.length || raw.draftId ? { draftId: String(raw.draftId || ""), worker: String(raw.worker || ""), lines } : null;
 }
 
 /** Owner only: what the crew spent per category next to the cost estimate. Changes job costs only when the owner taps "Use crew amount" / "Add all". */
-function CrewSpend({ docId, estimate, report, locked, onUse, kindFix = {}, onKindFix, undo = [], onUndo, onExtraCost, onExtraUndo, onExtraChangeOrder }: { docId: string; estimate: CostEstimate; report: CrewReport | null; locked: boolean; onUse: (list: [CrewKind, number][]) => void; kindFix?: Record<string, CrewKind>; onKindFix?: (id: string, kind: CrewKind) => void; undo?: CrewApplyUndo[]; onUndo?: (kind: CrewKind) => void; onExtraCost?: (rowId: string, name: string, amount: number) => void; onExtraUndo?: (rowId: string) => void; onExtraChangeOrder?: (name: string, amount: number) => void }) {
+function CrewSpend({ docId, estimate, report, locked, onUse, kindFix = {}, onKindFix, undo = [], onUndo, onExtraCost, onExtraUndo, onExtraChangeOrder }: { docId: string; estimate: CostEstimate; report: CrewReport | null; locked: boolean; onUse: (list: [CostKey, number][]) => void; kindFix?: Record<string, CostKey>; onKindFix?: (id: string, kind: CostKey) => void; undo?: CrewApplyUndo[]; onUndo?: (kind: CostKey) => void; onExtraCost?: (rowId: string, name: string, amount: number) => void; onExtraUndo?: (rowId: string) => void; onExtraChangeOrder?: (name: string, amount: number) => void }) {
   const [rows, setRows] = useState<{ id: string; worker_name: string; kind: string; amount: string; note: string; receipt: string }[]>([]);
   useEffect(() => {
     if (!docId) return;
@@ -1773,7 +1773,7 @@ function CrewSpend({ docId, estimate, report, locked, onUse, kindFix = {}, onKin
   const all = [...rows.map((row) => ({ ...row, fromReport: false, hasReceipt: Boolean(row.receipt) })), ...reportRows].map((row) => ({ ...row, crewKind: row.kind, kind: kindFix[row.id] || row.kind }));
   const flagged = (kind: string) => all.filter((row) => row.kind === kind && !kindFix[row.id] && crewTypeMismatch(row.kind, row.note));
   // Never silently add materials to fuel: a flagged line must be confirmed (or its type fixed) first.
-  const use = (list: [CrewKind, number][]) => {
+  const use = (list: [CostKey, number][]) => {
     const bad = list.flatMap(([kind]) => flagged(kind));
     if (bad.length && !window.confirm(`Check type: ${bad.map((row) => `$${Number(row.amount).toFixed(2)} "${row.note}"`).join(", ")} is filed as Fuel but sounds like materials. Fix the type below first, or press OK to add it to Fuel anyway.`)) return;
     onUse(list);
@@ -1782,9 +1782,18 @@ function CrewSpend({ docId, estimate, report, locked, onUse, kindFix = {}, onKin
   const num = (value: unknown) => Number(String(value ?? "").replace(/[^0-9.-]/g, "")) || 0;
   // Unknown kinds count as Other, so every crew dollar shows up in exactly one row.
   // Extra items the owner added as their own cost line are already in job costs: not compared again.
-  const spent = (kind: string) => all.filter((row) => !undo.some((u) => u.rowId === row.id)).filter((row) => (isCrewKind(row.kind) ? row.kind : "other") === kind).reduce((sum, row) => sum + num(row.amount), 0);
+  // The owner's own named lines on this job; a crew line naming one that is gone counts as Other (Check type).
+  const ownLines = customCostLineNames(estimate);
+  const known = (kind: string) => isCrewKind(kind) || (isFeeKind(kind) && ownLines.some((n) => n.toLowerCase() === kind.slice(4).toLowerCase()));
+  const keyOf = (kind: string) => (isCrewKind(kind) ? kind : known(kind) ? `fee:${ownLines.find((n) => n.toLowerCase() === kind.slice(4).toLowerCase())}` : "other");
+  const spent = (kind: string) => all.filter((row) => !undo.some((u) => u.rowId === row.id)).filter((row) => keyOf(row.kind) === kind).reduce((sum, row) => sum + num(row.amount), 0);
   const byKind = estimateByKind(estimate);
-  const groups = CREW_KINDS.map(({ kind, label }) => ({ kind, label, est: byKind[kind].amount, actual: spent(kind), source: byKind[kind].source }));
+  const feeEst = customFeeEstimates(estimate);
+  const groups: { kind: CostKey; label: string; est: number; actual: number; source: string }[] = [
+    ...CREW_KINDS.filter(({ kind }) => kind !== "other").map(({ kind, label }) => ({ kind: kind as CostKey, label, est: byKind[kind].amount, actual: spent(kind), source: byKind[kind].source })),
+    ...ownLines.map((name) => ({ kind: `fee:${name}` as CostKey, label: name, est: feeEst.get(`fee:${name}`) || 0, actual: spent(`fee:${name}`), source: "Your own cost line" })),
+    { kind: "other", label: "Other", est: byKind.other.amount, actual: spent("other"), source: byKind.other.source },
+  ];
   const shown = groups.filter((group) => group.est > 0 || group.actual > 0);
   const differing = shown.filter((group) => group.actual > 0 && Math.abs(group.actual - group.est) >= 0.005);
   const totalEstimate = shown.reduce((sum, group) => sum + group.est, 0);
@@ -1821,7 +1830,7 @@ function CrewSpend({ docId, estimate, report, locked, onUse, kindFix = {}, onKin
       {all.map((row) => (
         <div key={row.id} className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border border-slate-200 px-3 py-2" data-testid="cve-line" data-kind={row.kind} data-source={row.fromReport ? "report" : "expense"}>
           <p className="min-w-0 flex-1" data-testid="cve-line-text"><span className="tabular-nums font-medium">${num(row.amount).toFixed(2)}</span> · <span className="font-medium">{crewTypeLabel(row.kind)}</span>{row.note ? <> · Note: {row.note}</> : null} <span className="text-xs text-[var(--cr-muted)]">({row.worker_name}{row.fromReport ? ", job report" : ""}{kindFix[row.id] && kindFix[row.id] !== row.crewKind ? `, crew picked ${crewTypeLabel(row.crewKind)}` : ""})</span>
-            {!kindFix[row.id] && crewTypeMismatch(row.kind, row.note) && <span data-testid="cve-check-type" className="cr-tone-warn ml-2 inline-flex rounded-full border border-amber-400 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900">⚠ Check type</span>}</p>
+            {!kindFix[row.id] && (crewTypeMismatch(row.kind, row.note) || (isFeeKind(row.kind) && !known(row.kind))) && <span data-testid="cve-check-type" className="cr-tone-warn ml-2 inline-flex rounded-full border border-amber-400 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900">⚠ Check type</span>}</p>
           {isExtraItem(row.note) && <span className="flex w-full flex-wrap items-center gap-2" data-testid="cve-extra">
             <span className="cr-tone-warn inline-flex rounded-full border border-amber-400 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900">Not in estimate</span>
             {!locked && (undo.some((u) => u.rowId === row.id)
@@ -1829,7 +1838,7 @@ function CrewSpend({ docId, estimate, report, locked, onUse, kindFix = {}, onKin
               : <button type="button" data-testid="cve-extra-add" className="min-h-11 rounded-lg bg-teal-500 px-3 text-xs font-semibold text-slate-950!" onClick={() => onExtraCost?.(row.id, extraName(row.note), num(row.amount))}>Add to job costs</button>)}
             {!locked && <button type="button" data-testid="cve-extra-co" className="min-h-11 rounded-lg border border-teal-500/50 px-3 text-xs font-semibold text-teal-700" onClick={() => onExtraChangeOrder?.(extraName(row.note), num(row.amount))}>Bill client (change order)</button>}
           </span>}
-          {!locked && onKindFix && <label className="text-xs">Type <select aria-label="Expense type" data-testid="cve-type" value={isCrewKind(row.kind) ? row.kind : "other"} onChange={(event) => onKindFix(row.id, event.target.value as CrewKind)} className="ml-1 min-h-11 rounded-lg border border-slate-300 px-2 text-sm">{CREW_TYPE_CHOICES.map((choice) => <option key={choice.kind} value={choice.kind}>{choice.label}</option>)}</select></label>}
+          {!locked && onKindFix && <label className="text-xs">Type <select aria-label="Expense type" data-testid="cve-type" value={keyOf(row.kind)} onChange={(event) => onKindFix(row.id, event.target.value as CostKey)} className="ml-1 min-h-11 rounded-lg border border-slate-300 px-2 text-sm">{[...CREW_TYPE_CHOICES.filter((c) => c.kind !== "other").map((c) => [c.kind, c.label]), ...ownLines.map((n) => [`fee:${n}`, n]), ["other", "Other"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
           {row.receipt ? <a href={row.receipt} download={`receipt-${row.id}.jpg`} className="inline-flex min-h-11 items-center text-xs font-medium text-teal-700 underline">Save receipt</a> : row.hasReceipt ? <a href="/documents?view=crew-drafts" className="inline-flex min-h-11 items-center text-xs font-medium text-teal-700 underline">Receipt on Crew drafts</a> : null}
         </div>
       ))}

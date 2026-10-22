@@ -15,7 +15,28 @@ export const CREW_KINDS: { kind: CrewKind; label: string }[] = [
 ];
 const KEYS = CREW_KINDS.map((item) => item.kind as string);
 export const isCrewKind = (kind: unknown): kind is CrewKind => KEYS.includes(String(kind));
-export const crewKindLabel = (kind: unknown) => CREW_KINDS.find((item) => item.kind === kind)?.label || String(kind || "Other");
+export const crewKindLabel = (kind: unknown) => (isFeeKind(kind) ? feeName(kind) : CREW_KINDS.find((item) => item.kind === kind)?.label || String(kind || "Other"));
+
+/**
+ * The owner's own cost lines (custom "other fees" with a name) as crew categories: "fee:<name>".
+ * Only names travel to crew (crew_jobs.cost_lines), never amounts.
+ */
+export type CostKey = CrewKind | `fee:${string}`;
+export const isFeeKind = (kind: unknown): kind is `fee:${string}` => /^fee:[\s\S]{1,60}$/.test(String(kind || ""));
+export const feeName = (kind: unknown) => String(kind || "").slice(4);
+export const isCostKey = (kind: unknown): kind is CostKey => isCrewKind(kind) || isFeeKind(kind);
+/** Generic fee names the app itself makes for "Other" (not a custom owner line). */
+const GENERIC_FEE = /^(crew other costs|other)( \(crew adjustment\))?$/i;
+export const isCustomFee = (fee: { name?: string }) => Boolean((fee.name || "").trim()) && !isDumpFee(fee) && !GENERIC_FEE.test((fee.name || "").trim()) && !/^extra: /i.test((fee.name || "").trim());
+/** Names of the owner's custom cost lines on one job (deduped, trimmed, max 60 chars, max 20). No prices. */
+export function customCostLineNames(costs: { otherFees?: { name?: string }[] } | undefined) {
+  const out: string[] = [];
+  for (const fee of costs?.otherFees || []) {
+    const name = (fee.name || "").trim().slice(0, 60);
+    if (isCustomFee({ name }) && !out.some((n) => n.toLowerCase() === name.toLowerCase())) out.push(name);
+  }
+  return out.slice(0, 20);
+}
 
 /** Best guess for an old single-line report ("Parts, gas, or dump fee you paid" + "What it was"). */
 export function inferCrewKind(text: unknown): CrewKind {
@@ -28,7 +49,7 @@ export function inferCrewKind(text: unknown): CrewKind {
   return "other";
 }
 
-export type CostLine = { kind: CrewKind; amount: string; note: string; receipt?: string };
+export type CostLine = { kind: CostKey; amount: string; note: string; receipt?: string };
 const num = (value: unknown) => Number(String(value ?? "").replace(/[^0-9.-]/g, "")) || 0;
 
 /** Cost lines of a crew job report; old reports (parts_cost + parts_note only) become one inferred line. */
@@ -37,7 +58,7 @@ export function readCostLines(draft: { costs?: unknown; parts_cost?: unknown; pa
     return draft.costs
       .map((raw) => {
         const line = (raw || {}) as Partial<CostLine>;
-        return { kind: isCrewKind(line.kind) ? line.kind : "other", amount: num(line.amount) ? num(line.amount).toFixed(2) : "", note: String(line.note || "").slice(0, 300), ...(line.receipt ? { receipt: String(line.receipt) } : {}) } as CostLine;
+        return { kind: isCostKey(line.kind) ? line.kind : "other", amount: num(line.amount) ? num(line.amount).toFixed(2) : "", note: String(line.note || "").slice(0, 300), ...(line.receipt ? { receipt: String(line.receipt) } : {}) } as CostLine;
       })
       .filter((line) => num(line.amount) > 0);
   }
@@ -62,13 +83,15 @@ export function estimateByKind(costs: CostFields) {
   const dump = fees.filter(isDumpFee);
   const other = fees.filter((fee) => !isDumpFee(fee));
   const sum = (list: Fee[]) => list.reduce((total, fee) => total + num(fee.amount), 0);
+  // Custom owner lines have their own rows (customFeeEstimates), so "Other" holds only the generic fees.
+  const generic = other.filter((fee) => !isCustomFee(fee));
   return {
     parts: { amount: num(costs.parts), source: "Parts" },
     gas: { amount: num(costs.gas), source: "Gas / diesel" },
     tools: { amount: num(costs.tools), source: "Job supplies" },
     dump: { amount: sum(dump), source: "Other fees named “dump…”" },
     lunch: { amount: num(costs.lunch), source: "Lunch / meals cost" },
-    other: { amount: sum(other), source: "Other fees (not dump)" },
+    other: { amount: sum(generic), source: "Other fees (not dump, not your own named lines)" },
   } as const;
 }
 
@@ -99,10 +122,11 @@ export const CREW_TYPE_CHOICES: { kind: CrewKind; label: string }[] = [
   { kind: "lunch", label: "Meals" },
   { kind: "other", label: "Other" },
 ];
-export const crewTypeLabel = (kind: unknown) => CREW_TYPE_CHOICES.find((item) => item.kind === kind)?.label || "Other";
+export const crewTypeLabel = (kind: unknown) => (isFeeKind(kind) ? feeName(kind) : CREW_TYPE_CHOICES.find((item) => item.kind === kind)?.label || "Other");
 
 /** "Check type": the note reads like materials/supplies but the line is filed as fuel (e.g. Gas + "shingles, nails"). */
 export function crewTypeMismatch(kind: unknown, note: unknown): CrewKind | null {
+  if (isFeeKind(kind)) return null; // the owner's own named line, picked by the crew from the owner's list
   // Legacy / unknown types (and "Other") map to the closest owner line from the note, flagged until the owner confirms.
   if (!isCrewKind(kind) || kind === "other") { const guess = inferCrewKind(note); return guess !== "other" ? guess : null; }
   if (kind !== "gas") return null;
@@ -114,8 +138,8 @@ export function crewTypeMismatch(kind: unknown, note: unknown): CrewKind | null 
 }
 
 /** What one crew apply changed, so the owner can undo it (restores the owner's previous value). */
-export type CrewApplyUndo = { kind: CrewKind; at: string; /** set for "Extra item" lines added as their own cost line */ rowId?: string; before: { field?: string; otherFees?: Fee[] } };
-export function crewApplySnapshot(costs: CostFields, kind: CrewKind): CrewApplyUndo {
+export type CrewApplyUndo = { kind: CostKey; at: string; /** set for "Extra item" lines added as their own cost line */ rowId?: string; before: { field?: string; otherFees?: Fee[] } };
+export function crewApplySnapshot(costs: CostFields, kind: CostKey): CrewApplyUndo {
   const plain = kind === "parts" || kind === "gas" || kind === "tools" || kind === "lunch";
   return { kind, at: new Date().toISOString(), before: plain ? { field: String((costs as Record<string, unknown>)[kind] ?? "") } : { otherFees: (costs.otherFees || []).map((fee) => ({ ...fee })) } };
 }
@@ -124,10 +148,27 @@ export function undoCrewApply<T extends CostFields>(costs: T, undo: CrewApplyUnd
   return { ...costs, [undo.kind]: undo.before.field ?? "" };
 }
 export function readCrewUndo(value: unknown): CrewApplyUndo[] {
-  return Array.isArray(value) ? (value.filter((u) => u && typeof u === "object" && isCrewKind((u as CrewApplyUndo).kind) && (u as CrewApplyUndo).before) as CrewApplyUndo[]) : [];
+  return Array.isArray(value) ? (value.filter((u) => u && typeof u === "object" && isCostKey((u as CrewApplyUndo).kind) && (u as CrewApplyUndo).before) as CrewApplyUndo[]) : [];
 }
 
 /** Crew "Extra item (not in estimate)" purchases are saved with this note prefix (no new column needed). */
 export const EXTRA_PREFIX = "Extra item: ";
 export const isExtraItem = (note: unknown) => /^extra item:/i.test(String(note || "").trim());
 export const extraName = (note: unknown) => String(note || "").trim().replace(/^extra item:\s*/i, "") || "Extra item";
+
+/** Owner estimate for each custom cost line, keyed "fee:<name>". */
+export function customFeeEstimates(costs: CostFields) {
+  const out = new Map<string, number>();
+  for (const fee of costs.otherFees || []) if (isCustomFee(fee)) { const key = `fee:${(fee.name || "").trim().slice(0, 60)}`; out.set(key, (out.get(key) || 0) + num(fee.amount)); }
+  return out;
+}
+
+/** Owner tap only: set a custom cost line to the crew amount (first fee with that name; others untouched). */
+export function applyFeeAmount<T extends CostFields>(costs: T, key: string, amount: number): T {
+  const name = feeName(key).toLowerCase();
+  const fees = costs.otherFees || [];
+  const index = fees.findIndex((fee) => (fee.name || "").trim().slice(0, 60).toLowerCase() === name);
+  if (index < 0) return costs;
+  const same = fees.filter((fee, i) => i !== index && (fee.name || "").trim().slice(0, 60).toLowerCase() === name).reduce((t, f) => t + num(f.amount), 0);
+  return { ...costs, otherFees: fees.map((fee, i) => (i === index ? { ...fee, amount: Math.max(amount - same, 0).toFixed(2) } : fee)) };
+}
