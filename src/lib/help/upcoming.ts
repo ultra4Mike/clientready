@@ -38,8 +38,4 @@ export const UPCOMING_HELP_ARTICLES: UpcomingArticle[] = [
     summary: "Planned (R127, not shipped): choose what the Calendar shows so unapproved work doesn't look like a booked slot.",
     steps: ["Open Calendar and tap [TBD: Show button label].", "Turn approved jobs, unapproved drafts and proposals, and invoices on or off. Your choice is remembered.", "Unapproved items show faded with a dashed outline.", "Booking an approved job over an unapproved one warns you [TBD: labels] and offers to move it."],
     tips: ["HOLD: R127 in progress in cr-dev. Verify labels before publishing."], related: ["calendar-views", "schedule-conflicts"], keywords: ["filter", "hide drafts", "unapproved", "proposals on calendar", "show"] },
-  { feature: "crew-day-timesheet", status: "draft", id: "crew-day-timesheet", category: "Crew", question: "How does the crew day timesheet work?",
-    summary: "In progress (not shipped): crew tap through their day and the owner approves the week on Team > Timesheet.",
-    steps: ["Crew open My day and tap Start job, Start driving, Arrive and End shift. [TBD: verify labels after deploy].", "Paid time runs from the first job start to the last job end; long gaps are unpaid [TBD: setting label].", "The owner opens Team > Timesheet to review each day, edit it, and Approve all (Undo available).", "Fix time requests are approved or denied with history."],
-    tips: ["HOLD: Dev a0a9041/d3cd6cd in progress; needs migration 20261026110000_crew_timesheets. Verify every label before publishing."], related: ["crew-hours-approval", "crew-clock"], keywords: ["timesheet", "my day", "start driving", "end shift", "drive time"] },
 ];
