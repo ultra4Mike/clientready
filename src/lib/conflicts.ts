@@ -101,7 +101,7 @@ export function splitConflicts<T extends { tentative?: boolean }>(list: T[]) {
 /** Every unresolved double-booking across all jobs, once per pair (re-checked after each sync; Help R26). */
 export function allConflicts(docs: Doc[]) {
   const seen = new Set<string>();
-  const out: { docId: string; otherDocId: string; workerId: string; title: string; otherTitle: string; date: string; start: number; end: number }[] = [];
+  const out: { docId: string; otherDocId: string; workerId: string; title: string; otherTitle: string; date: string; start: number; end: number; tentative: boolean }[] = [];
   for (const doc of docs) {
     const s = sched(doc);
     if (!s) continue;
@@ -109,7 +109,7 @@ export function allConflicts(docs: Doc[]) {
       const key = [doc.id, c.docId].sort().join("|") + "|" + c.workerId;
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push({ docId: doc.id, otherDocId: c.docId, workerId: c.workerId, title: titleOf(doc), otherTitle: c.title, date: c.date, start: Math.max(c.start, c.mine.start), end: Math.min(c.end, c.mine.end) });
+      out.push({ docId: doc.id, otherDocId: c.docId, workerId: c.workerId, title: titleOf(doc), otherTitle: c.title, date: c.date, start: Math.max(c.start, c.mine.start), end: Math.min(c.end, c.mine.end), tentative: Boolean(c.tentative) });
     }
   }
   return out;
@@ -133,6 +133,7 @@ export function moveToNextOpen(docs: Doc[], doc: Doc): { startTime: string; endT
 }
 
 /** Doc ids that are in an unresolved same-worker overlap right now. */
-export function clashingIds(docs: Doc[]) {
-  return new Set(allConflicts(docs).flatMap((c) => [c.docId, c.otherDocId]));
+export function clashingIds(docs: Doc[], { includeTentative = false }: { includeTentative?: boolean } = {}) {
+  // R127: a clash with a job that isn't approved is a soft heads-up, not counted here unless asked.
+  return new Set(allConflicts(docs).filter((c) => includeTentative || !c.tentative).flatMap((c) => [c.docId, c.otherDocId]));
 }

@@ -10,6 +10,8 @@ import { clientOptedOut, reviewAskedAt } from "@/lib/review-request";
 import { uniqueDocs } from "@/lib/change-orders";
 import { confirmJobDone, doneState, omwTime, onMyWaySmsHref, readWorkers, saveSchedule, statusLabel, type Schedule } from "@/lib/schedule";
 import { localYmd, niceYmd, scheduledJobs, timeLabel } from "@/lib/scheduled-jobs";
+import CalendarFilterBar from "@/components/CalendarFilterBar";
+import { isTentative, PRESETS, readCalendarFilter, saveCalendarFilter, visibleOnCalendar, type CalendarFilter } from "@/lib/calendar-filter";
 
 type Doc = { id: string; type: string; title: string; clientName: string; createdAt: string; data: Record<string, unknown> };
 const text = (value: unknown) => (typeof value === "string" ? value : "");
@@ -25,6 +27,10 @@ export default function TodayPage() {
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
+  // R127: same approval filter as the calendar (shared per-user setting).
+  const [filter, setFilterState] = useState<CalendarFilter>(PRESETS.all);
+  function setFilter(next: CalendarFilter) { setFilterState(next); saveCalendarFilter(next); }
+  useEffect(() => { Promise.resolve().then(() => setFilterState(readCalendarFilter())); }, []);
 
   const read = () => {
     const raw = window.localStorage.getItem("clientready-documents");
@@ -45,7 +51,7 @@ export default function TodayPage() {
       });
   }, []);
 
-  const jobs = today ? scheduledJobs(docs).filter((job) => job.schedule.date === today) : [];
+  const jobs = today ? scheduledJobs(docs).filter((job) => job.schedule.date === today && visibleOnCalendar(job.doc, filter)) : [];
   // "Any time" jobs (no start time) go after timed jobs.
   jobs.sort((a, b) => (a.schedule.startTime || "99:99").localeCompare(b.schedule.startTime || "99:99"));
 
@@ -75,6 +81,7 @@ export default function TodayPage() {
     <AppShell title="Today">
       <section className="py-2 sm:py-4" data-testid="today" data-state={state}>
         <PageHeader title="Today" subtitle={today ? niceYmd(today) : "Loading…"} actions={<span className="flex gap-2"><a href="/route" data-testid="today-route" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-teal-500 px-4 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400"><span aria-hidden="true">🗺️</span>Route</a><a href="/calendar" className="inline-flex min-h-11 items-center rounded-lg border border-teal-500/30 px-4 text-sm font-medium transition hover:border-teal-400 sm:min-h-10">Calendar</a></span>} />
+        <div className="mb-3"><CalendarFilterBar filter={filter} onChange={setFilter} /></div>
         {message && <p className="mb-3 rounded-lg border border-teal-500/30 bg-teal-500/10 px-3 py-2 text-sm" role="status" data-testid="today-message">{message}</p>}
         {state === "loading" && <div className="space-y-3" aria-hidden="true">{[0, 1, 2].map((n) => <div key={n} className="h-28 animate-pulse rounded-2xl bg-teal-500/10" />)}<p className="sr-only">Loading…</p></div>}
         {state === "empty" && (
@@ -92,7 +99,7 @@ export default function TodayPage() {
             const people = schedule.workerIds.map((id) => workers.get(id)).filter(Boolean).join(", ");
             const tone = schedule.status === "done" ? (done === "awaiting" ? "border-l-amber-400" : "border-l-emerald-500") : schedule.status === "in_progress" ? "border-l-sky-400" : "border-l-teal-500";
             return (
-              <li key={doc.id} data-testid="today-job" data-doc-id={doc.id} data-time={schedule.startTime || ""} data-status={schedule.status} data-done={done || undefined} className={`grid grid-cols-[4.5rem_minmax(0,1fr)] gap-3 rounded-2xl border border-l-4 border-teal-500/20 bg-[var(--cr-card)] p-4 text-sm shadow-sm sm:grid-cols-[6rem_minmax(0,1fr)] sm:gap-5 sm:p-5 ${tone}`}>
+              <li key={doc.id} data-testid="today-job" data-doc-id={doc.id} data-time={schedule.startTime || ""} data-status={schedule.status} data-done={done || undefined} data-tentative={isTentative(doc) || undefined} className={`grid grid-cols-[4.5rem_minmax(0,1fr)] gap-3 rounded-2xl border border-l-4 border-teal-500/20 bg-[var(--cr-card)] p-4 text-sm shadow-sm sm:grid-cols-[6rem_minmax(0,1fr)] sm:gap-5 sm:p-5 ${tone}${isTentative(doc) ? " cr-tentative border-dashed opacity-60" : ""}`}>
                 <div className="font-semibold tabular-nums leading-tight">
                   <span data-testid="today-time">{schedule.startTime ? timeLabel(schedule.startTime) : "Any time"}{schedule.endTime ? ` – ${timeLabel(schedule.endTime)}` : ""}</span>
                 </div>
@@ -100,6 +107,7 @@ export default function TodayPage() {
                   <p className="text-base font-semibold">
                     <a href={`/invoice?id=${encodeURIComponent(doc.id)}`} className="underline-offset-2 hover:underline">{text(doc.data?.clientName) || doc.clientName || doc.title}</a>
                   </p>
+                  {isTentative(doc) && <span data-testid="not-approved-tag" className="inline-block rounded border border-dashed border-current px-1.5 text-[11px] font-semibold uppercase tracking-wide">Not approved</span>}
                   <OverlapBadge docs={docs} doc={doc} onMoved={read} />
                   <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--cr-muted)]" data-testid="today-status"><span className={`inline-block shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold ${schedule.status === "done" ? (done === "awaiting" ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300" : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300") : schedule.status === "in_progress" ? "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300" : "border-teal-500/30 bg-teal-500/10 text-teal-700 dark:text-teal-300"}`}>{statusLabel(schedule)}</span><span className="min-w-0 break-words"><span className="whitespace-nowrap">{doc.title}</span>{people ? ` · ${people}` : ""}</span></p>
                   {schedule.checklist && schedule.checklist.length > 0 && (
