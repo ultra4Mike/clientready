@@ -17,6 +17,8 @@ export type PaySettings = {
   shiftMinHours?: string;
   /** salary: weekly amount. Spread across jobs for job costing only; counted once per week in pay totals. */
   salaryWeekly?: string;
+  /** salary: first day this pay applies (hire / pay start, YYYY-MM-DD). Weeks before it never owe salary. */
+  payStart?: string;
   /** Optional drive-time rate (blank = same as the work rate). */
   travelRate?: string;
   dayHours?: string;
@@ -45,6 +47,7 @@ export function readPaySettings(raw: unknown): PaySettings {
     ...(value.shiftHours ? { shiftHours: String(value.shiftHours) } : {}),
     ...(value.shiftMinHours ? { shiftMinHours: String(value.shiftMinHours) } : {}),
     ...(value.salaryWeekly ? { salaryWeekly: String(value.salaryWeekly) } : {}),
+    ...(value.payStart && /^\d{4}-\d{2}-\d{2}$/.test(String(value.payStart)) ? { payStart: String(value.payStart) } : {}),
     ...(value.travelRate ? { travelRate: String(value.travelRate) } : {}),
     ...(ot ? { overtime: { on: Boolean(ot.on), weekly: String(ot.weekly ?? "40"), daily: String(ot.daily ?? ""), multiplier: String(ot.multiplier ?? "1.5") } } : {}),
   };

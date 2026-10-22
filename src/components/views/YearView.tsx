@@ -1,5 +1,5 @@
 "use client";
-import { readUnallocatedSalary } from "@/lib/timesheet-sync";
+import { unallocatedSalary } from "@/lib/timesheet-sync";
 import { isTimesheetRow, overtimePremium, readPaySettings, rowHours, rowPayMoney, weekOf, type PayType } from "@/lib/pay-types";
 import { readSetAside } from "@/lib/profit-alerts";
 import { buildReport } from "@/lib/reports";
@@ -312,11 +312,9 @@ export default function YearPage() {
       list.push({ id: `salary-${item.id}-${item.week}`, docId: "", docType: "invoice", kind: "pay", date: item.week, client: "", number: "", category: "Labor", amount: diff, method: "", ref: "", note: `Salary week of ${item.week} (weekly $${weekly.toFixed(2)}, counted once)`, hours: "", rate: "", worker: item.name, workerKind: kindFor(item.name, item.id) });
     }
     // Salary weeks with no hours (Timesheet): the weekly salary once, as unallocated labor (no job).
-    for (const [key, cents] of Object.entries(readUnallocatedSalary())) {
-      const [id, week] = key.split("|");
-      if (!week?.startsWith(year) || !(cents > 0) || [...salaryWeeks.values()].some((w) => w.id === id && w.week === week)) continue;
-      const person = employees.find((p) => p.id === id);
-      const name = person?.name || "Worker";
+    // Computed from pay settings + weeks (pay cutover / pay start onward), never from what Timesheet happened to open.
+    for (const { employeeId: id, week, cents, name } of unallocatedSalary(employees as never, documents as never, year)) {
+      if ([...salaryWeeks.values()].some((w) => w.id === id && w.week === week)) continue;
       list.push({ id: `salary-${id}-${week}`, docId: "", docType: "invoice", kind: "pay", date: week, client: "", number: "", category: "Labor", amount: cents / 100, method: "", ref: "", note: `Salary week of ${week}, no jobs (unallocated labor, counted once)`, hours: "", rate: "", worker: name, workerKind: kindFor(name, id) });
     }
     // Overtime premium (only for people whose owner switched overtime on; off by default).

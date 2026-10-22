@@ -11,7 +11,7 @@ import { readSchedule, readWorkers, type Worker } from "@/lib/schedule";
 import { rowPayMoney, weekOf, type PayRow } from "@/lib/pay-types";
 import { loadOwnerTimesheet, type DayApproval } from "@/lib/day-events";
 import { applyFixes, buildDay, estimateDriveMinutes, type DaySheet, type FixRequest, type ScheduledJob, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
-import { allocateWeek, applySharesToCrew, type DayPay, type JobShare } from "@/lib/timesheet-pay";
+import { allocateWeek, applySharesToCrew, unallocatedSalaryWeeks, type DayPay, type JobShare } from "@/lib/timesheet-pay";
 
 export const CUTOVER_KEY = "clientready-timesheet-pay-cutover";
 type Doc = { id: string; type?: string; title?: string; clientName?: string; data?: Record<string, unknown> };
@@ -49,20 +49,15 @@ export async function syncTimesheetCutover(): Promise<string> {
   } catch { return local; }
 }
 
-export const UNALLOCATED_SALARY_KEY = "clientready-salary-unallocated";
-/** Weekly salary with no hours: kept per worker+week so the Year packet and pay totals count it once. */
-export function recordUnallocatedSalary(employeeId: string, week: string, pays: DayPay[]) {
-  try {
-    if (typeof window === "undefined" || !week) return;
-    const cutover = window.localStorage.getItem(CUTOVER_KEY) || "";
-    const all = JSON.parse(window.localStorage.getItem(UNALLOCATED_SALARY_KEY) || "{}") as Record<string, number>;
-    const key = `${employeeId}|${weekOf(week)}`;
-    const cents = pays.filter((p) => p.unallocated).reduce((s, p) => s + p.cents, 0);
-    if (cents > 0 && cutover && addDays(weekOf(week), 6) >= cutover && weekOf(week) <= localYmd(new Date().toISOString())) all[key] = cents; else delete all[key];
-    window.localStorage.setItem(UNALLOCATED_SALARY_KEY, JSON.stringify(all));
-  } catch { /* storage off */ }
+/** The saved pay cutover, read-only ("" when Timesheet pay has never started on this device/account). */
+export function readCutover(): string {
+  try { const v = typeof window === "undefined" ? "" : window.localStorage.getItem(CUTOVER_KEY) || ""; return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : ""; } catch { return ""; }
 }
-export function readUnallocatedSalary(): Record<string, number> { try { return JSON.parse(window.localStorage.getItem(UNALLOCATED_SALARY_KEY) || "{}"); } catch { return {}; } }
+
+/** Unallocated weekly salary (no hours) for Year packet / Crew pay: computed from pay settings + weeks, never stored. */
+export function unallocatedSalary(workers: { id: string; name?: string; paySettings?: unknown }[], docs: Doc[], year?: string) {
+  return unallocatedSalaryWeeks({ workers, docs, cutover: readCutover(), today: localYmd(new Date().toISOString()), year });
+}
 
 export function readDocs(): Doc[] { try { return JSON.parse(window.localStorage.getItem(DOCS_KEY) || "[]"); } catch { return []; } }
 function readOwnerClockSafe() { try { return readOwnerClock(); } catch { return []; } }
@@ -106,7 +101,11 @@ export function weekShares(input: { workers: Worker[]; docs: Doc[]; days: string
       return { date, sheet: input.sheets.get(`${w.id}|${date}`), approved, approvedMinutes: a?.editedMinutes != null ? a.editedMinutes : approved ? a!.paidMinutes : null, fallbackDocIds };
     });
     const week = allocateWeek(list, w.paySettings, w.rate || "", { halfDayHours: input.settings?.halfDayHours });
-    recordUnallocatedSalary(w.id, input.days[0], week);
+    // Unallocated salary only for weeks from the pay cutover / his pay start up to this week (same rule as Year packet).
+    if (week.some((d) => d.unallocated)) {
+      const owed = unallocatedSalaryWeeks({ workers: [w], docs: [], cutover: readCutover() || timesheetCutover(), today: localYmd(new Date().toISOString()) }).some((u) => u.week === weekOf(input.days[0]));
+      if (!owed) week.forEach((d) => { if (d.unallocated) { d.cents = 0; d.unallocated = false; } });
+    }
     pays.set(w.id, week);
     for (const day of week) for (const s of day.shares) shares.set(`${w.id}|${s.date}|${s.docId}`, s);
   }

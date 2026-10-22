@@ -169,3 +169,47 @@ export function applySharesToCrew<T extends Row>(crew: T[], docId: string, share
   });
   return { crew: next, changed };
 }
+
+const addDaysYmd = (date: string, n: number) => { const d = new Date(`${date}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+
+export type UnallocatedSalaryWeek = { employeeId: string; name: string; week: string; cents: number };
+type SalaryWorker = { id: string; name?: string; paySettings?: unknown; active?: boolean };
+type SalaryDoc = { type?: string; data?: Record<string, unknown> | null };
+
+/**
+ * Weekly salary owed for weeks with NO hours (no job to cost it to), computed from the pay settings and the
+ * calendar only, so Timesheet, Crew pay and the Year packet always agree and it is counted once per worker per week.
+ * Weeks run Monday to Sunday, from the later of the timesheet pay cutover and the worker's pay start (that week
+ * counts if any of its days is on/after the start) up to the week containing `today`. A week is "no hours" when no
+ * non-void job has a crew row for him dated that week with hours or timesheet minutes (rows with hours are already
+ * paid through the job rows and the per-week salary adjustment).
+ */
+export function unallocatedSalaryWeeks(input: { workers: SalaryWorker[]; docs: SalaryDoc[]; cutover: string; today: string; year?: string }): UnallocatedSalaryWeek[] {
+  const out: UnallocatedSalaryWeek[] = [];
+  const ymd = /^\d{4}-\d{2}-\d{2}$/;
+  if (!ymd.test(input.cutover || "") || !ymd.test(input.today || "")) return out;
+  const worked = new Set<string>();
+  for (const doc of input.docs) {
+    const data = (doc?.data || {}) as Record<string, unknown>;
+    if (String(data.status || "") === "void" || data.deleted === true || data.deleted === "true") continue;
+    const sched = (data.schedule || {}) as { date?: string };
+    for (const row of (Array.isArray(data.crew) ? data.crew : []) as (Row & { timesheetMinutes?: number })[]) {
+      const date = String(row.workDate || sched.date || "").slice(0, 10);
+      if (!row.employeeId || !ymd.test(date)) continue;
+      if (num(row.hours) > 0 || num(row.timesheetMinutes) > 0) worked.add(`${row.employeeId}|${weekOf(date)}`);
+    }
+  }
+  const lastWeek = weekOf(input.today);
+  for (const w of input.workers) {
+    const pay = readPaySettings(w.paySettings);
+    const cents = Math.round(num(pay.salaryWeekly) * 100);
+    if (pay.type !== "salary" || !(cents > 0)) continue;
+    const start = pay.payStart && pay.payStart > input.cutover ? pay.payStart : input.cutover;
+    for (let week = weekOf(start); week <= lastWeek; week = addDaysYmd(week, 7)) {
+      if (input.year && !week.startsWith(input.year)) continue;
+      if (worked.has(`${w.id}|${week}`)) continue;
+      out.push({ employeeId: w.id, name: w.name || "Worker", week, cents });
+    }
+  }
+  return out;
+}
