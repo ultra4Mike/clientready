@@ -85,7 +85,7 @@ export async function loadAccountIntoCache(): Promise<boolean> {
 
 // Speed audit #4: every profile column except the (large, base64) logo; the logo is fetched only when the
 // profile changed since it was cached. Older databases missing a column fall back to select("*").
-const PROFILE_COLUMNS = "id,business_name,owner_name,email,phone,address,website,payment_terms,tax_id,payment_link,set_aside_percent,updated_at,late_fee_type,late_fee_value,late_fee_grace_days,timezone,review_link,packages,mileage,inventory,payment_methods,late_fee_rules,plan,subscription_status,plan_period_end,cancel_at_period_end,stripe_customer_id,stripe_subscription_id,subscription_event_at,crew_cost_flag_over,profit_alert_margin,overtime_hours,automations,api_enabled,trial_exempt";
+const PROFILE_COLUMNS = "id,business_name,owner_name,email,phone,address,website,payment_terms,tax_id,payment_link,set_aside_percent,updated_at,late_fee_type,late_fee_value,late_fee_grace_days,timezone,review_link,packages,mileage,inventory,payment_methods,late_fee_rules,plan,subscription_status,plan_period_end,cancel_at_period_end,stripe_customer_id,stripe_subscription_id,subscription_event_at,profit_alert_margin,overtime_hours,automations,api_enabled,trial_exempt";
 async function fetchProfile(userId: string, switching: boolean) {
   const first = await supabase.from("profiles").select(PROFILE_COLUMNS).eq("id", userId).maybeSingle();
   if (first.error) return supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
