@@ -34,6 +34,8 @@ export default function TodayPage() {
 
   useEffect(() => {
     const day = localYmd();
+    // Speed audit #1: cached jobs first, then refresh from the server.
+    try { read(); setToday(day); if (window.localStorage.getItem("clientready-documents")) setLoaded(true); } catch { /* bad cache: wait for the server */ }
     loadAccountIntoCache()
       .catch(() => false)
       .then(() => {

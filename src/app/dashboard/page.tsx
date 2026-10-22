@@ -96,6 +96,7 @@ export default function DashboardPage() {
   // Needs Review items still open (null until NeedsReview has loaded and reported).
   const [reviewCount, setReviewCount] = useState<number | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [cacheShown, setCacheShown] = useState(false);
   const [stale, setStale] = useState(false);
   // Clock-dependent text (greeting, chart months) renders after mount only: the server runs in UTC, the
   // owner's browser in their own zone, so rendering them on the server caused React #418 in the evening.
@@ -106,7 +107,15 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function load() {
-      // R100: no totals until the server fetch is done (the cache can be stale from another device).
+      // Speed audit #1: show this device's cached documents at once (Today block, lists); the money cards
+      // still wait for the server (R100: the cache can be stale from another device).
+      try {
+        const cached = window.localStorage.getItem("clientready-documents");
+        if (cached) setDocuments(uniqueDocs(JSON.parse(cached)));
+        const cachedProfile = JSON.parse(window.localStorage.getItem("clientready-profile") || "{}");
+        setOwnerName(cachedProfile.ownerName || cachedProfile.businessName || "");
+        setCacheShown(true);
+      } catch { /* bad cache: wait for the server */ }
       const fresh = await loadAccountIntoCache();
       if (!fresh) setStale(true);
       const profileRaw = window.localStorage.getItem("clientready-profile");
@@ -121,10 +130,12 @@ export default function DashboardPage() {
       setLoaded(true);
       // R110: show the dashboard first; recurring drafts and automations run after, then the list refreshes.
       // No server cron: due recurring drafts are made when the app opens.
-      await runDueRecurring().catch(() => null);
+      const made = await runDueRecurring().catch(() => null);
       // Backlog 13: owner-enabled automations only (all off by default).
-      setAuto(await runAutomations().catch(() => ({ sent: [], errors: [] })));
-      setDocuments(uniqueDocs(JSON.parse(window.localStorage.getItem("clientready-documents") || "[]")));
+      const ran = await runAutomations().catch(() => ({ sent: [], errors: [] }));
+      setAuto(ran);
+      // Speed audit #5: re-read documents only when recurring or automations changed something.
+      if (made || ran.sent.length) setDocuments(uniqueDocs(JSON.parse(window.localStorage.getItem("clientready-documents") || "[]")));
     }
     load();
   }, []);
@@ -258,7 +269,7 @@ export default function DashboardPage() {
 
       <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-6">
-          <TodayJobsBlock docs={documents as never} loaded={loaded} />
+          <TodayJobsBlock docs={documents as never} loaded={loaded || cacheShown} />
           <section className="space-y-4" aria-label="Needs attention">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Needs attention</h2>
           {(auto.sent.length > 0 || auto.errors.length > 0) && (

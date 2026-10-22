@@ -23,6 +23,9 @@ export function isUuid(id: string) {
 }
 
 export async function getUserId() {
+  // Speed audit: the stored session (no network trip); RLS still checks the token on every query.
+  const { data: session } = await supabase.auth.getSession();
+  if (session.session?.user?.id) return session.session.user.id;
   const { data } = await supabase.auth.getUser();
   return data.user?.id || "";
 }
@@ -38,16 +41,15 @@ export async function deleteCloudDocument(id: string) {
 }
 
 /** Cloud documents for the signed-in user, or null when signed out or the fetch failed. */
-export async function fetchCloudDocuments(): Promise<CloudDoc[] | null> {
-  const userId = await getUserId();
+export async function fetchCloudDocuments(knownUserId = ""): Promise<CloudDoc[] | null> {
+  const userId = knownUserId || (await getUserId());
   if (!userId) return null;
-  const { data, error } = await supabase
-    .from("documents")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
+  // Speed audit #1: documents and tombstones in parallel.
+  const [{ data, error }, deleted] = await Promise.all([
+    supabase.from("documents").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+    allTombstones(userId),
+  ]);
   if (error || !data) return null;
-  const deleted = await allTombstones(userId);
   return data.filter((row) => !deleted.has(row.id)).map((row) => ({
     id: row.id,
     type: row.type,

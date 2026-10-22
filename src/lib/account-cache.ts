@@ -83,19 +83,40 @@ export async function loadAccountIntoCache(): Promise<boolean> {
   return inFlight;
 }
 
+// Speed audit #4: every profile column except the (large, base64) logo; the logo is fetched only when the
+// profile changed since it was cached. Older databases missing a column fall back to select("*").
+const PROFILE_COLUMNS = "id,business_name,owner_name,email,phone,address,website,payment_terms,tax_id,payment_link,set_aside_percent,updated_at,late_fee_type,late_fee_value,late_fee_grace_days,timezone,review_link,packages,mileage,inventory,payment_methods,late_fee_rules,plan,subscription_status,plan_period_end,cancel_at_period_end,stripe_customer_id,stripe_subscription_id,subscription_event_at,crew_cost_flag_over,profit_alert_margin,overtime_hours,automations,api_enabled,trial_exempt";
+async function fetchProfile(userId: string, switching: boolean) {
+  const first = await supabase.from("profiles").select(PROFILE_COLUMNS).eq("id", userId).maybeSingle();
+  if (first.error) return supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
+  const row = first.data as Record<string, unknown> | null;
+  if (!row) return first;
+  let cached: { logo?: string; logoAt?: string } = {};
+  try { cached = switching ? {} : JSON.parse(window.localStorage.getItem("clientready-profile") || "{}"); } catch { cached = {}; }
+  if (cached.logoAt && cached.logoAt === String(row.updated_at || "")) return { data: { ...row, logo: cached.logo || "" }, error: null };
+  const logo = await supabase.from("profiles").select("logo").eq("id", userId).maybeSingle();
+  return { data: { ...row, logo: (logo.data as { logo?: string } | null)?.logo || "" }, error: null };
+}
+
 async function loadAccountOnce(): Promise<boolean> {
-  const { data, error: userError } = await supabase.auth.getUser();
-  const user = data.user;
-  if (userError || !user) return false;
+  // Speed audit #1: the stored session (no network trip), then profile / clients / team / deletes+documents in parallel.
+  const { data: sessionData } = await supabase.auth.getSession();
+  let user = sessionData.session?.user || null;
+  if (!user) {
+    const { data, error: userError } = await supabase.auth.getUser();
+    if (userError || !data.user) return false;
+    user = data.user;
+  }
   const owner = window.localStorage.getItem(OWNER_KEY);
   const switching = Boolean(owner && owner !== user.id);
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .maybeSingle();
-
+  const uid = user.id;
+  const [{ data: profile, error: profileError }, { data: clients, error: clientsError }, , cloud] = await Promise.all([
+    fetchProfile(uid, switching),
+    supabase.from("clients").select("*").eq("user_id", uid),
+    refreshEmployeesCache(uid),
+    // Deletes made offline go first, then nothing deleted (here or on another device) is merged back in.
+    flushDeletes(uid).then(() => fetchCloudDocuments(uid)),
+  ]);
   if (profileError) return false;
   if (switching) window.localStorage.removeItem("clientready-profile");
   if (profile) {
@@ -111,6 +132,7 @@ async function loadAccountOnce(): Promise<boolean> {
         paymentTerms: profile.payment_terms || "Payment is due within 14 days.",
         taxId: profile.tax_id || "",
         logo: profile.logo || "",
+        logoAt: String(profile.updated_at || ""),
         paymentLink: profile.payment_link || "",
         ...lateFeeFields(profile),
         ...moneySettings(profile),
@@ -129,11 +151,6 @@ async function loadAccountOnce(): Promise<boolean> {
     }
   }
 
-  const { data: clients, error: clientsError } = await supabase
-    .from("clients")
-    .select("*")
-    .eq("user_id", user.id);
-
   if (!clientsError && clients) window.localStorage.setItem(
     "clientready-clients",
     JSON.stringify(
@@ -141,12 +158,6 @@ async function loadAccountOnce(): Promise<boolean> {
     )
   );
 
-  await refreshEmployeesCache(user.id);
-
-  // Deletes made offline go first, then nothing deleted (here or on another device) is merged back in.
-  // (fetchCloudDocuments drops tombstoned rows and mergeDocs drops tombstoned local copies.)
-  await flushDeletes(user.id);
-  const cloud = await fetchCloudDocuments();
   if (!cloud) return false; // fetch failed: keep local documents untouched
 
   let local = readLocalDocs();

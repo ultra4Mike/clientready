@@ -128,10 +128,9 @@ export async function syncLocalDocs(docs: Doc[], pushUp: Doc[]) {
     rememberIdChange(oldId, newId);
   }
   for (const doc of pushUp) if (isUuid(doc.id)) toResave.set(doc.id, list.find((item) => item.id === doc.id) || doc);
-  for (const doc of toResave.values()) {
-    const current = list.find((item) => item.id === doc.id) || doc;
-    if (isUuid(current.id)) await saveCloudDocument(current);
-  }
+  // Speed audit #2: re-saves of existing cloud docs go up in parallel (4 at a time), not one by one.
+  const queue = [...toResave.values()].map((doc) => list.find((item) => item.id === doc.id) || doc).filter((doc) => isUuid(doc.id));
+  for (let i = 0; i < queue.length; i += 4) await Promise.all(queue.slice(i, i + 4).map((doc) => saveCloudDocument(doc).catch(() => doc.id)));
   return list;
 }
 

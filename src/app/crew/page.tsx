@@ -240,21 +240,24 @@ export default function CrewPage() {
       setOwnerId(row.user_id || "");
     }
     // Every read below is limited to this person's own rows by the database (row-level security).
-    const [employee, clientRows, jobRows, clockRows, spendRows, draftRows] = await Promise.all([
+    const [employee, clientRows, jobRows, clockRows, spendRows, draftRows, receiptRows] = await Promise.all([
       supabase.from("employees").select("name").ilike("email", user.email || "").maybeSingle(),
       supabase.rpc("list_crew_clients"),
       supabase.from("crew_jobs").select("*").order("job_date", { ascending: true }),
       supabase.from("crew_clock").select("*").order("started_at", { ascending: true }),
-      supabase.from("crew_expenses").select("*").order("created_at", { ascending: false }),
-      supabase.from("job_drafts").select("*").order("created_at", { ascending: false }),
+      // Speed audit #3: no receipt images or draft cost photos here; only which expenses have a receipt.
+      supabase.from("crew_expenses").select("id,doc_id,kind,amount,note,created_at,worker_email").order("created_at", { ascending: false }),
+      supabase.from("job_drafts").select("id,client_name,work_date,hours,work_done,status,created_at,worker_email").order("created_at", { ascending: false }),
+      supabase.from("crew_expenses").select("id").neq("receipt", "").not("receipt", "is", null),
     ]);
+    const withReceipt = new Set(((receiptRows.data || []) as { id: string }[]).map((row) => row.id));
     // The database already limits crew to their own rows. An owner who is also on their own crew
     // list can read all of their workers' rows (owner access), so keep only this person's rows here.
     const next: Cache = {
       name: employee.data?.name || user.email || "",
       jobs: ((jobRows.data || []) as Job[]).filter(ownRow),
       clock: ((clockRows.data || []) as ClockEntry[]).filter(ownRow),
-      expenses: ((spendRows.data || []) as Expense[]).filter(ownRow),
+      expenses: ((spendRows.data || []) as Expense[]).filter(ownRow).map((item) => ({ ...item, receipt: withReceipt.has(item.id) ? "1" : "" })),
       drafts: ((draftRows.data || []) as Draft[]).filter(ownRow),
     };
     refreshQueue(user.id);
