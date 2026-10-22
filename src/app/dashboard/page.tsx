@@ -295,63 +295,8 @@ export default function DashboardPage() {
             </div>
           )}
           </section>
-          <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] shadow-sm" data-testid="recent-docs">
-            <div className="flex items-center gap-3 border-b border-teal-500/15 px-5 py-4 min-[900px]:justify-between">
-              <h2 className="text-base font-semibold">Recent documents</h2>
-              <a href="/documents" className="inline-flex min-h-11 items-center text-sm font-medium text-teal-600 hover:underline dark:text-teal-300">View all</a>
-            </div>
-            {documents.length === 0 && !loaded && (
-              <div className="space-y-3 px-5 py-4" aria-busy="true" aria-label="Loading">
-                {[0, 1, 2].map((n) => <div key={n} className="flex items-center justify-between gap-3"><div className="h-4 w-2/5 animate-pulse rounded bg-teal-500/10" /><div className="h-4 w-16 animate-pulse rounded bg-teal-500/10" /></div>)}
-              </div>
-            )}
-            {documents.length === 0 && loaded && <EmptyState icon="📄" title="No documents yet." line="Your recent invoices and proposals will show here." actionHref="/invoice" actionLabel="New invoice" />}
-            {documents.slice(0, 5).map((doc) => (
-              <a key={doc.id} href={`/documents?q=${encodeURIComponent(doc.title || "")}`} className="flex items-start justify-between gap-3 border-b border-teal-500/10 px-4 py-3.5 text-sm transition last:border-b-0 hover:bg-teal-500/5 sm:px-5">
-                <span className="min-w-0 space-y-0.5" data-testid="recent-doc" data-doc-id={doc.id}>
-                  <span className="block truncate font-medium">{doc.title || "Untitled"}{doc.clientName && doc.clientName !== "No client" ? <span data-testid="recent-client"> · {doc.clientName}</span> : null}</span>
-                  {(() => {
-                    const first = (doc.data?.items || []).find((item) => String(item.description || "").trim()) || (doc.data?.items || [])[0];
-                    const crew = crewNames(doc);
-                    return (<>
-                      {first && <span className="block truncate text-xs tabular-nums text-slate-700 dark:text-slate-200" data-testid="recent-line">{String(first.description || "Item")}{first.rate ? ` · $${amountOf(first.rate).toFixed(2)}${amountOf(first.qty) !== 1 ? ` × ${first.qty}` : ""}` : ""}</span>}
-                      <span className={`block truncate text-xs ${crew.length ? "text-teal-700 dark:text-teal-300" : "italic text-[var(--cr-muted)]"}`} data-testid="recent-crew" data-crew-count={crew.length}>{crew.length ? `Crew: ${crew.join(", ")}` : "No employees scheduled"}</span>
-                    </>);
-                  })()}
-                  {doc.type === "invoice" && (() => {
-                    const total = invoiceTotal(doc); const owed = balance(doc); const paid = total - owed;
-                    return paid > 0.004 && owed > 0.004 ? <span className="block text-xs font-medium tabular-nums text-amber-700 dark:text-amber-300" data-testid="recent-remaining">${paid.toFixed(2)} paid · Remaining balance ${owed.toFixed(2)}</span> : null;
-                  })()}
-                  <span className="block text-xs capitalize text-[var(--cr-muted)]">{doc.type} · {doc.createdAt}</span>
-                </span>
-                <span className="shrink-0 rounded-full border border-teal-500/30 px-2.5 py-0.5 text-xs font-semibold capitalize">{String(doc.data?.status || "draft")}</span>
-              </a>
-            ))}
-          </div>
-        </div>
-
-        <aside className="min-w-0 space-y-4 lg:sticky lg:top-20">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Quick actions</h2>
-      <div className="grid gap-2">
-        <a href="/invoice" className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] flex items-center gap-3 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md">
-          <IconWrap>+</IconWrap>
-          <span className="min-w-0"><p className="font-semibold">New invoice</p>
-          <p className="mt-1 text-sm text-[var(--cr-muted)]">Create an invoice and send it to a client.</p></span>
-        </a>
-        <button type="button" onClick={newProposal} className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] flex items-center gap-3 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md text-left">
-          <IconWrap>✎</IconWrap>
-          <span className="min-w-0"><p className="font-semibold">New proposal</p>
-          <p className="mt-1 text-sm text-[var(--cr-muted)]">Create a proposal and share it with a prospect.</p></span>
-        </button>
-        <a href={thirdAction.href} className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] flex items-center gap-3 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md">
-          <IconWrap>{thirdAction.icon}</IconWrap>
-          <span className="min-w-0"><p className="font-semibold">{thirdAction.title}</p>
-          <p className="mt-1 text-sm text-[var(--cr-muted)]">{thirdAction.text}</p></span>
-        </a>
-      </div>
-        </aside>
-      </div>
-      <div className="cr-stat-row mt-6" data-layout="stat-row">
+          {/* User: money stats and the overview chart sit right after Today / Needs attention, not at the bottom. */}
+      <div className="cr-stat-row" data-testid="dashboard-stats" data-layout="stat-row">
         <a href="/documents?filter=outstanding" data-testid="stat-outstanding" data-loading={loaded ? undefined : "true"} className="group block data-[loading=true]:pointer-events-none data-[loading=true]:animate-pulse rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-3 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400">
           <div className="flex items-start justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cr-muted)] sm:text-xs">Total outstanding</p>
@@ -436,6 +381,62 @@ export default function DashboardPage() {
           </svg>
         </div>
       )}
+          <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] shadow-sm" data-testid="recent-docs">
+            <div className="flex items-center gap-3 border-b border-teal-500/15 px-5 py-4 min-[900px]:justify-between">
+              <h2 className="text-base font-semibold">Recent documents</h2>
+              <a href="/documents" className="inline-flex min-h-11 items-center text-sm font-medium text-teal-600 hover:underline dark:text-teal-300">View all</a>
+            </div>
+            {documents.length === 0 && !loaded && (
+              <div className="space-y-3 px-5 py-4" aria-busy="true" aria-label="Loading">
+                {[0, 1, 2].map((n) => <div key={n} className="flex items-center justify-between gap-3"><div className="h-4 w-2/5 animate-pulse rounded bg-teal-500/10" /><div className="h-4 w-16 animate-pulse rounded bg-teal-500/10" /></div>)}
+              </div>
+            )}
+            {documents.length === 0 && loaded && <EmptyState icon="📄" title="No documents yet." line="Your recent invoices and proposals will show here." actionHref="/invoice" actionLabel="New invoice" />}
+            {documents.slice(0, 5).map((doc) => (
+              <a key={doc.id} href={`/documents?q=${encodeURIComponent(doc.title || "")}`} className="flex items-start justify-between gap-3 border-b border-teal-500/10 px-4 py-3.5 text-sm transition last:border-b-0 hover:bg-teal-500/5 sm:px-5">
+                <span className="min-w-0 space-y-0.5" data-testid="recent-doc" data-doc-id={doc.id}>
+                  <span className="block truncate font-medium">{doc.title || "Untitled"}{doc.clientName && doc.clientName !== "No client" ? <span data-testid="recent-client"> · {doc.clientName}</span> : null}</span>
+                  {(() => {
+                    const first = (doc.data?.items || []).find((item) => String(item.description || "").trim()) || (doc.data?.items || [])[0];
+                    const crew = crewNames(doc);
+                    return (<>
+                      {first && <span className="block truncate text-xs tabular-nums text-slate-700 dark:text-slate-200" data-testid="recent-line">{String(first.description || "Item")}{first.rate ? ` · $${amountOf(first.rate).toFixed(2)}${amountOf(first.qty) !== 1 ? ` × ${first.qty}` : ""}` : ""}</span>}
+                      <span className={`block truncate text-xs ${crew.length ? "text-teal-700 dark:text-teal-300" : "italic text-[var(--cr-muted)]"}`} data-testid="recent-crew" data-crew-count={crew.length}>{crew.length ? `Crew: ${crew.join(", ")}` : "No employees scheduled"}</span>
+                    </>);
+                  })()}
+                  {doc.type === "invoice" && (() => {
+                    const total = invoiceTotal(doc); const owed = balance(doc); const paid = total - owed;
+                    return paid > 0.004 && owed > 0.004 ? <span className="block text-xs font-medium tabular-nums text-amber-700 dark:text-amber-300" data-testid="recent-remaining">${paid.toFixed(2)} paid · Remaining balance ${owed.toFixed(2)}</span> : null;
+                  })()}
+                  <span className="block text-xs capitalize text-[var(--cr-muted)]">{doc.type} · {doc.createdAt}</span>
+                </span>
+                <span className="shrink-0 rounded-full border border-teal-500/30 px-2.5 py-0.5 text-xs font-semibold capitalize">{String(doc.data?.status || "draft")}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+
+        <aside className="min-w-0 space-y-4 lg:sticky lg:top-20">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Quick actions</h2>
+      <div className="grid gap-2">
+        <a href="/invoice" className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] flex items-center gap-3 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md">
+          <IconWrap>+</IconWrap>
+          <span className="min-w-0"><p className="font-semibold">New invoice</p>
+          <p className="mt-1 text-sm text-[var(--cr-muted)]">Create an invoice and send it to a client.</p></span>
+        </a>
+        <button type="button" onClick={newProposal} className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] flex items-center gap-3 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md text-left">
+          <IconWrap>✎</IconWrap>
+          <span className="min-w-0"><p className="font-semibold">New proposal</p>
+          <p className="mt-1 text-sm text-[var(--cr-muted)]">Create a proposal and share it with a prospect.</p></span>
+        </button>
+        <a href={thirdAction.href} className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] flex items-center gap-3 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md">
+          <IconWrap>{thirdAction.icon}</IconWrap>
+          <span className="min-w-0"><p className="font-semibold">{thirdAction.title}</p>
+          <p className="mt-1 text-sm text-[var(--cr-muted)]">{thirdAction.text}</p></span>
+        </a>
+      </div>
+        </aside>
+      </div>
     </AppShell>
   );
 }
