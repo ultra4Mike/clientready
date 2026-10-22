@@ -1,5 +1,5 @@
 "use client";
-import { overtimePremium, readPaySettings, rowHours, rowPayMoney, type PayType } from "@/lib/pay-types";
+import { overtimePremium, readPaySettings, rowHours, rowPayMoney, weekOf, type PayType } from "@/lib/pay-types";
 import { readSetAside } from "@/lib/profit-alerts";
 import { buildReport } from "@/lib/reports";
 
@@ -162,6 +162,8 @@ export default function YearPage() {
   const rows = useMemo(() => {
     const dayKeys = new Set<string>();
     const hourly = new Map<string, { date: string; hours: number; rate: number; name: string }[]>();
+    // Salary: job rows carry a costing share; the week's pay is the weekly salary, counted once (adjustment below).
+    const salaryWeeks = new Map<string, { id: string; name: string; week: string; rows: number }>();
     const list: Row[] = [];
     documents.forEach((doc) => {
       const crew = doc.data?.crew || [];
@@ -269,6 +271,12 @@ export default function YearPage() {
           hourly.set(id, [...(hourly.get(id) || []), { date: String(rowDate).slice(0, 10), hours: rowHours(row), rate: Number(row.rate) || 0, name: row.name || "Worker" }]);
         }
         const amount = crewPay(row);
+        if (row.payType === "salary" && !String(row.payOverride ?? "").trim() && String(rowDate).includes(year)) {
+          const id = row.employeeId || row.name || "";
+          const key = `${id}|${weekOf(String(rowDate).slice(0, 10))}`;
+          const prev = salaryWeeks.get(key) || { id, name: row.name || "Worker", week: weekOf(String(rowDate).slice(0, 10)), rows: 0 };
+          salaryWeeks.set(key, { ...prev, rows: prev.rows + amount - (Number(row.bonus) || 0) });
+        }
         if (!amount) return;
         const date = row.workDate || doc.data?.invoiceDate || doc.createdAt || "";
         if (!String(date).includes(year) && !String(doc.createdAt).includes(year)) return;
@@ -293,6 +301,13 @@ export default function YearPage() {
         });
       });
     });
+    for (const item of salaryWeeks.values()) {
+      const person = employees.find((p) => p.id === item.id || p.name === item.id);
+      const weekly = Number(readPaySettings(person?.paySettings).salaryWeekly) || 0;
+      const diff = Math.round((weekly - item.rows) * 100) / 100;
+      if (!weekly || !diff) continue;
+      list.push({ id: `salary-${item.id}-${item.week}`, docId: "", docType: "invoice", kind: "pay", date: item.week, client: "", number: "", category: "Labor", amount: diff, method: "", ref: "", note: `Salary week of ${item.week} (weekly $${weekly.toFixed(2)}, counted once)`, hours: "", rate: "", worker: item.name, workerKind: kindFor(item.name, item.id) });
+    }
     // Overtime premium (only for people whose owner switched overtime on; off by default).
     for (const [id, entries] of hourly) {
       const person = employees.find((item) => item.id === id || item.name === id);

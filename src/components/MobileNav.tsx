@@ -12,6 +12,7 @@ const mainLinks = [
 
 const moreLinks = [
   { href: "/employees", label: "Employees" },
+  { href: "/timesheet", label: "Timesheet" },
   { href: "/reports", label: "Reports" },
   { href: "/mileage", label: "Mileage" },
   { href: "/inventory", label: "Inventory" },
@@ -26,7 +27,7 @@ export const NAV_GROUPS = [
   { label: "Clients", links: ["/clients"].map(byHref) },
   { label: "Work", links: ["/inventory"].map(byHref) },
   { label: "Money", links: ["/documents", "/collect", "/reports", "/mileage"].map(byHref) },
-  { label: "Team", links: ["/employees"].map(byHref) },
+  { label: "Team", links: ["/employees", "/timesheet"].map(byHref) },
 ];
 export const BOTTOM_LINKS = [{ href: "/profile", label: "Settings" }, byHref("/backup"), { href: "/help", label: "Help" }];
 
