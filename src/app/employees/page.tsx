@@ -4,6 +4,7 @@ import { inviteText } from "@/lib/crew-invite";
 import { mailtoHref } from "@/lib/reminders";
 
 import TimesheetExport from "@/components/TimesheetExport";
+import TimesheetRules from "@/components/timesheet/TimesheetRules";
 import EmptyState from "@/components/EmptyState";
 import { FormEvent, useEffect, useState } from "react";
 import FormDraft from "@/components/FormDraft";
@@ -327,6 +328,7 @@ export default function EmployeesPage() {
           </div>
         ))}
       </div>
+      <TimesheetRules />
       <TimesheetExport names={Object.fromEntries(employees.map((person) => [person.id, person.name]))} />
       </div>
       </div>
