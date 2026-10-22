@@ -133,7 +133,7 @@ export default function SignaturePad({ value, onChange, defaultName = "" }: Prop
         />
       )}
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" onClick={sign} className="min-h-11 flex-1 rounded-lg sm:flex-none bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Sign</button>
+        <button type="button" onClick={sign} className="min-h-11 flex-1 rounded-lg sm:flex-none bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white! shadow-md transition hover:bg-teal-500 disabled:opacity-50">Sign</button>
         <button type="button" onClick={clearAll} className="min-h-11 flex-1 rounded-lg sm:flex-none border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Clear</button>
         {value && <span className="cr-tone-good w-full rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 sm:w-auto">Signed by {value.signerName} · {signedAtLabel(value.signedAt)}</span>}
       </div>
