@@ -1,3 +1,4 @@
+import { customCostLineNames } from "@/lib/cost-categories";
 import { greetingName } from "@/lib/reminders";
 import { paySnapshot, readPaySettings } from "@/lib/pay-types";
 import { derivedWhen, isoDate } from "@/lib/job-when";
@@ -417,6 +418,23 @@ export async function saveSchedule(docId: string, schedule: Schedule | null, con
  * schedule status only: no prices, totals or owner costs (hours/rate/pay stay empty).
  */
 export async function syncScheduleCrewJobs(doc: CloudDoc) {
+  await syncScheduleCrewJobsInner(doc);
+  await pushCrewCostLines(doc);
+}
+
+/**
+ * Crew categories = the owner's own cost lines: copies only the custom line NAMES (never amounts) onto this
+ * job's crew rows (crew_jobs.cost_lines, migration 20261026090000). Quietly skipped until that migration runs.
+ */
+export async function pushCrewCostLines(doc: CloudDoc) {
+  if (!isUuid(doc.id)) return;
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return;
+  const names = customCostLineNames((doc.data?.jobCosts || {}) as { otherFees?: { name?: string }[] });
+  await supabase.from("crew_jobs").update({ cost_lines: names }).eq("owner_id", auth.user.id).eq("doc_id", doc.id).then(() => undefined, () => undefined);
+}
+
+async function syncScheduleCrewJobsInner(doc: CloudDoc) {
   if (!isUuid(doc.id)) return;
   const { data: auth } = await supabase.auth.getUser();
   const user = auth.user;

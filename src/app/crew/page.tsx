@@ -7,7 +7,7 @@ import EmptyState from "@/components/EmptyState";
 import FormDraft from "@/components/FormDraft";
 import { nextJob, recentJobs } from "@/lib/crew-next";
 import CrewDaysOff from "@/components/CrewDaysOff";
-import { CREW_KINDS, EXTRA_PREFIX, legacySummary, type CostLine, type CrewKind } from "@/lib/cost-categories";
+import { CREW_KINDS, EXTRA_PREFIX, crewKindLabel, legacySummary, type CostLine, type CrewKind } from "@/lib/cost-categories";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { crewMarkDone, crewCheckItem, crewOnMyWay, omwTime, crewSetJobStatus, onMyWaySmsHref, STATUS_CLASS, STATUS_LABEL, type JobStatus } from "@/lib/schedule";
@@ -36,6 +36,8 @@ type Job = {
   note: string;
   status: string;
   checklist?: unknown;
+  /** The owner's own cost-line names for this job (no prices). */
+  cost_lines?: string[] | null;
 };
 type Card = Job & { scheduled: boolean; crewNote: string; payRow?: Job; items: ChecklistItem[] };
 type Expense = { id: string; doc_id: string; kind: string; amount: string; note: string; receipt?: string; created_at?: string };
@@ -53,6 +55,12 @@ type CostDraft = { id: string; kind: CrewKind; amount: string; note: string; rec
 const newCostLine = (): CostDraft => ({ id: Math.random().toString(36).slice(2), kind: "parts", amount: "", note: "", receipt: "" });
 // Same keys and names as the owner's job costs ("Crew spend vs your estimate" rows).
 const KINDS = CREW_KINDS.map(({ kind, label }) => [kind, label] as const);
+/** Crew categories = the owner's cost lines for the job: Materials first, the standard lines, then the owner's own named lines. Names only. */
+const kindsFor = (names: (string[] | null | undefined)[]) => {
+  const own: string[] = [];
+  for (const list of names) for (const name of Array.isArray(list) ? list : []) { const n = String(name || "").trim().slice(0, 60); if (n && !own.some((x) => x.toLowerCase() === n.toLowerCase())) own.push(n); }
+  return [...KINDS.filter(([kind]) => kind !== "other"), ...own.map((n) => [`fee:${n}`, n] as const), ...KINDS.filter(([kind]) => kind === "other")] as (readonly [string, string])[];
+};
 const input = "min-h-11 w-full rounded-xl border border-teal-700/40 bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-slate-500 dark:border-teal-500/30 dark:placeholder:text-slate-400 transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30";
 const ICON_PATHS = {
   phone: "M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2",
@@ -697,7 +705,7 @@ export default function CrewPage() {
             <div className="space-y-3 border-t border-teal-500/20 pt-3" data-testid={`expense-form-${card.doc_id}`}>
               <div className="grid grid-cols-2 gap-2">
                 <select aria-label="Category" className={input} value={spend.kind} onChange={(event) => setSpend({ ...spend, kind: event.target.value })}>
-                  {KINDS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  {kindsFor([card.cost_lines]).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
                 <input aria-label="Amount" inputMode="decimal" className={input} placeholder="Amount $" value={spend.amount} onChange={(event) => setSpend({ ...spend, amount: event.target.value })} />
               </div>
@@ -732,7 +740,7 @@ export default function CrewPage() {
           {jobSpend.length > 0 && (
             <ul className="mt-2 space-y-1 text-sm text-[var(--cr-muted)]">
               {jobSpend.map((item) => (
-                <li key={item.id} data-testid="expense-item">{KINDS.find(([value]) => value === item.kind)?.[1] || item.kind} · ${item.amount}{item.note ? ` · ${item.note}` : ""}{item.receipt ? " · receipt attached" : ""}</li>
+                <li key={item.id} data-testid="expense-item">{crewKindLabel(item.kind)} · ${item.amount}{item.note ? ` · ${item.note}` : ""}{item.receipt ? " · receipt attached" : ""}</li>
               ))}
             </ul>
           )}
@@ -989,7 +997,7 @@ export default function CrewPage() {
                     <div key={line.id} className="space-y-2 rounded-lg border border-slate-200 bg-white p-2.5" data-testid="report-cost-line">
                       <div className="grid grid-cols-[minmax(0,1fr)_7.5rem] gap-2">
                         <select aria-label={`Cost ${index + 1} category`} data-testid="report-cost-kind" id={`report-cost-${index}-kind`} name={`costs[${index}].kind`} className={`${input} bg-white`} value={line.kind} onChange={(event) => setCostLines((current) => current.map((item) => (item.id === line.id ? { ...item, kind: event.target.value as CrewKind } : item)))}>
-                          {KINDS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                          {kindsFor(jobs.map((job) => job.cost_lines)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                         </select>
                         <input aria-label={`Cost ${index + 1} amount`} data-testid="report-cost-amount" id={`report-cost-${index}-amount`} name={`costs[${index}].amount`} inputMode="decimal" className={`${input} bg-white text-right tabular-nums`} placeholder="Amount $" value={line.amount} onChange={(event) => setCostLines((current) => current.map((item) => (item.id === line.id ? { ...item, amount: event.target.value } : item)))} />
                       </div>
