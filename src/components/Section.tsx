@@ -78,7 +78,7 @@ export default function Section({ id, label, summary, className = "", testId, he
   }
 
   return (
-    <div className={`relative ${className}`} data-section={id} data-collapsed={collapsed ? "true" : "false"} data-testid={testId}>
+    <div className={`cr-section relative ${className}`} data-section={id} data-collapsed={collapsed ? "true" : "false"} data-testid={testId}>
       <button
         type="button"
         onClick={toggle}
@@ -86,12 +86,12 @@ export default function Section({ id, label, summary, className = "", testId, he
         aria-controls={bodyId}
         aria-label={`${collapsed ? "Expand" : "Collapse"} ${label}`}
         data-testid="section-toggle"
-        className="print-hide absolute right-2 top-2 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--cr-muted)] transition hover:text-teal-500 max-sm:h-11 max-sm:w-11"
+        className="print-hide cr-section-toggle absolute right-3 top-3 z-10 sm:right-4 sm:top-4 inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--cr-muted)] transition hover:text-teal-500 max-sm:h-11 max-sm:w-11"
       >
         <span aria-hidden="true" className={`text-lg leading-none transition ${collapsed ? "" : "rotate-90"}`}>›</span>
       </button>
-      {header && <div className="pr-10">{header}</div>}
-      {!header && collapsed && <p className="pr-10 font-semibold">{label}</p>}
+      {header && <div className="cr-section-head flex min-h-8 items-center pr-10 max-sm:min-h-11 max-sm:pr-12">{header}</div>}
+      {!header && collapsed && <div className="cr-section-head flex min-h-8 items-center pr-10 max-sm:min-h-11 max-sm:pr-12"><p className="cr-section-label">{label}</p></div>}
       {collapsed && summary && <div className="pr-10 text-sm text-[var(--cr-muted)]" data-testid="section-summary">{summary}</div>}
       <div id={bodyId} hidden={collapsed} className={headerFirst ? "space-y-3" : ""}>
         {body}

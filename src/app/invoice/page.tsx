@@ -1305,7 +1305,7 @@ export default function NewInvoicePage() {
             <textarea className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
             </Section>
             <p className="cr-group-heading">Job extras</p>
-            <Section id="costs" label="Your costs" className="owner-costs space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-slate-900 sm:p-5">
+            <Section id="costs" label="Your costs" className="owner-costs space-y-3 rounded-xl border border-l-4 border-slate-200 border-l-amber-400 p-4 sm:p-5">
               <h2 className="font-medium">Your costs only</h2>
               <p className="text-sm text-slate-600">Wages fill from hours times the saved rate, plus any extra pay.</p>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -1448,8 +1448,8 @@ export default function NewInvoicePage() {
                 <CrewSpend docId={docId} estimate={{ ...costs, otherFees }} report={crewReport?.lines.length ? crewReport : null} locked={locked} onUse={useCrewAmounts} />
               </div>
             </Section>
-            {docId && !locked && <Section id="approval" label="Approval" headerFirst={false}><ApprovalShare docId={docId} approval={approval} onChange={setApproval} /></Section>}
-            {docId && !locked && <Section id="portal" label="Client portal" headerFirst={false}><PortalShare clientName={clientName} clientId={docClientId} /></Section>}
+            {docId && !locked && <Section id="approval" className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5" label="Approval" headerFirst={false}><ApprovalShare docId={docId} approval={approval} onChange={setApproval} /></Section>}
+            {docId && !locked && <Section id="portal" className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5" label="Client portal" headerFirst={false}><PortalShare clientName={clientName} clientId={docClientId} /></Section>}
             {!isProposal && docId && (
               <Section id="recurring" label="Recurring" className="space-y-3 rounded-xl border border-slate-200 p-4 text-sm sm:p-5" testId="recurring-section">
                 <p className="font-semibold">Recurring</p>
