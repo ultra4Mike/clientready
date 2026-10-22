@@ -72,7 +72,7 @@ export default function DraftsPage() {
           <div key={draft.id} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
             <p className="text-base font-semibold">{draft.client_name} · {draft.worker_name}</p>
             <p className="text-sm text-[var(--cr-muted)]">
-              {draft.work_date || (draft.created_at ? `Sent ${String(draft.created_at).slice(0, 10)}` : "No date")} · {draft.hours || "0"} hrs · {draft.status}
+              {draft.work_date || (draft.created_at ? `Sent ${String(draft.created_at).slice(0, 10)}` : "Date not set")} · {draft.hours || "0"} hrs · {draft.status}
               {draft.finished ? " · finished" : ""}
             </p>
             <p className="mt-3 text-sm leading-6">{draft.work_done}</p>

@@ -57,7 +57,7 @@ import { useAutosaveDraft } from "@/hooks/useAutosaveDraft";
 import RestoreDraftBanner from "@/components/RestoreDraftBanner";
 import FormDraft from "@/components/FormDraft";
 import ScheduleEditor from "@/components/ScheduleEditor";
-import { entryHours, fmtHours, hoursByWorker, ownerEditClock, crewFixReason, refreshOwnerClock, type ClockEntry } from "@/lib/clock";
+import { entryHours, fmtHours, hoursByWorker, ownerEditClock, fixTimeProblem, crewFixReason, refreshOwnerClock, type ClockEntry } from "@/lib/clock";
 import { confirmRemoval, jobDonePhotos, crewForWorkers, followSchedule, jobScheduleFromForm, crewIds, workLogged, clockHoursFor, dedupeWorkerIds, readSchedule, readWorkers, saveAssignment, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
 import { createClientFromInvoice } from "@/lib/client-create";
 import { defaultInvoiceTerms } from "@/lib/terms";
@@ -734,7 +734,8 @@ export default function NewInvoicePage() {
     if (!clockFix) return;
     const start = new Date(clockFix.start);
     const end = new Date(clockFix.end);
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return setSaveMessage("End time must be after the start time.");
+    const fixProblem = Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) ? "Enter both a start and an end time." : fixTimeProblem(start.toISOString(), end.toISOString()); // R121
+    if (fixProblem) return setSaveMessage(fixProblem);
     const error = await ownerEditClock(clockFix.id, start.toISOString(), end.toISOString());
     if (error) return setSaveMessage(`Could not fix the time: ${error}`);
     const entries = await refreshOwnerClock();

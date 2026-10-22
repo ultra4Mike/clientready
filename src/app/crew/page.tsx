@@ -13,7 +13,7 @@ import { supabase } from "@/lib/supabase";
 import { crewMarkDone, crewCheckItem, crewOnMyWay, omwTime, crewSetJobStatus, onMyWaySmsHref, STATUS_CLASS, STATUS_LABEL, type JobStatus } from "@/lib/schedule";
 import { compressPhoto } from "@/lib/photos";
 import CrewVisitNote from "@/components/CrewVisitNote";
-import { compressImage, crewClockIn, crewClockOut, crewEditClock, entryHours, withQueuedClock, fmtHours, fmtTimer, type ClockEntry } from "@/lib/clock";
+import { compressImage, crewClockIn, crewClockOut, crewEditClock, fixTimeProblem, entryHours, withQueuedClock, fmtHours, fmtTimer, type ClockEntry } from "@/lib/clock";
 
 type Client = { id: string; name: string; phone: string; address: string };
 type Job = {
@@ -39,7 +39,8 @@ type Job = {
 };
 type Card = Job & { scheduled: boolean; crewNote: string; payRow?: Job; items: ChecklistItem[] };
 type Expense = { id: string; doc_id: string; kind: string; amount: string; note: string; receipt?: string; created_at?: string };
-type Draft = { id: string; client_name: string; work_date: string; hours: string; work_done: string; status: string };
+const localYmdOf = (iso: string) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+type Draft = { id: string; client_name: string; work_date: string; hours: string; work_done: string; status: string; created_at?: string };
 type Tab = "today" | "week" | "hours" | "reports";
 type Cache = { name: string; jobs: Job[]; clock: ClockEntry[]; expenses: Expense[]; drafts: Draft[] };
 
@@ -470,6 +471,11 @@ export default function CrewPage() {
   async function saveFix() {
     if (!fixing) return;
     if (fixing.reason.trim().length < 3) return setMessage("Say why you're changing the time (for your boss).");
+    // R121: never save a fix that makes the entry 0 minutes, negative, or unreadable.
+    const fixStart = new Date(fixing.start).getTime(), fixEnd = new Date(fixing.end).getTime();
+    const problem = fixTimeProblem(Number.isFinite(fixStart) ? new Date(fixStart).toISOString() : "", Number.isFinite(fixEnd) ? new Date(fixEnd).toISOString() : "");
+    if (problem) return setMessage(problem);
+    if (fixEnd - fixStart > 16 * 3600000 && !window.confirm(`That is ${Math.round((fixEnd - fixStart) / 3600000)} hours. Save anyway?`)) return;
     await act(`fix-${fixing.id}`, () => crewEditClock(fixing.id, new Date(fixing.start).toISOString(), new Date(fixing.end).toISOString(), fixing.reason), "Time corrected. Your boss will see the reason.");
     setFixing(null);
   }
@@ -953,7 +959,7 @@ export default function CrewPage() {
 
         {!detailId && tab === "reports" && (
           <section className="space-y-3">
-            <button type="button" data-testid="report-open" onClick={() => { if (!reportOpen) { try { const kept = JSON.parse(window.localStorage.getItem(draftKey) || "null"); if (kept?.form) { setForm(kept.form); if (Array.isArray(kept.costLines) && kept.costLines.length) setCostLines(kept.costLines); setMessage("Your saved draft is back. Send it when ready."); } } catch { /* none */ } } if (!reportOpen && !form.workDate) { const d = new Date(); setForm((f) => ({ ...f, workDate: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` })); } setReportOpen(!reportOpen); }} className={`min-h-11 w-full rounded-xl px-4 py-3 font-semibold transition ${reportOpen ? "border border-teal-700/40 hover:bg-teal-500/10 dark:border-teal-500/40" : "bg-teal-500 text-slate-950! shadow-sm hover:bg-teal-400"}`}>{reportOpen ? "Close" : "New job report"}</button>
+            <button type="button" data-testid="report-open" onClick={() => { if (!reportOpen) { try { const kept = JSON.parse(window.localStorage.getItem(draftKey) || "null"); if (kept?.form) { setForm(kept.form); if (Array.isArray(kept.costLines) && kept.costLines.length) setCostLines(kept.costLines); setMessage("Your saved draft is back. Send it when ready."); } } catch { /* none */ } } if (!reportOpen) { const d = new Date(); setForm((f) => f.workDate ? f : ({ ...f, workDate: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` })); } setReportOpen(!reportOpen); }} className={`min-h-11 w-full rounded-xl px-4 py-3 font-semibold transition ${reportOpen ? "border border-teal-700/40 hover:bg-teal-500/10 dark:border-teal-500/40" : "bg-teal-500 text-slate-950! shadow-sm hover:bg-teal-400"}`}>{reportOpen ? "Close" : "New job report"}</button>
             {reportOpen && (
               <form onSubmit={saveDraft} className={`${cardClass} space-y-3`}>
                 <label className="block space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Client</span><select id="report-savedClient" name="savedClient" aria-label="Saved client" className={input} onChange={(event) => { const client = clients.find((item) => item.id === event.target.value); if (client) setForm({ ...form, clientName: client.name, clientPhone: client.phone || "", clientAddress: client.address || "" }); }}>
@@ -1005,7 +1011,7 @@ export default function CrewPage() {
             {drafts.map((draft) => (
               <div key={draft.id} className={cardClass}>
                 <p className="font-medium">{draft.client_name}</p>
-                <p className="text-sm text-[var(--cr-muted)]">{draft.work_date || "No date"} · {draft.hours || "0"} hrs · waiting on owner</p>
+                <p className="text-sm text-[var(--cr-muted)]"><span data-testid="crew-report-date">{draft.work_date ? dayLabel(draft.work_date) : draft.created_at ? `Sent ${dayLabel(localYmdOf(draft.created_at))}` : "Date not set"}</span> · {draft.hours || "0"} hrs · waiting on owner</p>
                 <p className="mt-1 text-sm">{draft.work_done}</p>
               </div>
             ))}

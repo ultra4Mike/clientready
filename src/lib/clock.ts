@@ -51,6 +51,8 @@ export async function refreshOwnerClock(): Promise<ClockEntry[]> {
 
 /** Owner: fix an entry (e.g. a forgotten clock-out). */
 export async function ownerEditClock(id: string, startedAt: string, endedAt: string) {
+  const problem = fixTimeProblem(startedAt, endedAt); // R121
+  if (problem) return problem;
   // B4: the crew member's own "Fix time" reason is kept; the owner's edit is added after it.
   const { data: before } = await supabase.from("crew_clock").select("edited_reason").eq("id", id).maybeSingle();
   const crewReason = crewFixReason(before as ClockEntry | null);
@@ -88,7 +90,17 @@ export function withQueuedClock(entries: ClockEntry[], queue: { id: string; kind
   }
   return list;
 }
+/** R121: why a Fix time can't be saved ("" = fine). Never save 0 minutes, negative or unreadable times. */
+export function fixTimeProblem(startedAt: string, endedAt: string) {
+  const a = Date.parse(startedAt), b = Date.parse(endedAt);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return "Enter both a start and an end time.";
+  if (b - a < 60000) return "End time must be after the start time (this would save 0h 0m). Check both times.";
+  return "";
+}
+
 export async function crewEditClock(id: string, startedAt: string, endedAt: string, reason: string) {
+  const problem = fixTimeProblem(startedAt, endedAt);
+  if (problem) return problem;
   const { error } = await supabase.rpc("crew_edit_clock", { p_id: id, p_started: startedAt, p_ended: endedAt, p_reason: reason });
   return error ? error.message : "";
 }
