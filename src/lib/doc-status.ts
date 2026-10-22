@@ -8,6 +8,8 @@ import { invoicePastDue, readPayments, refundState } from "@/lib/payments";
 type Doc = Parameters<typeof documentStage>[0];
 
 export function displayStatus(doc: Doc, allDocs: Doc[] = [], today?: string) {
+  // Help retest: a voided document reads "Void" everywhere (never "Paid" just because nothing is owed).
+  if (["void", "voided"].includes(String((doc.data as Record<string, unknown> | undefined)?.status || ""))) return { key: "void", label: "Void" };
   const { stage } = documentStage(doc, allDocs);
   const { total, owed } = docAmounts(doc);
   // R126: a paid invoice later refunded reads Refunded / Partially refunded (no silent owed balance) unless re-billed.

@@ -4,6 +4,8 @@ import { isPendingRecurringDraft } from "@/lib/recurring";
 import { uniqueDocs } from "@/lib/change-orders";
 import { clientKey } from "@/lib/portal";
 import { ownerJobCost, yearMonth } from "@/lib/reports";
+import { cashEntries } from "@/lib/money";
+import { isVoidStatus } from "@/lib/payments";
 
 /**
  * Best customers for one year, owner-only and read-only. Same rules as Reports: billed = sent invoices by
@@ -26,17 +28,29 @@ const days = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:0
 
 export function bestCustomers(allDocs: Doc[], year: string, sort: CustomerSort = "profit") {
   const map = new Map<string, CustomerRow & { payDays: number[] }>();
-  for (const doc of uniqueDocs(allDocs)) {
-    if (doc.type !== "invoice" || isPendingRecurringDraft(doc)) continue;
+  const docs = uniqueDocs(allDocs);
+  const rowFor = (doc: Doc) => {
     const data = doc.data || {};
     const name = String(data.clientName || doc.clientName || "").trim() || "No client";
     const clientId = String(data.clientId || "");
     const key = clientId ? `id:${clientId}` : `name:${clientKey(name)}`;
     const row = map.get(key) || { key, clientId, name, jobs: 0, billed: 0, collected: 0, profit: 0, owed: 0, avgDaysToPay: null, lastJob: "", payDays: [] };
     map.set(key, row);
+    return row;
+  };
+  // Collected: the shared cash calculation (R104/R126), so a proposal payment copied onto two invoices counts once
+  // and void docs never count. Collected can never exceed the real payments.
+  const byId = new Map(docs.map((doc) => [doc.id, doc]));
+  for (const entry of cashEntries(allDocs)) {
+    const doc = byId.get(entry.docId);
+    if (doc && !isPendingRecurringDraft(doc) && yearMonth(entry.date)?.year === year) rowFor(doc).collected += entry.amount;
+  }
+  for (const doc of docs) {
+    if (doc.type !== "invoice" || isPendingRecurringDraft(doc) || isVoidStatus(doc.data?.status) || doc.data?.deleted) continue;
+    const data = doc.data || {};
+    const row = rowFor(doc);
     const { total, owed } = docAmounts(doc);
     const payments = readPayments(data).filter((payment) => num(payment.amount) > 0);
-    for (const payment of payments) if (yearMonth(payment.date || data.invoiceDate || doc.createdAt)?.year === year) row.collected += num(payment.amount);
     if (String(data.status || "draft") === "draft") continue;
     row.owed += owed;
     const date = ymd(data.invoiceDate || doc.createdAt);
@@ -44,7 +58,7 @@ export function bestCustomers(allDocs: Doc[], year: string, sort: CustomerSort =
     row.jobs += 1;
     row.billed += total;
     row.profit += total - ownerJobCost(data);
-    if (date > row.lastJob) { row.lastJob = date; row.name = name; }
+    if (date > row.lastJob) { row.lastJob = date; row.name = String(data.clientName || doc.clientName || "").trim() || "No client"; }
     if (owed <= 0.004 && payments.length) {
       const last = payments.map((payment) => ymd(payment.date)).filter(Boolean).sort().pop();
       if (last && date) row.payDays.push(Math.max(0, days(date, last)));
