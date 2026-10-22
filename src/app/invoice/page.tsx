@@ -1133,8 +1133,17 @@ export default function NewInvoicePage() {
     const docs = raw ? JSON.parse(raw) : [];
     // R21: the deposit goes on the first invoice only; another invoice from this proposal starts with no payments.
     const carrier = depositInvoice(docs, proposalId);
-    const depositPaid = paidTotal(payments);
-    if (madeInvoices.length && !window.confirm(`An invoice was already made from this proposal (${madeInvoices.map((item) => item.number).join(", ")}).${depositPaid > 0 ? ` The $${depositPaid.toFixed(2)} deposit is already on ${String((carrier?.data as { invoiceNumber?: string } | undefined)?.invoiceNumber || "that invoice")} and will NOT be copied to the new one.` : ""} Make another one?`)) return;
+    // One invoice per proposal (unique index documents_one_invoice_per_proposal): if a live invoice already
+    // exists, open it with a plain message instead of trying to make a second one (which the cloud refuses).
+    const liveLocal = (docs as { id: string; type?: string; title?: string; data?: { invoiceNumber?: string; status?: string; deleted?: boolean | string; fromProposal?: { id?: string } } }[])
+      .filter((item) => item.type === "invoice" && item.data?.fromProposal?.id === proposalId && item.data?.status !== "void" && String(item.data?.deleted || "false") !== "true")
+      .map((item) => ({ id: item.id, number: String(item.data?.invoiceNumber || item.title || "the invoice") }));
+    const existing = liveLocal[0] || madeInvoices.find((made) => !(docs as { id: string }[]).some((item) => item.id === made.id));
+    if (existing) {
+      window.alert(`This proposal already has an invoice (${existing.number}). Opening it now.`);
+      window.location.href = `/invoice?id=${encodeURIComponent(existing.id)}`;
+      return;
+    }
     const copyDeposit = !carrier;
     const number = nextNumber("invoice");
     const labor = crew.length ? crew.reduce((sum, row) => sum + rowPay(row), 0).toFixed(2) : costs.labor;
