@@ -166,7 +166,7 @@ export default function ApprovePage() {
     <main className="min-h-screen bg-slate-100 px-3 py-6 text-slate-900 sm:px-4 sm:py-10">
       <section className="print-reset mx-auto max-w-3xl space-y-4">
         <div className="print-hide rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm sm:p-5" data-testid="approve-panel">
-          {portal && <a href={`/portal?t=${encodeURIComponent(portal.p)}`} className="mb-3 inline-flex min-h-11 items-center text-sm font-medium text-teal-700 underline" data-testid="portal-back">← All my documents</a>}
+          {portal && <a href={`/portal?t=${encodeURIComponent(portal.p)}`} className="mb-3 inline-flex min-h-11 items-center text-sm font-medium text-teal-700 underline dark:text-teal-300" data-testid="portal-back">← All my documents</a>}
           {portal && !approval && !isProposal ? null : approved ? (
             <p className="font-semibold text-emerald-700" data-testid="approve-done">
               Approved{approval?.approvedAt ? ` on ${new Date(approval.approvedAt).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}
@@ -198,7 +198,7 @@ export default function ApprovePage() {
               </details>
             </div>
           )}
-          {message && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{message}</p>}
+          {message && <p className="cr-tone-bad mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{message}</p>}
           <button type="button" onClick={() => window.print()} className="mt-3 inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 px-4 text-sm font-medium text-slate-700 transition hover:border-teal-500 hover:text-teal-700 max-sm:w-full sm:ml-3">Print / Save PDF</button>
         </div>
 
@@ -207,8 +207,8 @@ export default function ApprovePage() {
             <div className="min-w-0 text-sm text-slate-600">
               {/* eslint-disable-next-line @next/next/no-img-element -- data URL logo from the profile */}
               {doc.business.logo && <img src={doc.business.logo} alt="Business logo" className="mb-2 h-10 w-auto" />}
-              <p className="font-semibold">{doc.business.name}</p>
-              <p>{[doc.business.email, doc.business.phone].filter(Boolean).join(" · ")}</p>
+              <p className="text-lg font-bold leading-tight text-slate-900">{doc.business.name}</p>
+              <p className="mt-0.5 break-words">{[doc.business.email, doc.business.phone].filter(Boolean).join(" · ")}</p>
             </div>
             <div className="shrink-0 text-right">
               {changeOrderOf?.number && <p className="change-order-badge mb-1 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide" data-testid="change-order-badge">Change order</p>}
@@ -223,14 +223,14 @@ export default function ApprovePage() {
             </div>
           </div>
 
-          <div className="mt-6 text-sm">
+          <div className="cr-bill-to mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-900">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{isProposal ? "Prepared for" : "Bill to"}</p>
-            <p className="font-medium">{text(data.clientName) || doc.clientName}{text(data.clientCompany) && <span className="font-normal text-slate-600"> · {text(data.clientCompany)}</span>}</p>
-            {text(data.clientAddress) && <p className="text-slate-600">{text(data.clientAddress)}</p>}
+            <p className="mt-1 text-base font-semibold text-slate-900">{text(data.clientName) || doc.clientName}{text(data.clientCompany) && <span className="font-normal text-slate-600"> · {text(data.clientCompany)}</span>}</p>
+            {text(data.clientAddress) && <p className="mt-0.5 text-slate-700">{text(data.clientAddress)}</p>}
           </div>
 
           {visit && visit.date && (
-            <p data-testid="link-visit" data-status={visit.status} className="mt-4 rounded-lg border border-teal-500/30 bg-teal-50 px-3 py-2 text-sm text-slate-800">
+            <p data-testid="link-visit" data-status={visit.status} className="cr-tone-teal mt-4 rounded-xl border border-teal-500/30 bg-teal-50 px-4 py-3 text-sm text-slate-800">
               <span className="font-semibold">{visit.status === "done" ? "Visit done" : "Your visit"}:</span> {new Date(`${visit.date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}{visit.startTime ? ` · ${time12(visit.startTime)}${visit.endTime ? `–${time12(visit.endTime)}` : ""}` : ""}
             </p>
           )}
@@ -251,7 +251,7 @@ export default function ApprovePage() {
               <div className="flex justify-between"><span>Subtotal</span><span>${totals.subtotal.toFixed(2)}</span></div>
               {totals.discount > 0 && <div className="flex justify-between"><span>{discountLabel(text(data.discountType), text(data.discountValue))}</span><span>-${totals.discount.toFixed(2)}</span></div>}
               <div className="flex justify-between"><span>Tax</span><span>${totals.tax.toFixed(2)}</span></div>
-              <div className="flex justify-between font-semibold"><span>Total</span><span>${totals.total.toFixed(2)}</span></div>
+              <div className="flex justify-between border-t border-slate-200 pt-1.5 text-base font-bold"><span>Total</span><span>${totals.total.toFixed(2)}</span></div>
               {doc?.type === "proposal" && Number(text(data.depositPercent)) > 0 && <div className="flex justify-between" data-testid="approve-deposit-request"><span>Deposit requested ({text(data.depositPercent)}%)</span><span>${(totals.total * Number(text(data.depositPercent)) / 100).toFixed(2)}</span></div>}
               {/* R59: payments (e.g. a deposit) under Total, then the balance. */}
               {payments.filter((payment) => amountOf(payment.amount) > 0).map((payment, index) => (
@@ -261,7 +261,7 @@ export default function ApprovePage() {
                 </div>
               ))}
               {!isProposal && (
-                <div className="mt-2 flex items-baseline justify-between cr-tone-teal rounded-lg bg-teal-50 px-3 py-2 text-lg font-bold text-teal-900 print:bg-transparent print:px-0" data-testid="approve-owed">
+                <div className="mt-2 flex items-baseline justify-between gap-3 cr-tone-teal rounded-xl border border-teal-500/30 bg-teal-50 px-4 py-3 text-xl font-bold tabular-nums text-teal-900 print:bg-transparent print:px-0" data-testid="approve-owed">
                   <span>{totals.paid > 0.004 && totals.balance > 0.004 ? "Remaining balance" : "Still owed"}</span><span>${totals.balance.toFixed(2)}</span>
                 </div>
               )}
@@ -271,12 +271,12 @@ export default function ApprovePage() {
           {!isProposal && (cardEnabled || payMessage) && (
             <div className="print-hide mt-4 cr-tone-teal rounded-xl border border-teal-500/30 bg-teal-50 p-4 text-sm text-slate-800" data-testid="card-pay">
               {cardEnabled && totals.balance >= 0.5 && (
-                <button type="button" data-testid="pay-card" disabled={paying} onClick={() => payByCard(false)} className="min-h-12 w-full rounded-lg bg-teal-600 px-6 py-3 text-base font-semibold text-white shadow-md transition hover:bg-teal-500 disabled:opacity-60 sm:w-auto">
+                <button type="button" data-testid="pay-card" disabled={paying} onClick={() => payByCard(false)} className="min-h-14 w-full rounded-xl bg-teal-600 px-6 py-3 text-lg font-semibold text-white! shadow-md transition hover:bg-teal-500 disabled:opacity-60">
                   {paying ? "Opening secure checkout…" : `Pay $${payNow.toFixed(2)} by card${payNow < totals.balance ? " (due now)" : ""}`}
                 </button>
               )}
               {cardEnabled && payNow < totals.balance && totals.balance >= 0.5 && (
-                <button type="button" data-testid="pay-card-full" disabled={paying} onClick={() => payByCard(true)} className="mt-2 block text-sm font-medium text-teal-700 underline sm:ml-1 sm:inline-block sm:mt-0">
+                <button type="button" data-testid="pay-card-full" disabled={paying} onClick={() => payByCard(true)} className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-lg text-sm font-medium text-teal-700 underline dark:text-teal-300">
                   or pay the full balance ${totals.balance.toFixed(2)}
                 </button>
               )}
