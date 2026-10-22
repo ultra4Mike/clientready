@@ -33,7 +33,7 @@ export default function DayDetail(props: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" role="dialog" aria-modal="true" aria-label={`${props.workerName} ${date}`} onClick={props.onClose}>
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-[var(--cr-bg,#fff)] p-4 text-sm shadow-xl sm:rounded-2xl" style={{ background: "var(--cr-surface, white)" }} data-testid="ts-daydetail" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-[var(--cr-panel)] p-4 text-sm text-[var(--cr-text)] shadow-xl sm:rounded-2xl" data-testid="ts-daydetail" onClick={(e) => e.stopPropagation()}>
         <div className="mb-2 flex items-start justify-between gap-2">
           <div>
             <h2 className="text-base font-bold">{props.workerName}</h2>
@@ -45,7 +45,7 @@ export default function DayDetail(props: {
         {timeline.length ? (
           <ol className="mb-3 space-y-1 border-l-2 border-teal-500/30 pl-3" data-testid="ts-dd-timeline">
             {timeline.map((row, i) => (
-              <li key={i} className={row.kind === "gap" ? (row.paid ? "text-[var(--cr-muted)]" : "font-medium text-amber-700") : row.fromSchedule ? "text-amber-700" : ""} data-testid={`ts-dd-row-${row.kind}`}>{row.kind === "gap" ? "↳ " : ""}{row.text}</li>
+              <li key={i} className={row.kind === "gap" ? (row.paid ? "text-[var(--cr-muted)]" : "font-medium text-amber-700 dark:text-amber-300") : row.fromSchedule ? "text-amber-700 dark:text-amber-300" : ""} data-testid={`ts-dd-row-${row.kind}`}>{row.kind === "gap" ? "↳ " : ""}{row.text}</li>
             ))}
           </ol>
         ) : <p className="mb-3 text-[var(--cr-muted)]">No taps or scheduled jobs this day.</p>}
