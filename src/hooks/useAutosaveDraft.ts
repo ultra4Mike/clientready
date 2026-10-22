@@ -34,13 +34,14 @@ export function useAutosaveDraft<T>(form: string, recordId: string, value: T, { 
     checked.current = key;
     baseline.current = JSON.stringify(value);
     typed.current = false;
-    let live = true;
+    // Stale only if the record changed. (A cleanup flag here was cleared by the very next render, since
+    // `value` is a dependency; new docs re-render at once, so the draft was never armed or offered.)
+    const live = () => checked.current === key;
     getDraft<T>(form, recordId).then((draft) => {
-      if (!live) return;
+      if (!live()) return;
       resolved.current = key;
       if (draft && JSON.stringify(draft.payload) !== baseline.current && !(isEmpty && isEmpty(draft.payload))) setRestorable({ payload: draft.payload, updatedAt: draft.updatedAt });
-    }).catch(() => { if (live) resolved.current = key; });
-    return () => { live = false; };
+    }).catch(() => { if (live()) resolved.current = key; });
   }, [enabled, key, value, form, recordId, isEmpty]);
 
   const write = useCallback(() => {
