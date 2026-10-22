@@ -267,10 +267,11 @@ export default function DashboardPage() {
         })()}
       </div>
 
-      <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <div className="min-w-0 space-y-6">
-          <TodayJobsBlock docs={documents as never} loaded={loaded || cacheShown} />
-          <section className="space-y-4" aria-label="Needs attention">
+      {/* User: denser desktop. >=1024px two columns: Today | Recent, Needs attention | money (stats, chart under),
+          quick actions across. Mobile keeps one column in priority order: Today, attention, stats, chart, recent, actions. */}
+      <div data-testid="dash-grid" className="mt-6 grid items-start gap-4 lg:grid-cols-2 lg:gap-5">
+          <div className="min-w-0 lg:order-1" data-testid="dash-cell-today"><TodayJobsBlock docs={documents as never} loaded={loaded || cacheShown} /></div>
+          <section className="min-w-0 space-y-3 lg:order-3" data-testid="dash-cell-attention" aria-label="Needs attention">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Needs attention</h2>
           {(auto.sent.length > 0 || auto.errors.length > 0) && (
             <div className={`space-y-2 rounded-xl border px-4 py-3 text-sm ${auto.errors.length ? "border-rose-300/70" : "cr-tone-good border-emerald-300 bg-emerald-50 text-emerald-800"}`} data-testid="auto-sent" data-count={auto.sent.length}>
@@ -296,6 +297,7 @@ export default function DashboardPage() {
           )}
           </section>
           {/* User: money stats and the overview chart sit right after Today / Needs attention, not at the bottom. */}
+      <div className="cr-dash-money min-w-0 space-y-4 lg:order-4" data-testid="dash-cell-money">
       <div className="cr-stat-row" data-testid="dashboard-stats" data-layout="stat-row">
         <a href="/documents?filter=outstanding" data-testid="stat-outstanding" data-loading={loaded ? undefined : "true"} className="group block data-[loading=true]:pointer-events-none data-[loading=true]:animate-pulse rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-3 shadow-sm transition hover:border-teal-400/60 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400">
           <div className="flex items-start justify-between">
@@ -339,7 +341,7 @@ export default function DashboardPage() {
         </Link>
       </div>
       {stats.invoiceCount > 0 && (
-        <div className="mt-6 rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
+        <div data-testid="dash-chart" className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5">
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 sm:mb-4">
             <h2 className="text-base font-semibold">Invoice overview</h2>
             <span className="text-xs text-[var(--cr-muted)]">Last 6 months · {stats.paidRate}% of invoices marked paid</span>
@@ -381,8 +383,9 @@ export default function DashboardPage() {
           </svg>
         </div>
       )}
-          <div className="rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] shadow-sm" data-testid="recent-docs">
-            <div className="flex items-center gap-3 border-b border-teal-500/15 px-5 py-4 min-[900px]:justify-between">
+      </div>
+          <div className="min-w-0 rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] shadow-sm lg:order-2" data-testid="recent-docs">
+            <div className="flex items-center gap-3 border-b border-teal-500/15 px-4 py-2 min-[900px]:justify-between">
               <h2 className="text-base font-semibold">Recent documents</h2>
               <a href="/documents" className="inline-flex min-h-11 items-center text-sm font-medium text-teal-600 hover:underline dark:text-teal-300">View all</a>
             </div>
@@ -393,8 +396,8 @@ export default function DashboardPage() {
             )}
             {documents.length === 0 && loaded && <EmptyState icon="📄" title="No documents yet." line="Your recent invoices and proposals will show here." actionHref="/invoice" actionLabel="New invoice" />}
             {documents.slice(0, 5).map((doc) => (
-              <a key={doc.id} href={`/documents?q=${encodeURIComponent(doc.title || "")}`} className="flex items-start justify-between gap-3 border-b border-teal-500/10 px-4 py-3.5 text-sm transition last:border-b-0 hover:bg-teal-500/5 sm:px-5">
-                <span className="min-w-0 space-y-0.5" data-testid="recent-doc" data-doc-id={doc.id}>
+              <a key={doc.id} href={`/documents?q=${encodeURIComponent(doc.title || "")}`} className="flex items-start justify-between gap-3 border-b border-teal-500/10 px-4 py-2 text-sm leading-snug transition last:border-b-0 hover:bg-teal-500/5">
+                <span className="min-w-0" data-testid="recent-doc" data-doc-id={doc.id}>
                   <span className="block truncate font-medium">{doc.title || "Untitled"}{doc.clientName && doc.clientName !== "No client" ? <span data-testid="recent-client"> · {doc.clientName}</span> : null}</span>
                   {(() => {
                     const first = (doc.data?.items || []).find((item) => String(item.description || "").trim()) || (doc.data?.items || [])[0];
@@ -414,11 +417,10 @@ export default function DashboardPage() {
               </a>
             ))}
           </div>
-        </div>
 
-        <aside className="min-w-0 space-y-4 lg:sticky lg:top-20">
+        <aside className="min-w-0 space-y-3 lg:order-5 lg:col-span-2" data-testid="dash-cell-actions">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Quick actions</h2>
-      <div className="grid gap-2">
+      <div className="grid gap-2 sm:grid-cols-3">
         <a href="/invoice" className="group rounded-2xl border border-teal-500/15 bg-[var(--cr-card)] flex items-center gap-3 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400/50 hover:shadow-md">
           <IconWrap>+</IconWrap>
           <span className="min-w-0"><p className="font-semibold">New invoice</p>

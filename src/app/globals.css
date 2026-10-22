@@ -580,6 +580,8 @@ html.dark .cr-actionbar { background-color: rgba(11,31,36,.96) !important; borde
 /* Stat strip: one compact row, scrolls sideways on phones instead of stacking */
 .cr-stat-row { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(9.5rem, 1fr); gap: 0.75rem; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
 .cr-stat-row::-webkit-scrollbar { display: none; }
+/* Dashboard 2-column grid: the stats sit 2x2 in their half (no sideways scroll). */
+@media (min-width: 1024px) { .cr-dash-money .cr-stat-row { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; } }
 
 
 /* Crew tabs: only the selected tab is filled; idle tabs are plain text (no tint), so two never look selected. */
