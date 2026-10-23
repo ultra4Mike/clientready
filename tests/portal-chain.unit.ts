@@ -1,0 +1,20 @@
+// Live 6a943cf: portal home showed revision INV-1005 as $240 owed / total $590 (list missed INV-1004's $80).
+import { portalRowOwed, viewStatusLabel } from "@/lib/portal-chain";
+import { revisionOwed } from "@/lib/change-order-revision";
+let fails = 0; const ok = (c: boolean, m: string) => { if (!c) fails++; console.log((c ? "ok " : "FAIL ") + m); };
+const b = { id: "b", type: "invoice", title: "INV-1004", data: { invoiceNumber: "INV-1004", status: "partial", items: [{ qty: "1", rate: "240" }], payments: [{ id: "p", amount: "80", method: "Cash", date: "2026-10-22", ref: "" }] } };
+const r = { id: "r", type: "invoice", title: "INV-1005", data: { invoiceNumber: "INV-1005", status: "sent", coMode: "revision", revises: { id: "b", number: "INV-1004", total: 240 }, items: [{ qty: "1", rate: "240" }] } };
+const listOnly = revisionOwed([r] as never, r as never);
+ok(listOnly === 240, "bug repro: list without INV-1004 gives $240");
+ok(revisionOwed([b, r] as never, r as never) === 160, "chain helper with INV-1004 gives $160");
+const fixed = portalRowOwed(listOnly, { revision: { owed: 160 } });
+ok(fixed.owed === 160 && fixed.replacedNumber === null, "server chain answer wins: $160");
+ok(350 + fixed.owed === 510, "portal total 350 + 160 = $510 (not $590)");
+const rep = portalRowOwed(240, { replaced: { number: "INV-1005" } });
+ok(rep.owed === 0 && rep.replacedNumber === "INV-1005", "replaced version owes 0");
+ok(portalRowOwed(240, {}).owed === 240 && portalRowOwed(99, null).owed === 99, "no server answer: list math kept");
+ok(portalRowOwed(5, { revision: { owed: -3 } }).owed === 0, "never negative");
+ok(viewStatusLabel("sent", true) === "replaced" && viewStatusLabel("partial", true) === "replaced", "replaced shows REPLACED, not SENT");
+ok(viewStatusLabel("sent", false) === "sent" && viewStatusLabel("paid", false) === "✓ paid" && viewStatusLabel("void", true) === "void", "other statuses unchanged");
+console.log(fails ? `FAILED ${fails}` : "ALL PASS");
+if (fails) process.exit(1);

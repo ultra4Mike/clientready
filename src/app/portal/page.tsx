@@ -12,10 +12,11 @@ import { payNowAmount, readStages, stagePlan, todayYmd } from "@/lib/stages";
 import { isRevision, replacedBy, revisionOwed } from "@/lib/change-order-revision";
 import { effectiveDueDate, owedAfterRefunds, paidTotal, readPayments } from "@/lib/payments";
 import { readApproval } from "@/lib/approval";
+import { portalRowOwed, type ChainAnswer } from "@/lib/portal-chain";
 
 const text = (value: unknown) => (typeof value === "string" ? value : "");
 
-function figures(doc: PortalDoc, all: PortalDoc[] = []) {
+function figures(doc: PortalDoc, all: PortalDoc[] = [], server?: ChainAnswer) {
   const items = Array.isArray(doc.data.items) ? (doc.data.items as { qty?: string; rate?: string }[]) : [];
   const subtotal = items.reduce((sum, item) => sum + amountOf(item.qty) * amountOf(item.rate), 0);
   const total = documentTotals(subtotal, text(doc.data.taxPercent), text(doc.data.discountType), text(doc.data.discountValue)).total;
@@ -23,12 +24,15 @@ function figures(doc: PortalDoc, all: PortalDoc[] = []) {
   // Option A: a version replaced by a sent revision owes nothing; a revision owes net of earlier versions' payments.
   const by = doc.type === "invoice" ? replacedBy(all as never, doc as never) : null;
   const ownOwed = doc.type === "invoice" ? owedAfterRefunds(total, readPayments(doc.data), doc.data.status, doc.data.rebillRefund) : 0; // R128: refund-aware
-  const owed = by ? 0 : doc.type === "invoice" && isRevision(doc as never) ? revisionOwed(all as never, doc as never) : ownOwed;
-  const replacedNumber = by ? String((by.data as Record<string, unknown>).invoiceNumber || by.title || "") : "";
+  const listOwed = by ? 0 : doc.type === "invoice" && isRevision(doc as never) ? revisionOwed(all as never, doc as never) : ownOwed;
+  // Server chain (same chainInfo as the invoice page + checkout) wins: the list may not hold every earlier version.
+  const fixed = doc.type === "invoice" ? portalRowOwed(listOwed, server) : { owed: listOwed, replacedNumber: null };
+  const owed = fixed.owed;
+  const replacedNumber = fixed.replacedNumber ?? (by ? String((by.data as Record<string, unknown>).invoiceNumber || by.title || "") : "");
   // Payment plan / stages: only the current payment is due now.
   const stages = readStages(doc.data.stages);
   const dueNow = owed > 0 && stages.length ? payNowAmount(total, owed, stages, todayYmd()) : owed;
-  return { total, paid: by ? paid : Math.max(paid, Math.round((total - owed) * 100) / 100), owed, dueNow, replacedNumber, plan: stages.length > 0 && owed > 0 ? stagePlan(total, owed, stages, todayYmd()).current : null };
+  return { total, paid: replacedNumber ? paid : Math.max(paid, Math.round((total - owed) * 100) / 100), owed, dueNow, replacedNumber, plan: stages.length > 0 && owed > 0 ? stagePlan(total, owed, stages, todayYmd()).current : null };
 }
 
 /** Public, no-login client portal: every sent invoice/proposal for one client of one business. */
@@ -38,6 +42,8 @@ export default function PortalPage() {
   const [portal, setPortal] = useState<{ clientName: string; business: PortalBusiness; documents: PortalDoc[] } | null>(null);
 
   const [payMethods, setPayMethods] = useState<PaymentMethodsConfig>({});
+  const [chain, setChain] = useState<Record<string, ChainAnswer>>({});
+  const [chainReady, setChainReady] = useState(false);
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("t") || "";
     if (t) fetchPublicPaymentMethods({ portal: t }).then(setPayMethods).catch(() => {});
@@ -49,8 +55,13 @@ export default function PortalPage() {
       .then((found) => {
         setToken(t);
         if (!found) return setState("missing");
-        setPortal(found);
-        setState("ready");
+        // Revisions: ask the server for the chain-credited owed first (earlier versions may not be in this list),
+        // so the page never shows a pre-credit total. A failed lookup falls back to the list math.
+        Promise.allSettled(found.documents.filter((d) => isRevision(d as never)).slice(0, 20).map((doc) =>
+          fetch("/api/doc-chain", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ portal: t, docId: doc.id }) })
+            .then((r) => (r.ok ? r.json() : {}))
+            .then((info: ChainAnswer) => { if (info && (info.replaced || info.revision)) setChain((prev) => ({ ...prev, [doc.id]: info })); })
+        )).finally(() => { setPortal(found); setChainReady(true); setState("ready"); });
       })
       .catch(() => setState("error"));
   }, []);
@@ -69,7 +80,7 @@ export default function PortalPage() {
     );
   }
 
-  const rows = portal.documents.map((doc) => ({ doc, ...figures(doc, portal.documents), approval: readApproval(doc.data.approval) }));
+  const rows = portal.documents.map((doc) => ({ doc, ...figures(doc, portal.documents, chain[doc.id]), approval: readApproval(doc.data.approval) }));
   const owed = rows.reduce((sum, row) => sum + row.owed, 0);
   const timeline = portalTimeline(rows.map((row) => ({ ...row.doc, total: row.total, owed: row.owed })));
   const dueNow = Math.round(rows.reduce((sum, row) => sum + row.dueNow, 0) * 100) / 100;
@@ -86,7 +97,7 @@ export default function PortalPage() {
           <h1 className="text-2xl font-bold tracking-tight">Documents for {portal.clientName}</h1>
           <p className="mt-1 text-sm text-slate-600">{[portal.business.email, portal.business.phone].filter(Boolean).join(" · ")}</p>
           <p className={`mt-4 inline-flex flex-wrap items-baseline gap-x-2 rounded-xl px-4 py-3 text-lg font-semibold ${owed > 0 ? "cr-tone-warn bg-amber-50 text-amber-900 ring-1 ring-amber-200" : "cr-tone-good bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200"}`} data-testid="portal-owed">Total still owed: <span className="text-2xl font-bold tabular-nums">${owed.toFixed(2)}</span></p>
-          {owed > 0 && <PayOptions config={payMethods} amount={dueNow} reference="" publicCopy dueNote={dueNow < owed - 0.004 ? `Payment plan: $${dueNow.toFixed(2)} due now (of $${owed.toFixed(2)} owed)` : ""} />}
+          {owed > 0 && chainReady && <PayOptions config={payMethods} amount={dueNow} reference="" publicCopy dueNote={dueNow < owed - 0.004 ? `Payment plan: $${dueNow.toFixed(2)} due now (of $${owed.toFixed(2)} owed)` : ""} />}
           </div>
         </div>
         <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white shadow-sm" data-testid="portal-list">

@@ -5,6 +5,7 @@ import { readLocalPaymentMethods, type PaymentMethodsConfig } from "@/lib/paymen
 import { StageSchedule } from "@/components/StageSchedule";
 import { balanceLabel, readStages, type Stage } from "@/lib/stages";
 import { useEffect, useMemo, useState } from "react";
+import { viewStatusLabel } from "@/lib/portal-chain";
 import { chainCredits, creditLabel, isRevision, replacedBy, revisionOwed } from "@/lib/change-order-revision";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
@@ -275,7 +276,7 @@ export default function InvoiceViewPage() {
               )}
               {approvalBadgeApplies({ type: "invoice", data: { status, ...(changeOrderOf ? { changeOrderOf } : {}) } }, approval) && approval && <div className="mb-1"><ApprovalBadge approval={approval} /></div>}
               {changeOrderOf && <p className="change-order-badge mb-1 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide" data-testid="change-order-badge">Change order</p>}
-              <p className="text-xs uppercase tracking-wide text-slate-500">Invoice · <span data-testid="invoice-status-pill" className={`inline-flex items-center rounded-full border px-2.5 py-0.5 font-semibold ${status === "paid" ? "cr-tone-good border-emerald-200 bg-emerald-100 text-emerald-800" : "cr-tone-warn border-amber-200 bg-amber-100 text-amber-800"}`}>{status === "paid" ? "✓ paid" : ["void", "voided"].includes(status) ? "void" : status}</span></p>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Invoice · <span data-testid="invoice-status-pill" data-status={replaced ? "replaced" : status} className={`inline-flex items-center rounded-full border px-2.5 py-0.5 font-semibold ${replaced ? "border-slate-300 bg-slate-100 text-slate-700" : status === "paid" ? "cr-tone-good border-emerald-200 bg-emerald-100 text-emerald-800" : "cr-tone-warn border-amber-200 bg-amber-100 text-amber-800"}`}>{viewStatusLabel(status, Boolean(replaced))}</span></p>
               <h1 className="mt-0.5 text-2xl font-bold leading-tight tracking-tight">{invoiceNumber || "Invoice"}</h1>
               <p className="text-sm text-slate-600">Date: {invoiceDate || "-"} · Due: {dueDate || "-"}</p>
               {changeOrderOf && (
