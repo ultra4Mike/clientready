@@ -731,7 +731,7 @@ html.dark [data-testid="pending-sync"] { color: #fde68a !important; }
 [data-testid^="ts-week-"], [data-testid^="ts-week-pay-"] { font-weight: 700; text-align: right; }
 [data-testid="ts-cards"] { display: grid; gap: .75rem; font-variant-numeric: tabular-nums; }
 [data-testid="ts-cards"] [data-testid^="ts-row-"] { border-radius: .75rem; border: 1px solid rgba(100,116,139,.3); padding: .875rem; background: var(--cr-card); }
-[data-testid^="ts-card-toggle-"], [data-testid^="ts-select-"] { min-height: 2.75rem; min-width: 2.75rem; }
+[data-testid^="ts-card-toggle-"], [data-testid^="ts-select-"]:not(input) { min-height: 2.75rem; min-width: 2.75rem; }
 /* Pills */
 [data-testid^="ts-pill-"], [data-testid^="ts-dd-pill-"], [data-testid="ts-edited"], [data-testid="ts-fix-badge"] { display: inline-flex; align-items: center; border-radius: 999px; padding: 0 .4rem; font-size: .625rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; line-height: 1.25rem; border: 1px solid transparent; }
 html [data-testid="ts-pill-ot"], html [data-testid="ts-dd-pill-ot"] { background: rgba(245,158,11,.15) !important; color: #92400e !important; border-color: rgba(245,158,11,.5) !important; }
@@ -776,7 +776,7 @@ html.dark [data-testid="ts-edited"], html.dark [data-testid="ts-dd-pill-edited"]
 [data-testid^="ts-dd-pin-"] { display: inline-flex; align-items: center; gap: .25rem; }
 [data-testid^="ts-dd-pin-"] a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 .375rem; color: var(--cr-teal, #14b8a6); }
 [data-testid^="ts-dd-pin-"] a::before { content: ""; width: .5rem; height: .5rem; border-radius: 9999px; background: var(--cr-teal, #14b8a6); margin-right: .375rem; }
-[data-testid="ts-select-all"] { width: 1.25rem; height: 1.25rem; accent-color: var(--cr-teal, #14b8a6); }
+[data-testid="ts-select-all"] { width: 18px; height: 18px; accent-color: var(--cr-teal, #14b8a6); }
 label:has(> [data-testid="ts-select-all"]) { min-height: 44px; min-width: 44px; cursor: pointer; }
 [data-testid="break-timer-wrap"] { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.15; text-align: center; }
 [data-testid="tap-break-label"] { font-size: .8125rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #fbbf24; }
@@ -835,8 +835,9 @@ html.dark [data-testid="ts-how"] { color: #5eead4; }
 [data-testid="ts-filter-review"] { margin-left: .375rem; border-left: 1px solid rgba(100,116,139,.45) !important; }
 div[role="group"]:has(> [data-testid="ts-filter-all"]) { overflow: visible !important; border: 0 !important; gap: .375rem; }
 div[role="group"]:has(> [data-testid="ts-filter-all"]) > button { border: 1px solid rgba(100,116,139,.45); border-radius: .5rem; margin-left: 0; }
-[data-testid="ts-table"] input[type="checkbox"], [data-testid^="ts-select-"] input[type="checkbox"] { width: 20px; height: 20px; accent-color: #14b8a6; }
-[data-testid^="ts-select-"]:is(input) { width: 20px !important; height: 20px !important; min-width: 20px !important; min-height: 20px !important; accent-color: #14b8a6; }
+[data-testid="ts-table"] input[type="checkbox"], [data-testid^="ts-select-"] input[type="checkbox"] { width: 18px !important; height: 18px !important; min-width: 18px !important; min-height: 18px !important; padding: 0 !important; margin: 0; flex: 0 0 18px; vertical-align: middle; accent-color: #14b8a6; border-radius: 4px; }
+[data-testid^="ts-select-"]:is(input) { width: 18px !important; height: 18px !important; min-width: 18px !important; min-height: 18px !important; padding: 0 !important; margin: 0; flex: 0 0 18px; vertical-align: middle; accent-color: #14b8a6; border-radius: 4px; }
+label:has(> [data-testid^="ts-select-"]:is(input)), td:has(> [data-testid^="ts-select-"]:is(input)) { align-items: center; vertical-align: middle; cursor: pointer; }
 /* 5. Narrow timesheet cards */
 [data-testid="ts-cards"] [data-testid^="ts-row-"] { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; column-gap: .75rem; }
 [data-testid="ts-cards"] [data-testid^="ts-row-"] > :nth-child(n+3) { grid-column: 1 / -1; }
