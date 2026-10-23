@@ -979,3 +979,9 @@ html.dark li[data-testid^="crew-lead-row-"] > button:hover:not(:disabled) { back
 :is(button[data-testid^="visit-note-save-"], [data-testid^="omw-button-"], button[data-testid^="status-"]) { min-height: 44px; }
 .cr-crew-footnote { font-size: 13px; line-height: 1.45; }
 html.dark .cr-crew-footnote, .cr-crew-footnote { color: #94a3b8 !important; }
+
+/* Crew job-card buttons: hardened 44px (status / On my way / Save note) */
+html button:is([data-testid^="visit-note-save-"], [data-testid^="omw-button-"], [data-testid^="status-"]) {
+  min-height: 44px !important; display: inline-flex !important; align-items: center !important; justify-content: center; box-sizing: border-box; line-height: 1.25;
+}
+html [role="group"][aria-label="Job status"] > button { width: 100%; }
