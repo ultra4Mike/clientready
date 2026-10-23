@@ -788,4 +788,4 @@ label:has(> [data-testid="ts-select-all"]) { min-height: 44px; min-width: 44px; 
 [data-testid="dash-time-alerts"] a, [data-testid="dash-time-open"] { display: inline-flex; align-items: center; min-height: 44px; }
 [data-testid="dash-time-alert"] { font-size: .875rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 [data-testid^="clock-use-myday-"] { min-height: 60px !important; display: inline-flex; align-items: center; justify-content: center; }
-[data-testid="ts-gap"], [data-testid="ts-halfday"], [data-testid="ts-timeout"] { min-height: 44px; font-variant-numeric: tabular-nums; max-width: 100%; }
+#ts-gap, #ts-halfday, #ts-timeout { min-height: 44px; font-variant-numeric: tabular-nums; max-width: 100%; }
