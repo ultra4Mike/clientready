@@ -11,6 +11,7 @@ import { readSchedule, readWorkers, type Worker } from "@/lib/schedule";
 import { rowPayMoney, weekOf, type PayRow } from "@/lib/pay-types";
 import { loadOwnerTimesheet, type DayApproval } from "@/lib/day-events";
 import { applyFixes, buildDay, estimateDriveMinutes, type DaySheet, type FixRequest, type ScheduledJob, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
+import { readRouteMinutes } from "@/lib/route-cache";
 import { allocateWeek, applySharesToCrew, unallocatedSalaryWeeks, type DayPay, type JobShare } from "@/lib/timesheet-pay";
 
 export const CUTOVER_KEY = "clientready-timesheet-pay-cutover";
@@ -87,7 +88,7 @@ export function weekSheets(input: { workers: Worker[]; docs: Doc[]; events: TapE
     const mine = events.filter((e) => e.employeeId === worker.id && e.date === date);
     const coords = new Map(mine.filter((e) => e.lat != null && e.docId).map((e) => [e.docId!, { lat: e.lat!, lng: e.lng! }]));
     const sheet = buildDay({ employeeId: worker.id, date, events: mine, schedule, settings: input.settings, now: input.now,
-      expectedDriveMinutes: (a, b) => { const p = a && coords.get(a), q = b && coords.get(b); return p && q ? estimateDriveMinutes(p, q) : undefined; } });
+      expectedDriveMinutes: (a, b) => { const routed = a && b ? readRouteMinutes(date, a, b) : undefined; if (routed !== undefined) return routed; const p = a && coords.get(a), q = b && coords.get(b); return p && q ? estimateDriveMinutes(p, q) : undefined; } });
     if (input.fixes.some((f) => f.employeeId === worker.id && f.date === date && f.status === "pending")) sheet.flags.push("fix_requested");
     sheets.set(`${worker.id}|${date}`, sheet);
   }
@@ -95,7 +96,7 @@ export function weekSheets(input: { workers: Worker[]; docs: Doc[]; events: TapE
 }
 
 /** Per worker: the week's day pay and job shares from sheets + approvals. */
-export function weekShares(input: { workers: Worker[]; docs: Doc[]; days: string[]; sheets: Map<string, DaySheet>; approvals: DayApproval[]; settings?: { halfDayHours?: number } }) {
+export function weekShares(input: { workers: Worker[]; docs: Doc[]; days: string[]; sheets: Map<string, DaySheet>; approvals: DayApproval[]; settings?: Partial<TimesheetSettings> }) {
   const pays = new Map<string, DayPay[]>();
   const shares = new Map<string, JobShare>(); // employeeId|date|docId
   for (const w of input.workers) {
@@ -105,7 +106,14 @@ export function weekShares(input: { workers: Worker[]; docs: Doc[]; days: string
       const fallbackDocIds = input.docs.filter((doc) => ((doc.data?.crew || []) as { employeeId?: string; workDate?: string }[]).some((r) => r.employeeId === w.id && rowDate(r, doc) === date)).map((doc) => doc.id);
       return { date, sheet: input.sheets.get(`${w.id}|${date}`), approved, approvedMinutes: a?.editedMinutes != null ? a.editedMinutes : approved ? a!.paidMinutes : null, fallbackDocIds };
     });
-    const week = allocateWeek(list, w.paySettings, w.rate || "", { halfDayHours: input.settings?.halfDayHours });
+    // Non-discretionary bonuses on this worker's rows this week count in the FLSA regular rate (rows marked discretionary don't).
+    const weekBonus = new Map<string, number>();
+    const wk = weekOf(input.days[0]);
+    for (const doc of input.docs) for (const r of ((doc.data?.crew || []) as { employeeId?: string; workDate?: string; bonus?: string; bonusDiscretionary?: boolean }[])) {
+      if (r.employeeId !== w.id || r.bonusDiscretionary || !input.days.includes(rowDate(r, doc))) continue;
+      const b = Number(String(r.bonus ?? "").replace(/[^0-9.-]/g, "")); if (b > 0) weekBonus.set(wk, (weekBonus.get(wk) || 0) + b);
+    }
+    const week = allocateWeek(list, w.paySettings, w.rate || "", { halfDayHours: input.settings?.halfDayHours, settings: input.settings, weekBonus });
     // Unallocated salary only for weeks from the pay cutover / his pay start up to this week (same rule as Year packet).
     if (week.some((d) => d.unallocated)) {
       const owed = unallocatedSalaryWeeks({ workers: [w], docs: [], cutover: readCutover() || timesheetCutover(), today: localYmd(new Date().toISOString()) }).some((u) => u.week === weekOf(input.days[0]));

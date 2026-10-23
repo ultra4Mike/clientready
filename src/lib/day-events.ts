@@ -23,8 +23,15 @@ function writeLocal(key: string, value: unknown) {
 export const localDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
-type EventRow = { id: string; employee_id: string; work_date: string; kind: TapKind; at: string; doc_id: string; lat: number | null; lng: number | null; not_at_site: boolean };
-const fromRow = (row: EventRow): TapEvent => ({ id: row.id, employeeId: row.employee_id, date: String(row.work_date).slice(0, 10), kind: row.kind, at: row.at, docId: row.doc_id || undefined, ...(row.lat != null ? { lat: row.lat } : {}), ...(row.lng != null ? { lng: row.lng } : {}), notAtSite: Boolean(row.not_at_site) });
+type EventRow = { id: string; employee_id: string; work_date: string; kind: TapKind; at: string; doc_id: string; lat: number | null; lng: number | null; not_at_site: boolean; device_at?: string | null; out_of_order?: boolean | null; created_at?: string };
+const fromRow = (row: EventRow): TapEvent => ({ id: row.id, employeeId: row.employee_id, date: String(row.work_date).slice(0, 10), kind: row.kind, at: row.at, docId: row.doc_id || undefined, ...(row.lat != null ? { lat: row.lat } : {}), ...(row.lng != null ? { lng: row.lng } : {}), notAtSite: Boolean(row.not_at_site), ...(row.device_at ? { deviceAt: row.device_at } : {}), ...(row.out_of_order ? { outOfOrder: true } : {}) });
+const EVENT_COLS = "id,employee_id,work_date,kind,at,doc_id,lat,lng,not_at_site";
+const EVENT_COLS_P1 = `${EVENT_COLS},device_at,out_of_order,created_at`;
+/** Select events with the phase-1 columns, falling back to the old columns on a server without the migration. */
+async function selectEvents(build: (cols: string) => PromiseLike<{ data: unknown; error: { message?: string; code?: string } | null }>) {
+  const first = await build(EVENT_COLS_P1);
+  return first.error && /column|42703/i.test(`${first.error.message} ${first.error.code}`) ? build(EVENT_COLS) : first;
+}
 
 /** Best-effort GPS (never blocks: 6 s timeout, denied = undefined). */
 export function currentPosition(): Promise<{ lat: number; lng: number } | undefined> {
@@ -41,21 +48,27 @@ export function currentPosition(): Promise<{ lat: number; lng: number } | undefi
 
 /** Worker: record a tap. Saved on the phone first, then sent (an older server keeps the phone copy). */
 export async function recordTap(event: Omit<TapEvent, "id"> & { id?: string }, email: string) {
-  const full: TapEvent = { ...event, id: event.id || newId() };
+  const full: TapEvent = { ...event, id: event.id || newId(), deviceAt: event.deviceAt || event.at };
   const key = `${KEY_EVENTS}:${email.toLowerCase()}`;
-  writeLocal(key, [...readLocal<TapEvent[]>(key, []).filter((e) => e.id !== full.id), full]);
-  const { error } = await supabase.rpc("crew_add_day_event", {
-    p_id: full.id, p_kind: full.kind, p_at: full.at, p_work_date: full.date, p_doc_id: full.docId || "",
-    p_lat: full.lat ?? null, p_lng: full.lng ?? null, p_not_at_site: Boolean(full.notAtSite),
-  });
-  return { event: full, saved: !error || missing(error) ? "ok" : error.message, local: missing(error) };
+  writeLocal(key, [...readLocal<TapEvent[]>(key, []).filter((e) => e.id !== full.id), { ...full, pending: true }]);
+  const base = { p_id: full.id, p_kind: full.kind, p_at: full.at, p_work_date: full.date, p_doc_id: full.docId || "", p_lat: full.lat ?? null, p_lng: full.lng ?? null, p_not_at_site: Boolean(full.notAtSite) };
+  // Phase 1 server: stores the server time (live taps), the phone time and the out-of-order confirm.
+  let { error } = await supabase.rpc("crew_add_day_event", { ...base, p_device_at: full.deviceAt, p_out_of_order: Boolean(full.outOfOrder) });
+  // Older server: new tap kinds are not accepted there; old kinds go through the old signature.
+  if (error && /PGRST202|could not find|function/i.test(`${error.message} ${error.code}`)) {
+    const old = full.kind === "end_day" ? "end_shift" : full.kind;
+    ({ error } = ["start_job", "start_transit", "arrive", "end_shift"].includes(old) ? await supabase.rpc("crew_add_day_event", { ...base, p_kind: old }) : { error });
+  }
+  const ok = !error;
+  if (ok) writeLocal(key, readLocal<TapEvent[]>(key, []).map((e) => (e.id === full.id ? { ...e, pending: false } : e)));
+  return { event: { ...full, pending: !ok }, saved: ok || missing(error) ? "ok" : error!.message, local: !ok };
 }
 
 /** Worker: his own taps (server rows + anything only on this phone). */
 export async function loadMyTaps(email: string): Promise<TapEvent[]> {
   const local = readLocal<TapEvent[]>(`${KEY_EVENTS}:${email.toLowerCase()}`, []);
   const since = localDate(new Date(Date.now() - 14 * 86400000));
-  const { data, error } = await supabase.from("crew_day_events").select("id,employee_id,work_date,kind,at,doc_id,lat,lng,not_at_site").gte("work_date", since).order("at");
+  const { data, error } = await selectEvents((cols) => supabase.from("crew_day_events").select(cols).gte("work_date", since).order("at"));
   if (error) return local;
   const server = ((data || []) as EventRow[]).map(fromRow);
   const ids = new Set(server.map((e) => e.id));
@@ -70,8 +83,8 @@ export async function requestFix(fix: Omit<FixRequest, "id" | "status" | "create
   return { fix: full, error: error && !missing(error) ? error.message : "" };
 }
 
-type FixRow = { id: string; employee_id: string; work_date: string; event_id: string | null; kind: TapKind; at: string; doc_id: string; reason: string; status: FixRequest["status"]; created_at: string; decided_at: string | null };
-const fixFromRow = (r: FixRow): FixRequest => ({ id: r.id, employeeId: r.employee_id, date: String(r.work_date).slice(0, 10), ...(r.event_id ? { eventId: r.event_id } : {}), kind: r.kind, at: r.at, docId: r.doc_id || undefined, reason: r.reason, status: r.status, createdAt: r.created_at, ...(r.decided_at ? { decidedAt: r.decided_at } : {}) });
+type FixRow = { id: string; employee_id: string; work_date: string; event_id: string | null; kind: TapKind; at: string; doc_id: string; reason: string; status: FixRequest["status"]; created_at: string; decided_at: string | null; owner_note?: string | null };
+const fixFromRow = (r: FixRow): FixRequest => ({ id: r.id, employeeId: r.employee_id, date: String(r.work_date).slice(0, 10), ...(r.event_id ? { eventId: r.event_id } : {}), kind: r.kind, at: r.at, docId: r.doc_id || undefined, reason: r.reason, status: r.status, createdAt: r.created_at, ...(r.decided_at ? { decidedAt: r.decided_at } : {}), ...(r.owner_note ? { ownerNote: r.owner_note } : {}) });
 
 export async function loadMyFixes(email: string): Promise<FixRequest[]> {
   const local = readLocal<FixRequest[]>(`${KEY_FIXES}:${email.toLowerCase()}`, []);
@@ -90,7 +103,7 @@ export async function loadOwnerTimesheet(from: string, to: string): Promise<Owne
   const localApprovals = readLocal<DayApproval[]>(KEY_APPROVALS, []);
   const localSettings = readTimesheetSettings(readLocal(KEY_SETTINGS, {}));
   const [ev, fx, ap, st] = await Promise.all([
-    supabase.from("crew_day_events").select("id,employee_id,work_date,kind,at,doc_id,lat,lng,not_at_site").gte("work_date", from).lte("work_date", to).order("at"),
+    selectEvents((cols) => supabase.from("crew_day_events").select(cols).gte("work_date", from).lte("work_date", to).order("at")),
     supabase.from("crew_time_fixes").select("*").gte("work_date", from).lte("work_date", to).order("created_at"),
     supabase.from("crew_day_approvals").select("*").gte("work_date", from).lte("work_date", to),
     supabase.from("crew_timesheet_settings").select("*").maybeSingle(),
@@ -102,18 +115,66 @@ export async function loadOwnerTimesheet(from: string, to: string): Promise<Owne
     events: ev.error ? [] : ((ev.data || []) as EventRow[]).map(fromRow),
     fixes: fx.error ? [] : ((fx.data || []) as FixRow[]).map(fixFromRow),
     approvals: approvals.filter((a) => a.date >= from && a.date <= to),
-    settings: s ? readTimesheetSettings({ gapMinutes: s.gap_minutes, transitTimeoutMinutes: s.transit_timeout_minutes, halfDayHours: s.half_day_hours }) : localSettings,
+    settings: s ? readTimesheetSettings({ ...localSettings, ...((s.rules as object) || {}), gapMinutes: s.gap_minutes, transitTimeoutMinutes: s.transit_timeout_minutes, halfDayHours: s.half_day_hours }) : localSettings,
     cloud,
   };
 }
 
 export function readLocalTimesheetSettings() { return readTimesheetSettings(readLocal(KEY_SETTINGS, {})); }
 
-export async function saveTimesheetSettings(settings: TimesheetSettings) {
+export async function saveTimesheetSettings(settings: TimesheetSettings, previous?: TimesheetSettings) {
   writeLocal(KEY_SETTINGS, settings);
   const { data } = await supabase.auth.getUser();
   if (!data.user) return;
-  await supabase.from("crew_timesheet_settings").upsert({ owner_id: data.user.id, gap_minutes: Math.round(settings.gapMinutes), transit_timeout_minutes: Math.round(settings.transitTimeoutMinutes), half_day_hours: settings.halfDayHours, updated_at: new Date().toISOString() });
+  const row = { owner_id: data.user.id, gap_minutes: Math.round(settings.gapMinutes), transit_timeout_minutes: Math.round(settings.transitTimeoutMinutes), half_day_hours: settings.halfDayHours, updated_at: new Date().toISOString() };
+  const { error } = await supabase.from("crew_timesheet_settings").upsert({ ...row, rules: settings });
+  if (error && /rules|column|42703/i.test(`${error.message} ${error.code}`)) await supabase.from("crew_timesheet_settings").upsert(row); // older server: phone keeps the rest
+  if (previous) {
+    const changed = (Object.keys(settings) as (keyof TimesheetSettings)[]).filter((k) => JSON.stringify(settings[k]) !== JSON.stringify(previous[k]));
+    if (changed.length) await logAudit({ action: "settings", oldValue: Object.fromEntries(changed.map((k) => [k, previous[k]])), newValue: Object.fromEntries(changed.map((k) => [k, settings[k]])) });
+  }
+}
+
+// ---------- Audit log (owner only; rows are never deleted) ----------
+export type AuditRow = { id?: string; at: string; actor: string; employeeId: string; date: string | null; action: string; oldValue: unknown; newValue: unknown };
+const KEY_AUDIT = "clientready-time-audit";
+/** Owner: write one audit row (taps are logged by the database trigger). */
+export async function logAudit(row: { action: string; employeeId?: string; date?: string | null; oldValue?: unknown; newValue?: unknown }) {
+  const { data } = await supabase.auth.getUser();
+  const full: AuditRow = { at: new Date().toISOString(), actor: data.user?.email || "owner", employeeId: row.employeeId || "", date: row.date ?? null, action: row.action, oldValue: row.oldValue ?? null, newValue: row.newValue ?? null };
+  writeLocal(KEY_AUDIT, [...readLocal<AuditRow[]>(KEY_AUDIT, []), full].slice(-2000));
+  if (!data.user) return;
+  await supabase.from("crew_time_audit").insert({ owner_id: data.user.id, actor_email: full.actor, employee_id: full.employeeId, work_date: full.date, action: full.action, old_value: full.oldValue, new_value: full.newValue });
+}
+/** Owner: audit rows (newest first), optionally for one worker/day. Falls back to this device's copy. */
+export async function loadAudit(filter: { employeeId?: string; date?: string; limit?: number } = {}): Promise<AuditRow[]> {
+  let q = supabase.from("crew_time_audit").select("id,at,actor_email,employee_id,work_date,action,old_value,new_value").order("at", { ascending: false }).limit(filter.limit || 500);
+  if (filter.employeeId) q = q.eq("employee_id", filter.employeeId);
+  if (filter.date) q = q.eq("work_date", filter.date);
+  const { data, error } = await q;
+  const local = readLocal<AuditRow[]>(KEY_AUDIT, []).filter((r) => (!filter.employeeId || r.employeeId === filter.employeeId) && (!filter.date || r.date === filter.date)).reverse();
+  if (error) return local;
+  return ((data || []) as Record<string, unknown>[]).map((r) => ({ id: String(r.id), at: String(r.at), actor: String(r.actor_email || ""), employeeId: String(r.employee_id || ""), date: r.work_date ? String(r.work_date).slice(0, 10) : null, action: String(r.action), oldValue: r.old_value, newValue: r.new_value }));
+}
+/** CSV of audit rows (for the 3-year record keeping export). */
+export function auditCsv(rows: AuditRow[]) {
+  const q = (v: unknown) => `"${String(typeof v === "string" ? v : v == null ? "" : JSON.stringify(v)).replace(/"/g, '""')}"`;
+  return ["When,Who,Worker,Day,Action,Old,New", ...rows.map((r) => [r.at, r.actor, r.employeeId, r.date || "", r.action, r.oldValue, r.newValue].map(q).join(","))].join("\n");
+}
+
+// ---------- Weekly attestation ("I confirm these hours are correct") ----------
+export async function attestWeek(week: string, minutes: number, email: string) {
+  const key = `clientready-attest:${email.toLowerCase()}`;
+  const at = new Date().toISOString();
+  writeLocal(key, { ...readLocal<Record<string, string>>(key, {}), [week]: at });
+  const { error } = await supabase.rpc("crew_attest_week", { p_week: week, p_minutes: Math.round(minutes) });
+  return error && !missing(error) ? error.message : "";
+}
+export function readMyAttestations(email: string) { return readLocal<Record<string, string>>(`clientready-attest:${email.toLowerCase()}`, {}); }
+export async function loadAttestations(week: string): Promise<Record<string, string>> {
+  const { data, error } = await supabase.from("crew_week_attestations").select("employee_id,attested_at").eq("week_start", week);
+  if (error) return {};
+  return Object.fromEntries(((data || []) as { employee_id: string; attested_at: string }[]).map((r) => [r.employee_id, r.attested_at]));
 }
 
 /** Owner: save (or clear with approvedAt null) day approvals. Hours only, never money. */
@@ -121,16 +182,25 @@ export async function saveApprovals(rows: DayApproval[]) {
   const all = readLocal<DayApproval[]>(KEY_APPROVALS, []);
   const keyOf = (a: DayApproval) => `${a.employeeId}|${a.date}`;
   const next = new Map(all.map((a) => [keyOf(a), a]));
+  const before = new Map(all.map((a) => [keyOf(a), a]));
   for (const row of rows) next.set(keyOf(row), row);
   writeLocal(KEY_APPROVALS, [...next.values()]);
+  for (const row of rows) {
+    const old = before.get(keyOf(row));
+    const action = row.approvedAt ? (old?.approvedAt && old.editedMinutes === row.editedMinutes ? "" : row.editedMinutes != null && row.editedMinutes !== old?.editedMinutes ? "edit_approve" : "approve") : old?.approvedAt ? "unapprove" : row.editedMinutes != null ? "edit" : "";
+    if (action) void logAudit({ action, employeeId: row.employeeId, date: row.date, oldValue: old ? { paidMinutes: old.paidMinutes, editedMinutes: old.editedMinutes ?? null, approved: Boolean(old.approvedAt) } : null, newValue: { paidMinutes: row.paidMinutes, editedMinutes: row.editedMinutes ?? null, approved: Boolean(row.approvedAt) } });
+  }
   const { data } = await supabase.auth.getUser();
   if (!data.user) return;
   const uid = data.user.id;
   await supabase.from("crew_day_approvals").upsert(rows.map((r) => ({ owner_id: uid, employee_id: r.employeeId, work_date: r.date, paid_minutes: r.paidMinutes, drive_minutes: r.driveMinutes, edited_minutes: r.editedMinutes ?? null, approved_at: r.approvedAt ?? null, changed_at: r.changedAt ?? null, updated_at: new Date().toISOString() })));
 }
 
-export async function decideFix(id: string, status: "approved" | "denied") {
-  const { error } = await supabase.from("crew_time_fixes").update({ status, decided_at: new Date().toISOString() }).eq("id", id);
+export async function decideFix(id: string, status: "approved" | "denied", note = "", fix?: FixRequest) {
+  const patch = { status, decided_at: new Date().toISOString() };
+  let { error } = await supabase.from("crew_time_fixes").update(note ? { ...patch, owner_note: note.slice(0, 300) } : patch).eq("id", id);
+  if (error && note && /owner_note|column|42703/i.test(`${error.message} ${error.code}`)) ({ error } = await supabase.from("crew_time_fixes").update(patch).eq("id", id));
+  void logAudit({ action: `fix_${status}`, employeeId: fix?.employeeId, date: fix?.date ?? null, oldValue: fix ? { kind: fix.kind, status: fix.status } : null, newValue: { kind: fix?.kind, at: fix?.at, status, note } });
   return error && !missing(error) ? error.message : "";
 }
 
@@ -139,4 +209,20 @@ export function directionsUrl(address: string) {
   const q = encodeURIComponent(address);
   const apple = typeof navigator !== "undefined" && /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) && "ontouchend" in document;
   return apple ? `https://maps.apple.com/?daddr=${q}&dirflg=d` : `https://www.google.com/maps/dir/?api=1&destination=${q}&travelmode=driving`;
+}
+
+/** Re-send taps that were saved only on this phone (offline). The server keeps an owner edit: a late tap on an
+ * approved day is flagged "changed since approved" for the owner instead of overwriting the approved hours. */
+export async function syncPendingTaps(email: string) {
+  const key = `${KEY_EVENTS}:${email.toLowerCase()}`;
+  const pending = readLocal<TapEvent[]>(key, []).filter((e) => e.pending);
+  let sent = 0;
+  for (const e of pending) { const r = await recordTap(e, email); if (!r.local) sent++; }
+  return { sent, left: pending.length - sent };
+}
+
+/** Worker: the account's time rules (no prices in them), so the phone shows the same breaks/rounding as the owner. */
+export async function loadMyTimeRules(): Promise<TimesheetSettings> {
+  const { data, error } = await supabase.rpc("crew_time_rules");
+  return readTimesheetSettings(error || !data ? {} : data);
 }
