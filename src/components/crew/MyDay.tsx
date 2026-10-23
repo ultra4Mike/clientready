@@ -7,10 +7,10 @@
  * Only this worker's own taps are written. No prices or pay are shown here, only minutes.
  */
 import { useEffect, useMemo, useState } from "react";
-import { attestWeek, currentPosition, directionsUrl, loadMyFixes, loadMyTaps, loadMyTimeRules, localDate, readMyAttestations, recordTap, requestFix, syncPendingTaps } from "@/lib/day-events";
+import { currentPosition, directionsUrl, loadMyFixes, loadMyTaps, loadMyTimeOverrides, loadMyTimeRules, localDate, recordTap, requestFix, syncPendingTaps } from "@/lib/day-events";
 import {
-  allowedTaps, buildDay, dayState, DEFAULT_TIMESHEET_SETTINGS, flagReasons, geofencePrompt, geofenceRadius, hm, isAllowed, metersBetween, stillDrivingDue,
-  type DayStateName, type FixRequest, type ScheduledJob, type TapEvent, type TapKind, type TimesheetSettings,
+  allowedTaps, buildDay, dayState, DEFAULT_TIMESHEET_SETTINGS, flagReasons, geofencePrompt, geofenceRadius, hm, isAllowed, metersBetween, nextActions, stillDrivingDue,
+  type DayStateName, type FixRequest, type WorkerTimeOverrides, type ScheduledJob, type TapEvent, type TapKind, type TimesheetSettings,
 } from "@/lib/timesheet";
 
 export type MyDayJob = { docId: string; label: string; address: string; date: string; startTime: string; endTime: string };
@@ -18,7 +18,7 @@ export const KIND_LABEL: Record<TapKind, string> = {
   start_day: "Started day", start_job: "Started job", start_transit: "Started driving", arrive: "Arrived at job",
   break_start: "Started break", break_end: "Ended break", end_day: "Ended day", end_shift: "Ended day",
 };
-const ACTION_LABEL: Record<Exclude<TapKind, "end_shift">, string> = {
+export const ACTION_LABEL: Record<Exclude<TapKind, "end_shift">, string> = {
   start_day: "Start day", start_job: "Start job", start_transit: "Start driving", arrive: "Arrived at job",
   break_start: "Start break", break_end: "End break", end_day: "End day",
 };
@@ -26,7 +26,7 @@ const STEPS = ["Travel", "Arrived", "Working", "Break", "Done"] as const;
 const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 const toIso = (date: string, hm5: string) => (date && /^\d{1,2}:\d{2}/.test(hm5) ? new Date(`${date}T${hm5.slice(0, 5)}:00`).toISOString() : "");
 const pins = new Map<string, { lat: number; lng: number } | null>();
-const weekStart = (d: Date) => { const x = new Date(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return localDate(x); };
+export const FIX_STATUS_LABEL: Record<FixRequest["status"], string> = { pending: "Pending", approved: "Approved", denied: "Declined" };
 
 async function jobPin(address: string) {
   if (!address) return null;
@@ -60,16 +60,16 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
   const [confirmTap, setConfirmTap] = useState<{ kind: TapKind; job?: MyDayJob } | null>(null);
   const [geoSheet, setGeoSheet] = useState<"arrive" | "leave" | null>(null);
   const [geoDismissed, setGeoDismissed] = useState("");
-  const [attested, setAttested] = useState<Record<string, string>>({});
+  const [confirmEnd, setConfirmEnd] = useState(false);
+  const [worker, setWorker] = useState<WorkerTimeOverrides>({});
   const [fixOpen, setFixOpen] = useState<{ eventId?: string; kind: TapKind; at: string; reason: string; docId?: string; date: string } | null>(null);
   const today = localDate(new Date(now));
   const yesterday = localDate(new Date(new Date(now).getTime() - 86400000));
-  const week = weekStart(new Date(now));
 
   useEffect(() => {
     if (!email) return;
     const load = () => { void loadMyTaps(email).then(setEvents); void loadMyFixes(email).then(setFixes); };
-    load(); void loadMyTimeRules().then(setRules); setAttested(readMyAttestations(email));
+    load(); void loadMyTimeRules().then(setRules); void loadMyTimeOverrides().then(setWorker);
     const online = () => void syncPendingTaps(email).then(load);
     window.addEventListener("online", online);
     void syncPendingTaps(email).then((r) => r.sent && load());
@@ -86,7 +86,7 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
   const current = plan.find((j) => j.docId === ds.docId);
   const next = plan.find((j) => !doneDocs.has(j.docId) && j.docId !== ds.docId);
   const schedule: ScheduledJob[] = plan.map((j) => ({ docId: j.docId, start: toIso(j.date, j.startTime), end: toIso(j.date, j.endTime), label: j.label })).filter((j) => j.start && j.end);
-  const sheet = buildDay({ employeeId: employeeId || "me", date: today, events: todays.map((e) => ({ ...e, employeeId: employeeId || "me" })), schedule, now, settings: rules });
+  const sheet = buildDay({ employeeId: employeeId || "me", date: today, events: todays.map((e) => ({ ...e, employeeId: employeeId || "me" })), schedule, now, settings: rules, worker });
   const askStillDriving = stillDrivingDue(todays, now, rules);
   const forgotYesterday = yesterdays.length > 0 && dayState(yesterdays).state !== "OFF_DUTY" && !fixes.some((f) => f.date === yesterday && (f.kind === "end_day" || f.kind === "end_shift"));
   const breakMs = state === "ON_BREAK" && ds.since ? new Date(now).getTime() - new Date(ds.since).getTime() : 0;
@@ -95,19 +95,22 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
   const breakDueAfter = rules.breakPreset === "california" ? 4.5 * 60 : rules.autoMealOn ? rules.autoMealAfterHours * 60 - 30 : 0;
   const breakDue = breakDueAfter > 0 && state === "WORKING" && !hadBreak && workedMin >= breakDueAfter;
   const firstPlanned = schedule[0]; const lastPlanned = schedule[schedule.length - 1];
-  const missedStart = state === "OFF_DUTY" && !todays.length && firstPlanned && new Date(now).getTime() > new Date(firstPlanned.start).getTime() + 15 * 60000;
-  const missedEnd = state !== "OFF_DUTY" && lastPlanned && new Date(now).getTime() > new Date(lastPlanned.end).getTime() + 60 * 60000;
-  const reminder = missedStart ? "Your first job was planned to start already. Tap Start day when you begin." : missedEnd ? "Your last job was planned to end over an hour ago. Still working? If not, tap End day." : breakDue ? (rules.breakPreset === "california" ? "Meal break due before your 5th hour. Tap Start break." : "Break due soon. Tap Start break.") : "";
+  const missedStart = state === "OFF_DUTY" && !todays.length && firstPlanned && new Date(now).getTime() > new Date(firstPlanned.start).getTime() + rules.remindMissedStartMinutes * 60000;
+  const missedEnd = state !== "OFF_DUTY" && lastPlanned && new Date(now).getTime() > new Date(lastPlanned.end).getTime() + rules.remindMissedEndMinutes * 60000;
+  const reminder = missedStart ? "Your first job was planned to start already. Tap Start day when you begin." : missedEnd ? `Your last job was planned to end over ${hm(rules.remindMissedEndMinutes)} ago. Still working? If not, tap End day.` : breakDue ? (rules.breakPreset === "california" ? "Meal break due before your 5th hour. Tap Start break." : "Break due soon. Tap Start break.") : "";
   const allowed = allowedTaps(state);
   const pendingCount = todays.filter((e) => e.pending).length;
 
-  // Primary next step: one big button.
-  const primary: { kind: Exclude<TapKind, "end_shift">; job?: MyDayJob; label: string } | null =
-    state === "OFF_DUTY" ? (todays.length ? null : { kind: "start_day", label: "Start day" })
-    : state === "ON_DUTY_IDLE" ? (next || plan[0] ? { kind: "start_transit", job: next || plan[0], label: `Start driving to ${(next || plan[0])!.label}` } : { kind: "start_job", label: "Start job" })
-    : state === "IN_TRANSIT" ? { kind: "arrive", job: current || next, label: `Arrived${current || next ? ` · ${(current || next)!.label}` : ""}` }
-    : state === "WORKING" ? (next ? { kind: "start_transit", job: next, label: `Start driving to ${next.label}` } : null)
-    : { kind: "break_end", label: "End break" };
+  // Primary next step: one big button (the engine's first valid action; End day is never primary).
+  const actions = nextActions(state, { hasNextJob: Boolean(next), tapsToday: todays.length });
+  const pa = actions.find((x) => x.primary);
+  const target = next || plan[0];
+  const arriveAt = current || next;
+  const primary: { kind: Exclude<TapKind, "end_shift">; job?: MyDayJob; label: string } | null = !pa ? null
+    : pa.kind === "start_transit" ? { kind: pa.kind, job: target, label: target ? `Start driving to ${target.label}` : "Start driving" }
+    : pa.kind === "arrive" ? { kind: pa.kind, job: arriveAt, label: `Arrived${arriveAt ? ` · ${arriveAt.label}` : ""}` }
+    : pa.kind === "start_job" ? { kind: pa.kind, job: target, label: target ? `Start job · ${target.label}` : "Start job" }
+    : { kind: pa.kind, label: ACTION_LABEL[pa.kind] };
 
   // Foreground reminders and the geofence prompt (only while the app is open; never blocks).
   useEffect(() => {
@@ -125,11 +128,13 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
       if (!pos) { setLocDenied(true); return; }
       setLocDenied(false);
       const pin = await jobPin(target.address);
-      const p = geofencePrompt(state, pos, pin, geofenceRadius(rules, target.docId));
+      const radius = geofenceRadius(rules, target.docId, worker);
+      if (radius <= 0) return; // geofence off for this worker/job: no prompts
+      const p = geofencePrompt(state, pos, pin, radius);
       if (!off && p && geoDismissed !== `${p}:${target.docId}:${state}`) setGeoSheet(p);
     })();
     return () => { off = true; };
-  }, [now, state, current, next, rules, geoDismissed]);
+  }, [now, state, current, next, rules, worker, geoDismissed]);
 
   async function tap(kind: TapKind, job?: MyDayJob, confirmed = false) {
     if (busy) return;
@@ -140,8 +145,8 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
     setLocDenied(!pos);
     let notAtSite = false;
     if (kind === "start_job" || kind === "arrive") {
-      if (!pos) notAtSite = true;
-      else { const pin = job ? await jobPin(job.address) : null; if (pin && metersBetween(pos, pin) > geofenceRadius(rules, job?.docId)) notAtSite = true; }
+      if (!pos) notAtSite = geofenceRadius(rules, job?.docId, worker) > 0;
+      else { const pin = job ? await jobPin(job.address) : null; const radius = geofenceRadius(rules, job?.docId, worker); if (pin && radius > 0 && metersBetween(pos, pin) > radius) notAtSite = true; }
     }
     if (kind === "start_transit" && job?.address) window.open(directionsUrl(job.address), "_blank", "noopener");
     if (typeof Notification !== "undefined" && Notification.permission === "default") void Notification.requestPermission().catch(() => undefined);
@@ -160,14 +165,6 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
     setNote(error ? `Could not send: ${error}` : "Time fix sent to your boss.");
   }
 
-  async function attest() {
-    const dates = [...new Set(events.filter((e) => e.date >= week && e.date <= today).map((e) => e.date))];
-    const weekMin = dates.reduce((sum, d) => sum + buildDay({ employeeId: employeeId || "me", date: d, events: events.filter((e) => e.date === d), schedule: d === today ? schedule : [], now, settings: rules }).paidMinutes, 0);
-    const error = await attestWeek(week, weekMin, email);
-    setAttested(readMyAttestations(email));
-    setNote(error ? `Saved on this phone: ${error}` : "Thanks. Your hours for this week are confirmed.");
-  }
-
   const steps = stepStates(state, todays);
   const reasons = flagReasons(sheet, [], rules);
   const paidBreak = sheet.breaks.filter((b) => b.paid).reduce((s, b) => s + b.minutes, 0);
@@ -181,7 +178,7 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
         <span data-testid="my-day-state" data-state={state} className="cr-chip2 cr-tone-teal">{stateText}</span>
       </div>
       {forgotYesterday && (
-        <div data-testid="forgot-end" className="cr-panel cr-tone-warn space-y-2 text-sm">
+        <div data-testid="forgot-end" data-state="warn" className="cr-panel cr-tone-warn space-y-2 text-sm">
           <p className="font-semibold">Forgot to end your day yesterday?</p>
           <button data-testid="forgot-end-fix" className="cr-btn cr-btn-secondary" onClick={() => setFixOpen({ kind: "end_day", at: "", reason: "Forgot to tap End day", date: yesterday, docId: yesterdays[yesterdays.length - 1]?.docId })}>Tell your boss when you finished</button>
         </div>
@@ -193,16 +190,16 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
       {askStillDriving && <p data-testid="still-driving" className="cr-panel cr-tone-warn text-sm font-semibold">Still driving? Tap “Arrived” when you get there, or “End day”. If not, your day ends at your last stop.</p>}
       {locDenied && <p data-testid="location-denied" data-state="denied" className="cr-panel cr-tone-warn text-sm">Location is off. Your taps still save; they are marked for your boss to check. Turn on location for this site to skip that.</p>}
       {primary && (
-        <button data-testid="tap-primary" data-kind={primary.kind} disabled={busy} className="cr-btn cr-btn-primary min-h-14 w-full text-lg font-bold" onClick={() => tap(primary.kind, primary.job)}>{primary.label}</button>
+        <button data-testid="tap-primary" data-kind={primary.kind} disabled={busy} className="cr-btn cr-btn-primary min-h-14! w-full text-lg font-bold" onClick={() => tap(primary.kind, primary.job)}>{primary.label}</button>
       )}
       {(allowed.includes("break_start") || state === "ON_BREAK") && (
         <button data-testid="tap-break" data-state={state === "ON_BREAK" ? "on" : "off"} disabled={busy} className="cr-btn cr-btn-secondary w-full" onClick={() => tap(state === "ON_BREAK" ? "break_end" : "break_start")}>
-          {state === "ON_BREAK" ? <>On break <span data-testid="break-timer">{Math.floor(breakMs / 60000)}:{String(Math.floor((breakMs % 60000) / 1000)).padStart(2, "0")}</span>{breakMs / 60000 < rules.shortBreakPaidMinutes ? ` · paid under ${rules.shortBreakPaidMinutes} min` : " · unpaid"}</> : "Start break"}
+          {state === "ON_BREAK" ? <>On break <span data-testid="break-timer" className="tabular-nums">{Math.floor(breakMs / 60000)}:{String(Math.floor((breakMs % 60000) / 1000)).padStart(2, "0")}</span>{breakMs / 60000 < rules.shortBreakPaidMinutes ? ` · paid under ${rules.shortBreakPaidMinutes} min` : " · unpaid"}</> : "Start break"}
         </button>
       )}
       {note && <p data-testid="my-day-note" role="status" className="text-sm">{note}</p>}
-      <div data-testid="my-day-totals" className="cr-stat-row grid grid-cols-2 gap-2 text-sm">
-        <p data-testid="my-day-hours">Today: <b>{hm(sheet.paidMinutes)}</b> paid</p>
+      <div data-testid="my-day-totals" className="cr-stat-row grid grid-cols-2 gap-2 text-sm tabular-nums">
+        <p data-testid="my-day-hours">Today: <b className="tabular-nums">{hm(sheet.paidMinutes)}</b> paid · day total <b data-testid="my-day-total" className="tabular-nums">{hm(sheet.paidMinutes + sheet.breakMinutes + sheet.unpaidGapMinutes)}</b></p>
         <p data-testid="my-day-breaks">Breaks: <b>{hm(sheet.breakMinutes + paidBreak)}</b> ({hm(paidBreak)} paid, {hm(sheet.breakMinutes)} unpaid)</p>
         {sheet.driveMinutes > 0 && <p data-testid="my-day-drive">Driving: {hm(sheet.driveMinutes)}</p>}
         {sheet.unpaidGapMinutes > 0 && <p data-testid="my-day-unpaid">Unpaid gaps: {hm(sheet.unpaidGapMinutes)}</p>}
@@ -228,7 +225,13 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
         <button className="cr-btn-text mt-2" data-testid="fix-missing" onClick={() => setFixOpen({ kind: "start_day", at: "", reason: "", docId: plan[0]?.docId, date: today })}>Forgot to tap? Ask for a time fix</button>
       </details>
       {state !== "OFF_DUTY" && (
-        <div className="border-t pt-3"><button data-testid="tap-end-day" disabled={busy} className="cr-btn cr-btn-secondary w-full" onClick={() => tap("end_day")}>End day</button></div>
+        <div className="border-t pt-3"><button data-testid="tap-end-day" data-state="destructive" disabled={busy} className="cr-btn cr-btn-secondary cr-tone-bad w-full" onClick={() => setConfirmEnd(true)}>End day</button></div>
+      )}
+      {confirmEnd && (
+        <div data-testid="confirm-end" role="dialog" className="cr-panel cr-tone-warn space-y-2 text-sm">
+          <p>End your day now? After this, new taps today are flagged for your boss.</p>
+          <div className="flex gap-2"><button data-testid="confirm-end-yes" className="cr-btn cr-btn-primary min-h-11 flex-1" onClick={() => { setConfirmEnd(false); void tap("end_day"); }}>Yes, end my day</button><button data-testid="confirm-end-no" className="cr-btn cr-btn-secondary min-h-11" onClick={() => setConfirmEnd(false)}>Keep working</button></div>
+        </div>
       )}
       {confirmTap && (
         <div data-testid="confirm-tap" role="dialog" className="cr-panel cr-tone-warn space-y-2 text-sm">
@@ -240,8 +243,8 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
         <div data-testid="geo-sheet" data-kind={geoSheet} role="dialog" className="cr-actionbar fixed inset-x-0 bottom-0 z-40 space-y-2 p-4">
           <p className="font-semibold">{geoSheet === "arrive" ? "Arrived at the job?" : "Left the job site?"}</p>
           <div className="flex gap-2">
-            <button data-testid="geo-sheet-yes" className="cr-btn cr-btn-primary min-h-14 flex-1" onClick={() => geoSheet === "arrive" ? tap("arrive", current || next) : tap(next ? "start_transit" : "end_day", next)}>{geoSheet === "arrive" ? "Yes, I'm here" : next ? `Driving to ${next.label}` : "End day"}</button>
-            <button data-testid="geo-sheet-no" className="cr-btn cr-btn-secondary min-h-14 flex-1" onClick={() => { setGeoDismissed(`${geoSheet}:${(current || next)?.docId}:${state}`); setGeoSheet(null); }}>Not yet</button>
+            <button data-testid="geo-sheet-yes" className="cr-btn cr-btn-primary min-h-14! flex-1" onClick={() => geoSheet === "arrive" ? tap("arrive", current || next) : tap(next ? "start_transit" : "end_day", next)}>{geoSheet === "arrive" ? "Yes, I'm here" : next ? `Driving to ${next.label}` : "End day"}</button>
+            <button data-testid="geo-sheet-no" className="cr-btn cr-btn-secondary min-h-14! flex-1" onClick={() => { setGeoDismissed(`${geoSheet}:${(current || next)?.docId}:${state}`); setGeoSheet(null); }}>Not yet</button>
           </div>
         </div>
       )}
@@ -249,25 +252,22 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
         <div data-testid="fix-form" className="cr-panel space-y-2">
           <p className="text-sm">Day: {fixOpen.date}</p>
           <label className="block text-sm"><span className="cr-section-label">What</span>
-            <select className="mt-1 block min-h-11 w-full rounded-lg border bg-transparent px-2" value={fixOpen.kind} onChange={(e) => setFixOpen({ ...fixOpen, kind: e.target.value as TapKind })}>
+            <select data-testid="fix-kind" className="mt-1 block min-h-11 w-full rounded-lg border bg-transparent px-2" value={fixOpen.kind} onChange={(e) => setFixOpen({ ...fixOpen, kind: e.target.value as TapKind })}>
               {(Object.keys(ACTION_LABEL) as Exclude<TapKind, "end_shift">[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
             </select></label>
           <label className="block text-sm"><span className="cr-section-label">Correct time</span><input data-testid="fix-at" type="time" className="mt-1 block min-h-11 w-full rounded-lg border bg-transparent px-2" value={fixOpen.at} onChange={(e) => setFixOpen({ ...fixOpen, at: e.target.value })} /></label>
           <label className="block text-sm"><span className="cr-section-label">Reason</span><input data-testid="fix-reason" maxLength={300} className="mt-1 block min-h-11 w-full rounded-lg border bg-transparent px-2" value={fixOpen.reason} onChange={(e) => setFixOpen({ ...fixOpen, reason: e.target.value })} /></label>
-          <div className="flex gap-2"><button data-testid="fix-send" disabled={!fixOpen.reason.trim() || !fixOpen.at} className="cr-btn cr-btn-primary flex-1" onClick={sendFix}>Send to boss</button><button className="cr-btn cr-btn-secondary" onClick={() => setFixOpen(null)}>Cancel</button></div>
+          <div className="flex gap-2"><button data-testid="fix-send" disabled={!fixOpen.reason.trim() || !fixOpen.at} className="cr-btn cr-btn-primary flex-1" onClick={sendFix}>Send to boss</button><button data-testid="fix-cancel" className="cr-btn cr-btn-secondary" onClick={() => setFixOpen(null)}>Cancel</button></div>
         </div>
       )}
       {fixes.length > 0 && (
-        <ul data-testid="fix-history" className="space-y-1 text-xs">
-          {fixes.slice(-5).map((f) => (
-            <li key={f.id} data-testid="fix-status" data-state={f.status}>{f.date} · {KIND_LABEL[f.kind]} → {time(f.at)} · <span className={`cr-chip2 ${f.status === "approved" ? "cr-tone-good" : f.status === "denied" ? "cr-tone-bad" : "cr-tone-warn"}`}>{f.status === "pending" ? "waiting" : f.status}</span>{f.ownerNote ? <span data-testid="fix-owner-note"> · Boss: “{f.ownerNote}”</span> : null}</li>
+        <ul data-testid="fix-history" className="space-y-1 text-xs"><li className="cr-section-label">My time fixes</li>
+          {[...fixes].sort((x, y) => y.createdAt.localeCompare(x.createdAt)).slice(0, 10).map((f) => (
+            <li key={f.id} data-testid="fix-status" data-fix-id={f.id} data-state={f.status}>{f.date} · {KIND_LABEL[f.kind]} → {time(f.at)} · <span className={`cr-chip2 ${f.status === "approved" ? "cr-tone-good" : f.status === "denied" ? "cr-tone-bad" : "cr-tone-warn"}`}>{FIX_STATUS_LABEL[f.status]}</span>{f.ownerNote ? <span data-testid="fix-owner-note"> · Boss: “{f.ownerNote}”</span> : null}</li>
           ))}
         </ul>
       )}
-      <div data-testid="attest" data-state={attested[week] ? "done" : "open"} className="text-sm">
-        {attested[week] ? <p>Week confirmed {new Date(attested[week]).toLocaleString()}.</p>
-          : <button data-testid="attest-week" className="cr-btn cr-btn-text" onClick={attest}>I confirm my hours this week are correct</button>}
-      </div>
+      <a href="/crew?tab=hours" data-testid="my-day-week-link" className="cr-btn cr-btn-text text-sm">My week and confirm hours ›</a>
     </section>
   );
 }

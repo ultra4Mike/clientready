@@ -10,6 +10,7 @@ import CrewDaysOff from "@/components/CrewDaysOff";
 import { CREW_KINDS, EXTRA_PREFIX, crewKindLabel, legacySummary, type CostLine, type CrewKind } from "@/lib/cost-categories";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import MyDay from "@/components/crew/MyDay";
+import MyWeek from "@/components/crew/MyWeek";
 import { supabase } from "@/lib/supabase";
 import { crewMarkDone, crewCheckItem, crewOnMyWay, omwTime, crewSetJobStatus, onMyWaySmsHref, STATUS_CLASS, STATUS_LABEL, type JobStatus } from "@/lib/schedule";
 import { compressPhoto } from "@/lib/photos";
@@ -185,7 +186,7 @@ export default function CrewPage() {
   // Redesign 5: /crew?job=<doc id> opens one job's detail screen (no prices or pay).
   const [detailId, setDetailId] = useState("");
   useEffect(() => {
-    const read = () => setDetailId(new URLSearchParams(window.location.search).get("job") || "");
+    const read = () => { const q = new URLSearchParams(window.location.search); setDetailId(q.get("job") || ""); const t = q.get("tab"); if (t === "today" || t === "week" || t === "hours" || t === "reports") setTab(t); };
     read();
     window.addEventListener("popstate", read);
     return () => window.removeEventListener("popstate", read);
@@ -392,8 +393,6 @@ export default function CrewPage() {
   });
   const weekClocked = hoursByDay.reduce((sum, item) => sum + item.clocked, 0);
   const weekLogged = hoursByDay.reduce((sum, item) => sum + item.logged, 0);
-  const paidRows = jobs.filter((job) => job.status === "paid" && !job.id.includes("-sched-"));
-  const confirmedPay = paidRows.reduce((sum, job) => sum + (Number(job.pay) || 0), 0);
 
   async function saveExpense(card: Card) {
     if (!spend.amount.trim()) return setMessage("Add the amount you spent.");
@@ -668,7 +667,7 @@ export default function CrewPage() {
                 <button type="button" disabled={busy !== ""} data-testid={`clock-out-there-${open.doc_id}`} onClick={() => clockTap("clock-out", open.doc_id)} className="mt-1 min-h-11 rounded-xl border border-amber-500 px-3 py-2 text-sm font-semibold">Clock out there</button>
               </div>
             ) : (
-              <button type="button" disabled={busy !== "" || Boolean(open)} data-testid={`clock-in-${card.doc_id}`} onClick={() => clockTap("clock-in", card.doc_id)} className="min-h-11 shrink-0 rounded-xl bg-teal-500 px-4 py-2 font-semibold text-slate-950! disabled:opacity-40">Clock in</button>
+              <a href="/crew?tab=today" data-testid={`clock-use-myday-${card.doc_id}`} className="cr-btn cr-btn-secondary min-h-11 shrink-0">Use My day</a>
             )}
           </div>
           {mine.length > 0 && (
@@ -840,8 +839,8 @@ export default function CrewPage() {
                 {card.client_address && <p className="mt-1 text-sm">{card.client_address}</p>}
                 {running
                   ? <button type="button" disabled={busy !== ""} data-testid="crew-detail-clock-out" onClick={() => clockTap("clock-out", card.doc_id)} className="cr-btn mt-3 w-full bg-amber-500 py-4 text-lg text-slate-950!" style={{ minHeight: "3.75rem" }}>Clock out</button>
-                  : <button type="button" disabled={busy !== "" || Boolean(otherOpen) || Boolean(card.done_confirmed)} data-testid="crew-detail-start" onClick={() => clockTap("clock-in", card.doc_id)} className="cr-btn cr-btn-primary mt-3 w-full py-4 text-lg" style={{ minHeight: "3.75rem" }}>Start · Clock in</button>}
-                {otherOpen && !running && <p className="mt-1 text-xs text-[var(--cr-muted)]" data-testid="crew-detail-other-open">Clock out of your other job first.</p>}
+                  : <a href="/crew?tab=today" data-testid="crew-detail-start" className="cr-btn cr-btn-primary mt-3 flex min-h-14 w-full items-center justify-center text-lg">Tap your time in My day</a>}
+                {otherOpen && !running && <p className="mt-1 text-xs text-[var(--cr-muted)]" data-testid="crew-detail-other-open">An old clock-in is still open on another job. Clock out there.</p>}
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   {mapUrl ? <a href={mapUrl} target="_blank" rel="noreferrer" data-testid="crew-detail-map" className="cr-btn cr-btn-secondary">Map</a> : <span className="cr-btn cr-btn-secondary opacity-50" aria-disabled="true">Map</span>}
                   {phone ? <a href={`tel:${phone}`} data-testid="crew-detail-call" className="cr-btn cr-btn-secondary">Call</a> : <span className="cr-btn cr-btn-secondary opacity-50" aria-disabled="true">Call</span>}
@@ -945,10 +944,11 @@ export default function CrewPage() {
           </section>
         )}
 
+        {!detailId && tab === "hours" && email && <MyWeek email={email} employeeId={employeeId} clock={clock} />}
         {!detailId && tab === "hours" && (
           <section className={cardClass} data-testid="my-hours">
-            <h2 className="text-lg font-bold tracking-tight">My hours this week</h2>
-            <p className="text-xs text-[var(--cr-muted)]">Clocked is from your clock in/out. Pay sheet is what your boss logged for pay.</p>
+            <h2 className="text-lg font-bold tracking-tight">Logged hours this week</h2>
+            <p className="text-xs text-[var(--cr-muted)]">Clocked is from the old per-job clock in/out. Pay sheet is the hours your boss logged.</p>
             <table className="mt-4 w-full table-fixed text-sm"><colgroup><col /><col className="w-24" /><col className="w-24" /></colgroup>
               <thead><tr className="text-left text-xs uppercase tracking-wide text-[var(--cr-muted)]"><th className="px-2 py-2 font-semibold">Day</th><th className="px-2 py-2 text-right font-semibold">Clocked</th><th className="px-2 py-2 text-right font-semibold">Pay sheet</th></tr></thead>
               <tbody>
@@ -964,11 +964,6 @@ export default function CrewPage() {
                 <tr className="border-t border-teal-500/30 font-semibold" data-testid="hours-total"><td className="px-2 py-2">Total</td><td className="px-2 py-2 text-right tabular-nums">{fmtHours(weekClocked)}</td><td className="px-2 py-2 text-right tabular-nums">{weekLogged.toFixed(2)} h</td></tr>
               </tfoot>
             </table>
-            <div className="mt-5 rounded-xl bg-teal-500/10 p-4 text-sm">
-              <p className="text-xs text-[var(--cr-muted)]">Your confirmed pay (jobs marked paid)</p>
-              <p className="mt-1 text-2xl font-bold tabular-nums">${confirmedPay.toFixed(2)}</p>
-              <p className="text-xs text-[var(--cr-muted)]">Only you can see this. A scheduled job is not pay yet.</p>
-            </div>
           </section>
         )}
 
