@@ -14,7 +14,7 @@ import JobDonePanel from "@/components/JobDonePanel";
 import { StageEditor, StageSchedule } from "@/components/StageSchedule";
 import { balanceLabel, readStages, type Stage } from "@/lib/stages";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { saveCloudDocument } from "@/lib/cloud-docs";
+import { deleteCloudDocument, saveCloudDocument } from "@/lib/cloud-docs";
 import { displayStatus, jobMessageKind, rowStage } from "@/lib/doc-status";
 import InventoryUse, { type StockUse } from "@/components/InventoryUse";
 import { OwnerVisitNotes } from "@/components/CrewVisitNote";
@@ -83,6 +83,8 @@ import SignaturePad, { SignatureBlock } from "@/components/SignaturePad";
 import { readSignature, type Signature } from "@/lib/signature";
 import { amountOf, documentTotals, discountLabel, normalizeDiscountType, type DiscountType } from "@/lib/discount";
 import DocTrail from "@/components/DocTrail";
+import ChangeOrderPanel from "@/components/ChangeOrderPanel";
+import { isEmptyDraftChangeOrder } from "@/lib/change-order-summary";
 
 type LineItem = { description: string; qty: string; rate: string; category?: LineCategory };
 type SavedClient = { id: string; name: string; company: string; email: string; phone: string; address: string; preferences?: string; contactMethod?: string };
@@ -1082,6 +1084,18 @@ export default function NewInvoicePage() {
     window.location.href = `/invoice?id=${encodeURIComponent(draftId)}`;
   }
 
+  /** Owner-confirmed delete of an empty $0 draft change order (never automatic). Only removes that draft. */
+  function deleteEmptyDraft() {
+    const docs = docsForStage() as SavedDocument[];
+    const me = docs.find((d) => d.id === docId);
+    if (!me || !isEmptyDraftChangeOrder(me as never)) { setSaveMessage("Only an empty $0 draft change order can be deleted here."); return; }
+    if (!window.confirm(`Delete empty draft ${String(me.data?.invoiceNumber || me.title)}? It has no lines, no amount and no payments. The original invoice is not changed.`)) return;
+    window.localStorage.setItem("clientready-documents", JSON.stringify(docs.filter((d) => d.id !== docId)));
+    void deleteCloudDocument(docId);
+    const to = readChangeOrderOf(me.data?.changeOrderOf)?.id;
+    window.location.href = to ? `/invoice?id=${encodeURIComponent(to)}` : "/documents";
+  }
+
   /** New draft invoice copied from the saved version of this invoice. The original is not changed. */
   // R122: one change order per click; the button stays disabled until we navigate to it.
   const changeOrderBusy = useRef(false);
@@ -1265,6 +1279,7 @@ export default function NewInvoicePage() {
       <RestoreDraftBanner draft={draft.restorable} onRestore={restoreDraft} onDiscard={draft.discard} status={draft.status} conflict={Boolean(draft.conflict)} onResolve={(choice) => { void draft.resolve(choice).then((theirs) => { if (theirs) restoreFrom(theirs as never); }); }} />
       <FormDraft form="job-message" id={docId} enabled={formReady && Boolean(docId)} value={jobMsg || { kind: "", text: "" }} blank={{ kind: "", text: "" }} onRestore={(v) => setJobMsg(v.kind ? v : null)} what="message to the client" />
       <DocTrail docs={docsForStage() as never} currentId={docId} />
+      {!isProposal && <ChangeOrderPanel docs={docsForStage() as never} currentId={docId} onDeleteDraft={deleteEmptyDraft} />}
       <div className="print-hide mb-6 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0" data-testid="doc-stage" data-stage={docStage.stage} data-next-action={docStage.next}>

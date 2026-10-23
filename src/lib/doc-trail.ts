@@ -6,6 +6,7 @@
 import { jobChain } from "@/lib/job-chain";
 import { readChangeOrderOf } from "@/lib/change-orders";
 import { readRecurringFrom } from "@/lib/recurring";
+import { isEmptyDraftChangeOrder } from "@/lib/change-order-summary";
 
 type Doc = { id: string; type: string; title: string; clientName?: string; createdAt?: string; data?: Record<string, unknown> };
 export type TrailRole = "recurring-parent" | "proposal" | "invoice" | "change-order" | "recurring-copy";
@@ -32,7 +33,8 @@ export function docTrail<T extends Doc>(allDocs: T[], id: string): TrailItem<T>[
   add(chain.quote, "proposal");
   add(chain.invoice, "invoice");
   [...chain.changeOrders].sort(byDate).forEach((co) => add(co, "change-order"));
-  const main = out.filter((i) => i.role !== "recurring-parent");
+  // LATEST = newest real document: an empty $0 draft change order never wins.
+  const main = out.filter((i) => i.role !== "recurring-parent" && !(i.role === "change-order" && isEmptyDraftChangeOrder(i.doc)));
   if (main.length) main[main.length - 1].latest = true;
   if (chain.invoice) docs.filter((d) => d.type === "invoice" && readRecurringFrom(d.data?.recurringFrom)?.id === chain.invoice!.id).sort(byDate).forEach((c) => add(c, "recurring-copy"));
   return out;

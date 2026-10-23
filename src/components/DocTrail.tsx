@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { docAmounts } from "@/lib/doc-stage";
 import { displayStatus } from "@/lib/doc-status";
 import { docTrail } from "@/lib/doc-trail";
+import { isEmptyDraftChangeOrder } from "@/lib/change-order-summary";
 import { docHref } from "@/lib/job-chain";
 
 type Doc = { id: string; type: string; title: string; clientName?: string; createdAt?: string; data?: Record<string, unknown> };
@@ -27,7 +28,7 @@ export default function DocTrail({ docs, currentId, hrefFor = docHref, light = f
         {trail.map((item, index) => {
           const current = item.doc.id === currentId;
           const { total } = docAmounts(item.doc);
-          const status = displayStatus(item.doc as never, docs as never).label;
+          const status = isEmptyDraftChangeOrder(item.doc) ? "Empty draft" : displayStatus(item.doc as never, docs as never).label;
           const note = item.role === "change-order" && original ? `Change order to ${original.number}` : item.role === "invoice" && cos.length ? `Change orders: ${cos.map((c) => c.number).join(", ")}` : item.role === "recurring-parent" ? "Recurring from" : item.role === "recurring-copy" ? "Recurring copy" : "";
           return (
             <li key={item.doc.id} className="flex shrink-0 snap-start items-center gap-2">
