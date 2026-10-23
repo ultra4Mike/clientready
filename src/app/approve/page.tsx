@@ -7,6 +7,7 @@ import { amountOf, documentTotals, discountLabel } from "@/lib/discount";
 import { grossPaid, isRefundRow, owedAfterRefunds, paidTotal, readPayments, refundedTotal, refundWording } from "@/lib/payments";
 import { readPhotos } from "@/lib/photos";
 import { readSignature } from "@/lib/signature";
+import { needsCoSignature } from "@/lib/co-signature";
 import { payUrlFor } from "@/lib/pay-link";
 import { JobPhotoStrip } from "@/components/JobPhotos";
 import { SignatureBlock } from "@/components/SignaturePad";
@@ -246,7 +247,9 @@ export default function ApprovePage() {
   const approved = approval?.status === "approved";
   // R128: only proposals (and change orders sent for approval) need the client's approval. A plain
   // invoice is payable right away, whatever an old link's approval block says.
-  const needsApproval = isProposal || (Boolean(changeOrderOf?.number) && Boolean(approval));
+  // User: a sent change order not yet signed/approved asks the client to review and sign (portal approve creates the approval).
+  const coNeedsSign = !isProposal && needsCoSignature({ type: "invoice", data: { ...data, approval: approval || data.approval } });
+  const needsApproval = isProposal || (Boolean(changeOrderOf?.number) && (Boolean(approval) || (Boolean(portal) && coNeedsSign)));
   const today = todayYmd();
   const jobDone = visit?.status === "done" && Boolean(visit.date) && visit.date <= today;
   const stages = isProposal ? [] : readStages(data.stages);
@@ -402,6 +405,11 @@ export default function ApprovePage() {
           )}
         </div>
 
+        {coNeedsSign && !approved && (
+          <div role="status" data-testid="portal-co-sign-prompt" className="print-hide rounded-2xl border border-amber-400 bg-amber-50 p-4 text-sm font-semibold text-amber-900 sm:p-5">
+            ✍ Please review and sign this change. {number} updates your earlier {changeOrderOf?.number ? `invoice ${changeOrderOf.number}` : "invoice"}{(Boolean(portal) || approval) ? "; sign below to approve it." : "; contact us to approve it."}
+          </div>
+        )}
         {needsApproval && (
           <div className="print-hide rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm sm:p-5" data-testid="approve-panel">
             {approved ? (

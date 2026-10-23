@@ -1,5 +1,6 @@
 "use client";
 
+import { needsCoSignature } from "@/lib/co-signature";
 import TimeAttentionCard from "@/components/timesheet/TimeAttentionCard";
 import { profitAlertJobs, readMinMargin } from "@/lib/profit-alerts";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -376,6 +377,16 @@ export default function DashboardPage() {
           <section className="min-w-0 space-y-3 md:order-3" data-testid="dash-cell-attention" aria-label="Needs attention">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Needs attention</h2>
           <TimeAttentionCard />
+          {loaded && (() => {
+            const unsigned = documents.filter((doc) => needsCoSignature(doc as never));
+            if (!unsigned.length) return null;
+            return (
+              <div data-testid="dash-needs-signature" data-count={unsigned.length} className="space-y-1 rounded-xl border border-amber-400/60 bg-amber-500/10 px-4 py-3 text-sm">
+                <p className="font-semibold text-amber-800 dark:text-amber-200">✍ Needs signature: {unsigned.length} change order{unsigned.length === 1 ? "" : "s"} waiting on the customer</p>
+                {unsigned.slice(0, 5).map((doc) => <a key={doc.id} href={`/invoice?id=${encodeURIComponent(String(doc.id))}`} className="flex min-h-11 items-center underline">{String((doc.data as Record<string, unknown> | undefined)?.invoiceNumber || doc.title || "Change order")}: needs customer signature</a>)}
+              </div>
+            );
+          })()}
           {(auto.sent.length > 0 || auto.errors.length > 0) && (
             <div className={`space-y-2 rounded-xl border px-4 py-3 text-sm ${auto.errors.length ? "border-rose-300/70" : "cr-tone-good border-emerald-300 bg-emerald-50 text-emerald-800"}`} data-testid="auto-sent" data-count={auto.sent.length}>
               {auto.sent.length > 0 && <p className="flex items-start gap-2 font-medium text-emerald-800 dark:text-emerald-200"><span aria-hidden="true">✓</span><span className="min-w-0 break-words">Sent automatically: {auto.sent.map((item) => `${item.kind === "done" ? "invoice" : "reminder"} to ${item.to}`).join("; ")}</span></p>}

@@ -77,6 +77,7 @@ import { followDueDate } from "@/lib/stages";
 import { effectiveDueDate } from "@/lib/payments";
 import OverlapBadge from "@/components/OverlapBadge";
 import { bookingConflicts, clockText, readOverrides, type Conflict, type Override } from "@/lib/conflicts";
+import { coSignatureBanner } from "@/lib/co-signature";
 import { approvalBadgeApplies, readApproval, refreshApproval, type Approval } from "@/lib/approval";
 import { numberForKind } from "@/lib/doc-numbers";
 import { generateNextNow, readRecurring, readRecurringFrom, scheduleFromForm, type Frequency, type RecurringFrom } from "@/lib/recurring";
@@ -1884,6 +1885,14 @@ export default function NewInvoicePage() {
               />
             </div>
           )}
+          {(() => {
+            // User: a sent change order needs the customer's new signature (signatures never carry over).
+            if (isProposal || !changeOrderOf) return null;
+            let docs: { id?: string; type?: string; data?: Record<string, unknown> }[] = [];
+            try { if (typeof window !== "undefined") docs = JSON.parse(window.localStorage.getItem("clientready-documents") || "[]"); } catch { docs = []; }
+            const text = coSignatureBanner(docs, { id: docId, type: "invoice", data: { status, signature, approval, changeOrderOf, ...(revision ? { coMode: revision.coMode, revises: revision.revises } : {}) } });
+            return text ? <div role="status" data-testid="co-signature-banner" className="cr-tone-warn print-hide mb-3 rounded-xl border border-amber-400 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">✍ {text}.</div> : null;
+          })()}
           <div id="preview" className={`${previewClass} relative`}>
             {!isProposal && totals.total > 0 && totals.balance <= 0.004 && status !== "draft" && <div aria-label="Paid" data-testid="paid-stamp" className="pointer-events-none absolute right-6 top-24 rotate-[-12deg] rounded-lg border-4 border-emerald-600 px-4 py-1 text-3xl font-black tracking-widest text-emerald-600 opacity-80">PAID</div>}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">

@@ -9,6 +9,7 @@ import { fetchCloudDocuments, deleteCloudDocument, getUserId } from "@/lib/cloud
 import { mergeDocs, OWNER_KEY } from "@/lib/doc-sync";
 import { runDueRecurring } from "@/lib/recurring";
 import { ApprovalBadge } from "@/components/Approval";
+import { needsCoSignature } from "@/lib/co-signature";
 import { approvalBadgeApplies, readApproval } from "@/lib/approval";
 import { DocumentsViewTabs } from "@/components/ViewTabs";
 import AppShell from "@/components/AppShell";
@@ -397,6 +398,7 @@ export default function DocumentsPage({ initialView = "all" }: { initialView?: "
                 {NEXT_LABEL[stageOf(doc).next] ? <span className="text-teal-700 dark:text-teal-300">Next: {NEXT_LABEL[stageOf(doc).next]}</span> : null}
               </p>
               {(() => { const approval = readApproval(doc.data?.approval); return approvalBadgeApplies(doc, approval) ? <ApprovalBadge approval={approval} className="mt-1" /> : null; })()}
+              {needsCoSignature(doc as never) && <span data-testid="doc-needs-signature" className="mt-1 inline-block rounded-full border border-amber-500/50 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:text-amber-200">✍ Needs signature</span>}
             </button>
             </span>
             <div className="min-w-0 text-sm">
