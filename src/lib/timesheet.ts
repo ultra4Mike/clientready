@@ -341,8 +341,10 @@ export function buildDay(input: {
     if (tapped.has(job.docId) || !job.start || !job.end || ms(job.end) <= ms(job.start)) continue;
     if (Number.isFinite(nowMs) && ms(job.start) > nowMs) continue; // not happened yet
     // Real Start day / End day taps win: the scheduled fill-in is clipped to the day the worker actually tapped.
-    const start = dayStart && ms(dayStart) > ms(job.start) ? dayStart : job.start;
-    const end = dayEnd && ms(dayEnd) < ms(job.end) ? dayEnd : job.end;
+    // Only a fill-in that overlaps the tapped day is clipped; a scheduled job wholly outside it (never tapped) still counts in full.
+    const overlaps = (!dayEnd || ms(job.start) < ms(dayEnd)) && (!dayStart || ms(job.end) > ms(dayStart));
+    const start = overlaps && dayStart && ms(dayStart) > ms(job.start) ? dayStart : job.start;
+    const end = overlaps && dayEnd && ms(dayEnd) < ms(job.end) ? dayEnd : job.end;
     if (ms(end) <= ms(start)) continue;
     const clipped = start !== job.start || end !== job.end;
     jobs.push({ docId: job.docId, start, end, minutes: mins(start, end), fromSchedule: true, notAtSite: false, label: job.label, ...(clipped ? { scheduledStart: job.start, scheduledEnd: job.end } : {}) });
