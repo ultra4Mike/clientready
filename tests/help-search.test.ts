@@ -61,3 +61,9 @@ test("Phase 2 help: PTO and crew lead articles published with shipped labels", a
   assert.match(by["tt-owner-crew-lead"], /Can clock the crew in and out/);
   assert.doesNotMatch(by["tt-crew-my-hours"], /day total/);
 });
+test("24-hour calendar help: night and overnight jobs article", () => {
+  const ids = new Set(HELP_ARTICLES.map((a) => a.id));
+  assert.ok(ids.has("night-overnight-jobs"));
+  for (const a of HELP_ARTICLES) for (const r of a.related || []) assert.ok(ids.has(r), `${a.id} → ${r}`);
+  assert.ok(hay("overnight").includes("night-overnight-jobs"));
+});
