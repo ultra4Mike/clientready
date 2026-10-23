@@ -219,7 +219,22 @@ export function crewIds(crew: unknown) {
  */
 /** How far past the schedule's first day a per-day crew row can sit and still count as part of the job. */
 export const MULTI_DAY_SPAN = 30;
-type DatedRow = { workDate?: string; paidToWorker?: boolean };
+type DatedRow = { workDate?: string; paidToWorker?: boolean; clockMinutes?: number; hoursFromClock?: boolean };
+/** Paid or clocked rows are history: a reschedule never moves them. */
+export function lockedRow(row: DatedRow) {
+  return Boolean(row.paidToWorker) || (Number(row.clockMinutes) || 0) > 0 || Boolean(row.hoursFromClock);
+}
+const addDays = (date: string, days: number) => { const d = new Date(`${date}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); };
+/**
+ * Moving a job (calendar drag / reschedule): every unpaid, unclocked row on one of the job's days shifts by the
+ * same number of days, so a multi-day job keeps its shape. Paid/clocked rows and rows off the job's days stay.
+ */
+export function shiftCrewDays<R extends DatedRow>(crew: R[], from: Pick<Schedule, "date"> | null | undefined, toDate: string): R[] {
+  if (!from?.date || !isDate(from.date) || !isDate(toDate) || from.date === toDate) return crew;
+  const delta = Math.round((Date.parse(`${toDate}T12:00:00Z`) - Date.parse(`${from.date}T12:00:00Z`)) / 86400000);
+  const days = scheduleDays(from, crew);
+  return crew.map((row) => (!lockedRow(row) && row.workDate && days.has(row.workDate) ? { ...row, workDate: addDays(row.workDate, delta) } : row));
+}
 /**
  * The days a job runs on. The schedule stores one first day; a multi-day job is expressed by its unpaid
  * per-day crew rows: when at least one unpaid row sits on the schedule's day, other unpaid rows dated
@@ -230,7 +245,7 @@ export function scheduleDays(schedule: Pick<Schedule, "date"> | null | undefined
   const days = new Set<string>();
   if (!schedule?.date || !isDate(schedule.date)) return days;
   days.add(schedule.date);
-  const unpaid = crew.filter((row) => !row.paidToWorker && isDate(row.workDate)).map((row) => String(row.workDate));
+  const unpaid = crew.filter((row) => !lockedRow(row) && isDate(row.workDate)).map((row) => String(row.workDate));
   if (!unpaid.includes(schedule.date)) return days;
   const last = new Date(`${schedule.date}T12:00:00Z`); last.setUTCDate(last.getUTCDate() + MULTI_DAY_SPAN);
   const max = last.toISOString().slice(0, 10);
@@ -240,6 +255,8 @@ export function scheduleDays(schedule: Pick<Schedule, "date"> | null | undefined
 
 export function followSchedule<R extends { workDate?: string; startTime?: string; endTime?: string; paidToWorker?: boolean }>(row: R, schedule: Pick<Schedule, "date" | "startTime" | "endTime"> | null, siblings?: DatedRow[]): R {
   if (!schedule?.date || row.paidToWorker) return row;
+  // Clocked rows are history too, but only when the caller passes the job's rows (multi-day aware callers).
+  if (siblings && lockedRow(row)) return row;
   // Multi-day: a row on a later day of the job keeps its own day (and its own times when it has them).
   if (siblings && row.workDate && row.workDate !== schedule.date && scheduleDays(schedule, siblings).has(row.workDate)) {
     return { ...row, startTime: row.startTime || schedule.startTime || "", endTime: row.endTime || schedule.endTime || "" };
@@ -365,10 +382,12 @@ export function applySchedule<T extends CloudDoc>(docs: T[], docId: string, sche
   const before = moneyExceptCrew(doc.data);
   const data: Record<string, unknown> = { ...(doc.data || {}) };
   const crew = (Array.isArray(data.crew) ? data.crew : []) as CrewRow[];
+  // A moved job shifts all its unpaid day rows by the same number of days (multi-day shape kept).
+  const prev = data.schedule ? readSchedule(data) : null;
   if (schedule) {
     const ids = dedupeWorkerIds(data.schedule ? schedule.workerIds : [...schedule.workerIds, ...crewIds(crew)]);
     data.schedule = { ...schedule, workerIds: ids, updatedAt: new Date().toISOString() };
-    data.crew = crewForWorkers(crew, ids, schedule);
+    data.crew = crewForWorkers(shiftCrewDays(crew, prev, schedule.date), ids, schedule);
   } else {
     delete data.schedule;
   }

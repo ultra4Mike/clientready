@@ -1,4 +1,4 @@
-import { followSchedule, scheduleDays, jobScheduleFromForm, crewForWorkers, type Schedule } from "@/lib/schedule";
+import { followSchedule, scheduleDays, jobScheduleFromForm, crewForWorkers, shiftCrewDays, applySchedule, type Schedule } from "@/lib/schedule";
 import { revisionData } from "@/lib/change-orders";
 let fails = 0; const ok = (c: boolean, m: string) => { if (!c) fails++; console.log((c ? "ok " : "FAIL ") + m); };
 const sched: Schedule = { date: "2026-11-02", startTime: "08:00", endTime: "12:00", workerIds: ["e1", "e2"], status: "scheduled", updatedAt: "x" };
@@ -29,4 +29,16 @@ ok(jobScheduleFromForm(sched, { jobStart: "08:00", jobEnd: "12:00", invoiceDate:
 const orig = { id: "o", type: "invoice", title: "INV-1", data: { invoiceNumber: "INV-1", status: "sent", items: [{ description: "x", qty: "1", rate: "1" }], schedule: sched, crew: saved } };
 const rev = revisionData(orig as never, orig as never, "INV-2", "2026-10-23", "2026-11-06", 1) as unknown as { crew: { employeeId: string; workDate: string; startTime: string }[] };
 ok(rev.crew.map((r) => `${r.employeeId}@${r.workDate}`).join() === "e1@2026-11-02,e2@2026-11-03" && rev.crew[1].startTime === "09:00", "day-2 crew copied to the change order");
+// moving a multi-day job shifts every unpaid day row by the same delta
+const job = [row("c1", "e1", "2026-11-02"), row("c2", "e2", "2026-11-03", { startTime: "09:00" }), row("c3", "e1", "2026-10-30", { paidToWorker: true, hours: "4" }), row("c4", "e2", "2026-11-03", { clockMinutes: 120 })];
+const shifted = shiftCrewDays(job, sched, "2026-11-09");
+ok(shifted.map((r) => r.workDate).join() === "2026-11-09,2026-11-10,2026-10-30,2026-11-03", "shift: day rows +7, paid and clocked rows stay");
+ok(shiftCrewDays(job, sched, "2026-11-02") === job, "shift: same day is a no-op");
+const back = shiftCrewDays(job, sched, "2026-10-31");
+ok(back[0].workDate === "2026-10-31" && back[1].workDate === "2026-11-01", "shift: moving earlier keeps the shape");
+const docs = [{ id: "d", type: "invoice", data: { invoiceNumber: "INV-9", status: "sent", items: [], schedule: sched, crew: job } }];
+const applied = applySchedule(docs as never[], "d", { ...sched, date: "2026-11-09" }) as unknown as { doc: { data: { crew: { id: string; workDate: string; startTime: string }[]; schedule: Schedule } } };
+const by = new Map(applied.doc.data.crew.map((r) => [r.id, r]));
+ok(applied.doc.data.schedule.date === "2026-11-09" && by.get("c1")?.workDate === "2026-11-09" && by.get("c2")?.workDate === "2026-11-10" && by.get("c2")?.startTime === "09:00", "calendar move (applySchedule): multi-day shape kept");
+ok(by.get("c3")?.workDate === "2026-10-30" && by.get("c4")?.workDate === "2026-11-03", "calendar move: paid and clocked rows never move");
 console.log(fails ? `${fails} failed` : "all passed"); if (fails) process.exit(1);
