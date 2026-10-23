@@ -57,6 +57,7 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
   const [note, setNote] = useState("");
   const [now, setNow] = useState(() => new Date().toISOString());
   const [locDenied, setLocDenied] = useState(false);
+  const [loc, setLoc] = useState<{ on: boolean | null; pin: "none" | "near" | "far" | "" }>({ on: null, pin: "" });
   const [, setTzReady] = useState(0);
   const [dayStatus, setDayStatus] = useState<{ minutes: number | null; approved: boolean } | null>(null);
   const [confirmTap, setConfirmTap] = useState<{ kind: TapKind; job?: MyDayJob } | null>(null);
@@ -72,7 +73,7 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
     if (!email) return;
     const load = () => { void loadMyTaps(email).then(setEvents); void loadMyFixes(email).then(setFixes); };
     load(); void loadBusinessTz(true).then(() => setTzReady((n) => n + 1));
-    void locationPermission().then((p) => setLocDenied(p === "denied"));
+    void locationPermission().then((p) => { setLocDenied(p === "denied"); setLoc((l) => ({ ...l, on: p === "granted" ? true : p === "denied" ? false : l.on })); });
     void loadMyTimeRules().then(setRules); void loadMyTimeOverrides().then(setWorker);
     const online = () => void syncPendingTaps(email).then(load);
     window.addEventListener("online", online);
@@ -138,6 +139,7 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
       setLocDenied(false);
       const pin = await jobPin(target.address);
       const radius = geofenceRadius(rules, target.docId, worker);
+      setLoc({ on: true, pin: !pin ? "none" : radius > 0 && metersBetween(pos, pin) > radius ? "far" : "near" });
       if (radius <= 0) return; // geofence off for this worker/job: no prompts
       const p = geofencePrompt(state, pos, pin, radius);
       if (!off && p && geoDismissed !== `${p}:${target.docId}:${state}`) setGeoSheet(p);
@@ -152,6 +154,7 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
     const at = new Date().toISOString();
     const pos = await currentPosition();
     setLocDenied(pos ? false : (await locationPermission()) === "denied");
+    if (pos) setLoc((l) => ({ ...l, on: true }));
     let notAtSite = false;
     if (kind === "start_job" || kind === "arrive") {
       if (!pos) notAtSite = geofenceRadius(rules, job?.docId, worker) > 0;
@@ -201,6 +204,7 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
       </ol>
       {reminder && <p data-testid="my-day-reminder" role="status" className="cr-panel cr-tone-warn text-sm font-semibold">{reminder}</p>}
       {askStillDriving && <p data-testid="still-driving" className="cr-panel cr-tone-warn text-sm font-semibold">Still driving? Tap “Arrived” when you get there, or “End day”. If not, your day ends at your last stop.</p>}
+      {!locDenied && <p data-testid="location-status" data-state={loc.on ? loc.pin || "on" : "unknown"} className="text-xs text-[var(--cr-muted)]">{loc.on === null ? "Location: checking… (allow it when asked)" : `Location on${loc.pin === "none" || (!loc.pin && !plan.length) ? " · No job location saved" : loc.pin === "far" ? " · not at the job site" : loc.pin === "near" ? " · at the job site" : ""}`}</p>}
       {locDenied && <p data-testid="location-denied" data-state="denied" className="cr-panel cr-tone-warn text-sm">Location is off. Your taps still save; they are marked for your boss to check. Turn on location for this site to skip that.</p>}
       {primary && (
         <button data-testid="tap-primary" data-kind={primary.kind} disabled={busy} className="cr-btn cr-btn-primary min-h-14! w-full text-lg font-bold" onClick={() => tap(primary.kind, primary.job)}>{primary.label}</button>
@@ -213,6 +217,7 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
       {note && <p data-testid="my-day-note" role="status" className="text-sm">{note}</p>}
       <div data-testid="my-day-totals" className="cr-stat-row grid grid-cols-2 gap-2 text-sm tabular-nums">
         <p data-testid="my-day-hours" data-source={dayStatus?.minutes != null ? "owner" : "taps"}>Today: <b className="tabular-nums">{hm(dayStatus?.minutes ?? sheet.paidMinutes)}</b> paid{dayStatus?.approved ? <span data-testid="my-day-approved" className="cr-chip2 cr-tone-good ml-1">Approved</span> : null}</p>
+        {dayStatus?.minutes != null && Math.abs(sheet.paidMinutes - dayStatus.minutes) >= 1 && <p data-testid="my-day-since-approval" className="text-xs text-[var(--cr-muted)]">Your taps now add up to <b className="tabular-nums">{hm(sheet.paidMinutes)}</b>. Your boss will review the change.</p>}
         <p data-testid="my-day-breaks">Breaks: <b>{hm(sheet.breakMinutes + paidBreak)}</b> ({hm(paidBreak)} paid, {hm(sheet.breakMinutes)} unpaid)</p>
         {sheet.driveMinutes > 0 && <p data-testid="my-day-drive">Driving: {hm(sheet.driveMinutes)}</p>}
         {sheet.unpaidGapMinutes > 0 && <p data-testid="my-day-unpaid">Unpaid gaps: {hm(sheet.unpaidGapMinutes)}</p>}
