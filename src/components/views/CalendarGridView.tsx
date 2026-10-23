@@ -214,7 +214,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
         data-testid={`${agenda ? "agenda-" : ""}job-cont-${job.doc.id}`}
         data-overnight="continued"
         onClick={(event) => { event.stopPropagation(); setEditing({ docId: job.doc.id }); }}
-        title={`${crossesMidnight(job.schedule.startTime, job.schedule.endTime) ? `${timeLabel(job.schedule.startTime || "")}–${timeLabel(job.schedule.endTime || "")} (next day) · ` : ""}${job.doc.title} · continues from the day before`}
+        title={`${crossesMidnight(job.schedule.startTime, job.schedule.endTime) ? `${timeLabel(job.schedule.startTime || "")}–${timeLabel(job.schedule.endTime || "")} (next day) · ` : ""}Continues from the day before · ${job.doc.clientName || job.doc.title}${job.doc.clientName ? ` · ${job.doc.title}` : ""}`}
         aria-label={`Until ${timeLabel(job.schedule.endTime || "")} · ${job.doc.clientName || job.doc.title} · continues from the night before`}
         className={`cr-chip2 cr-chip-cont cursor-pointer min-w-0 break-words rounded-md border border-dashed border-l-4 px-1.5 py-1 text-left font-medium leading-snug opacity-90 ${agenda ? "min-h-11 text-sm" : "text-xs"} ${statusClass(job.schedule)}`}
       >

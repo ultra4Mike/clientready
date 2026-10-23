@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { loadAccountIntoCache } from "@/lib/account-cache";
+import { sweepEmptyLocalDocs } from "@/lib/empty-docs";
 import { currentSyncState, hasFetched, isSyncing, onSyncChange, pendingIds, setSyncing, type SyncState } from "@/lib/sync-status";
 
 /** Uploads documents saved while offline and sends queued deletes. Uses the normal merge (by id/updatedAt). */
@@ -46,6 +47,8 @@ export default function SyncPill() {
   useEffect(() => {
     let alive = true;
     const update = () => alive && setState(currentSyncState());
+    // Help retest: stray empty "No client" jobs left by an abandoned new job (before 7fb0ad8+1) are removed.
+    sweepEmptyLocalDocs();
     supabase.auth.getSession().then(({ data }) => {
       if (!alive) return;
       setSignedIn(Boolean(data.session));

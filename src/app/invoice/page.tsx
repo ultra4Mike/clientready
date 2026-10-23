@@ -55,6 +55,10 @@ import ChangeOrderNotes from "@/components/ChangeOrderNotes";
 import { ApprovalBadge, ApprovalShare } from "@/components/Approval";
 import { useAutosaveDraft } from "@/hooks/useAutosaveDraft";
 import { newDocDraftStale, wantsFreshDoc } from "@/lib/draft-stale";
+import { docHasContent, type DocContent } from "@/lib/empty-docs";
+
+/** A new form with no client, items or payments: never kept as a draft (Help retest: empty restore banner). */
+function isBlankNewDoc(v: unknown) { return !docHasContent(v as DocContent); }
 
 function readDocsForDraftCheck() {
   try { return JSON.parse(window.localStorage.getItem("clientready-documents") || "[]") as { id?: string; title?: string; data?: Record<string, unknown> }[]; } catch { return []; }
@@ -653,7 +657,7 @@ export default function NewInvoicePage() {
   const draftValue = { clientName, clientCompany, contactName, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, notes, items, taxPercent, discountType, discountValue, payments };
   const [saveToast, setSaveToast] = useState(false);
   useEffect(() => { if (!saveToast) return; const t = window.setTimeout(() => setSaveToast(false), 6000); return () => window.clearTimeout(t); }, [saveToast, saveMessage]);
-  const draft = useAutosaveDraft("doc", docId || `new-${docKind}`, draftValue, { enabled: formReady && notFound === "", isStale: docId ? undefined : (found) => newDocDraftStale(found.payload as { invoiceNumber?: string }, found.updatedAt, readDocsForDraftCheck()) });
+  const draft = useAutosaveDraft("doc", docId || `new-${docKind}`, draftValue, { enabled: formReady && notFound === "", isEmpty: docId ? undefined : isBlankNewDoc, isStale: docId ? undefined : (found) => !docHasContent(found.payload as DocContent) || newDocDraftStale(found.payload as { invoiceNumber?: string }, found.updatedAt, readDocsForDraftCheck()) });
   function restoreDraft() { restoreFrom(draft.accept() as Partial<typeof draftValue> | null); }
   function restoreFrom(v: Partial<typeof draftValue> | null) {
     if (!v) return;
@@ -910,9 +914,18 @@ export default function NewInvoicePage() {
   }
 
   /** Help retest: Save never fails silently. Errors show a message, and every result also shows as a toast at the bottom of the screen. */
+  // Help retest: the time picked on a blank new job, saved with the document on its first real Save.
+  const pendingScheduleRef = useRef<Schedule | null>(null);
   async function saveDocument(cash?: unknown) {
     try {
       const id = await saveDocumentInner(cash);
+      const pending = pendingScheduleRef.current;
+      if (id && pending) {
+        pendingScheduleRef.current = null;
+        const saved = await saveSchedule(id, pending).catch(() => null);
+        const savedSchedule = saved ? readSchedule(saved.data) : null;
+        if (savedSchedule) { setSchedule(savedSchedule); setJobStart(savedSchedule.startTime || ""); setJobEnd(savedSchedule.endTime || ""); setScheduleKey((key) => key + 1); }
+      }
       setSaveToast(true);
       return id;
     } catch {
@@ -1028,6 +1041,15 @@ export default function NewInvoicePage() {
       // The whole-doc save must never race the first load: an opened ?id= doc that is not in the form yet
       // would otherwise be saved as a NEW document with what was just typed (misrouted typing).
       if (!formReadyRef.current || (!id && new URLSearchParams(window.location.search).get("id"))) return;
+      if (!id && !docHasContent({ clientName, clientCompany, contactName, clientEmail, clientPhone, clientAddress, clientId: docClientId, items, payments })) {
+        // Help retest: a blank new job is never saved just because a date/time was picked (no "No client"
+        // chip on the calendar, no local record). The time is kept here and saved with the document.
+        pendingScheduleRef.current = next;
+        setSchedule(next);
+        if (next) { setJobStart(next.startTime || ""); setJobEnd(next.endTime || ""); }
+        setSaveMessage(next ? "Add a client or a line item and Save. The job goes on the calendar once the document is saved." : "");
+        return;
+      }
       if (!id) {
         id = (await saveDocument()) || "";
         if (!id) return;
