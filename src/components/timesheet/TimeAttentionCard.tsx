@@ -24,8 +24,8 @@ export default function TimeAttentionCard() {
       </div>
       <p className="text-[var(--cr-muted)]" data-testid="dash-time-on-clock">On the clock now: <b className="tabular-nums">{t.onClock.length}</b>{t.onClock.length ? ` · ${t.onClock.map((o) => `${o.name} (${word[o.state] || o.state})`).join(", ")}` : ""}</p>
       <div className="mt-1 flex flex-wrap gap-1">
-        {t.missingClockOuts > 0 && <span className="cr-chip2 cr-tone-warn" data-testid="dash-time-missing-out">{t.missingClockOuts} missing clock-out</span>}
-        {t.missedBreaks > 0 && <span className="cr-chip2 cr-tone-bad" data-testid="dash-time-missed-breaks">{t.missedBreaks} missed break</span>}
+        {t.missingClockOuts > 0 && <span className="cr-chip2 cr-tone-warn" data-testid="dash-time-missing-out">{t.missingClockOuts} missing clock-out{t.missingClockOuts === 1 ? "" : "s"}</span>}
+        {t.missedBreaks > 0 && <span className="cr-chip2 cr-tone-bad" data-testid="dash-time-missed-breaks">{t.missedBreaks} missed break{t.missedBreaks === 1 ? "" : "s"}</span>}
         {t.pendingFixes > 0 && <span className="cr-chip2 cr-tone-warn" data-testid="dash-time-fixes">{t.pendingFixes} fix request{t.pendingFixes === 1 ? "" : "s"}</span>}
       </div>
       {t.alerts.length > 0 && <ul className="mt-1 space-y-0.5" data-testid="dash-time-alerts">{t.alerts.slice(0, 6).map((a, i) => (

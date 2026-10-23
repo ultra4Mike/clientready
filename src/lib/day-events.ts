@@ -23,14 +23,18 @@ function writeLocal(key: string, value: unknown) {
 export const localDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
-type EventRow = { id: string; employee_id: string; work_date: string; kind: TapKind; at: string; doc_id: string; lat: number | null; lng: number | null; not_at_site: boolean; device_at?: string | null; out_of_order?: boolean | null; created_at?: string };
-const fromRow = (row: EventRow): TapEvent => ({ id: row.id, employeeId: row.employee_id, date: String(row.work_date).slice(0, 10), kind: row.kind, at: row.at, docId: row.doc_id || undefined, ...(row.lat != null ? { lat: row.lat } : {}), ...(row.lng != null ? { lng: row.lng } : {}), notAtSite: Boolean(row.not_at_site), ...(row.device_at ? { deviceAt: row.device_at } : {}), ...(row.out_of_order ? { outOfOrder: true } : {}) });
+type EventRow = { id: string; employee_id: string; work_date: string; kind: TapKind; at: string; doc_id: string; lat: number | null; lng: number | null; not_at_site: boolean; device_at?: string | null; out_of_order?: boolean | null; offline?: boolean | null; created_at?: string };
+const fromRow = (row: EventRow): TapEvent => ({ id: row.id, employeeId: row.employee_id, date: String(row.work_date).slice(0, 10), kind: row.kind, at: row.at, docId: row.doc_id || undefined, ...(row.lat != null ? { lat: row.lat } : {}), ...(row.lng != null ? { lng: row.lng } : {}), notAtSite: Boolean(row.not_at_site), ...(row.device_at ? { deviceAt: row.device_at } : {}), ...(row.out_of_order ? { outOfOrder: true } : {}), ...(row.offline ? { offline: true } : {}) });
 const EVENT_COLS = "id,employee_id,work_date,kind,at,doc_id,lat,lng,not_at_site";
-const EVENT_COLS_P1 = `${EVENT_COLS},device_at,out_of_order,created_at`;
+const EVENT_COLS_P0 = `${EVENT_COLS},device_at,out_of_order,created_at`;
+const EVENT_COLS_P1 = `${EVENT_COLS_P0},offline`;
 /** Select events with the phase-1 columns, falling back to the old columns on a server without the migration. */
 async function selectEvents(build: (cols: string) => PromiseLike<{ data: unknown; error: { message?: string; code?: string } | null }>) {
   const first = await build(EVENT_COLS_P1);
-  return first.error && /column|42703/i.test(`${first.error.message} ${first.error.code}`) ? build(EVENT_COLS) : first;
+  const bad = (r: typeof first) => Boolean(r.error && /column|42703/i.test(`${r.error.message} ${r.error.code}`));
+  if (!bad(first)) return first;
+  const second = await build(EVENT_COLS_P0);
+  return bad(second) ? build(EVENT_COLS) : second;
 }
 
 /** Best-effort GPS (never blocks: 6 s timeout, denied = undefined). */
@@ -53,7 +57,10 @@ export async function recordTap(event: Omit<TapEvent, "id"> & { id?: string }, e
   writeLocal(key, [...readLocal<TapEvent[]>(key, []).filter((e) => e.id !== full.id), { ...full, pending: true }]);
   const base = { p_id: full.id, p_kind: full.kind, p_at: full.at, p_work_date: full.date, p_doc_id: full.docId || "", p_lat: full.lat ?? null, p_lng: full.lng ?? null, p_not_at_site: Boolean(full.notAtSite) };
   // Phase 1 server: stores the server time (live taps), the phone time and the out-of-order confirm.
-  let { error } = await supabase.rpc("crew_add_day_event", { ...base, p_device_at: full.deviceAt, p_out_of_order: Boolean(full.outOfOrder) });
+  // A replayed offline tap (still pending on the phone) keeps the phone time on the server and is marked offline.
+  const offline = Boolean((event as TapEvent).pending);
+  let { error } = await supabase.rpc("crew_add_day_event", { ...base, p_device_at: full.deviceAt, p_out_of_order: Boolean(full.outOfOrder), p_offline: offline });
+  if (error && /PGRST202|could not find|function/i.test(`${error.message} ${error.code}`)) ({ error } = await supabase.rpc("crew_add_day_event", { ...base, p_device_at: full.deviceAt, p_out_of_order: Boolean(full.outOfOrder) }));
   // Older server: new tap kinds are not accepted there; old kinds go through the old signature.
   if (error && /PGRST202|could not find|function/i.test(`${error.message} ${error.code}`)) {
     const old = full.kind === "end_day" ? "end_shift" : full.kind;

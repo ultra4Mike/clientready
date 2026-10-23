@@ -94,7 +94,7 @@ export default function TimesheetRules() {
       <section className={card} data-testid="ts-rules-breaks" aria-labelledby="ts-h-breaks">
         <h3 id="ts-h-breaks" className="cr-section-label font-semibold">Breaks &amp; meals</h3>
         <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Break rules preset">
-          <button type="button" className="cr-btn cr-btn-secondary" data-testid="ts-preset-federal" data-state={settings.breakPreset === "federal" ? "on" : "off"} aria-pressed={settings.breakPreset === "federal"} onClick={() => set({ breakPreset: "federal", caPremiumPay: false })}>Federal</button>
+          <button type="button" className="cr-btn cr-btn-secondary" data-testid="ts-preset-federal" data-state={settings.breakPreset === "federal" ? "on" : "off"} aria-pressed={settings.breakPreset === "federal"} onClick={() => set({ breakPreset: "federal", caPremiumPay: false, dailyOtHours: 0, dailyDtHours: 0, seventhDayRule: false, ...(settings.otPreset === "california" ? { otPreset: "federal" as const, weeklyOtHours: 40 } : {}) })}>Federal</button>
           <button type="button" className="cr-btn cr-btn-secondary" data-testid="ts-preset-california" data-state={settings.breakPreset === "california" ? "on" : "off"} aria-pressed={settings.breakPreset === "california"} onClick={() => set({ ...CALIFORNIA_RULES, caPremiumPay: true })}>California</button>
         </div>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">

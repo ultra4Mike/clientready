@@ -30,10 +30,12 @@ export type TapEvent = {
   outOfOrder?: boolean;
   /** Saved on the phone, not yet on the server. */
   pending?: boolean;
+  /** Sent later from an offline queue: the phone time was kept (server time unknown). */
+  offline?: boolean;
 };
 export type ScheduledJob = { docId: string; start: string; end: string; label?: string; lat?: number; lng?: number }; // ISO start/end
 export type DayFlag = "from_schedule" | "not_at_site" | "long_drive" | "auto_ended" | "fix_requested" | "edited" | "changed_since_approved"
-  | "out_of_order" | "auto_meal" | "meal_missed" | "rest_missed" | "long_drive_break" | "clock_skew" | "ot" | "dt" | "before_hire";
+  | "out_of_order" | "auto_meal" | "meal_missed" | "rest_missed" | "long_drive_break" | "clock_skew" | "offline_tap" | "ot" | "dt" | "before_hire";
 
 export type BreakPreset = "federal" | "california";
 /**
@@ -245,7 +247,8 @@ export function buildDay(input: {
     cur = next;
     const away = notAtSiteFor(event);
     if (away) flags.add("not_at_site");
-    if (event.deviceAt && Math.abs(ms(event.deviceAt) - ms(event.at)) > CLOCK_SKEW_MS) flags.add("clock_skew");
+    if (event.offline) flags.add("offline_tap");
+    else if (event.deviceAt && Math.abs(ms(event.deviceAt) - ms(event.at)) > CLOCK_SKEW_MS) flags.add("clock_skew");
     const openBreak = breaks.length && !breaks[breaks.length - 1].end ? breaks[breaks.length - 1] : null;
     if (kind !== "break_start" && openBreak && kind !== "end_day") openBreak.end = event.at; // any tap ends an open break
     if (kind === "start_day") { if (!dayStart) dayStart = event.at; }
@@ -479,7 +482,7 @@ export function applyFixes(events: TapEvent[], fixes: FixRequest[]): TapEvent[] 
 }
 
 /** Flags that need the owner's eye before a day is "ready" (an owner edit counts as reviewed). */
-export const REVIEW_FLAGS: DayFlag[] = ["from_schedule", "not_at_site", "long_drive", "auto_ended", "fix_requested", "out_of_order", "meal_missed", "rest_missed", "long_drive_break", "clock_skew", "before_hire"];
+export const REVIEW_FLAGS: DayFlag[] = ["from_schedule", "not_at_site", "long_drive", "auto_ended", "fix_requested", "out_of_order", "meal_missed", "rest_missed", "long_drive_break", "clock_skew", "offline_tap", "before_hire"];
 export const needsReview = (flags: string[], edited = false) => !edited && flags.some((f) => (REVIEW_FLAGS as string[]).includes(f));
 
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -505,7 +508,8 @@ export function flagReasons(day: DaySheet | undefined, extra: string[] = [], set
       case "meal_missed": return { flag, text: `No 30-minute meal break started before the 5th hour (California rule).${s.caPremiumPay ? " One hour of premium pay was added." : ""}` };
       case "rest_missed": return { flag, text: `Not enough 10-minute rest breaks (one per 4 hours, California rule).${s.caPremiumPay ? " One hour of premium pay was added." : ""}` };
       case "long_drive_break": return { flag, text: `A drive ran over ${s.longDriveBreakMinutes} min ` + `(${hm(day?.autoBreakMinutes || 0)} extra). The extra is unpaid unless you tap "Pay the full drive".` };
-      case "clock_skew": return { flag, text: "The worker's phone clock was more than 5 minutes off; the server time was used." };
+      case "clock_skew": return { flag, text: "The worker's phone clock was more than 5 minutes off from the server. The server time was used." };
+      case "offline_tap": return { flag, text: "A tap was saved on the phone with no signal and sent later, so the phone's own clock time was used. Check it's right." };
       case "before_hire": return { flag, text: "Time was logged before this worker's hire date. Check the hire date or the day." };
       case "long_drive": {
         const leg = (day?.drives || []).find((d) => d.longDrive);
@@ -516,6 +520,27 @@ export function flagReasons(day: DaySheet | undefined, extra: string[] = [], set
       case "edited": return { flag, text: "You edited this day's hours." };
       case "changed_since_approved": return { flag, text: "Hours changed after you approved them. Approve again." };
       default: return { flag, text: flag };
+    }
+  });
+}
+
+/** Worker-facing wording for the same flags (no owner actions like "Approve or deny it below"). */
+export function crewFlagReasons(day: DaySheet | undefined, extra: string[] = [], settings: Partial<TimesheetSettings> = {}): { flag: string; text: string }[] {
+  const s = { ...DEFAULT_TIMESHEET_SETTINGS, ...settings };
+  return flagReasons(day, extra, settings).map(({ flag, text }) => {
+    switch (flag) {
+      case "from_schedule": return { flag, text: "No tap was recorded for part of the day, so your scheduled time was used. Ask your boss for a fix if it's wrong." };
+      case "not_at_site": return { flag, text: `A tap was made with GPS off or more than ${s.geofenceMeters} m from the job site. Your boss will check it.` };
+      case "out_of_order": return { flag, text: "A tap was made out of order (for example End break with no break started). It still counts; your boss will check the times." };
+      case "long_drive_break": return { flag, text: `A drive ran over ${s.longDriveBreakMinutes} min, so the extra may be unpaid. Your boss decides.` };
+      case "clock_skew": return { flag, text: "Your phone's clock was more than 5 minutes off, so the server time was used." };
+      case "offline_tap": return { flag, text: "A tap was saved with no signal and sent later, so your phone's time was used. Your boss will check it." };
+      case "before_hire": return { flag, text: "Time was logged before your hire date. Your boss will check it." };
+      case "auto_ended": return { flag, text: `Your day was never ended (or "Still driving?" went unanswered after ${s.transitTimeoutMinutes} min), so it was ended at your last real stop.` };
+      case "fix_requested": return { flag, text: "You asked for a time fix. Your boss will approve or deny it." };
+      case "edited": return { flag, text: "Your boss edited this day's hours." };
+      case "changed_since_approved": return { flag, text: "Your hours changed after your boss approved them. They'll need approving again." };
+      default: return { flag, text };
     }
   });
 }

@@ -12,7 +12,7 @@ export const AUDIT_GROUPS: Record<string, { label: string; actions: string[] }> 
   edits: { label: "Edits", actions: ["edit", "edit_approve"] },
   approvals: { label: "Approvals", actions: ["approve", "unapprove", "edit_approve", "attest"] },
   fixes: { label: "Fixes", actions: ["fix_request", "fix_approved", "fix_denied"] },
-  settings: { label: "Rules", actions: ["settings"] },
+  settings: { label: "Rules", actions: ["settings", "worker_rules"] },
 };
 
 export default function TimeAuditLog() {

@@ -38,17 +38,21 @@ begin
   return true;
 end $$;
 
--- New 10-argument tap function (p_device_at / p_out_of_order are required, so PostgREST never confuses the two).
--- A live tap (phone time within 10 minutes of the server) is stored at the SERVER time; a queued offline tap keeps
--- the phone time. The phone time is always kept in device_at so a wrong phone clock can be flagged.
-create or replace function public.crew_add_day_event(p_id text, p_kind text, p_at timestamptz, p_work_date date, p_doc_id text,
-  p_lat double precision, p_lng double precision, p_not_at_site boolean, p_device_at timestamptz, p_out_of_order boolean)
+-- Tap function, 11 arguments (p_device_at / p_out_of_order / p_offline are required, so PostgREST never confuses them).
+-- A live tap is ALWAYS stored at the SERVER time; the phone time is kept in device_at, and the timesheet flags
+-- clock_skew when they differ by more than 5 minutes. A queued offline tap (p_offline) keeps the phone time and is
+-- marked offline = true so the owner sees it. A tap that lands on a day the owner already approved un-approves it
+-- and marks it "changed since approved" (same state as an owner edit); the approved pay is not rewritten here.
+alter table public.crew_day_events add column if not exists offline boolean not null default false;
+drop function if exists public.crew_add_day_event(text, text, timestamptz, date, text, double precision, double precision, boolean, timestamptz, boolean, boolean);
+create function public.crew_add_day_event(p_id text, p_kind text, p_at timestamptz, p_work_date date, p_doc_id text,
+  p_lat double precision, p_lng double precision, p_not_at_site boolean, p_device_at timestamptz, p_out_of_order boolean, p_offline boolean)
 returns boolean language plpgsql security definer set search_path = public as $$
-declare a record; t timestamptz;
+declare a record; t timestamptz; n integer;
 begin
   if p_kind not in ('start_day', 'start_job', 'start_transit', 'arrive', 'break_start', 'break_end', 'end_day', 'end_shift') then raise exception 'kind is not valid' using errcode = 'P0001'; end if;
   if abs(extract(epoch from (p_at - now()))) > 3 * 86400 then raise exception 'time is not valid' using errcode = 'P0001'; end if;
-  t := case when abs(extract(epoch from (p_at - now()))) <= 600 then now() else p_at end;
+  t := case when coalesce(p_offline, false) then p_at else now() end;
   if coalesce(p_doc_id, '') <> '' then
     select * into a from public.crew_assignment(p_doc_id);
   else
@@ -56,12 +60,25 @@ begin
      where public.crew_email() <> '' and lower(j.worker_email) = public.crew_email() order by j.job_date desc limit 1;
   end if;
   if a.owner_id is null then raise exception 'not assigned to this job' using errcode = '42501'; end if;
-  insert into public.crew_day_events (id, owner_id, employee_id, worker_email, work_date, kind, at, doc_id, lat, lng, not_at_site, device_at, out_of_order)
+  insert into public.crew_day_events (id, owner_id, employee_id, worker_email, work_date, kind, at, doc_id, lat, lng, not_at_site, device_at, out_of_order, offline)
   values (left(p_id, 80), a.owner_id, a.employee_id, public.crew_email(), p_work_date, p_kind, t, coalesce(p_doc_id, ''), p_lat, p_lng,
-    coalesce(p_not_at_site, false), coalesce(p_device_at, p_at), coalesce(p_out_of_order, false))
+    coalesce(p_not_at_site, false), coalesce(p_device_at, p_at), coalesce(p_out_of_order, false), coalesce(p_offline, false))
   on conflict (id) do nothing;
+  get diagnostics n = row_count;
+  if n > 0 then
+    update public.crew_day_approvals set approved_at = null, changed_at = now(), updated_at = now()
+     where owner_id = a.owner_id and employee_id = a.employee_id and work_date = p_work_date and approved_at is not null;
+  end if;
   return true;
 end $$;
+-- 10-argument version (phones on the previous build): a live tap.
+create or replace function public.crew_add_day_event(p_id text, p_kind text, p_at timestamptz, p_work_date date, p_doc_id text,
+  p_lat double precision, p_lng double precision, p_not_at_site boolean, p_device_at timestamptz, p_out_of_order boolean)
+returns boolean language sql security definer set search_path = public as $$
+  select public.crew_add_day_event(p_id, p_kind, p_at, p_work_date, p_doc_id, p_lat, p_lng, p_not_at_site, p_device_at, p_out_of_order, false);
+$$;
+revoke all on function public.crew_add_day_event(text, text, timestamptz, date, text, double precision, double precision, boolean, timestamptz, boolean, boolean) from public, anon;
+grant execute on function public.crew_add_day_event(text, text, timestamptz, date, text, double precision, double precision, boolean, timestamptz, boolean, boolean) to authenticated;
 revoke all on function public.crew_add_day_event(text, text, timestamptz, date, text, double precision, double precision, boolean, timestamptz, boolean) from public, anon;
 grant execute on function public.crew_add_day_event(text, text, timestamptz, date, text, double precision, double precision, boolean, timestamptz, boolean) to authenticated;
 revoke all on function public.crew_add_day_event(text, text, timestamptz, date, text, double precision, double precision, boolean) from public, anon;
@@ -102,7 +119,7 @@ begin
     if tg_op = 'INSERT' then
       insert into public.crew_time_audit (owner_id, actor_email, employee_id, work_date, action, old_value, new_value)
       values (new.owner_id, coalesce(new.worker_email, ''), new.employee_id, new.work_date, 'tap', null,
-        jsonb_build_object('kind', new.kind, 'at', new.at, 'device_at', new.device_at, 'doc_id', new.doc_id, 'not_at_site', new.not_at_site, 'out_of_order', new.out_of_order));
+        jsonb_build_object('kind', new.kind, 'at', new.at, 'device_at', new.device_at, 'doc_id', new.doc_id, 'not_at_site', new.not_at_site, 'out_of_order', new.out_of_order, 'offline', new.offline));
     elsif tg_op = 'UPDATE' then
       insert into public.crew_time_audit (owner_id, actor_email, employee_id, work_date, action, old_value, new_value)
       values (new.owner_id, coalesce(auth.jwt() ->> 'email', ''), new.employee_id, new.work_date, 'tap_edit',
@@ -175,9 +192,9 @@ grant execute on function public.crew_time_rules() to authenticated;
 
 -- Checks (each returns TRUE):
 -- select pg_get_constraintdef(oid) like '%break_start%' and pg_get_constraintdef(oid) like '%end_shift%' as tap_kinds_ready from pg_constraint where conname = 'crew_day_events_kind_check';
--- select count(*) = 2 as event_columns_ready from information_schema.columns where table_schema = 'public' and table_name = 'crew_day_events' and column_name in ('device_at', 'out_of_order');
+-- select count(*) = 3 as event_columns_ready from information_schema.columns where table_schema = 'public' and table_name = 'crew_day_events' and column_name in ('device_at', 'out_of_order', 'offline');
 -- select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'crew_timesheet_settings' and column_name = 'rules') and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'crew_time_fixes' and column_name = 'owner_note') as settings_and_note_ready;
--- select to_regprocedure('public.crew_add_day_event(text,text,timestamptz,date,text,double precision,double precision,boolean)') is not null and to_regprocedure('public.crew_add_day_event(text,text,timestamptz,date,text,double precision,double precision,boolean,timestamptz,boolean)') is not null as tap_functions_ready;
+-- select to_regprocedure('public.crew_add_day_event(text,text,timestamptz,date,text,double precision,double precision,boolean)') is not null and to_regprocedure('public.crew_add_day_event(text,text,timestamptz,date,text,double precision,double precision,boolean,timestamptz,boolean)') is not null and to_regprocedure('public.crew_add_day_event(text,text,timestamptz,date,text,double precision,double precision,boolean,timestamptz,boolean,boolean)') is not null as tap_functions_ready;
 -- select relrowsecurity as audit_rls_on from pg_class where relname = 'crew_time_audit';
 -- select count(*) = 2 and bool_and(cmd in ('SELECT', 'INSERT')) as audit_owner_only from pg_policies where schemaname = 'public' and tablename = 'crew_time_audit';
 -- select count(*) = 3 as audit_triggers_ready from pg_trigger where tgname in ('crew_time_audit_no_change', 'crew_day_events_audit', 'crew_time_fixes_audit');

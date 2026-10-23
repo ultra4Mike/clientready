@@ -11,23 +11,36 @@ import type { DayPay } from "@/lib/timesheet-pay";
 import { KIND_LABEL } from "@/components/crew/MyDay";
 
 /** Plain words for one audit row (no prices). */
+const SETTING_LABEL: Record<string, string> = {
+  gapMinutes: "Paid gap between jobs (min)", shortBreakPaidMinutes: "Short breaks paid up to (min)", breakPreset: "Break rules", payFirstCommute: "Pay travel to first job",
+  payLastCommute: "Pay drive home", commuteDeductMinutes: "Normal commute taken off (min)", roundingMinutes: "Rounding (min)", geofenceMeters: "Job site radius (m)", geofenceOptOut: "Location check off",
+  otPreset: "Overtime rules", weeklyOtHours: "Weekly overtime after (h)", dailyOtHours: "Daily overtime after (h)", dailyDtHours: "Double time after (h)", seventhDayRule: "7th-day rule",
+  payPeriod: "Pay period", remindMissedStartMinutes: "Missed start reminder (min)", remindMissedEndMinutes: "Missed end reminder (min)", autoMealMinutes: "Auto meal break (min)",
+  autoMealAfterHours: "Auto meal break after (h)", caPremiumPay: "California premium pay", longDriveBreakMinutes: "Long drive limit (min)", transitTimeoutMinutes: "\u201cStill driving?\u201d after (min)",
+  halfDayHours: "Half day (h)", hireDate: "Hire date",
+};
+export const settingLabel = (k: string) => SETTING_LABEL[k] || k.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()).trim();
+const settingValue = (x: unknown) => (x === true ? "on" : x === false ? "off" : x == null || x === "" ? "—" : typeof x === "object" ? JSON.stringify(x) : String(x));
+const settingDiff = (o: Record<string, unknown>, v: Record<string, unknown>) => Object.keys(v).map((k) => `${settingLabel(k)} ${settingValue(o[k])} → ${settingValue(v[k])}`).join("; ");
+const kindLabel = (k: unknown) => KIND_LABEL[k as keyof typeof KIND_LABEL] || String(k ?? "").replace(/_/g, " ");
+
 export function auditText(r: AuditRow) {
   const v = (r.newValue || {}) as Record<string, unknown>; const o = (r.oldValue || {}) as Record<string, unknown>;
   const t = (x: unknown) => (typeof x === "string" && x ? new Date(x).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "");
   const mins = (x: unknown) => (typeof x === "number" ? hm(x) : "—");
   switch (r.action) {
-    case "tap": return `Tap: ${KIND_LABEL[v.kind as keyof typeof KIND_LABEL] || v.kind} at ${t(v.at)}${v.device_at && Math.abs(new Date(String(v.device_at)).getTime() - new Date(String(v.at)).getTime()) > 300000 ? ` (phone said ${t(v.device_at)})` : ""}${v.out_of_order ? " · out of order" : ""}${v.not_at_site ? " · not at site" : ""}`;
-    case "tap_edit": return `Tap changed: ${o.kind} ${t(o.at)} → ${v.kind} ${t(v.at)}`;
-    case "tap_delete": return `Tap removed: ${o.kind} ${t(o.at)}`;
-    case "fix_request": return `Fix requested: ${v.kind} → ${t(v.at)} “${v.reason || ""}”`;
+    case "tap": return `Tap: ${kindLabel(v.kind)} at ${t(v.at)}${v.device_at && Math.abs(new Date(String(v.device_at)).getTime() - new Date(String(v.at)).getTime()) > 300000 ? ` (phone said ${t(v.device_at)})` : ""}${v.offline ? " · sent later (offline)" : ""}${v.out_of_order ? " · out of order" : ""}${v.not_at_site ? " · not at site" : ""}`;
+    case "tap_edit": return `Tap changed: ${kindLabel(o.kind)} ${t(o.at)} → ${kindLabel(v.kind)} ${t(v.at)}`;
+    case "tap_delete": return `Tap removed: ${kindLabel(o.kind)} ${t(o.at)}`;
+    case "fix_request": return `Fix requested: ${kindLabel(v.kind)} → ${t(v.at)} “${v.reason || ""}”`;
     case "fix_approved": case "fix_denied": return `Fix ${r.action === "fix_approved" ? "approved" : "declined"}${v.note ? `: “${v.note}”` : ""}`;
     case "approve": return `Approved ${mins(v.paidMinutes)}`;
     case "edit_approve": return `Edited ${mins(o.editedMinutes ?? o.paidMinutes)} → ${mins(v.editedMinutes)} and approved`;
     case "edit": return `Edited ${mins(o.editedMinutes ?? o.paidMinutes)} → ${mins(v.editedMinutes)}`;
     case "unapprove": return "Approval undone";
     case "attest": return `Worker confirmed the week (${mins(v.minutes)})`;
-    case "settings": return `Rules changed: ${Object.keys(v).map((k) => `${k} ${JSON.stringify(o[k] ?? "")} → ${JSON.stringify(v[k])}`).join("; ")}`;
-    case "worker_rules": return `Worker time settings: ${Object.keys(v).map((k) => `${k} ${JSON.stringify(o[k] ?? "")} → ${JSON.stringify(v[k])}`).join("; ")}`;
+    case "settings": return `Rules changed: ${settingDiff(o, v)}`;
+    case "worker_rules": return `Worker time settings: ${settingDiff(o, v)}`;
     default: return r.action;
   }
 }
@@ -117,7 +130,7 @@ export default function DayDetail(props: {
             <p className="font-semibold">Fix-my-time requests</p>
             {pending.map((f) => (
               <div key={f.id} className="flex flex-wrap items-center gap-2 rounded-lg border p-2">
-                <span>{f.kind.replace("_", " ")} → {new Date(f.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · “{f.reason}”</span>
+                <span>{kindLabel(f.kind)} → {new Date(f.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · “{f.reason}”</span>
                 <input aria-label="Note to worker" placeholder="Note to worker (optional)" name="ts-dd-fix-note" data-testid="ts-dd-fix-note" maxLength={300} className="min-h-9 flex-1 rounded border bg-transparent px-2" value={notes[f.id] || ""} onChange={(e) => setNotes({ ...notes, [f.id]: e.target.value })} />
                 <button className="cr-btn cr-btn-primary" data-testid="ts-dd-fix-approve" onClick={() => props.onDecide(f, "approved", notes[f.id])}>Approve</button>
                 <button className="cr-btn cr-btn-secondary" data-testid="ts-dd-fix-deny" onClick={() => props.onDecide(f, "denied", notes[f.id])}>Decline</button>

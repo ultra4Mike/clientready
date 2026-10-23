@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { currentPosition, directionsUrl, loadMyFixes, loadMyTaps, loadMyTimeOverrides, loadMyTimeRules, localDate, recordTap, requestFix, syncPendingTaps } from "@/lib/day-events";
 import {
-  allowedTaps, buildDay, dayState, DEFAULT_TIMESHEET_SETTINGS, flagReasons, geofencePrompt, geofenceRadius, hm, isAllowed, metersBetween, nextActions, stillDrivingDue,
+  allowedTaps, buildDay, dayState, DEFAULT_TIMESHEET_SETTINGS, crewFlagReasons, geofencePrompt, geofenceRadius, hm, isAllowed, metersBetween, nextActions, stillDrivingDue,
   type DayStateName, type FixRequest, type WorkerTimeOverrides, type ScheduledJob, type TapEvent, type TapKind, type TimesheetSettings,
 } from "@/lib/timesheet";
 
@@ -166,7 +166,7 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
   }
 
   const steps = stepStates(state, todays);
-  const reasons = flagReasons(sheet, [], rules);
+  const reasons = crewFlagReasons(sheet, [], rules);
   const paidBreak = sheet.breaks.filter((b) => b.paid).reduce((s, b) => s + b.minutes, 0);
   const stateText = state === "WORKING" ? `Working${current ? ` · ${current.label}` : ""}` : state === "IN_TRANSIT" ? "Driving" : state === "ON_BREAK" ? "On break" : state === "ON_DUTY_IDLE" ? "On duty" : todays.length ? "Day ended" : "Off duty";
   const more = (Object.keys(ACTION_LABEL) as Exclude<TapKind, "end_shift">[]).filter((k) => k !== primary?.kind && k !== "end_day" && k !== "break_start" && k !== "break_end");
@@ -267,7 +267,7 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
           ))}
         </ul>
       )}
-      <a href="/crew?tab=hours" data-testid="my-day-week-link" className="cr-btn cr-btn-text text-sm">My week and confirm hours ›</a>
+      <a href="/crew?tab=hours" data-testid="my-day-week-link" className="cr-btn cr-btn-text text-sm">My hours ›</a>
     </section>
   );
 }

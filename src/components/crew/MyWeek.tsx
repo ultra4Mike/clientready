@@ -5,7 +5,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { attestWeek, loadMyTaps, loadMyTimeOverrides, loadMyTimeRules, localDate, readMyAttestations } from "@/lib/day-events";
-import { buildDay, DEFAULT_TIMESHEET_SETTINGS, flagReasons, hm, type TapEvent, type TimesheetSettings, type WorkerTimeOverrides } from "@/lib/timesheet";
+import { buildDay, DEFAULT_TIMESHEET_SETTINGS, crewFlagReasons, hm, type TapEvent, type TimesheetSettings, type WorkerTimeOverrides } from "@/lib/timesheet";
 import { entryHours, type ClockEntry } from "@/lib/clock";
 
 export const weekStartOf = (d: Date) => { const x = new Date(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return localDate(x); };
@@ -20,7 +20,7 @@ export function weekRows(events: TapEvent[], clock: ClockEntry[], week: string, 
     const sheet = evs.length ? buildDay({ employeeId, date, events: evs, schedule: [], now, settings: rules, worker }) : null;
     const oldClock = clock.filter((c) => localDate(new Date(c.started_at)) === date).reduce((s, c) => s + entryHours(c, Date.parse(now)) * 60, 0);
     const paidBreaks = sheet ? sheet.breaks.filter((b) => b.paid).reduce((s, b) => s + b.minutes, 0) : 0;
-    const reasons = sheet ? flagReasons(sheet, [], rules).map((r) => r.text) : [];
+    const reasons = sheet ? crewFlagReasons(sheet, [], rules).map((r) => r.text) : [];
     return { date, paid: sheet?.paidMinutes || 0, breaks: (sheet?.breakMinutes || 0) + paidBreaks, paidBreaks, unpaid: (sheet?.breakMinutes || 0) + (sheet?.unpaidGapMinutes || 0), oldClock, flagged: reasons.length > 0, reasons };
   });
 }
