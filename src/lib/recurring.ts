@@ -2,6 +2,7 @@ import { isUuid, saveCloudDocument } from "@/lib/cloud-docs";
 import { supabase } from "@/lib/supabase";
 import { markSynced } from "@/lib/sync-status";
 import { readSchedule, syncScheduleCrewJobs } from "@/lib/schedule";
+import { holdsSchedule } from "@/lib/change-order-revision";
 import { moneySnapshot } from "@/lib/change-orders";
 
 export type Frequency = "weekly" | "monthly" | "days";
@@ -257,8 +258,11 @@ async function generateOne(templateId: string, period: string, nextRun: string) 
 export async function runDueRecurring(today = ymd(new Date())) {
   return withLock(async () => {
     let made = 0;
-    for (const template of readDocs()) {
+    const all = readDocs();
+    for (const template of all) {
       if (template.type !== "invoice") continue;
+      // Change-order revisions copy the recurring settings: only the version holding the job runs the series (never twice).
+      if (!holdsSchedule(all as never, template as never)) continue;
       const schedule = readRecurring(template.data?.recurring);
       if (!schedule || !schedule.active || schedule.nextRunDate > today) continue;
       const periods: string[] = [];

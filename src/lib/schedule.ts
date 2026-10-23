@@ -6,6 +6,7 @@ import { readChecklist, type ChecklistItem } from "@/lib/checklist";
 import { supabase } from "@/lib/supabase";
 import { isUuid, saveCloudDocument, type CloudDoc } from "@/lib/cloud-docs";
 import { moneySnapshot } from "@/lib/change-orders";
+import { holdsSchedule, isRevision, parentOf } from "@/lib/change-order-revision";
 import { readOverrides, type Override } from "@/lib/conflicts";
 import { addDaysYmd as addDayOvernight, jobMinutes } from "@/lib/overnight";
 
@@ -445,6 +446,15 @@ export async function saveSchedule(docId: string, schedule: Schedule | null, con
 export async function syncScheduleCrewJobs(doc: CloudDoc) {
   await syncScheduleCrewJobsInner(doc);
   await pushCrewCostLines(doc);
+  // Change-order revision: sending it moves the crew job(s) off the version it revises (relink, not duplicate);
+  // voiding/un-sending gives them back. Re-mirror the parent so the crew view always shows the job once.
+  if (isRevision(doc)) {
+    const parent = parentOf(readDocs(), doc);
+    if (parent && isUuid(parent.id)) {
+      await syncScheduleCrewJobsInner(parent).catch(() => undefined);
+      await syncCrewPayRows(parent).catch(() => undefined);
+    }
+  }
 }
 
 /**
@@ -464,7 +474,8 @@ async function syncScheduleCrewJobsInner(doc: CloudDoc) {
   const { data: auth } = await supabase.auth.getUser();
   const user = auth.user;
   if (!user) return;
-  const schedule = readSchedule(doc.data);
+  // Only the version that holds the job mirrors it to the crew (draft change order -> original; sent -> the change order).
+  const schedule = holdsSchedule(readDocs(), doc) ? readSchedule(doc.data) : null;
   // B1: derived schedules (a job/proposal with a date + time but no schedule block yet) reach crew too.
   const keep = schedule ? dedupeWorkerIds(schedule.workerIds).map((workerId) => `${doc.id}-sched-${workerId}`) : [];
   let stale = supabase.from("crew_jobs").delete().eq("owner_id", user.id).eq("doc_id", doc.id).like("id", `${doc.id}-sched-%`);

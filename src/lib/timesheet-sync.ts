@@ -7,6 +7,7 @@
 import { DOCS_KEY } from "@/lib/doc-sync";
 import { readOwnerClock } from "@/lib/clock";
 import { readHoursApprovals } from "@/lib/hours-approval";
+import { holdsSchedule } from "@/lib/change-order-revision";
 import { readSchedule, readWorkers, type Worker } from "@/lib/schedule";
 import { rowExtraPay, rowPayMoney, weekOf, type PayRow } from "@/lib/pay-types";
 import { loadOwnerTimesheet, type DayApproval } from "@/lib/day-events";
@@ -68,6 +69,7 @@ const rowDate = (row: { workDate?: string }, doc: Doc) => String(row.workDate ||
 /** The scheduled jobs for one worker on one day (what missing taps fill from). */
 export function scheduleFor(docs: Doc[], workerId: string, date: string): ScheduledJob[] {
   return docs.flatMap((doc) => {
+    if (!holdsSchedule(docs as never, doc as never)) return [];
     const s = readSchedule(doc.data);
     if (!s || s.date !== date || !s.workerIds.includes(workerId)) return [];
     const start = toIso(s.date, s.startTime), end = toIso(s.date, s.endTime || "");

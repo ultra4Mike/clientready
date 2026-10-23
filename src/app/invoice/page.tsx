@@ -1179,7 +1179,7 @@ export default function NewInvoicePage() {
       clientName: original.clientName,
       createdAt: new Date().toLocaleDateString(),
       // Crew "Extra item": the owner's tap pre-fills one line (still a Draft change order they review and send).
-      // It copies every line of the latest version (original or newest sent change order); never crew/schedule/photos/signatures/payments.
+      // It copies everything on the latest version (crew, schedule, photos, stages...); never signatures, approval or payments.
       data: (() => {
         const base = revisionData(original, version, number, ymd(new Date()), plusDays(14), docAmounts(version as never).total);
         return line ? { ...base, items: [...base.items, { description: line.description, qty: "1", rate: line.amount.toFixed(2), category: "" }] } : base;

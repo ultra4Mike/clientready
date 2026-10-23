@@ -40,18 +40,50 @@ export function changeOrderData(original: Doc, newNumber: string, today: string,
 }
 
 /**
- * Option A: a revised-version change order. Copies every line plus client, tax, discount, notes and style
- * from the latest version of the chain (the original or the newest sent revision). Lines remember where
- * they came from (fromVersion) so the editor can say "From INV-x" vs "Added". Never copied (R87):
- * payments, crew, schedule, photos, signatures, approval, stages.
+ * Fields a revision never copies from the version it revises (owner rule: everything else carries over and
+ * the owner edits only what changed). Signatures/approval are per version (the customer re-approves);
+ * number/status/dates-sent are the new document's own; payments stay where they were made and show as credits.
+ * Owner job costs, stock used, clock/hours approvals and the crew's report are recorded work on that version:
+ * copying them would count labor, materials and inventory twice.
+ */
+export const REVISION_NOT_COPIED = [
+  "signature", "proposalSignature", "approval", "invoiceNumber", "status", "invoiceDate",
+  "emailLog", "sentAt", "viewedAt", "firstViewedAt", "lastViewedAt", "viewCount", "updatedAt", "deleted",
+  "payments", "paymentAmount", "paymentMethod", "paymentDate", "paymentRef",
+  "changeOrderNotes", "renumberedFrom", "reviews", "jobCosts", "stockUsed", "crewReport", "crewUndo", "hoursApprovals",
+] as const;
+
+/** Crew row fields that are logged work/pay on the old version (they stay there; the copy is the assignment). */
+const CREW_WORK_FIELDS = ["hours", "bonus", "paidToWorker", "paidDate", "hoursFromClock", "clockMinutes", "payOverride"];
+
+export function revisionCrewRow(row: Record<string, unknown>) {
+  const out: Record<string, unknown> = { ...row };
+  for (const key of CREW_WORK_FIELDS) delete out[key];
+  return { ...out, hours: "", bonus: "", paidToWorker: false, paidDate: "" };
+}
+
+/**
+ * Option A: a revised-version change order. Copies EVERYTHING on the latest version of the chain (the original
+ * or the newest sent revision): client and contact, address, notes, terms, tax, discount, deposit and payment
+ * stages, photos, checklists, job/task rates, tags, custom fields, recurring settings, the crew and the schedule
+ * (date, times, multi-day / per-day crew rows), except REVISION_NOT_COPIED. Lines remember where they came from
+ * (fromVersion) so the editor can say "From INV-x" vs "Added". The job is never double-booked: until the revision
+ * is sent the original holds it (holdsSchedule); once sent it moves to the revision.
  */
 export function revisionData(root: Doc, latest: Doc, newNumber: string, today: string, due: string, latestTotal: number) {
-  const base = changeOrderData(latest, newNumber, today, due) as Record<string, unknown>;
+  const data: Record<string, unknown> = JSON.parse(JSON.stringify(latest.data || {}));
+  for (const key of REVISION_NOT_COPIED) delete data[key];
   const latestNumber = String(latest.data?.invoiceNumber || latest.title);
   const items = (Array.isArray(latest.data?.items) ? latest.data.items : []) as Record<string, unknown>[];
+  const crew = (Array.isArray(data.crew) ? data.crew : []) as Record<string, unknown>[];
   return {
-    ...base,
+    ...data,
+    invoiceNumber: newNumber,
+    invoiceDate: today,
+    dueDate: String(latest.data?.dueDate || "") || due,
+    status: "draft",
     items: items.map((item) => ({ ...item, fromVersion: String(item.fromVersion || latestNumber) })),
+    ...(Array.isArray(data.crew) ? { crew: crew.map(revisionCrewRow) } : {}),
     coMode: "revision",
     revises: { id: latest.id, number: latestNumber, total: latestTotal },
     changeOrderOf: { id: root.id, number: String(root.data?.invoiceNumber || root.title) },

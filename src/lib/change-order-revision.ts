@@ -152,3 +152,15 @@ export function latestVersion<T extends Doc>(docs: T[], anyDoc: Doc): T | null {
   }
   return current;
 }
+
+/**
+ * Which version owns the job's schedule and crew (calendar, crew view, timesheet planning), so a job is
+ * never booked twice: a draft revision does not (the version it revises keeps the job until it is sent);
+ * a replaced version does not (the live revision has taken it over). Everything else does.
+ */
+export function holdsSchedule(docs: Doc[], doc?: Doc | null) {
+  if (!doc) return false;
+  if (isRevision(doc) && !revisionLive(doc)) return false; // draft or voided change order
+  if (doc.type === "invoice" && replacedBy(docs, doc)) return false;
+  return true;
+}

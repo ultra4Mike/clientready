@@ -1,4 +1,5 @@
 import { readSchedule, type Schedule } from "@/lib/schedule";
+import { holdsSchedule } from "@/lib/change-order-revision";
 
 type Doc = { id: string; type: string; title: string; clientName?: string; data?: Record<string, unknown> };
 
@@ -10,6 +11,8 @@ type Doc = { id: string; type: string; title: string; clientName?: string; data?
 export function scheduledJobs<T extends Doc>(docs: T[]) {
   return docs
     .filter((doc) => doc.type === "invoice" || doc.type === "proposal")
+    // Change-order revisions: the job shows once, on the version that holds it (draft CO -> original; sent CO -> the CO).
+    .filter((doc) => holdsSchedule(docs, doc))
     .flatMap((doc) => {
       const schedule = readSchedule(doc.data);
       return schedule ? [{ doc, schedule }] : [];

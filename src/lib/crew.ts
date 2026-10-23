@@ -1,5 +1,23 @@
 import { rowPayMoney, type PayType } from "@/lib/pay-types";
 import { supabase } from "@/lib/supabase";
+import { holdsSchedule } from "@/lib/change-order-revision";
+
+/**
+ * Change-order revisions: a version that doesn't hold the job (a draft change order, or a version replaced by a
+ * sent one) mirrors only rows with work already logged (hours, clock time or paid), so the crew view never
+ * lists the job twice and recorded pay stays where it was earned.
+ */
+export function crewRowsFor<T extends { hours?: string; paidToWorker?: boolean; clockMinutes?: number }>(holds: boolean, crew: T[]) {
+  if (holds) return crew;
+  return crew.filter((row) => row.paidToWorker || (Number(row.clockMinutes) || 0) > 0 || (Number(String(row.hours || "").replace(/[^0-9.]/g, "")) || 0) > 0);
+}
+function mirroredCrewRows<T extends { hours?: string; paidToWorker?: boolean; clockMinutes?: number }>(docId: string, crew: T[]) {
+  try {
+    const docs = JSON.parse(window.localStorage.getItem("clientready-documents") || "[]") as { id: string; type?: string; data?: Record<string, unknown> }[];
+    const doc = docs.find((d) => d.id === docId);
+    return doc ? crewRowsFor(holdsSchedule(docs, doc), crew) : crew;
+  } catch { return crew; }
+}
 
 type CrewRow = {
   id: string;
@@ -38,6 +56,7 @@ export async function saveCrewJobs(
   const { data } = await supabase.auth.getUser();
   const user = data.user;
   if (!user || !docId) return;
+  crew = mirroredCrewRows(docId, crew);
   // Pay rows only: schedule rows ("<doc>-sched-<worker>") are kept in step by syncScheduleCrewJobs.
   await supabase.from("crew_jobs").delete().eq("owner_id", user.id).eq("doc_id", docId).not("id", "like", `${docId}-sched-%`);
   if (!crew.length) return;
