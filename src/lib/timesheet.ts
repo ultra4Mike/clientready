@@ -147,7 +147,7 @@ export function step(cur: { state: DayStateName; resume: DayStateName; docId?: s
   const target = TRANSITIONS[cur.state][kind];
   const ok = Boolean(target);
   let state: DayStateName = target === "RESUME" ? cur.resume : (target || FALLBACK[kind]);
-  if (!ok && kind === "break_end") state = cur.resume;
+  if (!ok && kind === "break_end") state = cur.state === "OFF_DUTY" ? cur.resume : cur.state; // no break open: stay put
   const resume = state === "ON_BREAK" ? (cur.state === "ON_BREAK" ? cur.resume : cur.state === "OFF_DUTY" ? "ON_DUTY_IDLE" : cur.state) : cur.resume;
   const docId = kind === "start_job" || kind === "arrive" || kind === "start_transit" ? event.docId || cur.docId : state === "OFF_DUTY" ? undefined : cur.docId;
   return { state, resume, docId, ok };
