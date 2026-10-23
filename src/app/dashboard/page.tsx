@@ -5,6 +5,7 @@ import { profitAlertJobs, readMinMargin } from "@/lib/profit-alerts";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { recurringDraftsReady, runDueRecurring } from "@/lib/recurring";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 import EmptyState from "@/components/EmptyState";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
@@ -104,6 +105,7 @@ export default function DashboardPage() {
   const [loaded, setLoaded] = useState(false);
   const [cacheShown, setCacheShown] = useState(false);
   const [stale, setStale] = useState(false);
+  const [signedOut, setSignedOut] = useState(false);
   // Clock-dependent text (greeting, chart months) renders after mount only: the server runs in UTC, the
   // owner's browser in their own zone, so rendering them on the server caused React #418 in the evening.
   const [now, setNow] = useState<Date | null>(null);
@@ -123,7 +125,11 @@ export default function DashboardPage() {
         setCacheShown(true);
       } catch { /* bad cache: wait for the server */ }
       const fresh = await loadAccountIntoCache();
-      if (!fresh) setStale(true);
+      if (!fresh) {
+        setStale(true);
+        const { data: sess } = await supabase.auth.getSession();
+        if (!sess.session) setSignedOut(true);
+      }
       const profileRaw = window.localStorage.getItem("clientready-profile");
       const clientsRaw = window.localStorage.getItem("clientready-clients");
       const docsRaw = window.localStorage.getItem("clientready-documents");
@@ -242,7 +248,7 @@ export default function DashboardPage() {
     <AppShell title="Dashboard">
       <PageHeader
         title={`${hello}${ownerName ? `, ${ownerName}` : ""}.`}
-        subtitle={<>{stale && loaded ? <span data-testid="dashboard-stale">Couldn&apos;t reach the server. These are the numbers saved on this device. </span> : null}{!loaded ? "Loading your numbers…" : stats.invoiceCount === 0
+        subtitle={<>{stale && loaded ? <span data-testid="dashboard-stale">{signedOut ? <>You&apos;re signed out, so nothing can sync. <a href="/login" className="underline">Sign in again</a>. These are the numbers saved on this device. </> : <>Couldn&apos;t reach the server. These are the numbers saved on this device. </>}</span> : null}{!loaded ? "Loading your numbers…" : stats.invoiceCount === 0
           ? "Create your first invoice to see totals."
           : "Here is what is happening with your invoices today."}</>}
         actions={<>

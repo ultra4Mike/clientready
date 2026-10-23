@@ -70,8 +70,21 @@ export default function SyncPill() {
     };
   }, []);
 
-  if (!signedIn || !state) return null;
+  if (!state) return null;
   const count = pendingIds().length;
+  if (!signedIn) {
+    // Signed out (session expired or revoked): say so instead of vanishing, since nothing can sync until sign-in.
+    let hasLocal = count > 0;
+    try { hasLocal = hasLocal || Boolean(window.localStorage.getItem("clientready-documents")); } catch { /* ignore */ }
+    if (!hasLocal) return null;
+    return (
+      <a href="/login" data-testid="sync-pill" data-state="signed-out" aria-label="Signed out · sign in to sync"
+        className="print-hide inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-600 dark:text-amber-300">
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+        <span>Signed out · sign in to sync{count > 0 ? ` (${count})` : ""}</span>
+      </a>
+    );
+  }
   return (
     <span className="relative inline-flex">
     <button
