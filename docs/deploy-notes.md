@@ -1,0 +1,1 @@
+- 2026-10-23 01:57 CDT: deploy d63504f (change-order chain credits, portal $160 fix); tsc, corev.unit, corev.js, signed-out passed.
