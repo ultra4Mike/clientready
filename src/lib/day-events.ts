@@ -143,7 +143,9 @@ export type AuditRow = { id?: string; at: string; actor: string; employeeId: str
 const KEY_AUDIT = "clientready-time-audit";
 /** Owner: write one audit row (taps are logged by the database trigger). */
 export async function logAudit(row: { action: string; employeeId?: string; date?: string | null; oldValue?: unknown; newValue?: unknown }) {
-  const { data } = await supabase.auth.getUser();
+  // Session from local storage (no network), so this device's copy is written right away, even offline.
+  const { data: sess } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+  const data = { user: sess.session?.user || null };
   const full: AuditRow = { at: new Date().toISOString(), actor: data.user?.email || "owner", employeeId: row.employeeId || "", date: row.date ?? null, action: row.action, oldValue: row.oldValue ?? null, newValue: row.newValue ?? null };
   writeLocal(KEY_AUDIT, [...readLocal<AuditRow[]>(KEY_AUDIT, []), full].slice(-2000));
   if (!data.user) return;
