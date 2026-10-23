@@ -12,6 +12,7 @@ import { uniqueDocs } from "@/lib/change-orders";
 import { confirmJobDone, doneState, omwTime, onMyWaySmsHref, readWorkers, saveSchedule, statusLabel, type Schedule } from "@/lib/schedule";
 import { localYmd, niceYmd, scheduledJobs, timeLabel } from "@/lib/scheduled-jobs";
 import CalendarFilterBar from "@/components/CalendarFilterBar";
+import { businessToday, segmentOn } from "@/lib/overnight";
 import { isTentative, PRESETS, readCalendarFilter, saveCalendarFilter, visibleOnCalendar, type CalendarFilter } from "@/lib/calendar-filter";
 
 type Doc = { id: string; type: string; title: string; clientName: string; createdAt: string; data: Record<string, unknown> };
@@ -40,7 +41,7 @@ export default function TodayPage() {
   };
 
   useEffect(() => {
-    const day = localYmd();
+    const day = businessToday() || localYmd(); // cal24: business-zone day (11:30 PM CT is still today)
     // Speed audit #1: cached jobs first, then refresh from the server.
     try { read(); setToday(day); if (window.localStorage.getItem("clientready-documents")) setLoaded(true); } catch { /* bad cache: wait for the server */ }
     loadAccountIntoCache()
@@ -53,6 +54,8 @@ export default function TodayPage() {
   }, []);
 
   const jobs = today ? scheduledJobs(docs).filter((job) => job.schedule.date === today && visibleOnCalendar(job.doc, filter, docs)) : [];
+  // cal24: overnight jobs from last night still running this morning.
+  const carried = today ? scheduledJobs(docs).filter((job) => job.schedule.date !== today && segmentOn(job.schedule, today)?.continued && visibleOnCalendar(job.doc, filter, docs)) : [];
   // "Any time" jobs (no start time) go after timed jobs.
   jobs.sort((a, b) => (a.schedule.startTime || "99:99").localeCompare(b.schedule.startTime || "99:99"));
 
@@ -93,6 +96,15 @@ export default function TodayPage() {
             <a href="/calendar" className="mt-2 inline-flex min-h-11 items-center rounded-lg border border-teal-500/30 px-4 text-sm font-medium">Open calendar</a>
           </div>
         )}
+        {carried.length > 0 && (
+          <ul className="mb-3 space-y-1.5" data-testid="today-overnight">
+            {carried.map(({ doc, schedule }) => (
+              <li key={`cont-${doc.id}`} data-testid="today-job-cont" data-doc-id={doc.id} className="rounded-xl border border-dashed border-sky-400/60 bg-sky-500/5 px-3 py-2 text-sm">
+                <span className="font-semibold tabular-nums">Until {timeLabel(schedule.endTime || "")}</span> · <a href={`/invoice?id=${encodeURIComponent(doc.id)}`} className="underline-offset-2 hover:underline">{text(doc.data?.clientName) || doc.clientName || doc.title}</a> <span className="text-xs text-[var(--cr-muted)]">· overnight job from yesterday ({timeLabel(schedule.startTime)} start)</span>
+              </li>
+            ))}
+          </ul>
+        )}
         <ol className="space-y-3">
           {jobs.map(({ doc, schedule }) => {
             const phone = text(doc.data?.clientPhone);
@@ -103,7 +115,7 @@ export default function TodayPage() {
             return (
               <li key={doc.id} data-testid="today-job" data-doc-id={doc.id} data-time={schedule.startTime || ""} data-status={schedule.status} data-done={done || undefined} data-tentative={isTentative(doc, docs) || undefined} className={`grid grid-cols-[4.5rem_minmax(0,1fr)] gap-3 rounded-2xl border border-l-4 border-teal-500/20 bg-[var(--cr-card)] p-4 text-sm shadow-sm sm:grid-cols-[6rem_minmax(0,1fr)] sm:gap-5 sm:p-5 ${tone}${isTentative(doc, docs) ? " cr-tentative border-dashed opacity-60" : ""}`}>
                 <div className="font-semibold tabular-nums leading-tight">
-                  <span data-testid="today-time">{schedule.startTime ? timeLabel(schedule.startTime) : "Any time"}{schedule.endTime ? ` – ${timeLabel(schedule.endTime)}` : ""}</span>
+                  <span data-testid="today-time">{schedule.startTime ? timeLabel(schedule.startTime) : "Any time"}{schedule.endTime ? ` – ${timeLabel(schedule.endTime)}` : ""}{schedule.endTime && schedule.startTime && schedule.endTime < schedule.startTime ? " (next day)" : ""}</span>
                 </div>
                 <div className="min-w-0 space-y-1">
                   <p className="text-base font-semibold">

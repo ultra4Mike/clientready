@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { isUuid, saveCloudDocument, type CloudDoc } from "@/lib/cloud-docs";
 import { moneySnapshot } from "@/lib/change-orders";
 import { readOverrides, type Override } from "@/lib/conflicts";
+import { addDaysYmd as addDayOvernight, jobMinutes } from "@/lib/overnight";
 
 export type JobStatus = "scheduled" | "in_progress" | "done";
 export type Schedule = {
@@ -165,7 +166,7 @@ export function moveSchedule(schedule: Schedule, date: string, startTime?: strin
   const start = startTime ?? schedule.startTime;
   let endTime = schedule.endTime;
   if (startTime && schedule.startTime && schedule.endTime) {
-    endTime = hhmm(minutes(startTime) + (minutes(schedule.endTime) - minutes(schedule.startTime)));
+    endTime = hhmm((minutes(startTime) + jobMinutes(schedule.startTime, schedule.endTime)) % 1440); // cal24: keeps an overnight length
   }
   return { ...schedule, date, startTime: start, ...(endTime ? { endTime } : {}) };
 }
@@ -615,14 +616,18 @@ export function travelWarnings(docId: string, date: string, startTime: string, e
     docs = [];
   }
   const start = minutes(startTime);
-  const end = endTime ? minutes(endTime) : start + 60;
+  const end = start + jobMinutes(startTime, endTime);
   const out: TravelWarning[] = [];
   for (const doc of docs) {
     if (!doc || doc.id === docId) continue;
     const other = readSchedule(doc.data);
-    if (!other || other.date !== date || !other.startTime || other.status === "done") continue;
-    const oStart = minutes(other.startTime);
-    const oEnd = other.endTime ? minutes(other.endTime) : oStart + 60;
+    if (!other || !other.startTime || other.status === "done") continue;
+    // cal24: yesterday's overnight job / tomorrow's early job, on this day's clock.
+    const offset = other.date === date ? 0 : other.date === addDayOvernight(date, -1) ? -1440 : other.date === addDayOvernight(date, 1) ? 1440 : null;
+    if (offset === null) continue;
+    const oStart = minutes(other.startTime) + offset;
+    const oEnd = oStart + jobMinutes(other.startTime, other.endTime);
+    if (offset && (oEnd <= start - buffer || oStart >= end + buffer)) continue;
     const gap = oStart >= start ? oStart - end : start - oEnd;
     if (gap >= buffer) continue;
     for (const id of workerIds) if (other.workerIds.includes(id)) out.push({ workerId: id, otherTitle: doc.title || String(doc.data?.invoiceNumber || "another job"), gap });

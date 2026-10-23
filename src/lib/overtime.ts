@@ -1,5 +1,6 @@
 import { readSchedule } from "@/lib/schedule";
 import { periodRange } from "@/lib/period";
+import { jobMinutes } from "@/lib/overnight";
 
 /**
  * Overtime soft warning (owner only). One number in Profile: weekly hours per worker (default 40; 0 = off).
@@ -21,7 +22,7 @@ const toMin = (time: string) => { const [h, m] = String(time || "").split(":").m
 /** Hours a job's schedule takes (end - start; a start with no end counts 1 hour). */
 export function scheduledHours(schedule: { startTime?: string; endTime?: string } | null) {
   if (!schedule?.startTime) return 0;
-  const minutes = schedule.endTime && schedule.endTime > schedule.startTime ? toMin(schedule.endTime) - toMin(schedule.startTime) : 60;
+  const minutes = jobMinutes(schedule.startTime, schedule.endTime); // cal24: 22:00-04:00 = 6 h
   return minutes / 60;
 }
 

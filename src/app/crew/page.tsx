@@ -100,7 +100,8 @@ function hoursBetween(start: string, end: string) {
   if (!start || !end) return "";
   const [sh, sm] = start.split(":").map(Number);
   const [eh, em] = end.split(":").map(Number);
-  const mins = eh * 60 + em - (sh * 60 + sm);
+  let mins = eh * 60 + em - (sh * 60 + sm);
+  if (mins < 0) mins += 24 * 60; // cal24: a night shift that ends after midnight
   return mins > 0 ? (mins / 60).toFixed(2) : "";
 }
 function localInput(iso: string | null | undefined) {

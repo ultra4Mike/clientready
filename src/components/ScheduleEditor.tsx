@@ -6,13 +6,14 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { refreshOwnerUnavailable, unavailableOn, type Unavailable } from "@/lib/unavailable";
 import { bookedBlocks, bookingConflicts, clockText, DEFAULT_JOB_MINUTES, nextOpenSlot, readOverrides, splitConflicts, type Override } from "@/lib/conflicts";
 import { ignoresTentative, readCalendarFilter } from "@/lib/calendar-filter";
+import { crossesMidnight, jobMinutes } from "@/lib/overnight";
 import { STATUS_LABEL, TRAVEL_BUFFER_MINUTES, travelWarnings, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
 
 function readDocsSafe(): { id: string; title?: string; data?: Record<string, unknown> }[] {
   try { return JSON.parse(window.localStorage.getItem("clientready-documents") || "[]") || []; } catch { return []; }
 }
 const toMin = (time: string) => { const [h, m] = time.split(":").map(Number); return h * 60 + m; };
-const toHhmm = (total: number) => { const t = Math.max(0, Math.min(23 * 60 + 59, total)); return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`; };
+const toHhmm = (total: number) => { const t = ((Math.round(total) % 1440) + 1440) % 1440; /* cal24: wraps past midnight */ return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`; };
 
 function watchOnline(callback: () => void) {
   window.addEventListener("online", callback);
@@ -68,7 +69,7 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
   const blocks = bookedBlocks(allDocs, docId, date, workerIds);
   const overtimeLimit = ownerOvertimeHours();
   const overtime = date && workerIds.length ? overLimit(weekScheduledHours(allDocs, docId, { date, startTime, endTime, workerIds }), overtimeLimit).filter((row) => workerIds.includes(row.id)) : [];
-  const length = startTime ? (endTime && endTime > startTime ? toMin(endTime) - toMin(startTime) : 60) : 60;
+  const length = jobMinutes(startTime, endTime); // cal24: 22:00-04:00 = 6 h
   const slotOpts = { ignoreTentative: skipTentative };
   const suggestion = conflicts.length || softConflicts.length ? nextOpenSlot(allDocs, docId, date, workerIds, length, startTime ? toMin(startTime) : undefined, slotOpts) || nextOpenSlot(allDocs, docId, date, workerIds, length, undefined, slotOpts) : "";
   function applySlot(slot: string) {
@@ -106,7 +107,7 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
   /** Why this can't be saved yet ("" = it can). */
   function problem() {
     if (!date || !/^(19|20)\d\d-\d\d-\d\d$/.test(date)) return "Pick a date."; // R123: half-typed years don't save
-    if (startTime && endTime && endTime <= startTime) return "End time must be after the start time.";
+    if (startTime && endTime && endTime === startTime) return "End time must be different from the start time (an earlier end means the job runs past midnight).";
     if (conflicts.length && !bookAnyway) return "Someone on this job is already booked at that time. Pick another time, or tick Book anyway.";
     return "";
   }
@@ -160,6 +161,7 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
           </select>
         </label>
       </div>
+      {crossesMidnight(startTime, endTime) && <p data-testid="overnight-note" className="rounded-md border border-sky-400/50 bg-sky-500/10 px-2.5 py-1.5 text-sky-900 dark:text-sky-100">Overnight job: ends {endTime ? new Date(`2000-01-01T${endTime}`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : ""} the next day ({Math.floor(length / 60)} h{length % 60 ? ` ${length % 60} m` : ""}).</p>}
       <label className="flex flex-col gap-1">Note for crew <span className="text-xs opacity-60">(shown to assigned crew only, not the customer)</span>
         <input aria-label="Note for crew" value={crewNote} maxLength={500} onChange={(event) => setCrewNote(event.target.value)} placeholder="Gate code, parking, what to bring…" className="rounded-md border border-slate-300 bg-transparent px-2 py-1.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" />
       </label>

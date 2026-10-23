@@ -161,7 +161,8 @@ function hoursBetween(start: string, end: string) {
   if (!start || !end) return "";
   const [sh, sm] = start.split(":").map(Number);
   const [eh, em] = end.split(":").map(Number);
-  const mins = eh * 60 + em - (sh * 60 + sm);
+  let mins = eh * 60 + em - (sh * 60 + sm);
+  if (mins < 0) mins += 24 * 60; // cal24: a 10 PM to 4 AM shift is 6 hours (runs past midnight)
   if (mins <= 0) return "";
   return (mins / 60).toFixed(2);
 }

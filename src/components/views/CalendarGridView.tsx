@@ -1,7 +1,8 @@
 "use client";
 
 import OverlapBadge from "@/components/OverlapBadge";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ALL_HOURS, businessToday, crossesMidnight, jobMinutes, scrollHour, segmentOn, zonedNow } from "@/lib/overnight";
 import { CalendarViewTabs } from "@/components/ViewTabs";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
@@ -26,7 +27,10 @@ type Job = { doc: SavedDocument; schedule: Schedule };
 type View = "week" | "month" | "worker";
 type Editing = { docId: string; date?: string; startTime?: string } | null;
 
-const HOURS = Array.from({ length: 15 }, (_, index) => index + 6); // 6:00 to 20:00
+// cal24: every hour of the day (12 AM to 11 PM). The compact view scrolls inside a box (opens at business hours or now);
+// "Show 24 hours" shows them all at once. The choice is remembered on this device.
+const HOURS = ALL_HOURS;
+const HOURS_KEY = "clientready-calendar-hours";
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function ymd(date: Date) {
@@ -68,7 +72,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
   const [filter, setFilterState] = useState<CalendarFilter>(PRESETS.all);
   function setFilter(next: CalendarFilter) { setFilterState(next); saveCalendarFilter(next); }
   useEffect(() => {
-    setState({ docs: readDocs(), workers: readWorkers(), today: ymd(new Date()) });
+    setState({ docs: readDocs(), workers: readWorkers(), today: businessToday() }); // cal24: business-zone today, never UTC
     setFilterState(readCalendarFilter());
   }, []);
 
@@ -109,7 +113,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
     const base = { date, startTime: start, workerIds, status: "scheduled" as JobStatus, updatedAt: "" };
     if (!start) return base;
     const js = String(data?.jobStart || ""), je = String(data?.jobEnd || "");
-    if (isT(js) && isT(je) && je > js) return moveSchedule({ ...base, startTime: js, endTime: je }, date, start);
+    if (isT(js) && isT(je) && je !== js) return moveSchedule({ ...base, startTime: js, endTime: je }, date, start);
     return base;
   }
 
@@ -128,7 +132,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
       // Same double-booking check as the schedule editor: offer the next open time, else Book anyway (recorded).
       // R127: an approved job there blocks (below); a pending/draft one only warns, with a move option.
       const { hard: clash, soft } = splitConflicts(bookingConflicts(docs, docId, next));
-      const softLen = next.startTime ? (next.endTime && next.endTime > next.startTime ? toMin(next.endTime) - toMin(next.startTime) : 60) : 60;
+      const softLen = jobMinutes(next.startTime, next.endTime);
       if (!clash.length && soft.length) {
         const who = soft.map((c) => `${workerName.get(c.workerId) || "Worker"} on ${c.title} ${clockText(c.start)}–${clockText(c.end)}`).join("\n");
         const slot = nextOpenSlot(docs, docId, date, next.workerIds, softLen, next.startTime ? toMin(next.startTime) : undefined, { ignoreTentative: skipTentative });
@@ -141,7 +145,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
       }
       if (clash.length) {
         const who = clash.map((c) => `${workerName.get(c.workerId) || "Worker"} is already on ${c.title} ${clockText(c.start)}–${clockText(c.end)}`).join("\n");
-        const length = next.startTime ? (next.endTime && next.endTime > next.startTime ? toMin(next.endTime) - toMin(next.startTime) : 60) : 60;
+        const length = jobMinutes(next.startTime, next.endTime);
         const slot = nextOpenSlot(docs, docId, date, next.workerIds, length, next.startTime ? toMin(next.startTime) : undefined, { ignoreTentative: skipTentative }) || nextOpenSlot(docs, docId, date, next.workerIds, length, undefined, { ignoreTentative: skipTentative });
         if (slot && window.confirm(`Double-booked:\n${who}\n\nMove it to the next open time, ${clockText(toMin(slot))}, instead?`)) {
           const moved = moveSchedule(next, date, slot);
@@ -180,12 +184,12 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
       >
         {agenda ? (
           <span className="flex min-w-0 items-baseline gap-2">
-            <span className="shrink-0 font-semibold tabular-nums">{job.schedule.startTime ? timeLabel(job.schedule.startTime) : "Any time"}</span>
+            <span className="shrink-0 font-semibold tabular-nums">{job.schedule.startTime ? timeLabel(job.schedule.startTime) : "Any time"}{crossesMidnight(job.schedule.startTime, job.schedule.endTime) ? `–${timeLabel(job.schedule.endTime || "")} (next day)` : ""}</span>
             <span className="min-w-0 truncate">{job.doc.title}{job.doc.clientName ? <span className="opacity-80"> · {job.doc.clientName}</span> : null}</span>
           </span>
         ) : (
           <>
-            {job.schedule.startTime && <span className="font-semibold">{timeLabel(job.schedule.startTime)} </span>}
+            {job.schedule.startTime && <span className="font-semibold">{timeLabel(job.schedule.startTime)}{crossesMidnight(job.schedule.startTime, job.schedule.endTime) ? `–${timeLabel(job.schedule.endTime || "")} ☾` : ""} </span>}
             {job.doc.clientName || job.doc.title}
           </>
         )}
@@ -200,6 +204,42 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
       </div>
     );
   }
+
+  /** cal24: an overnight job from the day before, shown on this day as "continues until 4am". */
+  const continuing = (day: string) => jobs.filter((job) => job.schedule.date !== day && segmentOn(job.schedule, day)?.continued);
+  function contChip(job: Job, agenda = false) {
+    return (
+      <div
+        key={`cont-${job.doc.id}`}
+        data-testid={`${agenda ? "agenda-" : ""}job-cont-${job.doc.id}`}
+        data-overnight="continued"
+        onClick={(event) => { event.stopPropagation(); setEditing({ docId: job.doc.id }); }}
+        title={`${job.doc.title} · continues from the day before`}
+        className={`cr-chip2 cr-chip-cont cursor-pointer min-w-0 break-words rounded-md border border-dashed border-l-4 px-1.5 py-1 text-left font-medium leading-snug opacity-90 ${agenda ? "min-h-11 text-sm" : "text-xs"} ${statusClass(job.schedule)}`}
+      >
+        <span className="font-semibold">↳ until {timeLabel(job.schedule.endTime || "")} </span>{job.doc.clientName || job.doc.title}
+        <span className="block text-[10px] opacity-80">Continues from {parse(job.schedule.date).toLocaleDateString("en-US", { weekday: "short" })} night</span>
+      </div>
+    );
+  }
+
+  // cal24: compact (scrolls, opens at business hours / now) vs all 24 hours, remembered on this device.
+  const [full24, setFull24] = useState(false);
+  useEffect(() => { Promise.resolve().then(() => { try { setFull24(window.localStorage.getItem(HOURS_KEY) === "24"); } catch { /* private mode */ } }); }, []);
+  function toggle24() { const next = !full24; setFull24(next); try { window.localStorage.setItem(HOURS_KEY, next ? "24" : "compact"); } catch { /* private mode */ } }
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const weekKey = current ? addDays(weekStart(current), 0) : "";
+  useEffect(() => {
+    const box = scrollRef.current;
+    if (!box || full24 || view !== "week" || !weekKey) return;
+    const days = Array.from({ length: 7 }, (_, i) => addDays(weekKey, i));
+    const starts = jobs.filter((job) => days.includes(job.schedule.date) && job.schedule.startTime).map((job) => Number(job.schedule.startTime.slice(0, 2)));
+    const hour = scrollHour(days.includes(today), zonedNow().minutes, starts.length ? Math.min(...starts) : undefined);
+    const row = box.querySelector<HTMLElement>(`[data-hour="${hour}"]`);
+    if (row) box.scrollTop = row.offsetTop;
+    box.dataset.scrollHour = String(hour);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [full24, view, weekKey, today, jobs.length]);
 
   const weekDays = current ? Array.from({ length: 7 }, (_, index) => addDays(weekStart(current), index)) : [];
   const monthFirst = current ? `${current.slice(0, 8)}01` : "";
@@ -282,51 +322,57 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
         <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_14rem]">
           <div className="min-w-0 rounded-2xl border border-slate-500/25 bg-[var(--cr-card)] p-2 shadow-sm sm:p-3 min-[900px]:overflow-x-auto max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none">
             {view === "week" && (
-              <div className="hidden min-w-0 grid-cols-[3rem_repeat(7,minmax(0,1fr))] text-xs min-[900px]:grid" data-testid="week-grid">
-                <div />
-                {weekDays.map((day) => (
-                  <div key={day} className={`border-b border-slate-500/30 px-2 py-2.5 text-center text-sm font-semibold ${day === today ? "rounded-t-lg bg-teal-500/15 text-teal-600 dark:text-teal-300" : ""}`}>
-                    {DAY_NAMES[parse(day).getDay()]} {parse(day).getDate()}
-                  </div>
-                ))}
-                <div className="p-1.5 pr-2 text-right text-[11px] font-medium uppercase tracking-wide opacity-70">Any</div>
-                {weekDays.map((day) => (
-                  <div key={`any-${day}`} data-testid={`slot-${day}-any`} onDragOver={(event) => event.preventDefault()} onDrop={dropOn(day, "")} className={`min-h-10 space-y-1 border-b border-l border-slate-500/20 bg-slate-500/5 p-1 ${day === today ? "bg-teal-500/10" : ""}`}>
-                    {jobs.filter((job) => job.schedule.date === day && !job.schedule.startTime).map((job) => chip(job, true))}
-                  </div>
-                ))}
-                {HOURS.map((hour) => (
-                  <div key={hour} className="contents">
-                    <div className="-mt-2 p-1.5 pr-2 text-right text-[11px] font-medium tabular-nums opacity-70">{timeLabel(`${String(hour).padStart(2, "0")}:00`)}</div>
-                    {weekDays.map((day) => {
-                      const slot = `${String(hour).padStart(2, "0")}:00`;
-                      const here = jobs.filter((job) => job.schedule.date === day && job.schedule.startTime && Number(job.schedule.startTime.slice(0, 2)) === hour);
-                      return (
-                        <div
-                          key={`${day}-${hour}`}
-                          data-testid={`slot-${day}-${String(hour).padStart(2, "0")}`}
-                          onDragOver={(event) => event.preventDefault()}
-                          onDrop={dropOn(day, slot)}
-                          onClick={() => unscheduled.length ? setEditing({ docId: unscheduled[0].id, date: day, startTime: slot }) : setMessage("Every job is scheduled. Click a job to change it.")}
-                          className={`min-h-12 space-y-1 border-b border-l border-slate-500/20 p-1 transition hover:bg-teal-500/10 ${day === today ? "bg-teal-500/10" : ""}`}
-                        >
-                          {here.map((job) => chip(job))}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-                {(() => {
-                  const outside = jobs.filter((job) => weekDays.includes(job.schedule.date) && job.schedule.startTime && (Number(job.schedule.startTime.slice(0, 2)) < HOURS[0] || Number(job.schedule.startTime.slice(0, 2)) > HOURS[HOURS.length - 1]));
-                  return outside.length ? <div className="col-span-8 p-1 opacity-80">Outside 6am–8pm: {outside.map((job) => chip(job, true))}</div> : null;
-                })()}
+              <div className="hidden min-[900px]:block" data-testid="week-grid" data-hours={full24 ? "24" : "compact"}>
+                <div className="mb-1.5 flex items-center justify-end gap-2 text-xs">
+                  <span className="opacity-70" data-testid="cal-hours-note">{full24 ? "Showing all 24 hours" : "12 AM to 11 PM · scroll for night hours"}</span>
+                  <button type="button" data-testid="cal-hours-toggle" aria-pressed={full24} onClick={toggle24} className="inline-flex min-h-9 items-center rounded-lg border border-slate-500/30 px-3 font-medium transition hover:border-teal-400">{full24 ? "Compact view" : "Show 24 hours"}</button>
+                </div>
+                <div className="grid min-w-0 grid-cols-[3rem_repeat(7,minmax(0,1fr))]">
+                  <div />
+                  {weekDays.map((day) => (
+                    <div key={day} className={`border-b border-slate-500/30 px-2 py-2.5 text-center text-sm font-semibold ${day === today ? "rounded-t-lg bg-teal-500/15 text-teal-600 dark:text-teal-300" : ""}`}>
+                      {DAY_NAMES[parse(day).getDay()]} {parse(day).getDate()}
+                    </div>
+                  ))}
+                  <div className="p-1.5 pr-2 text-right text-[11px] font-medium uppercase tracking-wide opacity-70">Any</div>
+                  {weekDays.map((day) => (
+                    <div key={`any-${day}`} data-testid={`slot-${day}-any`} onDragOver={(event) => event.preventDefault()} onDrop={dropOn(day, "")} className={`min-h-10 space-y-1 border-b border-l border-slate-500/20 bg-slate-500/5 p-1 ${day === today ? "bg-teal-500/10" : ""}`}>
+                      {jobs.filter((job) => job.schedule.date === day && !job.schedule.startTime).map((job) => chip(job, true))}
+                    </div>
+                  ))}
+                </div>
+                <div ref={scrollRef} data-testid="week-hours" className={`relative grid min-w-0 grid-cols-[3rem_repeat(7,minmax(0,1fr))] ${full24 ? "" : "max-h-[36rem] overflow-y-auto overscroll-contain"}`}>
+                  {HOURS.map((hour) => (
+                    <div key={hour} className="contents">
+                      <div data-hour={hour} data-testid={`hour-label-${String(hour).padStart(2, "0")}`} className="p-1.5 pr-2 text-right text-[11px] font-medium tabular-nums opacity-70">{timeLabel(`${String(hour).padStart(2, "0")}:00`)}</div>
+                      {weekDays.map((day) => {
+                        const slot = `${String(hour).padStart(2, "0")}:00`;
+                        const here = jobs.filter((job) => job.schedule.date === day && job.schedule.startTime && Number(job.schedule.startTime.slice(0, 2)) === hour);
+                        const cont = hour === 0 ? continuing(day) : [];
+                        return (
+                          <div
+                            key={`${day}-${hour}`}
+                            data-testid={`slot-${day}-${String(hour).padStart(2, "0")}`}
+                            onDragOver={(event) => event.preventDefault()}
+                            onDrop={dropOn(day, slot)}
+                            onClick={() => unscheduled.length ? setEditing({ docId: unscheduled[0].id, date: day, startTime: slot }) : setMessage("Every job is scheduled. Click a job to change it.")}
+                            className={`min-h-12 space-y-1 border-b border-l border-slate-500/20 p-1 transition hover:bg-teal-500/10 ${day === today ? "bg-teal-500/10" : ""} ${hour < 6 || hour >= 20 ? "cr-night-slot bg-slate-500/5" : ""}`}
+                          >
+                            {cont.map((job) => contChip(job))}
+                            {here.map((job) => chip(job))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
 
             {(view === "week" || view === "month") && (() => {
               const days = (view === "week" ? weekDays : monthCells.filter((day): day is string => Boolean(day)))
-                .filter((day) => view === "week" || day === today || jobs.some((job) => job.schedule.date === day) || docs.some((doc) => isDueInvoice(doc) && doc.data?.dueDate === day));
+                .filter((day) => view === "week" || day === today || jobs.some((job) => job.schedule.date === day) || continuing(day).length > 0 || docs.some((doc) => isDueInvoice(doc) && doc.data?.dueDate === day));
               return (
                 <div className="space-y-3 min-[900px]:hidden" data-testid="agenda-list">
                   {days.length === 0 && <p className="py-8 text-center text-sm text-[var(--cr-muted)]">No jobs this month.</p>}
@@ -341,11 +387,12 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
                           {day === today && <span className="ml-auto text-xs font-semibold uppercase tracking-wide">Today</span>}
                         </h2>
                         <div className="space-y-1.5">
+                          {continuing(day).map((job) => contChip(job, true))}
                           {dayJobs.map((job) => chip(job, false, true))}
                           {due.map((doc) => (
                             <a key={`agenda-due-${doc.id}`} href={`/invoice-view?id=${encodeURIComponent(doc.id)}`} className="flex min-h-11 items-center rounded-lg border border-dashed border-slate-500/30 px-3 text-sm text-[var(--cr-muted)]" data-testid={`agenda-due-${doc.id}`}>Due: {doc.title}</a>
                           ))}
-                          {dayJobs.length === 0 && due.length === 0 && <p className="px-3 py-2 text-sm text-[var(--cr-muted)]">No jobs</p>}
+                          {dayJobs.length === 0 && due.length === 0 && continuing(day).length === 0 && <p className="px-3 py-2 text-sm text-[var(--cr-muted)]">No jobs</p>}
                         </div>
                       </section>
                     );
@@ -368,6 +415,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
                     >
                       {day && <div className={`mb-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${day === today ? "bg-teal-500 text-slate-950!" : ""}`}>{parse(day).getDate()}</div>}
                       <div className="space-y-0.5">
+                        {day && continuing(day).map((job) => contChip(job))}
                         {day && jobs.filter((job) => job.schedule.date === day).sort((a, b) => a.schedule.startTime.localeCompare(b.schedule.startTime)).map((job) => chip(job, true))}
                         {day && docs.filter((doc) => isDueInvoice(doc) && doc.data?.dueDate === day).map((doc) => (
                           <a key={`due-${doc.id}`} href={`/invoice-view?id=${encodeURIComponent(doc.id)}`} onClick={(event) => event.stopPropagation()} className="block truncate opacity-70" data-testid={`due-${doc.id}`}>Due: {doc.title}</a>

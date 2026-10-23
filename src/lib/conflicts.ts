@@ -1,5 +1,6 @@
 import { derivedWhen } from "./job-when";
 import { isUnsentDraft, needsApproval } from "./doc-status";
+import { addDaysYmd, DAY_MINUTES, jobMinutes } from "./overnight";
 
 /** Clash rule: an unapproved proposal / pending change order or an unsent draft invoice is tentative (soft warning); approved or sent work is hard. */
 export const softClash = (doc: Doc, allDocs: Doc[] = []) => { const d = doc as Doc & { type?: string }; return needsApproval(d, allDocs) || (d.type !== "proposal" && isUnsentDraft(d)); };
@@ -15,11 +16,13 @@ type Doc = { id: string; title?: string; data?: Record<string, unknown> };
 /** A job with a start but no end counts as this long everywhere (R112). */
 export const DEFAULT_JOB_MINUTES = 60;
 const mins = (time: string) => { const [h, m] = time.split(":").map(Number); return h * 60 + m; };
-export const clockText = (total: number) => {
+export const clockText = (raw: number) => {
+  // cal24: minutes past midnight (overnight jobs) or before it (yesterday's) wrap to the clock time.
+  const total = ((Math.round(raw) % 1440) + 1440) % 1440;
   const h = Math.floor(total / 60), m = total % 60;
   return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 };
-export const hhmmOf = (total: number) => `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+export const hhmmOf = (raw: number) => { const total = ((Math.round(raw) % 1440) + 1440) % 1440; return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`; };
 
 function sched(doc: Doc): Sched | null {
   // R119: void / deleted jobs never clash.
@@ -38,8 +41,8 @@ function sched(doc: Doc): Sched | null {
 function span(s: Sched) {
   if (!s.startTime || !/^\d{2}:\d{2}$/.test(s.startTime)) return null;
   const start = mins(s.startTime);
-  const end = s.endTime && /^\d{2}:\d{2}$/.test(s.endTime) && mins(s.endTime) > start ? mins(s.endTime) : start + DEFAULT_JOB_MINUTES;
-  return { start, end };
+  // cal24: an end before the start runs past midnight (22:00-04:00 = 6 h, ending 28:00 on the start day's clock).
+  return { start, end: start + jobMinutes(s.startTime, s.endTime, DEFAULT_JOB_MINUTES) };
 }
 export function readOverrides(value: unknown): Override[] {
   if (!Array.isArray(value)) return [];
@@ -64,12 +67,18 @@ export function bookedBlocks(docs: Doc[], docId: string, date: string, workerIds
   for (const doc of docs) {
     if (!doc || doc.id === docId || sameJob(doc, byId.get(docId))) continue;
     const s = sched(doc);
-    if (!s || s.date !== date || s.status === "done") continue;
+    if (!s || s.status === "done") continue;
+    // cal24: the day before (an overnight job still running after midnight) and the day after (my overnight job runs into it),
+    // shifted onto this day's clock (minutes can be negative or past 24:00).
+    const offset = s.date === date ? 0 : s.date === addDaysYmd(date, -1) ? -DAY_MINUTES : s.date === addDaysYmd(date, 1) ? DAY_MINUTES : null;
+    if (offset === null) continue;
     const tentative = softClash(doc, docs);
     if (ignoreTentative && tentative) continue;
-    const t = span(s);
-    if (!t) continue;
-    for (const id of s.workerIds || []) if (workerIds.includes(String(id))) out.push({ docId: doc.id, title: titleOf(doc), workerId: String(id), ...t, date, tentative });
+    const raw = span(s);
+    if (!raw) continue;
+    const t = { start: raw.start + offset, end: raw.end + offset };
+    if (offset < 0 && t.end <= 0) continue;
+    for (const id of s.workerIds || []) if (workerIds.includes(String(id))) out.push({ docId: doc.id, title: titleOf(doc), workerId: String(id), ...t, date: String(s.date), tentative });
   }
   return out.sort((a, b) => a.start - b.start);
 }
@@ -87,10 +96,13 @@ export function bookingConflicts(docs: Doc[], docId: string, mine: Sched, extraO
     .map((b) => ({ ...b, tentative: Boolean(b.tentative || (byId.get(docId) && softClash(byId.get(docId) as Doc, docs))), mine: t }));
 }
 
-/** Earliest start (15-minute steps, 7 AM to 8 PM end) with no overlap for any of these people, or "". */
+/**
+ * Earliest start (15-minute steps) from `from` (default 7 AM) to 11:45 PM with no overlap for any of these people, or "".
+ * cal24: night starts are allowed and a job may run past midnight (checked against the next day's jobs too).
+ */
 export function nextOpenSlot(docs: Doc[], docId: string, date: string, workerIds: string[], duration: number, from = 7 * 60, opts: { ignoreTentative?: boolean } = {}): string {
   const blocks = bookedBlocks(docs, docId, date, workerIds, opts);
-  for (let start = Math.ceil(from / 15) * 15; start + duration <= 20 * 60; start += 15) {
+  for (let start = Math.max(0, Math.ceil(from / 15) * 15); start < DAY_MINUTES; start += 15) {
     if (!blocks.some((b) => b.start < start + duration && start < b.end)) return hhmmOf(start);
   }
   return "";
@@ -132,7 +144,7 @@ export function moveToNextOpen(docs: Doc[], doc: Doc): { startTime: string; endT
   const length = t.end - t.start;
   const start = nextOpenSlot(docs, doc.id, s.date, (s.workerIds || []).map(String), length, t.start);
   if (!start) return null;
-  return { startTime: start, endTime: hhmmOf(mins(start) + length) };
+  return { startTime: start, endTime: hhmmOf((mins(start) + length) % DAY_MINUTES) };
 }
 
 /** Doc ids that are in an unresolved same-worker overlap right now. */

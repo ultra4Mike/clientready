@@ -23,7 +23,7 @@ export function derivedWhen(data: Record<string, unknown> | undefined): JobWhen 
   const date = [...crew.map((row) => row.workDate), data.invoiceDate].map(isoDate).find(Boolean);
   if (!date) return null;
   const start = String(data.jobStart), end = String(data.jobEnd || "");
-  return { date, startTime: start, ...(isTime(end) && end > start ? { endTime: end } : {}), workerIds: Array.from(new Set(crew.map((row) => String(row.employeeId || "")).filter(Boolean))), derived: true };
+  return { date, startTime: start, ...(isTime(end) && end !== start ? { endTime: end } : {}) /* cal24: an earlier end = past midnight */, workerIds: Array.from(new Set(crew.map((row) => String(row.employeeId || "")).filter(Boolean))), derived: true };
 }
 
 /** data.schedule (date/time/workers only) or the derived one. */
