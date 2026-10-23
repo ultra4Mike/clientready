@@ -985,3 +985,7 @@ html button:is([data-testid^="visit-note-save-"], [data-testid^="omw-button-"], 
   min-height: 44px !important; display: inline-flex !important; align-items: center !important; justify-content: center; box-sizing: border-box; line-height: 1.25;
 }
 html [role="group"][aria-label="Job status"] > button { width: 100%; }
+/* Owner timesheet doc-number links: plain until hover, then a subtle teal underline. */
+a.cr-doc-link { color: inherit; text-decoration: none; }
+a.cr-doc-link:hover, a.cr-doc-link:focus-visible { color: #0f766e; text-decoration: underline; text-decoration-color: #14b8a6; text-underline-offset: 2px; }
+.dark a.cr-doc-link:hover, .dark a.cr-doc-link:focus-visible { color: #5eead4; }

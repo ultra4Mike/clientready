@@ -1,5 +1,6 @@
 "use client";
 /** Reports > Labor: hours and cost by worker, job and week, from the same approved-timesheet day pay (incl. OT/DT/premium). */
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { addDays } from "@/lib/timesheet-sync";
 import { laborRows, loadTimeWeek, localYmd, type LaborRow } from "@/lib/time-owner";
@@ -59,7 +60,7 @@ export default function LaborReport({ docs }: { docs: { id: string; title?: stri
           <thead><tr><th className="text-left">Name</th><th className="text-right">Hours</th><th className="text-right">OT / DT</th><th className="text-right">Top-up / PTO h</th><th className="text-right">Cost</th></tr></thead>
           <tbody>{groups.map(([k, g]) => (
             <tr key={k} className="border-t" data-testid="labor-row" data-key={k} data-state={g.estimated ? "estimated" : "approved"}>
-              <td>{g.label}</td><td className="text-right tabular-nums">{(g.minutes / 60).toFixed(2)}</td><td className="text-right tabular-nums">{g.ot.toFixed(2)} / {g.dt.toFixed(2)}</td><td className="text-right tabular-nums" data-testid="labor-topup-pto">${(g.topUp / 100).toFixed(2)} / {g.pto.toFixed(2)}</td>
+              <td>{by === "job" && docs.some((x) => x.id === k) ? <Link href={`/invoice?id=${encodeURIComponent(k)}`} data-testid="labor-doc-link" data-doc-id={k} className="cr-doc-link">{g.label}</Link> : g.label}</td><td className="text-right tabular-nums">{(g.minutes / 60).toFixed(2)}</td><td className="text-right tabular-nums">{g.ot.toFixed(2)} / {g.dt.toFixed(2)}</td><td className="text-right tabular-nums" data-testid="labor-topup-pto">${(g.topUp / 100).toFixed(2)} / {g.pto.toFixed(2)}</td>
               <td className="text-right tabular-nums" data-testid="labor-cost">${(g.cents / 100).toFixed(2)}{g.estimated ? " est." : ""}</td></tr>))}
             <tr className="border-t font-semibold" data-testid="labor-total"><td>Total</td><td className="text-right tabular-nums">{(total.minutes / 60).toFixed(2)}</td><td /><td /><td className="text-right tabular-nums">${(total.cents / 100).toFixed(2)}</td></tr>
           </tbody>

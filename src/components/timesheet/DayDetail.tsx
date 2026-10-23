@@ -10,6 +10,7 @@ import { buildDay, fmtTime, hhmmTz, wallToIso, dayTimeline, daySummary, flagReas
 import { loadAudit, type AuditRow, type DayApproval } from "@/lib/day-events";
 import type { DayPay } from "@/lib/timesheet-pay";
 import { KIND_LABEL } from "@/components/crew/MyDay";
+import DocLinkText, { docLinkMap } from "@/components/timesheet/DocLinkText";
 
 /** Plain words for one audit row (no prices). */
 const SETTING_LABEL: Record<string, string> = {
@@ -74,6 +75,7 @@ export default function DayDetail(props: {
   const [hours, setHours] = useState(() => (props.minutes / 60).toFixed(2));
   const timeline = dayTimeline(sheet);
   const reasons = flagReasons(sheet, props.extraFlags, settings);
+  const docLinks = docLinkMap([...(sheet?.jobs || []), ...props.schedule]);
   const pending = props.fixes.filter((f) => f.status === "pending");
   const approved = Boolean(props.approval?.approvedAt);
   // Same engine as the taps: edited job times become the day's "schedule" with no taps.
@@ -102,7 +104,7 @@ export default function DayDetail(props: {
         {timeline.length ? (
           <ol className="mb-3 space-y-1 border-l-2 border-teal-500/30 pl-3" data-testid="ts-dd-timeline">
             {timeline.map((row, i) => (
-              <li key={i} className={row.kind === "gap" ? (row.paid ? "text-[var(--cr-muted)]" : "font-medium text-amber-700 dark:text-amber-300") : row.fromSchedule ? "text-amber-700 dark:text-amber-300" : ""} data-testid={`ts-dd-row-${row.kind}`}>{row.kind === "gap" ? "↳ " : ""}{row.text}</li>
+              <li key={i} className={row.kind === "gap" ? (row.paid ? "text-[var(--cr-muted)]" : "font-medium text-amber-700 dark:text-amber-300") : row.fromSchedule ? "text-amber-700 dark:text-amber-300" : ""} data-testid={`ts-dd-row-${row.kind}`}>{row.kind === "gap" ? "↳ " : ""}<DocLinkText text={row.text} docs={docLinks} /></li>
             ))}
           </ol>
         ) : <p className="mb-3 text-[var(--cr-muted)]">No taps or scheduled jobs this day.</p>}
@@ -137,7 +139,7 @@ export default function DayDetail(props: {
         {reasons.length > 0 && (
           <div className="mb-3 space-y-1" data-testid="ts-dd-why">
             <p className="font-semibold">Why this day is flagged</p>
-            {reasons.map((r) => <p key={r.flag} className="rounded bg-amber-500/15 px-2 py-1" data-testid={`ts-flag-${r.flag}`}>{r.text}</p>)}
+            {reasons.map((r) => <p key={r.flag} className="rounded bg-amber-500/15 px-2 py-1" data-testid={`ts-flag-${r.flag}`}><DocLinkText text={r.text} docs={docLinks} /></p>)}
           </div>
         )}
         {pending.length > 0 && (
