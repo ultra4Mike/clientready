@@ -6,7 +6,7 @@
  * Pay comes from the APPROVED day (from the cutover date on): approving or undoing here rewrites each job's share of
  * the day on its crew rows, so job labor/profit, Crew pay, Year packet and Reports follow. Unapproved days are estimates.
  */
-import { readWorkerOverrides } from "@/lib/timesheet";
+import { readWorkerOverrides, timeAlerts, payPeriodOf, type ScheduledJob } from "@/lib/timesheet";
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
@@ -31,7 +31,7 @@ export default function TimesheetPage() {
   const [approvals, setApprovals] = useState<DayApproval[]>([]);
   const [settings, setSettings] = useState<TimesheetSettings>(DEFAULT_TIMESHEET_SETTINGS);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [period, setPeriod] = useState<"weekly" | "biweekly" | "semimonthly">("weekly");
+  const [periodPick, setPeriod] = useState<"" | "weekly" | "biweekly" | "semimonthly">("");
   const [attest, setAttest] = useState<Record<string, string>>({});
   const [fixNotes, setFixNotes] = useState<Record<string, string>>({});
   // Undo history per week (newest last, up to 20 steps): each step is the approvals as they were before it.
@@ -78,7 +78,6 @@ export default function TimesheetPage() {
     setApprovals((list) => [...list.filter((a) => !keys.has(`${a.employeeId}|${a.date}`)), ...rows]);
     if (record && before.length) setHistory((all) => ({ ...all, [week]: [...(all[week] || []), before].slice(-20) }));
     await saveApprovals(rows);
-    try { window.dispatchEvent(new CustomEvent("clientready:timesheet-changed")); } catch { /* ssr */ }
   }
   const blank = (employeeId: string, date: string): DayApproval => ({ employeeId, date, paidMinutes: 0, driveMinutes: 0, editedMinutes: null, approvedAt: null, changedAt: null });
   const flagsOf = (id: string, date: string) => { const s = sheets.get(`${id}|${date}`); const a = approvalOf(id, date); return [...(s?.flags || []), ...(a?.editedMinutes != null ? ["edited"] : []), ...(a?.changedAt && !a?.approvedAt ? ["changed_since_approved"] : [])]; };
@@ -153,18 +152,24 @@ export default function TimesheetPage() {
   const todayYmd = now ? localYmd(now) : "";
   const onClock = workers.map((w) => ({ w, st: dayState(events.filter((e) => e.employeeId === w.id && e.date === todayYmd)) })).filter((x) => x.st.state !== "OFF_DUTY");
   const stateWord: Record<DayStateName, string> = { OFF_DUTY: "Off", ON_DUTY_IDLE: "On duty", WORKING: "Working", IN_TRANSIT: "Driving", ON_BREAK: "On break" };
+  const period = periodPick || settings.payPeriod;
   const pendingFixes = fixes.filter((f) => f.status === "pending");
+  // Late start / no-show from the schedule (same engine rule the dashboard uses).
+  const lateAlerts = useMemo(() => {
+    if (!now) return [];
+    const schedule = new Map<string, ScheduledJob[]>();
+    for (const w of workers) for (const d of days) { const j = scheduleFor(docs, w.id, d); if (j.length) schedule.set(`${w.id}|${d}`, j); }
+    return timeAlerts({ sheets, fixes: [], events, today: localYmd(now), schedule, now }).filter((a) => a.kind === "late_start" || a.kind === "no_show");
+  }, [workers, days, docs, sheets, events, now]);
   const alerts = [
+    ...lateAlerts.map((a) => ({ key: `${a.kind}-${a.employeeId}-${a.date}`, kind: a.kind, text: `${workers.find((w) => w.id === a.employeeId)?.name || "Worker"} · ${a.date}: ${a.kind === "no_show" ? "No-show" : "Late start"}`, open: `${a.employeeId}|${a.date}` })),
     ...pendingFixes.map((f) => ({ key: `fix-${f.id}`, text: `${workers.find((w) => w.id === f.employeeId)?.name || "Worker"} asked to fix ${f.date}`, open: `${f.employeeId}|${f.date}` })),
     ...rows.flatMap((r) => r.info.filter((d) => d.flagged && !d.approved && d.hasHours).map((d) => ({ key: `flag-${r.w.id}-${d.date}`, text: `${r.w.name} · ${d.date} needs review`, open: `${r.w.id}|${d.date}` }))),
     ...events.filter((e) => e.outOfOrder || (e.deviceAt && Math.abs(new Date(e.deviceAt).getTime() - new Date(e.at).getTime()) > 300000)).map((e) => ({ key: `tap-${e.id}`, text: `${workers.find((w) => w.id === e.employeeId)?.name || "Worker"} · ${e.date}: ${e.outOfOrder ? "tap out of order" : "phone clock was off"}`, open: `${e.employeeId}|${e.date}` })),
   ];
   async function exportCsv() {
     // Pay period: weekly = this week; biweekly = this + next week; semi-monthly = 1st–15th or 16th–end of the month of this week.
-    const [y, m, d] = week.split("-").map(Number);
-    let from = week, to = addDays(week, 6);
-    if (period === "biweekly") to = addDays(week, 13);
-    if (period === "semimonthly") { const first = d <= 15; from = `${y}-${String(m).padStart(2, "0")}-${first ? "01" : "16"}`; to = first ? `${y}-${String(m).padStart(2, "0")}-15` : localYmd(new Date(y, m, 0, 12).toISOString()); }
+    const { from, to } = payPeriodOf(week, period, period === settings.payPeriod ? settings.payPeriodAnchor : "");
     const lines = ["Worker,Date,Paid hours,Drive min,Unpaid break min,Rounding min,OT hours,DT hours,Break premium hours,Approved,Flags"];
     for (let wk = weekOf(from); wk <= to; wk = addDays(wk, 7)) {
       const data = await loadOwnerTimesheet(wk, addDays(wk, 6));
@@ -234,7 +239,7 @@ export default function TimesheetPage() {
         {undoSteps.length > 0 && <button className="min-h-11 rounded-lg border px-3" data-testid="ts-undo" onClick={undoLast}>Undo ({undoSteps.length})</button>}
         {selected.size > 0 && <button className="cr-btn cr-btn-primary" data-testid="ts-approve-selected" onClick={() => { void approveDays([...selected], false); setSelected(new Set()); }}>Approve selected ({selected.size})</button>}
         <label className="flex items-center gap-1 text-sm"><span className="cr-section-label">Pay period</span>
-          <select data-testid="ts-period" className="min-h-11 rounded-lg border bg-transparent px-2" value={period} onChange={(e) => setPeriod(e.target.value as typeof period)}>
+          <select name="ts-period" data-testid="ts-period" className="min-h-11 rounded-lg border bg-transparent px-2" value={period} onChange={(e) => setPeriod(e.target.value as typeof period)}>
             <option value="weekly">Weekly</option><option value="biweekly">Every 2 weeks</option><option value="semimonthly">Twice a month</option>
           </select></label>
         <button className="cr-btn cr-btn-secondary" data-testid="ts-export-csv" onClick={() => void exportCsv()}>Export hours (CSV)</button>
@@ -250,7 +255,7 @@ export default function TimesheetPage() {
       {alerts.length > 0 && (
         <details className="cr-collapse mb-3" data-testid="ts-alerts" open>
           <summary>Alerts ({alerts.length})</summary>
-          <ul className="mt-1 space-y-1 text-sm">{alerts.slice(0, 30).map((a) => <li key={a.key} data-testid="ts-alert"><button className="cr-btn-text" onClick={() => setOpen(a.open)}>{a.text}</button></li>)}</ul>
+          <ul className="mt-1 space-y-1 text-sm">{alerts.slice(0, 30).map((a) => <li key={a.key} data-testid="ts-alert" data-kind={"kind" in a ? a.kind : undefined}><button className="cr-btn-text" onClick={() => setOpen(a.open)}>{a.text}</button></li>)}</ul>
         </details>
       )}
       {phone ? (
@@ -276,8 +281,8 @@ export default function TimesheetPage() {
             <tbody>
               {shown.map((r) => (
                 <tr key={r.w.id} className="border-t align-top" data-testid={`ts-row-${r.w.id}`}>
-                  <td className="p-2 font-semibold"><label className="flex items-center gap-2"><input type="checkbox" data-testid={`ts-select-${r.w.id}`} checked={selected.has(r.w.id)} onChange={(e) => { const n = new Set(selected); if (e.target.checked) n.add(r.w.id); else n.delete(r.w.id); setSelected(n); }} />{r.w.name}</label>
-                    {attest[r.w.id] && <span className="block text-xs font-normal cr-text-good" data-testid={`ts-attested-${r.w.id}`}>Worker confirmed {new Date(attest[r.w.id]).toLocaleDateString()}</span>}</td>
+                  <td className="p-2 font-semibold"><label className="flex items-center gap-2"><input type="checkbox" name={`ts-select-${r.w.id}`} data-testid={`ts-select-${r.w.id}`} checked={selected.has(r.w.id)} onChange={(e) => { const n = new Set(selected); if (e.target.checked) n.add(r.w.id); else n.delete(r.w.id); setSelected(n); }} />{r.w.name}</label>
+                    {attest[r.w.id] && <span className="cr-chip2 cr-tone-good ml-1 text-[11px] font-normal" data-testid="ts-pill-attested" data-worker={r.w.id} title={`Worker confirmed ${new Date(attest[r.w.id]).toLocaleDateString()}`}><span data-testid={`ts-attested-${r.w.id}`}>Attested</span></span>}</td>
                   {r.info.map((d) => <td key={d.date} className="p-1" data-testid={`ts-cell-${r.w.id}-${d.date}`}>{cell(r.w.id, d)}</td>)}
                   <td className="p-2">{weekEnd(r)}</td>
                 </tr>
@@ -293,7 +298,7 @@ export default function TimesheetPage() {
           {fixes.filter((f) => f.status === "pending").map((f) => (
             <div key={f.id} className="flex flex-wrap items-center gap-2 rounded-lg border p-2 text-sm">
               <span>{workers.find((w) => w.id === f.employeeId)?.name || "Worker"} · {f.date} · {f.kind.replace("_", " ")} → {new Date(f.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · “{f.reason}”</span>
-              <input aria-label="Note to worker" placeholder="Note (optional)" data-testid="ts-fix-note" maxLength={300} className="min-h-9 flex-1 rounded border bg-transparent px-2" value={fixNotes[f.id] || ""} onChange={(e) => setFixNotes({ ...fixNotes, [f.id]: e.target.value })} />
+              <input aria-label="Note to worker" placeholder="Note (optional)" name="ts-fix-note" data-testid="ts-fix-note" maxLength={300} className="min-h-9 flex-1 rounded border bg-transparent px-2" value={fixNotes[f.id] || ""} onChange={(e) => setFixNotes({ ...fixNotes, [f.id]: e.target.value })} />
               <button className="cr-btn cr-btn-primary" data-testid="ts-fix-approve" onClick={() => decide(f, "approved", fixNotes[f.id])}>Approve</button>
               <button className="cr-btn cr-btn-secondary" data-testid="ts-fix-deny" onClick={() => decide(f, "denied", fixNotes[f.id])}>Decline</button>
             </div>

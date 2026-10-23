@@ -1,5 +1,6 @@
 "use client";
 /** Account-wide time audit log (Team > Timesheet rules): who changed what, old → new, when; filter chips; CSV export. */
+import { TIMESHEET_CHANGED_EVENT } from "@/lib/timesheet-sync";
 import { useEffect, useState } from "react";
 import { auditCsv, loadAudit, type AuditRow } from "@/lib/day-events";
 import { readWorkers } from "@/lib/schedule";
@@ -23,8 +24,8 @@ export default function TimeAuditLog() {
     let live = true;
     void loadAudit({ limit: 1000 }).then((r) => { if (live) { setRows(r); setNames(Object.fromEntries(readWorkers().map((w) => [w.id, w.name]))); } });
     const on = () => void loadAudit({ limit: 1000 }).then((r) => { if (live) setRows(r); });
-    window.addEventListener("clientready:timesheet-changed", on);
-    return () => { live = false; window.removeEventListener("clientready:timesheet-changed", on); };
+    window.addEventListener(TIMESHEET_CHANGED_EVENT, on);
+    return () => { live = false; window.removeEventListener(TIMESHEET_CHANGED_EVENT, on); };
   }, []);
   const g = AUDIT_GROUPS[group];
   const shown = (rows || []).filter((r) => (!g.actions.length || g.actions.includes(r.action)) && (!worker || r.employeeId === worker));
@@ -41,7 +42,7 @@ export default function TimeAuditLog() {
         {Object.entries(AUDIT_GROUPS).map(([k, v]) => (
           <button key={k} type="button" className="cr-chip2 cr-btn-text min-h-9 rounded-full border px-3" data-testid={`ts-audit-chip-${k}`} data-state={group === k ? "on" : "off"} aria-pressed={group === k} onClick={() => setGroup(k)}>{v.label}</button>
         ))}
-        <select aria-label="Worker" data-testid="ts-audit-worker" className="min-h-9 rounded-lg border bg-transparent px-2" value={worker} onChange={(e) => setWorker(e.target.value)}>
+        <select aria-label="Worker" name="ts-audit-worker" data-testid="ts-audit-worker" className="min-h-9 rounded-lg border bg-transparent px-2" value={worker} onChange={(e) => setWorker(e.target.value)}>
           <option value="">Everyone</option>{Object.entries(names).map(([id, n]) => <option key={id} value={id}>{n}</option>)}
         </select>
         <button type="button" className="cr-btn cr-btn-secondary" data-testid="ts-audit-export" disabled={!shown.length} onClick={exportCsv}>Export (CSV)</button>

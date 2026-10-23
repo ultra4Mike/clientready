@@ -70,7 +70,10 @@ export function scheduleFor(docs: Doc[], workerId: string, date: string): Schedu
     const s = readSchedule(doc.data);
     if (!s || s.date !== date || !s.workerIds.includes(workerId)) return [];
     const start = toIso(s.date, s.startTime), end = toIso(s.date, s.endTime || "");
-    return start && end ? [{ docId: doc.id, start, end, label: String(doc.data?.invoiceNumber || doc.clientName || "Job") }] : [];
+    // Job pin for the distance check, from coordinates saved on the doc (data.pin {lat,lng} or data.lat/lng), if any.
+    const raw = (doc.data?.pin && typeof doc.data.pin === "object" ? doc.data.pin : doc.data) as Record<string, unknown> | undefined;
+    const pin = raw && Number.isFinite(Number(raw.lat)) && Number.isFinite(Number(raw.lng)) && raw.lat !== "" && raw.lat != null ? { lat: Number(raw.lat), lng: Number(raw.lng) } : null;
+    return start && end ? [{ docId: doc.id, start, end, label: String(doc.data?.invoiceNumber || doc.clientName || "Job"), ...(pin ? pin : {}) }] : [];
   });
 }
 

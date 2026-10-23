@@ -1,5 +1,6 @@
 "use client";
 /** Dashboard > Needs attention: who's on the clock, missing clock-outs, missed breaks, pending fixes, late/no-show. */
+import { TIMESHEET_CHANGED_EVENT } from "@/lib/timesheet-sync";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { loadTimeWeek, localYmd, timeAttention, type TimeAttention } from "@/lib/time-owner";
@@ -10,8 +11,8 @@ export default function TimeAttentionCard() {
     let live = true;
     const load = () => { const now = new Date().toISOString(); void loadTimeWeek(localYmd(), now).then((w) => { if (live && w.workers.length) setT(timeAttention(w, now)); }).catch(() => undefined); };
     load();
-    window.addEventListener("clientready:timesheet-changed", load);
-    return () => { live = false; window.removeEventListener("clientready:timesheet-changed", load); };
+    window.addEventListener(TIMESHEET_CHANGED_EVENT, load);
+    return () => { live = false; window.removeEventListener(TIMESHEET_CHANGED_EVENT, load); };
   }, []);
   if (!t || (!t.onClock.length && !t.alerts.length)) return null;
   const word: Record<string, string> = { ON_DUTY_IDLE: "on duty", WORKING: "working", IN_TRANSIT: "driving", ON_BREAK: "on break" };

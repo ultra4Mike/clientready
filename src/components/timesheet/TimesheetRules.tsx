@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { loadOwnerTimesheet, readLocalTimesheetSettings, saveTimesheetSettings } from "@/lib/day-events";
 import { CALIFORNIA_RULES, DEFAULT_TIMESHEET_SETTINGS, type TimesheetSettings } from "@/lib/timesheet";
-import { syncTimesheetCutover, addDays, readDocs, refreshTimesheetPay } from "@/lib/timesheet-sync";
+import { syncTimesheetCutover, addDays, readDocs } from "@/lib/timesheet-sync";
 import { weekOf } from "@/lib/pay-types";
 import TimeAuditLog from "@/components/timesheet/TimeAuditLog";
 
@@ -27,7 +27,7 @@ export function rulePreviews(s: TimesheetSettings) {
   ].filter(Boolean).join(" ");
   const breaks = `${s.breakPreset === "california" ? "California: 30-min meal before the 5th hour, 10-min rest per 4 hours." : "Federal: no required breaks."} Breaks under ${s.shortBreakPaidMinutes} min are paid, longer ones are unpaid.${s.autoMealOn ? ` A ${s.autoMealMinutes}-min meal is taken off days over ${s.autoMealAfterHours} h with no break logged.` : ""}${s.breakPreset === "california" && s.caPremiumPay ? " A missed meal or rest adds 1 hour of premium pay." : ""}`;
   const ot = s.otPreset === "worker" ? "Each worker's own overtime setting is used." : s.otPreset === "federal" ? "Overtime 1.5× after 40 h a week." : s.otPreset === "california" ? "1.5× after 8 h a day or 40 h a week, 2× after 12 h a day, 7th day in a row: 1.5× first 8 h then 2×." : `Custom: 1.5× after ${s.weeklyOtHours || "—"} h a week${s.dailyOtHours ? ` or ${s.dailyOtHours} h a day` : ""}${s.dailyDtHours ? `, 2× after ${s.dailyDtHours} h a day` : ""}${s.seventhDayRule ? ", 7th-day rule on" : ""}.`;
-  const rounding = s.roundingMinutes ? `Each start and end is rounded to the nearest ${s.roundingMinutes} min (rounds both ways, so it evens out).` : "Exact minutes, no rounding.";
+  const rounding = Number(s.roundingMinutes) === 15 ? "Quarter hour (7-minute rule): 1–7 min rounds down, 8–14 rounds up. Rounds both ways, so it evens out." : s.roundingMinutes ? `Each start and end is rounded to the nearest ${s.roundingMinutes} min (rounds both ways).` : "Exact: paid to the minute, no rounding.";
   const loc = `A tap more than ${s.geofenceMeters} m from the job is flagged (never blocked).${Object.keys(s.jobGeofence).length ? ` ${Object.keys(s.jobGeofence).length} job(s) have their own distance.` : ""}`;
   const period = `${s.payPeriod === "weekly" ? "Paid weekly" : s.payPeriod === "biweekly" ? `Paid every 2 weeks${s.payPeriodAnchor ? ` from ${s.payPeriodAnchor}` : ""}` : "Paid twice a month (1st–15th, 16th–end)"}. Reminders: ${s.remindMissedStartMinutes ? `${s.remindMissedStartMinutes} min after a missed start` : "no missed-start reminder"}, ${s.remindMissedEndMinutes ? `${s.remindMissedEndMinutes} min after a missed end` : "no missed-end reminder"}.`;
   return { travel, breaks, ot, rounding, loc, period };
@@ -55,7 +55,7 @@ export default function TimesheetRules() {
       {help && <span className="text-xs text-[var(--cr-muted)]">{help}</span>}</label>
   );
   const tog = (k: keyof TimesheetSettings, label: string, id: string) => (
-    <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" data-testid={id} checked={Boolean(settings[k])} onChange={(e) => set({ [k]: e.target.checked } as Partial<TimesheetSettings>)} />{label}</label>
+    <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" name={id} data-testid={id} checked={Boolean(settings[k])} onChange={(e) => set({ [k]: e.target.checked } as Partial<TimesheetSettings>)} />{label}</label>
   );
   const p = rulePreviews(settings);
   const preview = (text: string, id: string) => <p className="cr-preview mt-2 text-sm text-[var(--cr-muted)]" data-testid={id}>{text}</p>;
@@ -65,10 +65,7 @@ export default function TimesheetRules() {
     try {
       await saveTimesheetSettings(settings, saved);
       setSaved(settings);
-      // Re-apply pay for this week and last week so every screen shows the new rules.
-      const t = today();
-      await refreshTimesheetPay(t); await refreshTimesheetPay(addDays(t, -7));
-      try { window.dispatchEvent(new CustomEvent("clientready:timesheet-changed")); } catch { /* ssr */ }
+      // saveTimesheetSettings re-applies pay and fires TIMESHEET_CHANGED_EVENT itself.
       setMessage("Rules saved. This week's and last week's pay were updated.");
     } catch { setMessage("Saved on this device; will sync when online."); }
     setBusy(false);
@@ -114,7 +111,7 @@ export default function TimesheetRules() {
       <section className={card} data-testid="ts-rules-ot" aria-labelledby="ts-h-ot">
         <h3 id="ts-h-ot" className="cr-section-label font-semibold">Overtime / double time</h3>
         <label className="mt-2 block text-sm"><span className="font-medium">Rules</span>
-          <select data-testid="ts-ot-preset" className={field} value={settings.otPreset} onChange={(e) => set({ otPreset: e.target.value as TimesheetSettings["otPreset"] })}>
+          <select name="ts-ot-preset" data-testid="ts-ot-preset" className={field} value={settings.otPreset} onChange={(e) => set({ otPreset: e.target.value as TimesheetSettings["otPreset"] })}>
             <option value="worker">Each worker&apos;s own setting (Team)</option><option value="federal">Federal (40 h week)</option><option value="california">California (daily, double time, 7th day)</option><option value="custom">Custom</option>
           </select></label>
         {settings.otPreset === "custom" && <div className="mt-2 grid gap-2 sm:grid-cols-3">
@@ -130,7 +127,7 @@ export default function TimesheetRules() {
       <section className={card} data-testid="ts-rules-rounding" aria-labelledby="ts-h-round">
         <h3 id="ts-h-round" className="cr-section-label font-semibold">Rounding</h3>
         <label className="mt-2 block text-sm"><span className="font-medium">Round times to</span>
-          <select data-testid="ts-rounding" className={field} value={settings.roundingMinutes} onChange={(e) => set({ roundingMinutes: Number(e.target.value) as TimesheetSettings["roundingMinutes"] })}>
+          <select name="ts-rounding" data-testid="ts-rounding" className={field} value={settings.roundingMinutes} onChange={(e) => set({ roundingMinutes: Number(e.target.value) as TimesheetSettings["roundingMinutes"] })}>
             <option value={0}>Exact (no rounding)</option><option value={5}>5 min</option><option value={6}>6 min (1/10 h)</option><option value={15}>15 min (7-minute rule)</option>
           </select></label>
         {preview(p.rounding, "ts-preview-rounding")}
@@ -141,8 +138,8 @@ export default function TimesheetRules() {
         <div className="mt-2 grid gap-2 sm:grid-cols-2">{num("geofenceMeters", "Job-site distance (meters)", "ts-geofence")}</div>
         <div className="mt-2 flex flex-wrap items-end gap-2">
           <label className="block text-sm"><span className="font-medium">Job with its own distance</span>
-            <select data-testid="ts-geo-job" className={field} value={jobPick} onChange={(e) => setJobPick(e.target.value)}><option value="">Pick a job…</option>{jobs.map((j) => <option key={j.id} value={j.id}>{j.label}</option>)}</select></label>
-          <label className="block text-sm"><span className="font-medium">Meters</span><input data-testid="ts-geo-job-meters" className={field} inputMode="numeric" value={jobMeters} onChange={(e) => setJobMeters(e.target.value)} /></label>
+            <select name="ts-geo-job" data-testid="ts-geo-job" className={field} value={jobPick} onChange={(e) => setJobPick(e.target.value)}><option value="">Pick a job…</option>{jobs.map((j) => <option key={j.id} value={j.id}>{j.label}</option>)}</select></label>
+          <label className="block text-sm"><span className="font-medium">Meters</span><input name="ts-geo-job-meters" data-testid="ts-geo-job-meters" className={field} inputMode="numeric" value={jobMeters} onChange={(e) => setJobMeters(e.target.value)} /></label>
           <button type="button" className="cr-btn cr-btn-secondary" data-testid="ts-geo-job-add" disabled={!jobPick || !(Number(jobMeters) > 0)} onClick={() => { set({ jobGeofence: { ...settings.jobGeofence, [jobPick]: Number(jobMeters) } }); setJobPick(""); setJobMeters(""); }}>Add</button>
         </div>
         {Object.keys(settings.jobGeofence).length > 0 && <ul className="mt-2 space-y-1" data-testid="ts-geo-jobs">{Object.entries(settings.jobGeofence).map(([id, m]) => (
@@ -155,10 +152,10 @@ export default function TimesheetRules() {
         <h3 id="ts-h-period" className="cr-section-label font-semibold">Pay period &amp; reminders</h3>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           <label className="block text-sm"><span className="font-medium">Pay period</span>
-            <select data-testid="ts-pay-period" className={field} value={settings.payPeriod} onChange={(e) => set({ payPeriod: e.target.value as TimesheetSettings["payPeriod"] })}>
+            <select name="ts-pay-period" data-testid="ts-pay-period" className={field} value={settings.payPeriod} onChange={(e) => set({ payPeriod: e.target.value as TimesheetSettings["payPeriod"] })}>
               <option value="weekly">Weekly</option><option value="biweekly">Every 2 weeks</option><option value="semimonthly">Twice a month</option>
             </select></label>
-          {settings.payPeriod === "biweekly" && <label className="block text-sm"><span className="font-medium">A period starts on</span><input type="date" data-testid="ts-pay-anchor" className={field} value={settings.payPeriodAnchor} onChange={(e) => set({ payPeriodAnchor: e.target.value })} /></label>}
+          {settings.payPeriod === "biweekly" && <label className="block text-sm"><span className="font-medium">A period starts on</span><input type="date" name="ts-pay-anchor" data-testid="ts-pay-anchor" className={field} value={settings.payPeriodAnchor} onChange={(e) => set({ payPeriodAnchor: e.target.value })} /></label>}
           {num("remindMissedStartMinutes", "Remind about a missed start after (min, 0 = off)", "ts-remind-start")}
           {num("remindMissedEndMinutes", "Remind about a missed end after (min, 0 = off)", "ts-remind-end")}
         </div>

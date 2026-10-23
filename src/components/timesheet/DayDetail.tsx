@@ -118,7 +118,7 @@ export default function DayDetail(props: {
             {pending.map((f) => (
               <div key={f.id} className="flex flex-wrap items-center gap-2 rounded-lg border p-2">
                 <span>{f.kind.replace("_", " ")} → {new Date(f.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · “{f.reason}”</span>
-                <input aria-label="Note to worker" placeholder="Note to worker (optional)" data-testid="ts-dd-fix-note" maxLength={300} className="min-h-9 flex-1 rounded border bg-transparent px-2" value={notes[f.id] || ""} onChange={(e) => setNotes({ ...notes, [f.id]: e.target.value })} />
+                <input aria-label="Note to worker" placeholder="Note to worker (optional)" name="ts-dd-fix-note" data-testid="ts-dd-fix-note" maxLength={300} className="min-h-9 flex-1 rounded border bg-transparent px-2" value={notes[f.id] || ""} onChange={(e) => setNotes({ ...notes, [f.id]: e.target.value })} />
                 <button className="cr-btn cr-btn-primary" data-testid="ts-dd-fix-approve" onClick={() => props.onDecide(f, "approved", notes[f.id])}>Approve</button>
                 <button className="cr-btn cr-btn-secondary" data-testid="ts-dd-fix-deny" onClick={() => props.onDecide(f, "denied", notes[f.id])}>Decline</button>
               </div>
@@ -130,12 +130,12 @@ export default function DayDetail(props: {
             {spans.map((s, i) => (
               <div key={i} className="flex flex-wrap items-center gap-2">
                 <span className="min-w-20 font-medium">{s.label || "Job"}</span>
-                <input type="time" aria-label={`${s.label || "Job"} start`} data-testid={`ts-dd-start-${i}`} className="min-h-11 rounded border bg-transparent px-2" value={s.start} onChange={(e) => { const next = spans.map((x, j) => (j === i ? { ...x, start: e.target.value } : x)); setSpans(next); setHours((recalc(next) / 60).toFixed(2)); }} />
+                <input type="time" aria-label={`${s.label || "Job"} start`} name={`ts-dd-start-${i}`} data-testid={`ts-dd-start-${i}`} className="min-h-11 rounded border bg-transparent px-2" value={s.start} onChange={(e) => { const next = spans.map((x, j) => (j === i ? { ...x, start: e.target.value } : x)); setSpans(next); setHours((recalc(next) / 60).toFixed(2)); }} />
                 <span>to</span>
-                <input type="time" aria-label={`${s.label || "Job"} end`} data-testid={`ts-dd-end-${i}`} className="min-h-11 rounded border bg-transparent px-2" value={s.end} onChange={(e) => { const next = spans.map((x, j) => (j === i ? { ...x, end: e.target.value } : x)); setSpans(next); setHours((recalc(next) / 60).toFixed(2)); }} />
+                <input type="time" aria-label={`${s.label || "Job"} end`} name={`ts-dd-end-${i}`} data-testid={`ts-dd-end-${i}`} className="min-h-11 rounded border bg-transparent px-2" value={s.end} onChange={(e) => { const next = spans.map((x, j) => (j === i ? { ...x, end: e.target.value } : x)); setSpans(next); setHours((recalc(next) / 60).toFixed(2)); }} />
               </div>
             ))}
-            <label className="flex items-center gap-2">Paid hours<input aria-label="Paid hours" data-testid="ts-edit-hours" className="min-h-11 w-24 rounded border bg-transparent px-2" inputMode="decimal" value={hours} onChange={(e) => setHours(e.target.value)} /></label>
+            <label className="flex items-center gap-2">Paid hours<input aria-label="Paid hours" name="ts-edit-hours" data-testid="ts-edit-hours" className="min-h-11 w-24 rounded border bg-transparent px-2" inputMode="decimal" value={hours} onChange={(e) => setHours(e.target.value)} /></label>
             <div className="flex gap-2">
               <button className="min-h-11 rounded-lg bg-teal-600 px-4 font-semibold text-white" data-testid="ts-edit-save" onClick={() => { props.onSetMinutes(Math.max(0, Number(hours) * 60 || 0), false); setEditing(false); }}>Save</button>
               <button className={btn} onClick={() => setEditing(false)}>Cancel</button>
@@ -146,9 +146,9 @@ export default function DayDetail(props: {
           {approved
             ? <button className={btn} data-testid="ts-dd-unapprove" onClick={props.onUnapprove}>Unapprove</button>
             : <button className="min-h-11 rounded-lg bg-teal-600 px-4 font-semibold text-white disabled:opacity-50" disabled={!props.minutes} data-testid="ts-dd-approve" onClick={props.onApprove}>Looks right, approve</button>}
-          {approved && <span className="cr-chip2 cr-tone-good" data-testid="ts-dd-locked" data-state="locked">Locked: unapprove to change</span>}
+          {approved && <span className="cr-chip2 cr-tone-good" data-testid="ts-dd-locked" data-state="locked">Locked: reopen or unapprove to change</span>}
           {!approved && scheduleMinutes != null && <button className={btn} data-testid="ts-dd-schedule" onClick={() => props.onSetMinutes(scheduleMinutes, true)} title={`Use the scheduled ${hm(scheduleMinutes)} and approve`}>Use the schedule ({hm(scheduleMinutes)})</button>}
-          {!editing && !approved && <button className={btn} data-testid="ts-dd-edit" onClick={() => setEditing(true)}>Edit times</button>}
+          {!editing && <button className={btn} data-testid="ts-dd-edit" data-state={approved ? "reopen" : "edit"} onClick={() => setEditing(true)}>{approved ? "Reopen and edit" : "Edit times"}</button>}
         </div>
         <details className="cr-collapse mt-3" data-testid="ts-dd-history">
           <summary>History</summary>
