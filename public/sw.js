@@ -34,7 +34,7 @@ async function warmAll() {
   for (let i = 0; i < WARM_PAGES.length; i += 6) await Promise.all(WARM_PAGES.slice(i, i + 6).map(warm));
 }
 // Public token pages show someone else's document; don't keep copies of them.
-const NO_CACHE_PAGES = ["/approve", "/portal", "/invoice-view", "/account/delete"];
+const NO_CACHE_PAGES = ["/approve", "/portal", "/invoice-view", "/account/delete", "/team"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(SHELL).then((cache) => cache.addAll(PRECACHE)).then(() => warmAll()).then(() => self.skipWaiting()));
