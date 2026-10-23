@@ -10,7 +10,7 @@ import { readHoursApprovals } from "@/lib/hours-approval";
 import { readSchedule, readWorkers, type Worker } from "@/lib/schedule";
 import { rowPayMoney, weekOf, type PayRow } from "@/lib/pay-types";
 import { loadOwnerTimesheet, type DayApproval } from "@/lib/day-events";
-import { applyFixes, buildDay, estimateDriveMinutes, type DaySheet, type FixRequest, type ScheduledJob, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
+import { applyFixes, buildDay, readWorkerOverrides, estimateDriveMinutes, type DaySheet, type FixRequest, type ScheduledJob, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
 import { readRouteMinutes } from "@/lib/route-cache";
 import { allocateWeek, applySharesToCrew, unallocatedSalaryWeeks, type DayPay, type JobShare } from "@/lib/timesheet-pay";
 
@@ -87,7 +87,7 @@ export function weekSheets(input: { workers: Worker[]; docs: Doc[]; events: TapE
     const schedule = scheduleFor(input.docs, worker.id, date);
     const mine = events.filter((e) => e.employeeId === worker.id && e.date === date);
     const coords = new Map(mine.filter((e) => e.lat != null && e.docId).map((e) => [e.docId!, { lat: e.lat!, lng: e.lng! }]));
-    const sheet = buildDay({ employeeId: worker.id, date, events: mine, schedule, settings: input.settings, now: input.now,
+    const sheet = buildDay({ employeeId: worker.id, date, events: mine, schedule, settings: input.settings, worker: readWorkerOverrides(worker), now: input.now,
       expectedDriveMinutes: (a, b) => { const routed = a && b ? readRouteMinutes(date, a, b) : undefined; if (routed !== undefined) return routed; const p = a && coords.get(a), q = b && coords.get(b); return p && q ? estimateDriveMinutes(p, q) : undefined; } });
     if (input.fixes.some((f) => f.employeeId === worker.id && f.date === date && f.status === "pending")) sheet.flags.push("fix_requested");
     sheets.set(`${worker.id}|${date}`, sheet);
@@ -175,6 +175,12 @@ export async function pushChangedDocs(changed: Doc[]) {
 /** Recompute the shares for the week containing `date` and write them on the jobs. Used by Timesheet and the invoice. */
 export async function refreshTimesheetPay(date: string, opts: { approvals?: DayApproval[]; now?: string } = {}) {
   const week = weekOf(date);
+  // A direct refresh replaces a queued auto-refresh for this week (no double refresh); the event still fires after it.
+  const queued = autoRefresh.get(week);
+  if (queued) { clearTimeout(queued.timer); autoRefresh.delete(week); }
+  try { return await refreshWeek(date, week, opts); } finally { if (queued) fireTimesheetChanged(queued.source, [week]); }
+}
+async function refreshWeek(date: string, week: string, opts: { approvals?: DayApproval[]; now?: string }) {
   const [data, cutover] = await Promise.all([loadOwnerTimesheet(week, addDays(week, 6)), syncTimesheetCutover()]);
   const workers = readWorkers();
   const docs = readDocs();
@@ -202,4 +208,26 @@ export async function setWorkerDayApproved(employeeId: string, date: string, app
   await saveApprovals([row]);
   const approvals = [...first.approvals.filter((a) => !(a.employeeId === employeeId && a.date === date)), row];
   return refreshTimesheetPay(date, { approvals });
+}
+
+/** Window event fired after approvals or rules were saved and pay was refreshed. detail: { source, weeks }. Listeners should reload, not save. */
+export const TIMESHEET_CHANGED_EVENT = "clientready:timesheet-changed";
+function fireTimesheetChanged(source: "approvals" | "settings", weeks: string[]) {
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(TIMESHEET_CHANGED_EVENT, { detail: { source, weeks } }));
+}
+const autoRefresh = new Map<string, { timer: ReturnType<typeof setTimeout>; source: "approvals" | "settings" }>();
+/**
+ * Queue a pay refresh for the weeks of `dates` (used by saveApprovals / saveTimesheetSettings). It runs on the next
+ * tick; if the caller calls refreshTimesheetPay for that week first, the queued one is dropped (one refresh, one event).
+ */
+export function queueTimesheetRefresh(dates: string[], source: "approvals" | "settings") {
+  for (const week of new Set(dates.filter(Boolean).map((d) => weekOf(d)))) {
+    const old = autoRefresh.get(week);
+    if (old) clearTimeout(old.timer);
+    const timer = setTimeout(() => {
+      autoRefresh.delete(week);
+      void refreshWeek(week, week, {}).catch(() => undefined).finally(() => fireTimesheetChanged(source, [week]));
+    }, 0);
+    autoRefresh.set(week, { timer, source });
+  }
 }

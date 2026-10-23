@@ -30,7 +30,7 @@ export type Schedule = {
   /** "Book anyway" decisions: this person may overlap that other job (lib/conflicts). */
   overrides?: Override[];
 };
-export type Worker = { id: string; name: string; email?: string; phone?: string; role?: string; rate?: string; active?: boolean; paySettings?: unknown };
+export type Worker = { id: string; name: string; email?: string; phone?: string; role?: string; rate?: string; active?: boolean; paySettings?: unknown; hireDate?: string; timeOverrides?: unknown };
 /** The older per-job crew/pay rows (data.crew). */
 export type CrewRow = {
   id: string; employeeId: string; name: string; rate: string; hours: string; startTime: string; endTime: string;
