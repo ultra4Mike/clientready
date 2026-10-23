@@ -176,6 +176,8 @@ function buildCards(jobs: Job[]): Card[] {
 export default function CrewPage() {
   const [userId, setUserId] = useState("");
   const [email, setEmail] = useState("");
+  const [isLeadUser, setIsLeadUser] = useState(false);
+  useEffect(() => { if (!email) return; void import("@/lib/phase2-data").then((m) => m.loadLeadSelf()).then((s) => setIsLeadUser(Boolean(s))).catch(() => {}); }, [email]);
   const [myWeekRows, setMyWeekRows] = useState<WeekRow[]>([]);
   const [offline, setOffline] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -780,7 +782,7 @@ export default function CrewPage() {
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-500 font-bold text-slate-950! shadow-sm">C</span>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold leading-tight" data-testid="crew-name">{name || "Your jobs"}</p>
-              <p className="text-xs text-[var(--cr-muted)]">Crew</p>
+              <p className="text-xs text-[var(--cr-muted)]" data-testid="crew-role-badge">{isLeadUser ? "Crew lead" : "Crew"}</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-1 text-sm sm:gap-3">

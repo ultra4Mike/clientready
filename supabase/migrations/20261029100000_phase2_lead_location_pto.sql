@@ -49,6 +49,30 @@ end $$;
 revoke all on function public.crew_request_pto(text, date, numeric, text, text) from public, anon;
 grant execute on function public.crew_request_pto(text, date, numeric, text, text) to authenticated;
 
+-- 3) Lead lookup no longer needs a published job: match the signed-in email on the owner's Team record first
+--    (a lead with nothing scheduled yet was invisible because only crew_jobs was searched), then fall back to crew_jobs.
+create or replace function public.crew_lead_self()
+returns table (owner_id uuid, employee_id text, crew_ids text[], see_hours boolean, clock_team boolean)
+language sql stable security definer set search_path = public as $$
+  with o as (
+    select x.owner_id, x.employee_id from (
+      select e.user_id as owner_id, e.id as employee_id, 0 as pri, null::text as d from public.employees e
+        where public.crew_email() <> '' and lower(coalesce(e.email, '')) = public.crew_email() and coalesce(e.active, true)
+          and (coalesce((e.time_overrides->>'lead')::boolean, false) or lower(coalesce(e.role, '')) = 'lead')
+      union all
+      select j.owner_id, j.employee_id, 1, j.job_date from public.crew_jobs j where public.crew_email() <> '' and lower(j.worker_email) = public.crew_email()
+    ) x order by x.pri, x.d desc nulls last limit 1)
+  select o.owner_id, o.employee_id,
+    coalesce(array(select jsonb_array_elements_text(coalesce(e.time_overrides->'crewIds', '[]'::jsonb))), '{}'),
+    coalesce((e.time_overrides->'leadPerms'->>'seeHours')::boolean, true),
+    coalesce((e.time_overrides->'leadPerms'->>'clockTeam')::boolean, true)
+  from o join public.employees e on e.user_id = o.owner_id and e.id = o.employee_id
+  where coalesce((e.time_overrides->>'lead')::boolean, false) or lower(coalesce(e.role, '')) = 'lead'
+$$;
+revoke all on function public.crew_lead_self() from public, anon;
+grant execute on function public.crew_lead_self() to authenticated;
+
 -- Check queries (each should return true):
 -- select to_regprocedure('public.crew_lead_tap(text,text,text,timestamptz,date,double precision,double precision)') is not null as lead_location_ready;
 -- select pg_get_functiondef('public.crew_request_pto(text,date,numeric,text,text)'::regprocedure) like '%ptoAllowNegative%' as pto_negative_ready;
+-- select pg_get_functiondef('public.crew_lead_self()'::regprocedure) like '%pri%' as lead_by_team_email_ready;
