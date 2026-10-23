@@ -10,6 +10,7 @@ import { displayStatus } from "@/lib/doc-status";
 import { docHref, jobChain, type JobChain } from "@/lib/job-chain";
 import { crewIds, readWorkers, statusLabel } from "@/lib/schedule";
 import { niceYmd, timeLabel } from "@/lib/scheduled-jobs";
+import DocTrail from "@/components/DocTrail";
 
 type Doc = { id: string; type: string; title: string; clientName?: string; createdAt?: string; data?: Record<string, unknown> };
 type Tab = "request" | "quote" | "job" | "invoice";
@@ -60,6 +61,7 @@ export default function JobPage() {
       {chain === null && <p data-testid="job-not-found" className="text-sm">This job could not be found. <a href="/documents" className="underline">Open documents</a></p>}
       {chain && (
         <>
+          {main && <DocTrail docs={docs} currentId={main.id} />}
           <div role="tablist" data-testid="job-tabs" className="mb-3 flex w-full gap-1 rounded-xl border border-slate-500/30 bg-[var(--cr-card)] p-1 shadow-sm sm:w-auto">
             {TABS.map(([key, label], i) => (
               <button key={key} type="button" role="tab" aria-selected={tab === key} data-testid={`job-tab-${key}`} onClick={() => setTab(key)} className={`cr-btn flex-1 sm:flex-none ${tab === key ? "cr-btn-primary" : "cr-btn-text"}`}>

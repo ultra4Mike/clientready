@@ -73,6 +73,7 @@ import { printOrigin } from "@/lib/site";
 import SignaturePad, { SignatureBlock } from "@/components/SignaturePad";
 import { readSignature, type Signature } from "@/lib/signature";
 import { amountOf, documentTotals, discountLabel, normalizeDiscountType, type DiscountType } from "@/lib/discount";
+import DocTrail from "@/components/DocTrail";
 
 type LineItem = { description: string; qty: string; rate: string; category?: LineCategory };
 type SavedClient = { id: string; name: string; company: string; email: string; phone: string; address: string; preferences?: string; contactMethod?: string };
@@ -1232,6 +1233,7 @@ export default function NewInvoicePage() {
     <AppShell title={isProposal ? "New proposal" : "New invoice"}>
       <RestoreDraftBanner draft={draft.restorable} onRestore={restoreDraft} onDiscard={draft.discard} status={draft.status} conflict={Boolean(draft.conflict)} onResolve={(choice) => { void draft.resolve(choice).then((theirs) => { if (theirs) restoreFrom(theirs as never); }); }} />
       <FormDraft form="job-message" id={docId} enabled={formReady && Boolean(docId)} value={jobMsg || { kind: "", text: "" }} blank={{ kind: "", text: "" }} onRestore={(v) => setJobMsg(v.kind ? v : null)} what="message to the client" />
+      <DocTrail docs={docsForStage() as never} currentId={docId} />
       <div className="print-hide mb-6 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0" data-testid="doc-stage" data-stage={docStage.stage} data-next-action={docStage.next}>

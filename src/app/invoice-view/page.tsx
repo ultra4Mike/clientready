@@ -21,6 +21,7 @@ import { readSignature, type Signature } from "@/lib/signature";
 import { ApprovalBadge } from "@/components/Approval";
 import { approvalBadgeApplies, readApproval, refreshApproval, type Approval } from "@/lib/approval";
 import { amountOf, documentTotals, discountLabel } from "@/lib/discount";
+import DocTrail from "@/components/DocTrail";
 
 type LineItem = {
   description: string;
@@ -39,6 +40,7 @@ type SavedDocument = {
 
 export default function InvoiceViewPage() {
   const [docId, setDocId] = useState("");
+  const [trailDocs, setTrailDocs] = useState<SavedDocument[]>([]);
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientCompany, setClientCompany] = useState("");
@@ -88,6 +90,7 @@ export default function InvoiceViewPage() {
       const docs = openId && docsRaw ? (JSON.parse(docsRaw) as SavedDocument[]) : [];
       const doc = docs.find((item) => item.id === openId && item.type === "invoice");
       setViewState(doc ? "ready" : "empty");
+      setTrailDocs(docs);
       if (!doc) return;
       const data = (doc.data || {}) as {
         invoiceNumber?: string;
@@ -211,6 +214,7 @@ export default function InvoiceViewPage() {
 
   return (
     <AppShell title="Invoice">
+      <div className="mx-auto max-w-3xl"><DocTrail docs={trailDocs} currentId={docId} hrefFor={(d) => d.type === "invoice" ? `/invoice-view?id=${encodeURIComponent(d.id)}` : `/invoice?id=${encodeURIComponent(d.id)}`} /></div>
       <div className="print-hide mx-auto mb-6 flex max-w-3xl flex-wrap items-center justify-between gap-3">
         <a href="/documents" className="inline-flex min-h-11 items-center text-sm font-medium text-[var(--cr-muted)] transition hover:text-teal-600 dark:hover:text-teal-300">
           Back to documents

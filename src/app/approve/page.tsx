@@ -13,7 +13,8 @@ import { SignatureBlock } from "@/components/SignaturePad";
 import LineSplit from "@/components/LineSplit";
 import PayQr from "@/components/PayQr";
 import SignaturePad from "@/components/SignaturePad";
-import { fetchPortalDoc, portalApprove } from "@/lib/portal";
+import { fetchPortal, fetchPortalDoc, portalApprove, portalDocUrl, type PortalDoc } from "@/lib/portal";
+import { linkByNumber } from "@/lib/doc-trail";
 import { StageSchedule, niceDate } from "@/components/StageSchedule";
 import RatingBox from "@/components/Rating";
 import PayOptions from "@/components/PayOptions";
@@ -21,6 +22,7 @@ import { fetchPublicPaymentMethods } from "@/lib/payments/public";
 import type { PaymentMethodsConfig } from "@/lib/payments/providers";
 import { payNowAmount, readStages, todayYmd } from "@/lib/stages";
 import type { Signature } from "@/lib/signature";
+import DocTrail from "@/components/DocTrail";
 
 type LineItem = { description?: string; qty?: string; rate?: string; category?: string };
 type PublicDoc = NonNullable<Awaited<ReturnType<typeof fetchApprovalDoc>>>;
@@ -51,6 +53,7 @@ export default function ApprovePage() {
   const [paying, setPaying] = useState(false);
   const [payMessage, setPayMessage] = useState("");
   const [portal, setPortal] = useState<{ p: string; d: string } | null>(null);
+  const [portalDocs, setPortalDocs] = useState<PortalDoc[]>([]);
   const [mySignature, setMySignature] = useState<Signature | null>(null);
   const [approvalSignature, setApprovalSignature] = useState<Signature | null>(null);
   const [payMethods, setPayMethods] = useState<PaymentMethodsConfig>({});
@@ -85,6 +88,7 @@ export default function ApprovePage() {
       .then((found) => {
         setToken(t);
         setPortal(viaPortal);
+        if (viaPortal) fetchPortal(viaPortal.p).then((all) => setPortalDocs(linkByNumber(all?.documents || []))).catch(() => setPortalDocs([]));
         if (!found) return setState("missing");
         setDoc(found);
         setApproval(readApproval(found.data?.approval));
@@ -254,6 +258,7 @@ export default function ApprovePage() {
     <main className="min-h-screen bg-slate-100 px-3 py-6 text-slate-900 sm:px-4 sm:py-10">
       <section className="print-reset mx-auto max-w-3xl space-y-4">
         {portal && <a href={`/portal?t=${encodeURIComponent(portal.p)}`} className="print-hide inline-flex min-h-11 items-center text-sm font-medium text-teal-700 underline" data-testid="portal-back">← All my documents</a>}
+        {portal && <DocTrail docs={portalDocs} currentId={portal.d} hrefFor={(d) => portalDocUrl(portal.p, d.id)} light />}
         {receiptState === "confirming" && <p className="print-hide rounded-xl border border-teal-500/30 bg-teal-50 p-4 text-sm font-medium text-teal-900" data-testid="pay-confirming" role="status">Thank you! Confirming your payment with Stripe…</p>}
         {receiptState === "slow" && <p className="print-hide rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" data-testid="pay-message" role="status">Thank you! Stripe has your payment. Your receipt will appear on this page shortly; reload in a minute.</p>}
         {receipt && (
