@@ -44,19 +44,13 @@ export async function POST(request: Request) {
   // the invoice made automatically at approval, see /api/approve/convert).
   if (["void", "voided", "deleted"].includes(String(data.status || "")) || data.deleted) return Response.json({ error: "This invoice is void." }, { status: 400 });
   // Progress billing: the current stage's amount unless the customer chose to pay the full balance.
-  const amounts = amountToCharge(data, full);
-  let { charge, owed } = amounts;
-  const { staged } = amounts;
   // Option A: a version replaced by a sent revision change order can't be paid; a revision is charged
-  // its total minus everything already paid across the chain (those payments stay where they are).
+  // its total minus everything already paid across the chain (those payments stay where they are),
+  // and its payment-plan stages count those chain credits as already paid.
   const { self, chain } = await loadChain(doc);
   const by = replacedBy(chain, self);
   if (by) return Response.json({ error: `This invoice was replaced by ${String(by.data?.invoiceNumber || by.title || "a newer change order")}. Please pay that one.` }, { status: 409 });
-  if (isRevision(self)) {
-    const net = revisionOwed(chain, self);
-    owed = Math.min(owed, net);
-    charge = Math.min(charge, net);
-  }
+  const { charge, owed, staged } = amountToCharge(data, full, isRevision(self) ? revisionOwed(chain, self) : undefined);
   // Never charge more than the saved remaining balance.
   const cents = toCents(Math.min(charge, owed)); // R98: integer cents, no float drift
   if (cents < 50) return Response.json({ error: "Nothing is owed on this invoice." }, { status: 400 });

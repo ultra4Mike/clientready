@@ -51,7 +51,7 @@ import { ownerRating, starsText, type Rating } from "@/lib/ratings";
 import { applyPackage, deletePackage, readPackages, savePackage, syncPackages, type JobPackage } from "@/lib/packages";
 import ReminderPanel from "@/components/ReminderPanel";
 import { normalizeCategory, type LineCategory } from "@/lib/line-split";
-import { chainCredits, latestVersion, revisionOwed } from "@/lib/change-order-revision";
+import { chainCredits, childRevision, creditLabel, newestDescendant, revisionOwed } from "@/lib/change-order-revision";
 import { appendChangeOrderNote, changeOrdersFor, revisionData, mergeChangeOrderNotes, readChangeOrderNotes, readChangeOrderOf, type ChangeOrderNote, type ChangeOrderOf } from "@/lib/change-orders";
 import ChangeOrderNotes from "@/components/ChangeOrderNotes";
 import { ApprovalBadge, ApprovalShare } from "@/components/Approval";
@@ -481,9 +481,10 @@ export default function NewInvoicePage() {
         setDueDate(plusDays(kind === "proposal" ? 14 : defaultInvoiceTerms().days));
         setNotes(kind === "proposal" ? "This proposal is valid for 14 days." : defaultInvoiceTerms().notes);
         // Crew job report opened from /drafts (R82: costs go into Job costs; client carried; one invoice per report).
-        const draftRaw = window.localStorage.getItem("clientready-open-draft");
+        // Only when opened from Crew drafts (?draft=1); "New invoice" always opens blank and clears any left-over handoff.
+        const draftRaw = params.get("draft") === "1" ? window.localStorage.getItem("clientready-open-draft") : null;
+        window.localStorage.removeItem("clientready-open-draft");
         if (draftRaw) {
-          window.localStorage.removeItem("clientready-open-draft");
           const draft = JSON.parse(draftRaw) as Record<string, unknown>;
           const text = (key: string) => String(draft[key] || "");
           // R82: one crew report makes one invoice. If it was opened before, open that invoice again.
@@ -681,7 +682,7 @@ export default function NewInvoicePage() {
     const paid = paidTotal(payments);
     // R126: a refund on a paid-in-full invoice doesn't reopen a balance unless the owner re-bills it.
     const own = isProposal ? balanceDue(base.total, paid, status) : owedAfterRefunds(base.total, payments, status, rebillRefund);
-    if (isProposal || !revision || !docId) return { ...base, paid, balance: own, credits: [] as { id: string; number: string; paid: number }[] };
+    if (isProposal || !revision || !docId) return { ...base, paid, balance: own, credits: [] as { id: string; number: string; paid: number; marked?: boolean }[] };
     const live = { id: docId, type: "invoice", title: invoiceNumber, data: { invoiceNumber, items, taxPercent, discountType, discountValue, payments, status, rebillRefund, ...revision, ...(changeOrderOf ? { changeOrderOf } : {}) } };
     const all = [...docsForStage().filter((d) => d.id !== docId), live];
     return { ...base, paid, balance: revisionOwed(all as never, live as never), credits: chainCredits(all as never, live as never) };
@@ -1133,6 +1134,7 @@ export default function NewInvoicePage() {
   // R122: one change order per click; the button stays disabled until we navigate to it.
   const changeOrderBusy = useRef(false);
   const [creatingChangeOrder, setCreatingChangeOrder] = useState(false);
+  const [changeOrderBlock, setChangeOrderBlock] = useState<{ id: string; number: string } | null>(null);
   async function createChangeOrder(prefill?: unknown) {
     if (changeOrderBusy.current) return;
     changeOrderBusy.current = true; setCreatingChangeOrder(true);
@@ -1155,7 +1157,17 @@ export default function NewInvoicePage() {
     // Option A: a change order is a revised version of the job's invoice, linked to the original (root).
     const rootId = readChangeOrderOf(opened.data?.changeOrderOf)?.id || opened.id;
     const original = docs.find((doc) => doc.id === rootId && doc.type === "invoice") || opened;
-    const version = (latestVersion(docs as never, original as never) as SavedDocument | null) || original;
+    // Revise the version that is open (an add-on change order revises the original). Parent chain only:
+    // a version that already has a live revision can't get a second (sibling) one; go to the newest instead.
+    const version = opened.id !== original.id && opened.data?.coMode !== "revision" ? original : opened;
+    const existing = childRevision(docs as never, version as never) as SavedDocument | null;
+    if (existing) {
+      const newest = (newestDescendant(docs as never, version as never) as SavedDocument | null) || existing;
+      const newestNumber = String(newest.data?.invoiceNumber || newest.title);
+      setSaveMessage(`${String(version.data?.invoiceNumber || version.title)} already has a change order (${newestNumber}). Open ${newestNumber} to make another change.`);
+      setChangeOrderBlock({ id: newest.id, number: newestNumber });
+      return false;
+    }
     const originalNumber = String(original.data?.invoiceNumber || original.title);
     const count = changeOrdersFor(docs, original.id).length + 1;
     const number = nextNumber("invoice");
@@ -1756,6 +1768,7 @@ export default function NewInvoicePage() {
               {!locked && <button type="button" onClick={clearForm} className="cr-btn cr-btn-text">Clear form</button>}
             </div>
             {saveMessage && saveToast && <p role="status" aria-live="polite" onClick={() => setSaveToast(false)} className="print-hide fixed bottom-24 left-1/2 z-50 w-[min(92vw,32rem)] -translate-x-1/2 cursor-pointer rounded-lg border border-teal-500/40 bg-[var(--cr-card)] px-4 py-3 text-sm font-medium shadow-lg" data-testid="save-toast" data-kind={paymentProblem && saveMessage === paymentProblem ? "payment-required" : undefined}>{saveMessage}</p>}
+            {changeOrderBlock && <a data-testid="co-open-latest" className="block rounded-lg border border-amber-500/40 px-3 py-2 text-sm font-semibold underline" href={`/invoice?id=${encodeURIComponent(changeOrderBlock.id)}`}>Open {changeOrderBlock.number}, the latest version</a>}
             {saveMessage && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-slate-600" data-testid="save-message" data-kind={paymentProblem && saveMessage === paymentProblem ? "payment-required" : undefined}>{saveMessage}</p>}
           </fieldset>
         </form>
@@ -1923,7 +1936,7 @@ export default function NewInvoicePage() {
                 <div className="flex justify-between font-semibold"><span>Total</span><span>${totals.total.toFixed(2)}</span></div>
                 {isProposal && Number(depositPercent) > 0 && <div className="flex justify-between" data-testid="preview-deposit-request"><span>Deposit requested ({depositPercent}%)</span><span>${(totals.total * Number(depositPercent) / 100).toFixed(2)}</span></div>}
                 {totals.paid > 0 && <div className="flex justify-between text-emerald-700"><span>{isProposal ? "Deposit paid ✓" : "Paid"}</span><span>-${totals.paid.toFixed(2)}</span></div>}
-                {totals.credits.map((c) => <div key={c.id} className="flex justify-between text-emerald-700" data-testid="preview-chain-credit"><span>Paid on {c.number}</span><span>-${c.paid.toFixed(2)}</span></div>)}
+                {totals.credits.map((c) => <div key={c.id} className="flex justify-between text-emerald-700" data-testid="preview-chain-credit"><span>{creditLabel(c)}</span><span>-${c.paid.toFixed(2)}</span></div>)}
                 {tipTotal(payments) > 0 && <div className="flex justify-between" data-testid="tip-line"><span>Tip received, thank you</span><span>${tipTotal(payments).toFixed(2)}</span></div>}
                 {(!isProposal || totals.paid > 0) && <div className="mt-1 flex justify-between border-t border-slate-500 pt-1 text-lg font-bold"><span data-testid="preview-balance-label">{isProposal ? "Balance after deposit" : balanceLabel(totals.paid, totals.balance)}</span><span data-testid="preview-still-owed">${totals.balance.toFixed(2)}</span></div>}
               </div>

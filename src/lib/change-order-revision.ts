@@ -11,7 +11,7 @@
  * version it replaced active again. Add-on change orders (older ones, no coMode) keep the old behavior.
  */
 import { docAmounts } from "@/lib/doc-stage";
-import { owedAfterRefunds, readPayments, type Payment } from "@/lib/payments";
+import { owedAfterRefunds, paidTotal, readPayments, type Payment } from "@/lib/payments";
 
 type Doc = { id?: string; type?: string; title?: string; data?: Record<string, unknown> | null };
 const dataOf = (doc?: Doc | null) => (doc?.data || {}) as Record<string, unknown>;
@@ -38,32 +38,44 @@ export function rootIdOf(doc?: Doc | null) {
   return String(of.id || "") || String(doc?.id || "");
 }
 
+/**
+ * The version a revision was made from: by revises.id, else by revises.number (a parent saved offline first
+ * can get a new cloud id after the revision stored it; invoice numbers are unique per business).
+ */
+export function parentOf<T extends Doc>(docs: T[], rev?: Doc | null): T | null {
+  if (!isRevision(rev)) return null;
+  const { id, number } = revisesOf(rev);
+  return docs.find((d) => d.id === id && d.id !== rev?.id) || (number ? docs.find((d) => d.id !== rev?.id && d.type === "invoice" && numberOf(d) === number) : undefined) || null;
+}
+const isParent = (docs: Doc[], rev: Doc, doc: Doc) => { const p = parentOf(docs, rev); return !!p && p.id === doc.id; };
+
 /** The live revision that replaced this document, if any (newest by date, then number). */
 export function replacedBy<T extends Doc>(docs: T[], doc?: Doc | null): T | null {
   if (!doc?.id) return null;
-  const hits = docs.filter((d) => d.id !== doc.id && revisionLive(d) && revisesOf(d).id === doc.id);
+  const hits = docs.filter((d) => d.id !== doc.id && revisionLive(d) && isParent(docs, d, doc));
   if (!hits.length) return null;
   hits.sort((a, b) => String(dataOf(b).invoiceDate || "").localeCompare(String(dataOf(a).invoiceDate || "")) || numberOf(b).localeCompare(numberOf(a), undefined, { numeric: true }));
   return hits[0];
 }
 
-/** Original + every revision of it (not add-on change orders), void ones excluded, each id once. */
+/**
+ * The version chain of a document: itself plus its parents (revises -> parent -> ... -> original), void ones excluded.
+ * Only the parent line counts, so two sibling change orders made from the same version never credit each other.
+ */
 export function revisionChain<T extends Doc>(docs: T[], doc?: Doc | null): T[] {
   if (!doc) return [];
-  const root = rootIdOf(doc);
-  // Also walk back through "revises" (the client portal only sees changeOrderOf.number, not its id).
-  const back = new Set<string>([String(doc.id || "")]);
+  const ids: string[] = [String(doc.id || "")];
   for (let cur: Doc | undefined = doc, guard = 0; cur && isRevision(cur) && guard < 50; guard++) {
-    const prev: string = revisesOf(cur).id;
-    if (!prev || back.has(prev)) break;
-    back.add(prev);
-    cur = docs.find((d: Doc) => d.id === prev) as Doc | undefined;
+    const parent: Doc | null = parentOf(docs, cur);
+    const prev = String(parent?.id || "");
+    if (!prev || ids.includes(prev)) break;
+    ids.push(prev);
+    cur = parent || undefined;
   }
-  const seen = new Set<string>();
   const out: T[] = [];
-  for (const d of docs) {
-    if (!d.id || seen.has(d.id) || isVoidish(d)) continue;
-    if (back.has(d.id) || d.id === root || (isRevision(d) && rootIdOf(d) === root)) { seen.add(d.id); out.push(d); }
+  for (const id of ids) {
+    const d = docs.find((x) => x.id === id);
+    if (d && !isVoidish(d) && !out.includes(d)) out.push(d);
   }
   return out;
 }
@@ -75,12 +87,38 @@ function paymentsCounting(doc: Doc): Payment[] {
   return rows;
 }
 
-/** What was paid on each earlier version of the chain (for the "Paid on INV-x: −$X" lines). */
+/**
+ * Single source of truth for "what was paid on this version" (credits, the replaced banner and revisionOwed):
+ * net of refunds; a legacy "marked paid" with no payment rows counts as its total (marked: true).
+ */
+export function versionPaid(doc: Doc) {
+  const rows = paymentsCounting(doc);
+  const marked = rows.length === 1 && rows[0].id === "marked";
+  return { paid: paidTotal(rows), marked };
+}
+
+/** What was paid on each earlier version of the chain ("Paid on INV-x: −$X" / "Marked paid on INV-x: −$X"). */
 export function chainCredits(docs: Doc[], doc: Doc) {
   return revisionChain(docs, doc)
     .filter((d) => d.id !== doc.id)
-    .map((d) => ({ id: String(d.id), number: numberOf(d), paid: docAmounts(d as never).paid }))
-    .filter((c) => c.paid > 0.004);
+    .map((d) => ({ id: String(d.id), number: numberOf(d), ...versionPaid(d) }))
+    .filter((c) => c.paid > 0.004)
+    .reverse();
+}
+export const creditLabel = (c: { number: string; marked?: boolean }) => `${c.marked ? "Marked paid" : "Paid"} on ${c.number}`;
+
+/** A non-void revision (draft or sent) made from this exact version, newest first. */
+export function childRevision<T extends Doc>(docs: T[], doc?: Doc | null): T | null {
+  if (!doc?.id) return null;
+  const hits = docs.filter((d) => d.id !== doc.id && isRevision(d) && !isVoidish(d) && isParent(docs, d, doc));
+  hits.sort((a, b) => String(dataOf(b).invoiceDate || "").localeCompare(String(dataOf(a).invoiceDate || "")) || numberOf(b).localeCompare(numberOf(a), undefined, { numeric: true }));
+  return hits[0] || null;
+}
+/** The newest version below this one (following non-void child revisions); itself if it has none. */
+export function newestDescendant<T extends Doc>(docs: T[], doc: T): T {
+  let cur = doc;
+  for (let guard = 0; guard < 50; guard++) { const next = childRevision(docs, cur); if (!next) break; cur = next; }
+  return cur;
 }
 
 /** Owed on a revision: its total minus all payments across the chain (refund-aware). */
@@ -88,6 +126,7 @@ export function revisionOwed(docs: Doc[], doc: Doc) {
   const own = docAmounts(doc as never);
   if (!isRevision(doc)) return own.owed;
   const others = revisionChain(docs, doc).filter((d) => d.id !== doc.id);
+  // Same rows as versionPaid/chainCredits (paymentsCounting), so the credits always explain the Balance due.
   const payments = [...readPayments(dataOf(doc) as never), ...others.flatMap(paymentsCounting)];
   return owedAfterRefunds(own.total, payments, dataOf(doc).status, dataOf(doc).rebillRefund);
 }

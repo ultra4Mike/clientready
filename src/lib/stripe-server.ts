@@ -38,8 +38,10 @@ function amountsFor(data: Record<string, unknown>) {
 }
 
 /** What to charge now: the current payment stage's remainder, or the full balance (no stages / full=true). */
-export function amountToCharge(data: Record<string, unknown>, full: boolean) {
-  const { total, owed } = amountsFor(data);
+/** chainOwed (Option A revision): owed net of earlier versions' payments, so the plan stages count those credits as paid. */
+export function amountToCharge(data: Record<string, unknown>, full: boolean, chainOwed?: number) {
+  const { total, owed: ownOwed } = amountsFor(data);
+  const owed = typeof chainOwed === "number" ? Math.min(ownOwed, chainOwed) : ownOwed;
   const stages = readStages(data.stages);
   return { owed, charge: payNowAmount(total, owed, stages, todayYmd(), full), staged: stages.length > 0 && !full };
 }

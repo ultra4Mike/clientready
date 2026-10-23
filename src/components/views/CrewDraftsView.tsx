@@ -60,7 +60,8 @@ export default function DraftsPage() {
     // Receipts stay on the report (too big to hand over); the invoice only notes that one exists.
     const lines = readCostLines(draft).map(({ receipt, ...line }) => ({ ...line, ...(receipt ? { receipt: "1" } : {}) }));
     window.localStorage.setItem("clientready-open-draft", JSON.stringify({ ...draft, costs: lines }));
-    window.location.href = "/invoice";
+    // Explicit handoff flag: a plain /invoice ("New invoice") never picks up a left-over crew draft.
+    window.location.href = "/invoice?draft=1";
   }
 
   return (

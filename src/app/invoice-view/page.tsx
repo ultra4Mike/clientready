@@ -5,6 +5,7 @@ import { readLocalPaymentMethods, type PaymentMethodsConfig } from "@/lib/paymen
 import { StageSchedule } from "@/components/StageSchedule";
 import { balanceLabel, readStages, type Stage } from "@/lib/stages";
 import { useEffect, useMemo, useState } from "react";
+import { chainCredits, creditLabel, isRevision, replacedBy, revisionOwed } from "@/lib/change-order-revision";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { balanceDue, owedAfterRefunds, paidTotal, readPayments, tipTotal, type Payment } from "@/lib/payments";
@@ -159,8 +160,19 @@ export default function InvoiceViewPage() {
     }, 0);
     const base = documentTotals(subtotal, taxPercent, discountType, discountValue);
     const paid = paidTotal(payments);
-    return { ...base, paid, balance: owedAfterRefunds(base.total, payments, status) }; // R128: refund-aware
-  }, [items, taxPercent, discountType, discountValue, payments, status]);
+    const own = owedAfterRefunds(base.total, payments, status); // R128: refund-aware
+    // Option A: a replaced version owes nothing (no pay links, banner); a revision owes net of earlier versions' payments.
+    const self = trailDocs.find((d) => d.id === docId);
+    const by = self ? (replacedBy(trailDocs as never, self as never) as SavedDocument | null) : null;
+    if (by) return { ...base, paid, balance: 0, replacedBy: { id: by.id, number: String(by.data?.invoiceNumber || by.title || "") }, credits: [] as ReturnType<typeof chainCredits> };
+    if (self && isRevision(self as never)) {
+      const live = { ...self, data: { ...(self.data || {}), items, taxPercent, discountType, discountValue, payments, status } };
+      const all = trailDocs.map((d) => (d.id === docId ? live : d));
+      return { ...base, paid, balance: revisionOwed(all as never, live as never), replacedBy: null, credits: chainCredits(all as never, live as never) };
+    }
+    return { ...base, paid, balance: own, replacedBy: null, credits: [] as ReturnType<typeof chainCredits> };
+  }, [items, taxPercent, discountType, discountValue, payments, status, trailDocs, docId]);
+  const replaced = totals.replacedBy;
 
   function editInvoice() {
     if (!docId) return;
@@ -227,7 +239,7 @@ export default function InvoiceViewPage() {
           >
             Print / Save PDF
           </button>
-          {status !== "paid" && (
+          {status !== "paid" && !replaced && (
             <button
               type="button"
               onClick={copyPayLink}
@@ -256,6 +268,11 @@ export default function InvoiceViewPage() {
               {jobTime && <p>Scheduled time: {jobTime}</p>}
             </div>
             <div className="shrink-0 text-right">
+              {replaced && (
+                <div data-testid="view-replaced" className="mb-3 rounded-lg border-2 border-slate-500 px-3 py-2 text-sm font-bold">
+                  Replaced by <a data-testid="view-replaced-link" className="underline" href={`/invoice-view?id=${encodeURIComponent(replaced.id)}`}>{replaced.number}</a>, no longer valid. Do not pay this version.
+                </div>
+              )}
               {approvalBadgeApplies({ type: "invoice", data: { status, ...(changeOrderOf ? { changeOrderOf } : {}) } }, approval) && approval && <div className="mb-1"><ApprovalBadge approval={approval} /></div>}
               {changeOrderOf && <p className="change-order-badge mb-1 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide" data-testid="change-order-badge">Change order</p>}
               <p className="text-xs uppercase tracking-wide text-slate-500">Invoice · <span data-testid="invoice-status-pill" className={`inline-flex items-center rounded-full border px-2.5 py-0.5 font-semibold ${status === "paid" ? "cr-tone-good border-emerald-200 bg-emerald-100 text-emerald-800" : "cr-tone-warn border-amber-200 bg-amber-100 text-amber-800"}`}>{status === "paid" ? "✓ paid" : ["void", "voided"].includes(status) ? "void" : status}</span></p>
@@ -304,7 +321,7 @@ export default function InvoiceViewPage() {
                   <span>-${amountOf(payment.amount).toFixed(2)}</span>
                 </div>
               ))}
-              {paymentLink && <p className="break-all pt-1 text-xs">Pay here: {paymentLink}</p>}
+              {paymentLink && !replaced && <p className="break-all pt-1 text-xs">Pay here: {paymentLink}</p>}
             </div>
             <div className="space-y-1">
               <div className="flex justify-between">
@@ -337,7 +354,14 @@ export default function InvoiceViewPage() {
                   <span>${tipTotal(payments).toFixed(2)}</span>
                 </div>
               )}
-              {status === "paid" || (totals.paid > 0 && totals.balance <= 0.004) ? (
+              {totals.credits.map((c) => (
+                <div key={c.id} className="flex justify-between text-emerald-700" data-testid="view-chain-credit"><span>{creditLabel(c)}</span><span>-${c.paid.toFixed(2)}</span></div>
+              ))}
+              {replaced ? (
+                <div data-testid="view-replaced-balance" className="mt-2 flex items-baseline justify-between rounded-lg border border-slate-400 px-3 py-2 text-lg font-bold">
+                  <span>Replaced by {replaced.number}</span><span>$0.00</span>
+                </div>
+              ) : status === "paid" || (totals.paid > 0 && totals.balance <= 0.004) ? (
                 <div data-testid="paid-in-full" className="mt-2 flex items-baseline justify-between cr-tone-good rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-lg font-bold text-emerald-800 print:bg-transparent print:px-0">
                   <span>✓ Paid in full</span>
                   <span>${totals.balance.toFixed(2)}</span>
@@ -351,18 +375,18 @@ export default function InvoiceViewPage() {
             </div>
           </div>
 
-          {status !== "paid" && totals.balance > 0.004 && <PayOptions config={payMethods} amount={totals.balance} reference={invoiceNumber} />}
+          {status !== "paid" && !replaced && totals.balance > 0.004 && <PayOptions config={payMethods} amount={totals.balance} reference={invoiceNumber} />}
           <StageSchedule stages={stages} total={totals.total} balance={totals.balance} />
           {notes && <p className="mt-6 whitespace-pre-line text-sm text-slate-600">{notes}</p>}
           <JobPhotoStrip photos={photos} />
-          {((invoiceQrUrl(approval?.token, printOrigin(), docPayLink, paymentLink) && totals.balance > 0.004) || signature || proposalSignature) && (
+          {((!replaced && invoiceQrUrl(approval?.token, printOrigin(), docPayLink, paymentLink) && totals.balance > 0.004) || signature || proposalSignature) && (
             <div className="print-keep mt-3 grid grid-cols-1 items-end gap-6 sm:grid-cols-2 print:grid-cols-2 border-t border-slate-200 pt-3">
               <div className="space-y-3">
                 <SignatureBlock signature={proposalSignature} label="Proposal accepted" />
                 <SignatureBlock signature={signature} />
               </div>
               <div className="flex justify-start sm:justify-end print:justify-end">
-                {totals.balance > 0.004 && <PayQr url={invoiceQrUrl(approval?.token, printOrigin(), docPayLink, paymentLink)} />}
+                {!replaced && totals.balance > 0.004 && <PayQr url={invoiceQrUrl(approval?.token, printOrigin(), docPayLink, paymentLink)} />}
               </div>
             </div>
           )}

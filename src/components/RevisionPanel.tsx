@@ -1,7 +1,6 @@
 "use client";
 
-import { isRevision, replacedBy, revisesOf } from "@/lib/change-order-revision";
-import { docAmounts } from "@/lib/doc-stage";
+import { creditLabel, versionPaid, isRevision, replacedBy, revisesOf } from "@/lib/change-order-revision";
 
 type Doc = { id: string; type: string; title: string; data?: Record<string, unknown> };
 const $ = (n: number) => `$${Math.abs(n).toFixed(2)}`;
@@ -12,18 +11,18 @@ const numberOf = (d: Doc) => String(d.data?.invoiceNumber || d.title || "");
  * On a revised version: Was → Now, paid credits from earlier versions, Balance due. Payments are never moved or copied.
  */
 export default function RevisionPanel({ docs, currentId, liveTotal, balance, credits, status, empty, onDeleteDraft }: {
-  docs: Doc[]; currentId: string; liveTotal: number; balance: number; credits: { id: string; number: string; paid: number }[];
+  docs: Doc[]; currentId: string; liveTotal: number; balance: number; credits: { id: string; number: string; paid: number; marked?: boolean }[];
   status: string; empty?: boolean; onDeleteDraft?: () => void;
 }) {
   const doc = docs.find((d) => d.id === currentId);
   if (!doc || doc.type !== "invoice") return null;
   const by = replacedBy(docs as never, doc as never) as Doc | null;
   if (by) {
-    const paid = docAmounts(doc as never).paid;
+    const { paid, marked } = versionPaid(doc as never);
     return (
       <section data-testid="co-replaced" className="print-hide mb-4 rounded-2xl border-2 border-slate-400/60 bg-slate-500/10 p-4 text-sm">
         <p className="text-base font-bold">Replaced by <a data-testid="co-replaced-link" className="underline" href={`/invoice?id=${encodeURIComponent(by.id)}`}>{numberOf(by)}</a>, no longer valid</p>
-        <p className="mt-1 opacity-80">Your client sees {numberOf(by)} instead. This version is never overdue and can&apos;t be paid online.{paid > 0 ? ` The ${$(paid)} paid here stays recorded here and is credited on ${numberOf(by)}.` : ""}</p>
+        <p className="mt-1 opacity-80">Your client sees {numberOf(by)} instead. This version is never overdue and can&apos;t be paid online.{paid > 0 ? ` The ${$(paid)} ${marked ? "marked paid" : "paid"} here stays recorded here and is credited on ${numberOf(by)}.` : ""}</p>
       </section>
     );
   }
@@ -44,7 +43,7 @@ export default function RevisionPanel({ docs, currentId, liveTotal, balance, cre
       <p data-testid="co-was-now" className="mt-2 text-base font-semibold tabular-nums">Was {$(was.total)} → Now {$(liveTotal)} ({diff < 0 ? "−" : "+"}{$(diff)})</p>
       <dl className="mt-2 grid gap-1 tabular-nums sm:max-w-md">
         {credits.map((c) => (
-          <div key={c.id} className="flex justify-between gap-3" data-testid="co-credit"><dt className="opacity-75">Paid on {c.number}</dt><dd className="font-semibold">−{$(c.paid)}</dd></div>
+          <div key={c.id} className="flex justify-between gap-3" data-testid="co-credit"><dt className="opacity-75">{creditLabel(c)}</dt><dd className="font-semibold">−{$(c.paid)}</dd></div>
         ))}
         <div className="flex justify-between gap-3 border-t border-amber-400/40 pt-1"><dt className="font-bold">Balance due</dt><dd data-testid="co-balance-due" className="font-bold">{$(Math.max(balance, 0))}</dd></div>
       </dl>
