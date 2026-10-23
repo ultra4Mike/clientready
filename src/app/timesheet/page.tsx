@@ -14,6 +14,7 @@ import { readWorkers, type Worker } from "@/lib/schedule";
 import { weekOf } from "@/lib/pay-types";
 import Link from "next/link";
 import DayDetail from "@/components/timesheet/DayDetail";
+import PtoOwnerCard from "@/components/phase2/PtoOwnerCard";
 import { loadBusinessTz, loadAttestations, decideFix, loadOwnerTimesheet, readLocalTimesheetSettings, saveApprovals, type DayApproval } from "@/lib/day-events";
 import { dayState, DEFAULT_TIMESHEET_SETTINGS, reviewDayInfo, weekStatus, type DayStateName, type DaySheet, type FixRequest, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
 import { addDays, applyWeekToDocs, pushChangedDocs, readDocs, syncTimesheetCutover, scheduleFor, weekShares, weekSheets } from "@/lib/timesheet-sync";
@@ -43,6 +44,7 @@ export default function TimesheetPage() {
   const [phone, setPhone] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [cloud, setCloud] = useState(true);
+  const [cloudError, setCloudError] = useState("");
   useEffect(() => { const mq = window.matchMedia("(max-width: 639px)"); const on = () => setPhone(mq.matches); on(); mq.addEventListener("change", on); return () => mq.removeEventListener("change", on); }, []);
   const [message, setMessage] = useState("");
   const [now, setNow] = useState("");
@@ -62,7 +64,7 @@ export default function TimesheetPage() {
   }, []);
   useEffect(() => {
     if (!week) return;
-    void loadOwnerTimesheet(week, addDays(week, 6)).then((data) => { setCloud(data.cloud); setEvents(data.events); setFixes(data.fixes); setApprovals(data.approvals); setSettings(data.settings); });
+    void loadOwnerTimesheet(week, addDays(week, 6)).then((data) => { setCloud(data.cloud); setCloudError(data.cloudError || ""); setEvents(data.events); setFixes(data.fixes); setApprovals(data.approvals); setSettings(data.settings); });
     void loadAttestations(week).then(setAttest);
   }, [week]);
   const { days, sheets } = useMemo(() => (week && now ? weekSheets({ workers, docs, events, fixes, settings, week, now }) : { days: [] as string[], sheets: new Map<string, DaySheet>() }), [workers, docs, events, fixes, settings, week, now]);
@@ -241,6 +243,7 @@ export default function TimesheetPage() {
   return (
     <AppShell title="Timesheet">
       <PageHeader title="Weekly timesheet" subtitle="Tap any day to see its timeline, fix it or approve it." />
+      {todayYmd && <PtoOwnerCard workers={workers.map((w) => ({ id: w.id, name: w.name, hireDate: w.hireDate, pto: readWorkerOverrides(w) }))} settings={settings} today={todayYmd} />}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <button className="min-h-11 rounded-lg border px-3" onClick={() => setWeek(addDays(week, -7))} data-testid="ts-prev" aria-label="Previous week">‹</button>
         <span className="font-semibold" data-testid="ts-week">Week of {week}</span>
@@ -305,7 +308,7 @@ export default function TimesheetPage() {
           </table>
         </div>
       )}
-      {!cloud && <p className="cr-panel cr-tone-warn mt-2 text-sm" data-testid="ts-cloud-offline" role="status">Couldn&apos;t read the saved timesheet (signed out or offline). Showing this device&apos;s copy; nothing was deleted. Sign in again or refresh.</p>}
+      {!cloud && <p className="cr-panel cr-tone-warn mt-2 text-sm" data-testid="ts-cloud-offline" role="status">Couldn&apos;t read the saved timesheet (signed out or offline). Showing this device&apos;s copy; nothing was deleted. Sign in again or refresh.{cloudError ? <span className="block text-xs" data-testid="ts-cloud-error">Details: {cloudError}</span> : null}</p>}
       {orphans.length > 0 && <p className="cr-panel cr-tone-warn mt-2 text-sm" data-testid="ts-orphan-hours" role="status">Hours saved for {orphans.length} crew record{orphans.length === 1 ? "" : "s"} not on your Team list this week ({orphans.join(", ")}). They are kept, not deleted. Check Team for a removed or re-added person.</p>}
       {!shown.length && <p className="mt-2 text-sm text-[var(--cr-muted)]" data-testid="ts-empty">{filter === "review" ? "Nothing needs review this week." : <>No crew yet. Add your crew on <Link href="/employees" className="underline">Team</Link>; their taps on My day show up here.</>}</p>}
       {pendingFixes.length > 0 && (

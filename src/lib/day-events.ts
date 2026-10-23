@@ -65,15 +65,26 @@ export async function locationPermission(): Promise<"granted" | "denied" | "prom
 
 /** The account's time zone (profiles.timezone) for showing every time the same on every device. */
 let tzLoaded: Promise<void> | null = null;
+const rememberTz = (tz: string) => { try { window.localStorage.setItem("clientready-business-tz", tz); } catch { /* private mode */ } };
 /** Loads the account time zone once per page load (all day keys and times use it). */
 export function loadBusinessTz(asCrew = false) { return (tzLoaded ||= loadBusinessTzOnce(asCrew)); }
 async function loadBusinessTzOnce(asCrew: boolean) {
   try {
-    if (asCrew) { const { data, error } = await supabase.rpc("crew_time_zone"); if (!error && typeof data === "string") setBusinessTz(data); return; }
+    if (asCrew) {
+      // crew_time_zone (phase 2); else crew_time_rules().timezone; else the last zone seen on this device; default stays America/Chicago (never the device/UTC zone).
+      const { data, error } = await supabase.rpc("crew_time_zone");
+      if (!error && typeof data === "string" && data) { setBusinessTz(data); rememberTz(data); return; }
+      const r = await supabase.rpc("crew_time_rules");
+      const tz = (r.data as { timezone?: string } | null)?.timezone;
+      if (tz) { setBusinessTz(tz); rememberTz(tz); return; }
+      try { setBusinessTz(window.localStorage.getItem("clientready-business-tz")); } catch { /* none */ }
+      return;
+    }
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
     const { data } = await supabase.from("profiles").select("timezone").eq("id", u.user.id).maybeSingle();
-    setBusinessTz((data as { timezone?: string | null } | null)?.timezone);
+    const tz = (data as { timezone?: string | null } | null)?.timezone;
+    setBusinessTz(tz); if (tz) rememberTz(tz);
   } catch { /* keep the default zone */ }
 }
 
@@ -138,13 +149,14 @@ export async function loadMyFixes(email: string): Promise<FixRequest[]> {
 }
 
 export type DayApproval = { employeeId: string; date: string; paidMinutes: number; driveMinutes: number; editedMinutes?: number | null; approvedAt?: string | null; changedAt?: string | null };
-export type OwnerTimesheet = { events: TapEvent[]; fixes: FixRequest[]; approvals: DayApproval[]; settings: TimesheetSettings; cloud: boolean };
+export type OwnerTimesheet = { events: TapEvent[]; fixes: FixRequest[]; approvals: DayApproval[]; settings: TimesheetSettings; cloud: boolean; cloudError?: string };
 
 /** Owner: everything for the days [from, to] (YYYY-MM-DD). */
 export async function loadOwnerTimesheet(from: string, to: string): Promise<OwnerTimesheet> {
   const localApprovals = readLocal<DayApproval[]>(KEY_APPROVALS, []);
   const localSettings = readTimesheetSettings(readLocal(KEY_SETTINGS, {}));
-  const [ev, fx, ap, st] = await Promise.all([
+  const evQuery = () => selectEvents((cols) => supabase.from("crew_day_events").select(cols).gte("work_date", from).lte("work_date", to).order("at"));
+  let [ev, fx, ap, st] = await Promise.all([
     selectEvents((cols) => supabase.from("crew_day_events").select(cols).gte("work_date", from).lte("work_date", to).order("at")),
     supabase.from("crew_time_fixes").select("*").gte("work_date", from).lte("work_date", to).order("created_at"),
     supabase.from("crew_day_approvals").select("*").gte("work_date", from).lte("work_date", to),
@@ -154,7 +166,15 @@ export async function loadOwnerTimesheet(from: string, to: string): Promise<Owne
   // fall back to this device's copy and report cloud=false so the page can say so.
   const { data: auth } = await supabase.auth.getSession();
   const signedIn = Boolean(auth.session?.user);
-  const cloud = signedIn && !ev.error;
+  // One retry for a transient failure (network blip, token refresh racing the first read) before showing the offline banner.
+  if (signedIn && (ev.error || ap.error)) {
+    await new Promise((r) => setTimeout(r, 1500)); // PostgREST answers 503 PGRST002 for a moment while it reloads its schema after a migration
+    [ev, ap] = await Promise.all([ev.error ? evQuery() : Promise.resolve(ev), ap.error ? supabase.from("crew_day_approvals").select("*").gte("work_date", from).lte("work_date", to) : Promise.resolve(ap)]);
+  }
+  const errs = [ev.error && `events: ${ev.error.code || ""} ${ev.error.message || ""}`, ap.error && `approvals: ${ap.error.code || ""} ${ap.error.message || ""}`, fx.error && `fixes: ${fx.error.code || ""} ${fx.error.message || ""}`, st.error && `settings: ${st.error.code || ""} ${st.error.message || ""}`].filter(Boolean) as string[];
+  if (errs.length && typeof console !== "undefined") console.warn("[timesheet] cloud read failed:", errs.join(" | "));
+  const cloud = signedIn && !ev.error && !ap.error;
+  const cloudError = !signedIn ? "not signed in" : errs.join(" | ");
   const cloudApprovals = !signedIn || ap.error ? [] : ((ap.data || []) as Record<string, unknown>[]).map((r) => ({ employeeId: String(r.employee_id), date: String(r.work_date).slice(0, 10), paidMinutes: Number(r.paid_minutes) || 0, driveMinutes: Number(r.drive_minutes) || 0, editedMinutes: r.edited_minutes == null ? null : Number(r.edited_minutes), approvedAt: (r.approved_at as string) || null, changedAt: (r.changed_at as string) || null }));
   const seen = new Set(cloudApprovals.map((a) => `${a.employeeId}|${a.date}`));
   const approvals = !signedIn || ap.error ? localApprovals : [...cloudApprovals, ...localApprovals.filter((a) => !seen.has(`${a.employeeId}|${a.date}`) && a.approvedAt)];
@@ -165,6 +185,7 @@ export async function loadOwnerTimesheet(from: string, to: string): Promise<Owne
     approvals: approvals.filter((a) => a.date >= from && a.date <= to),
     settings: s ? readTimesheetSettings({ ...localSettings, ...((s.rules as object) || {}), gapMinutes: s.gap_minutes, transitTimeoutMinutes: s.transit_timeout_minutes, halfDayHours: s.half_day_hours }) : localSettings,
     cloud,
+    cloudError,
   };
 }
 

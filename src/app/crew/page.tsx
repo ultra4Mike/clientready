@@ -11,6 +11,11 @@ import { CREW_KINDS, EXTRA_PREFIX, crewKindLabel, legacySummary, type CostLine, 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import MyDay from "@/components/crew/MyDay";
 import MyWeek from "@/components/crew/MyWeek";
+import LeadPanel from "@/components/phase2/LeadPanel";
+import CrewPto from "@/components/phase2/CrewPto";
+import { ymdTz } from "@/lib/timesheet";
+import { clearDraft } from "@/lib/drafts";
+import { loadBusinessTz } from "@/lib/day-events";
 import { supabase } from "@/lib/supabase";
 import { crewMarkDone, crewCheckItem, crewOnMyWay, omwTime, crewSetJobStatus, onMyWaySmsHref, STATUS_CLASS, STATUS_LABEL, type JobStatus } from "@/lib/schedule";
 import { compressPhoto } from "@/lib/photos";
@@ -292,7 +297,8 @@ export default function CrewPage() {
     const saved = window.localStorage.getItem("clientready-theme") || "dark";
     document.documentElement.classList.toggle("dark", saved === "dark");
     document.documentElement.classList.toggle("light", saved === "light");
-    const tick = () => { setNow(Date.now()); setToday(ymd(new Date())); };
+    const tick = () => { setNow(Date.now()); setToday(ymdTz(new Date())); };
+    void loadBusinessTz(true).then(tick);
     const first = window.setTimeout(tick, 0);
     const timer = window.setInterval(tick, 1000);
     const start = window.setTimeout(() => { setTheme(saved); load(); }, 0);
@@ -388,7 +394,7 @@ export default function CrewPage() {
   const later = cards.filter((card) => card.job_date && weekDays.length > 0 && card.job_date > weekDays[6]).sort((a, b) => a.job_date.localeCompare(b.job_date));
 
   const hoursByDay = weekDays.map((day) => {
-    const clocked = clock.filter((entry) => ymd(new Date(entry.started_at)) === day).reduce((sum, entry) => sum + entryHours(entry, now), 0);
+    const clocked = clock.filter((entry) => ymdTz(new Date(entry.started_at)) === day).reduce((sum, entry) => sum + entryHours(entry, now), 0);
     const logged = jobs.filter((job) => !job.id.includes("-sched-") && job.job_date === day).reduce((sum, job) => sum + (Number(job.hours) || 0), 0);
     return { day, clocked, logged };
   });
@@ -494,6 +500,7 @@ export default function CrewPage() {
     if (fixEnd - fixStart > 16 * 3600000 && !window.confirm(`That is ${Math.round((fixEnd - fixStart) / 3600000)} hours. Save anyway?`)) return;
     await act(`fix-${fixing.id}`, () => crewEditClock(fixing.id, new Date(fixing.start).toISOString(), new Date(fixing.end).toISOString(), fixing.reason), "Time corrected. Your boss will see the reason.");
     setFixing(null);
+    void clearDraft("crew-fix-time");
   }
 
   /** Job report insert; the upload key is the row id, so a retry after a lost reply cannot add it twice. */
@@ -677,7 +684,7 @@ export default function CrewPage() {
             <ul className="mt-3 divide-y divide-teal-500/10 border-t border-teal-500/10 text-sm">
               {mine.map((entry) => (
                 <li key={entry.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5" data-testid="clock-entry">
-                  <span>{dayLabel(ymd(new Date(entry.started_at)))} · {clockTime(entry.started_at)} – {entry.ended_at ? clockTime(entry.ended_at) : "now"}{entry.edited_reason ? ` · edited: ${entry.edited_reason}` : ""}</span>
+                  <span>{dayLabel(ymdTz(new Date(entry.started_at)))} · {clockTime(entry.started_at)} – {entry.ended_at ? clockTime(entry.ended_at) : "now"}{entry.edited_reason ? ` · edited: ${entry.edited_reason}` : ""}</span>
                   <span className="flex items-center gap-2">
                     <span className="tabular-nums">{fmtHours(entryHours(entry, now))}</span>
                     {entry.id.startsWith("pending-") ? <span className="text-xs text-[var(--cr-muted)]" data-testid="clock-pending">Not sent yet</span> : <button type="button" data-testid="clock-fix-time" className="inline-flex min-h-11 min-w-11 items-center rounded-lg border border-teal-600/40 px-3 text-sm font-medium text-teal-700 dark:text-teal-300" onClick={() => setFixing({ id: entry.id, start: localInput(entry.started_at), end: localInput(entry.ended_at || new Date().toISOString()), reason: "" })}>Fix time</button>}
@@ -787,7 +794,7 @@ export default function CrewPage() {
 
       <div className="mx-auto max-w-3xl space-y-5 px-4 pt-5">
         {message && <p className="rounded-xl border border-teal-500/30 px-3 py-2 text-sm" role="status" data-testid="crew-message">{message}</p>}
-        <FormDraft form="crew-fix-time" value={fixing || { id: "", start: "", end: "", reason: "" }} blank={{ id: "", start: "", end: "", reason: "" }} onRestore={(v) => { setFixing(v); setTab("hours"); }} what="time fix" />
+        <FormDraft form="crew-fix-time" value={fixing || { id: "", start: "", end: "", reason: "" }} blank={{ id: "", start: "", end: "", reason: "" }} onRestore={(v) => { setFixing(v); setTab("hours"); }} what="time fix" maxAgeHours={12} />
         {/* Backlog 7: one clear sync status for the phone: offline or not, and how much is still on this phone. */}
         {((offlineFlag: boolean) => {
           // The browser's own signal too, so a tap made after losing signal never shows "Send now".
@@ -858,6 +865,7 @@ export default function CrewPage() {
           <section className="space-y-3">
             <h2 className="text-xl font-bold tracking-tight">{today ? dayLabel(today) : "Today"}</h2>
             {email && <MyDay email={email} employeeId={employeeId} jobs={todayCards.map((card) => ({ docId: card.doc_id, label: [card.client_name, card.invoice_number].filter(Boolean).join(" · ") || "Job", address: card.client_address || "", date: card.job_date, startTime: card.start_time || "", endTime: card.end_time || "" }))} />}
+            {email && <LeadPanel />}
             {todayCards.length === 0 && <EmptyState icon={<Icon name="sun" className="h-6 w-6" />} title="Nothing scheduled for you today." className={`${cardClass} border-dashed`} />}
             {(() => {
               const route = routeStops(todayCards);
@@ -948,6 +956,7 @@ export default function CrewPage() {
         )}
 
         {!detailId && tab === "hours" && email && <MyWeek email={email} employeeId={employeeId} clock={clock} />}
+        {!detailId && tab === "hours" && email && <CrewPto />}
         {!detailId && tab === "hours" && (
           <section className={cardClass} data-testid="my-hours">
             <h2 className="text-lg font-bold tracking-tight">Logged hours this week</h2>

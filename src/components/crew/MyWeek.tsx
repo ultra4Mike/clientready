@@ -58,13 +58,13 @@ export default function MyWeek({ email, employeeId, clock }: { email: string; em
     <section data-testid="my-week" className="cr-section space-y-3">
       <h2 className="text-lg font-bold tracking-tight">My week</h2>
       <p className="text-xs text-[var(--cr-muted)]">Paid hours from My day. Short breaks are paid; long breaks and gaps are not. Older per-job clock times are shown too.</p>
-      <table className="w-full table-fixed text-sm tabular-nums" data-testid="my-week-table">
-        <colgroup><col /><col className="w-20" /><col className="w-20" /><col className="w-20" /></colgroup>
+      <table className="w-full table-fixed text-sm tabular-nums [&_td:not(:first-child)]:whitespace-nowrap [&_th:not(:first-child)]:whitespace-nowrap [&_td]:align-top" data-testid="my-week-table">
+        <colgroup><col /><col className="w-[4.75rem]" /><col className="w-[4.75rem]" /><col className="w-[4.75rem]" /></colgroup>
         <thead><tr className="text-left text-xs uppercase text-[var(--cr-muted)]"><th className="py-1">Day</th><th className="py-1 pr-1 text-right" data-testid="my-week-h-paid">Paid</th><th className="py-1 pr-1 text-right" data-testid="my-week-h-breaks">Breaks</th><th className="py-1 pr-1 text-right" data-testid="my-week-h-unpaid">Unpaid</th></tr></thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r.date} data-testid={`my-week-day-${r.date}`} data-state={r.flagged ? "flagged" : r.paid + r.oldClock > 0 ? "worked" : "empty"} data-today={r.date === today ? "true" : "false"} className="border-t">
-              <td className="py-1.5">{dayName(r.date)}{r.approved && <span data-testid="my-week-approved" className="cr-chip2 cr-tone-good ml-1">✓</span>}{r.flagged && <span data-testid="my-week-flag" title={r.reasons.join(" ")} className="cr-chip2 cr-tone-warn ml-1">!</span>}
+              <td className="py-1.5"><span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap">{dayName(r.date)}{r.approved && <span data-testid="my-week-approved" className="cr-chip2 cr-tone-good px-1 text-xs">✓</span>}{r.flagged && <span data-testid="my-week-flag" title={r.reasons.join(" ")} className="cr-chip2 cr-tone-warn px-1 text-xs">!</span>}</span>
                 {r.flagged && <span className="block text-xs cr-text-warn" data-testid="my-week-reason">{r.reasons[0]}</span>}</td>
               <td className="py-1.5 pr-1 text-right" data-testid="my-week-paid">{r.paid + r.oldClock > 0 ? hm(r.paid + r.oldClock) : "–"}</td>
               <td className="py-1.5 pr-1 text-right" data-testid="my-week-breaks">{r.breaks > 0 ? hm(r.breaks) : "–"}</td>

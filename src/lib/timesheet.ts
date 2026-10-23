@@ -34,6 +34,8 @@ export type TapEvent = {
   offline?: boolean;
   /** Time set by an owner-approved fix (or an owner edit): never flagged out of order or clock skew. */
   fixed?: boolean;
+  /** The original tapped time a fix replaced (shown struck through). */
+  wasAt?: string;
 };
 export type ScheduledJob = { docId: string; start: string; end: string; label?: string; lat?: number; lng?: number }; // ISO start/end
 export type DayFlag = "from_schedule" | "not_at_site" | "long_drive" | "auto_ended" | "fix_requested" | "edited" | "changed_since_approved"
@@ -528,9 +530,11 @@ export function dedupeTaps(events: TapEvent[]): TapEvent[] {
 export function applyFixes(events: TapEvent[], fixes: FixRequest[]): TapEvent[] {
   let out = [...events];
   for (const fix of fixes.filter((f) => f.status === "approved")) {
-    const target = fix.eventId ? out.find((e) => e.id === fix.eventId) : undefined;
+    // A start/end-of-day fix without an event id replaces that day's own start/end tap (one per day), never adds a second.
+    const target = fix.eventId ? out.find((e) => e.id === fix.eventId)
+      : (fix.kind === "start_day" || fix.kind === "end_day") ? out.find((e) => e.kind === fix.kind && e.date === fix.date && (!e.employeeId || !fix.employeeId || e.employeeId === fix.employeeId) && !e.fixed) : undefined;
     // A fixed tap is the owner-approved time: no phone time (no clock_skew) and never "out of order".
-    if (target) out = out.map((e) => (e.id === target.id ? { ...e, at: fix.at, deviceAt: undefined, outOfOrder: false, fixed: true } : e));
+    if (target) out = out.map((e) => (e.id === target.id ? { ...e, at: fix.at, deviceAt: undefined, outOfOrder: false, fixed: true, wasAt: e.at } : e));
     else out.push({ id: `fix-${fix.id}`, employeeId: fix.employeeId, date: fix.date, kind: fix.kind, at: fix.at, docId: fix.docId, fixed: true });
   }
   return out;

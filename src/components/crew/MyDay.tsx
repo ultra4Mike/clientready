@@ -212,7 +212,7 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
       )}
       {note && <p data-testid="my-day-note" role="status" className="text-sm">{note}</p>}
       <div data-testid="my-day-totals" className="cr-stat-row grid grid-cols-2 gap-2 text-sm tabular-nums">
-        <p data-testid="my-day-hours" data-source={dayStatus?.minutes != null ? "owner" : "taps"}>Today: <b className="tabular-nums">{hm(dayStatus?.minutes ?? sheet.paidMinutes)}</b> paid{dayStatus?.approved ? <span data-testid="my-day-approved" className="cr-chip2 cr-tone-good ml-1">Approved</span> : null} · day total <b data-testid="my-day-total" className="tabular-nums">{hm(sheet.paidMinutes + sheet.breakMinutes + sheet.unpaidGapMinutes)}</b></p>
+        <p data-testid="my-day-hours" data-source={dayStatus?.minutes != null ? "owner" : "taps"}>Today: <b className="tabular-nums">{hm(dayStatus?.minutes ?? sheet.paidMinutes)}</b> paid{dayStatus?.approved ? <span data-testid="my-day-approved" className="cr-chip2 cr-tone-good ml-1">Approved</span> : null}</p>
         <p data-testid="my-day-breaks">Breaks: <b>{hm(sheet.breakMinutes + paidBreak)}</b> ({hm(paidBreak)} paid, {hm(sheet.breakMinutes)} unpaid)</p>
         {sheet.driveMinutes > 0 && <p data-testid="my-day-drive">Driving: {hm(sheet.driveMinutes)}</p>}
         {sheet.unpaidGapMinutes > 0 && <p data-testid="my-day-unpaid">Unpaid gaps: {hm(sheet.unpaidGapMinutes)}</p>}
@@ -224,6 +224,7 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
         {todays.map((e) => (
           <li key={e.id} data-testid="my-day-tap" data-pending={e.pending ? "true" : "false"} className="flex items-center justify-between gap-2">
             <span>{time(e.at)} · {KIND_LABEL[e.kind]}{e.docId ? ` · ${plan.find((j) => j.docId === e.docId)?.label || ""}` : ""}{e.notAtSite ? " · not at job site" : ""}{e.outOfOrder ? " · flagged" : ""}
+              {e.wasAt && e.wasAt !== e.at && <span data-testid="my-day-tap-was" className="ml-1 text-xs text-[var(--cr-muted)]">(was <s>{time(e.wasAt)}</s>)</span>}
               {e.pending && <span data-testid="pending-sync" className="cr-chip2 cr-tone-warn ml-1">Not sent yet</span>}</span>
             <button className="cr-btn-text shrink-0 text-xs" data-testid="fix-time" onClick={() => setFixOpen({ eventId: e.id, kind: e.kind, at: hhmmTz(e.at), reason: "", docId: e.docId, date: today })}>Fix time</button>
           </li>
