@@ -1,7 +1,8 @@
 // Phase 2 data: PTO/sick requests + balances, crew lead team. localStorage first (owner), Supabase when signed in.
 import { supabase } from "@/lib/supabase";
 import { ymdTz, type TapKind } from "@/lib/timesheet";
-import type { PtoKind, PtoRequest } from "@/lib/pay-phase2";
+import { mergePtoRequests, type PtoKind, type PtoRequest } from "@/lib/pay-phase2";
+export { mergePtoRequests };
 
 const KEY_PTO = "clientready-pto-requests";
 const readLocal = (): PtoRequest[] => { try { return JSON.parse(window.localStorage.getItem(KEY_PTO) || "[]"); } catch { return []; } };
@@ -12,6 +13,18 @@ const fromRow = (r: Row): PtoRequest => ({ id: r.id, employeeId: r.employee_id, 
 
 /** This device's copy of PTO requests (owner; kept fresh by loadPtoRequests). Used to count paid-off hours toward OT. */
 export function readLocalPtoRequests(): PtoRequest[] { return typeof window === "undefined" ? [] : readLocal(); }
+
+/** Owner: requests in [from, to] from the server (Supabase) merged with this device's copy. Used to count PTO / sick toward OT. */
+export async function loadPtoForRange(from: string, to: string): Promise<PtoRequest[]> {
+  const local = readLocalPtoRequests().filter((r) => r.date >= from && r.date <= to);
+  try {
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session?.user) return local;
+    const { data, error } = await supabase.from("crew_pto_requests").select("*").gte("work_date", from).lte("work_date", to);
+    if (error) return local;
+    return mergePtoRequests(((data || []) as Row[]).map(fromRow), local);
+  } catch { return local; }
+}
 
 /** Owner: all requests for a year (cloud wins; this device's copy when signed out / table missing). */
 export async function loadPtoRequests(year: string): Promise<PtoRequest[]> {

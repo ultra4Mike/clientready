@@ -123,9 +123,26 @@ export function allocateWeek(days: DayInput[], payRaw: PaySettings | unknown, ra
     }
     // California missed meal/rest premium: an hour at the regular rate per missed break (only when the owner turned it on).
     const caHours = list.map((d) => d.sheet?.premiumHours || 0);
-    // Overtime premium per day: account preset (OT / double time / 7th day, FLSA regular rate) or the worker's own rule.
+    // Overtime premium per day (shared with Year view and CSV via resolvedOvertime so numbers can't disagree).
+    const { premium, ot } = weekOvertime(list.map((d, i) => ({ date: d.date, hours: hoursOf(i), straight: base[i] })), pay, defaults, weekKey, extra, topUp.reduce((s2, x) => s2 + x, 0));
+    list.forEach((_, i) => { if (caHours[i] > 0 && num(rate) > 0) premium[i] += caHours[i] * num(rate); });
+    const exact = list.map((_, i) => base[i] + premium[i] + topUp[i]);
+    const weekCents = Math.round(exact.reduce((s, x) => s + x, 0) * 100);
+    const dayCents = splitCents(weekCents, exact.map((x) => Math.max(0, x)));
+    list.forEach((d, i) => {
+      const cents = exact.every((x) => x <= 0) ? 0 : dayCents[i];
+      out.push({ date: d.date, cents, workMinutes: mins[i].work, driveMinutes: mins[i].drive, approved: d.approved, shares: shareDay(d, cents, mins[i], pay, rate, defaults.jobRates), otHours: ot[i].ot, dtHours: ot[i].dt, premiumCents: Math.round(premium[i] * 100), caPremiumHours: caHours[i], ...(pwTop[i] ? { prevailingTopUpCents: Math.round(pwTop[i] * 100) } : {}), ...(topUp[i] ? { topUpCents: Math.round(topUp[i] * 100) } : {}) });
+    });
+  }
+  return out;
+}
+
+/** One week's overtime premium per day: account rules unless the worker overrides (the single OT engine for every screen). */
+export function weekOvertime(days: { date: string; hours: number; straight: number }[], pay: PaySettings, defaults: PayRules, weekKey: string, extra = 0, topUpTotal = 0) {
+  const weekHours = days.reduce((s2, d) => s2 + d.hours, 0);
+  // Account preset (OT / double time / 7th day, FLSA regular rate) or the worker's own rule.
     const premium: number[] = [];
-    const ot: { ot: number; dt: number }[] = list.map(() => ({ ot: 0, dt: 0 }));
+    const ot: { ot: number; dt: number }[] = days.map(() => ({ ot: 0, dt: 0 }));
     // Account rules unless the worker overrides (Team > edit); "Use account rules" with account overtime off = no overtime.
     const accountOt = usesAccountOvertime(pay, defaults.settings?.otPreset);
     const rules = accountOt && defaults.settings ? otRules({ otPreset: "worker", weeklyOtHours: 40, dailyOtHours: 0, dailyDtHours: 0, seventhDayRule: false, ...defaults.settings }) : null;
@@ -145,35 +162,54 @@ export function allocateWeek(days: DayInput[], payRaw: PaySettings | unknown, ra
     if (nonHourly && defaults.settings?.flsaNonHourly && weekHours + counted > flsaWeek) {
       // FLSA for piece / day-rate / commission: regular rate = all straight-time pay (incl. piece/commission extras and
       // prevailing-wage and min-wage top-ups) / all hours; each hour over the weekly threshold (40) earns (multiplier - 1) x that rate on top (0.5x at 1.5x) (straight pay already covers 1x).
-      const regular = (base.reduce((s2, x) => s2 + x, 0) + extra + topUp.reduce((s2, x) => s2 + x, 0)) / weekHours;
+      const regular = (days.reduce((s2, d) => s2 + d.straight, 0) + extra + topUpTotal) / weekHours;
       let seen = counted;
-      list.forEach((_, i) => { const h = hoursOf(i); const over = Math.max(0, seen + h - flsaWeek) - Math.max(0, seen - flsaWeek); seen += h; premium.push(over * regular * (flsaMult - 1)); ot[i] = { ot: over, dt: 0 }; });
+      days.forEach((d, i) => { const h = d.hours; const over = Math.max(0, seen + h - flsaWeek) - Math.max(0, seen - flsaWeek); seen += h; premium.push(over * regular * (flsaMult - 1)); ot[i] = { ot: over, dt: 0 }; });
     } else if (tierRules && hourlyLike) {
       const bonus = (defaults.settings?.bonusInRegularRate === false ? 0 : defaults.weekBonus?.get(weekKey) || 0) + (pay.type === "hybrid" ? extra : 0);
-      const res = overtimeTiers(list.map((d, i) => ({ date: d.date, hours: (mins[i].work + mins[i].drive) / 60, straight: base[i] })), tierRules, bonus, counted);
+      const res = overtimeTiers(days, tierRules, bonus, counted);
       res.days.forEach((r, i) => { premium.push(r.premium); ot[i] = { ot: r.otHours, dt: r.dtHours }; });
     } else {
       const entries: { date: string; hours: number; rate: number }[] = [];
       let before = 0;
-      list.forEach((d, i) => {
-        const hours = (mins[i].work + mins[i].drive) / 60;
-        if (hourlyLike && hours > 0) entries.push({ date: d.date, hours, rate: base[i] / hours });
+      days.forEach((d, i) => {
+        const hours = d.hours;
+        if (hourlyLike && hours > 0) entries.push({ date: d.date, hours, rate: d.straight / hours });
         const r = overtimePremium(entries, ownPay);
         premium.push(r.premium - before);
         ot[i] = { ot: Math.max(0, r.hours - ot.slice(0, i).reduce((s2, x) => s2 + x.ot, 0)), dt: 0 };
         before = r.premium;
       });
     }
-    list.forEach((_, i) => { if (caHours[i] > 0 && num(rate) > 0) premium[i] += caHours[i] * num(rate); });
-    const exact = list.map((_, i) => base[i] + premium[i] + topUp[i]);
-    const weekCents = Math.round(exact.reduce((s, x) => s + x, 0) * 100);
-    const dayCents = splitCents(weekCents, exact.map((x) => Math.max(0, x)));
-    list.forEach((d, i) => {
-      const cents = exact.every((x) => x <= 0) ? 0 : dayCents[i];
-      out.push({ date: d.date, cents, workMinutes: mins[i].work, driveMinutes: mins[i].drive, approved: d.approved, shares: shareDay(d, cents, mins[i], pay, rate, defaults.jobRates), otHours: ot[i].ot, dtHours: ot[i].dt, premiumCents: Math.round(premium[i] * 100), caPremiumHours: caHours[i], ...(pwTop[i] ? { prevailingTopUpCents: Math.round(pwTop[i] * 100) } : {}), ...(topUp[i] ? { topUpCents: Math.round(topUp[i] * 100) } : {}) });
-    });
+  return { premium, ot };
+}
+
+/** Approved PTO / sick hours per week (Monday) for one worker, for counting toward OT. */
+export function ptoWeekOff(reqs: { employeeId: string; date: string; hours: number | string; kind: string; status: string }[], employeeId: string) {
+  const m = new Map<string, { pto: number; sick: number }>();
+  for (const r of reqs) {
+    if (r.employeeId !== employeeId || r.status !== "approved") continue;
+    const o = m.get(weekOf(r.date)) || { pto: 0, sick: 0 }; o[r.kind === "sick" ? "sick" : "pto"] += Number(r.hours) || 0; m.set(weekOf(r.date), o);
   }
-  return out;
+  return m;
+}
+
+/** Year view / CSV: overtime hours (OT + DT) and premium for a worker's entries, by the same resolved rules as the timesheet. */
+export function resolvedOvertime(entries: { date: string; hours: number; rate: number }[], payRaw: PaySettings | unknown, defaults: PayRules = {}) {
+  const pay = readPaySettings(payRaw);
+  const byWeek = new Map<string, Map<string, { hours: number; straight: number }>>();
+  for (const e of entries) {
+    if (!(e.hours > 0)) continue;
+    const w = byWeek.get(weekOf(e.date)) || new Map(); byWeek.set(weekOf(e.date), w);
+    const d = w.get(e.date) || { hours: 0, straight: 0 }; d.hours += e.hours; d.straight += e.hours * (e.rate || 0); w.set(e.date, d);
+  }
+  let hours = 0, premium = 0;
+  for (const [wk, m] of byWeek) {
+    const days = [...m.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, d]) => ({ date, ...d }));
+    const r = weekOvertime(days, pay, defaults, wk, defaults.weekExtra?.get(wk) || 0);
+    hours += r.ot.reduce((s2, x) => s2 + x.ot + x.dt, 0); premium += r.premium.reduce((s2, x) => s2 + x, 0);
+  }
+  return { hours: Math.round(hours * 100) / 100, premium: Math.round(premium * 100) / 100 };
 }
 
 /** Split one day's cents across its jobs: work pay by work minutes, drive pay to the job driven TO. */
