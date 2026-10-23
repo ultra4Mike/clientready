@@ -125,7 +125,9 @@ export function readLocalTimesheetSettings() { return readTimesheetSettings(read
 export async function saveTimesheetSettings(settings: TimesheetSettings, previous?: TimesheetSettings) {
   writeLocal(KEY_SETTINGS, settings);
   const { data } = await supabase.auth.getUser();
-  if (!data.user) return;
+  // Rules change pay: refresh this week and last week (older weeks are usually approved/paid and stay as they are).
+  const today = new Date().toLocaleDateString("en-CA"), last = new Date(Date.now() - 7 * 86400000).toLocaleDateString("en-CA");
+  if (!data.user) { await queuePayRefresh([today, last], "settings"); return; }
   const row = { owner_id: data.user.id, gap_minutes: Math.round(settings.gapMinutes), transit_timeout_minutes: Math.round(settings.transitTimeoutMinutes), half_day_hours: settings.halfDayHours, updated_at: new Date().toISOString() };
   const { error } = await supabase.from("crew_timesheet_settings").upsert({ ...row, rules: settings });
   if (error && /rules|column|42703/i.test(`${error.message} ${error.code}`)) await supabase.from("crew_timesheet_settings").upsert(row); // older server: phone keeps the rest
@@ -133,6 +135,7 @@ export async function saveTimesheetSettings(settings: TimesheetSettings, previou
     const changed = (Object.keys(settings) as (keyof TimesheetSettings)[]).filter((k) => JSON.stringify(settings[k]) !== JSON.stringify(previous[k]));
     if (changed.length) await logAudit({ action: "settings", oldValue: Object.fromEntries(changed.map((k) => [k, previous[k]])), newValue: Object.fromEntries(changed.map((k) => [k, settings[k]])) });
   }
+  await queuePayRefresh([today, last], "settings");
 }
 
 // ---------- Audit log (owner only; rows are never deleted) ----------
@@ -191,9 +194,10 @@ export async function saveApprovals(rows: DayApproval[]) {
     if (action) void logAudit({ action, employeeId: row.employeeId, date: row.date, oldValue: old ? { paidMinutes: old.paidMinutes, editedMinutes: old.editedMinutes ?? null, approved: Boolean(old.approvedAt) } : null, newValue: { paidMinutes: row.paidMinutes, editedMinutes: row.editedMinutes ?? null, approved: Boolean(row.approvedAt) } });
   }
   const { data } = await supabase.auth.getUser();
-  if (!data.user) return;
+  if (!data.user) { await queuePayRefresh(rows.map((r) => r.date), "approvals"); return; }
   const uid = data.user.id;
   await supabase.from("crew_day_approvals").upsert(rows.map((r) => ({ owner_id: uid, employee_id: r.employeeId, work_date: r.date, paid_minutes: r.paidMinutes, drive_minutes: r.driveMinutes, edited_minutes: r.editedMinutes ?? null, approved_at: r.approvedAt ?? null, changed_at: r.changedAt ?? null, updated_at: new Date().toISOString() })));
+  await queuePayRefresh(rows.map((r) => r.date), "approvals");
 }
 
 export async function decideFix(id: string, status: "approved" | "denied", note = "", fix?: FixRequest) {
@@ -232,4 +236,11 @@ export async function loadMyTimeOverrides(): Promise<WorkerTimeOverrides> {
   const { data, error } = await supabase.rpc("crew_time_rules");
   const w = (!error && data && typeof data === "object" ? (data as Record<string, unknown>).worker : undefined) as Record<string, unknown> | undefined;
   return readWorkerOverrides({ hireDate: w?.hireDate, timeOverrides: w || {} });
+}
+
+/** Queue the pay refresh (lazy import: timesheet-sync imports this file). */
+// Awaited so the refresh is queued before the save resolves: a caller that then calls refreshTimesheetPay replaces it.
+async function queuePayRefresh(dates: string[], source: "approvals" | "settings") {
+  if (typeof window === "undefined") return;
+  try { (await import("@/lib/timesheet-sync")).queueTimesheetRefresh(dates, source); } catch { /* pay refresh is best effort */ }
 }
