@@ -64,7 +64,10 @@ export async function locationPermission(): Promise<"granted" | "denied" | "prom
 }
 
 /** The account's time zone (profiles.timezone) for showing every time the same on every device. */
-export async function loadBusinessTz(asCrew = false) {
+let tzLoaded: Promise<void> | null = null;
+/** Loads the account time zone once per page load (all day keys and times use it). */
+export function loadBusinessTz(asCrew = false) { return (tzLoaded ||= loadBusinessTzOnce(asCrew)); }
+async function loadBusinessTzOnce(asCrew: boolean) {
   try {
     if (asCrew) { const { data, error } = await supabase.rpc("crew_time_zone"); if (!error && typeof data === "string") setBusinessTz(data); return; }
     const { data: u } = await supabase.auth.getUser();
