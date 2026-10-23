@@ -158,11 +158,17 @@ revoke all on function public.crew_attest_week(date, integer) from public, anon;
 grant execute on function public.crew_attest_week(date, integer) to authenticated;
 
 -- 5) Worker: read the account's time rules (breaks, rounding, geofence; never any price) so My day matches the owner.
+-- Per-worker time overrides (owner-edited; employees RLS unchanged): {"breakPreset": ""|"federal"|"california", "geofenceOptOut": bool}
+alter table public.employees add column if not exists time_overrides jsonb default '{}'::jsonb;
+
 create or replace function public.crew_time_rules()
 returns jsonb language sql stable security definer set search_path = public as $$
+  -- Account rules plus this worker's own overrides as "worker" (break preset, geofence opt-out, hire date; no pay fields).
+  with o as (select j.owner_id, j.employee_id from public.crew_jobs j where public.crew_email() <> '' and lower(j.worker_email) = public.crew_email() order by j.job_date desc limit 1)
   select coalesce(s.rules, '{}'::jsonb) || jsonb_build_object('gapMinutes', s.gap_minutes, 'transitTimeoutMinutes', s.transit_timeout_minutes)
-  from public.crew_timesheet_settings s
-  where s.owner_id = (select j.owner_id from public.crew_jobs j where public.crew_email() <> '' and lower(j.worker_email) = public.crew_email() order by j.job_date desc limit 1)
+    || jsonb_build_object('worker', coalesce((select jsonb_build_object('breakPreset', coalesce(e.time_overrides->>'breakPreset', ''), 'geofenceOptOut', coalesce((e.time_overrides->>'geofenceOptOut')::boolean, false), 'hireDate', coalesce(e.hire_date, ''))
+      from public.employees e where e.user_id = o.owner_id and e.id = o.employee_id limit 1), '{}'::jsonb))
+  from o join public.crew_timesheet_settings s on s.owner_id = o.owner_id
 $$;
 revoke all on function public.crew_time_rules() from public, anon;
 grant execute on function public.crew_time_rules() to authenticated;
@@ -176,4 +182,5 @@ grant execute on function public.crew_time_rules() to authenticated;
 -- select count(*) = 2 and bool_and(cmd in ('SELECT', 'INSERT')) as audit_owner_only from pg_policies where schemaname = 'public' and tablename = 'crew_time_audit';
 -- select count(*) = 3 as audit_triggers_ready from pg_trigger where tgname in ('crew_time_audit_no_change', 'crew_day_events_audit', 'crew_time_fixes_audit');
 -- select exists (select 1 from pg_class where relname = 'crew_week_attestations' and relrowsecurity) and to_regprocedure('public.crew_attest_week(date,integer)') is not null and to_regprocedure('public.crew_time_rules()') is not null as attestation_ready;
+-- select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'employees' and column_name = 'time_overrides') as worker_overrides_ready;
 -- select not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name in ('crew_day_events', 'crew_time_fixes', 'crew_week_attestations') and column_name ~ '(rate|pay|price|amount)') as no_price_columns_for_workers;

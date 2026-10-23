@@ -4,7 +4,7 @@
  * everything keeps working on this device's localStorage. A worker only ever writes his own taps.
  */
 import { supabase } from "@/lib/supabase";
-import { readTimesheetSettings, type FixRequest, type TapEvent, type TapKind, type TimesheetSettings } from "@/lib/timesheet";
+import { readTimesheetSettings, readWorkerOverrides, type WorkerTimeOverrides, type FixRequest, type TapEvent, type TapKind, type TimesheetSettings } from "@/lib/timesheet";
 
 const missing = (error: { message?: string; code?: string } | null | undefined) =>
   Boolean(error && /could not find|does not exist|PGRST202|PGRST205|42P01|42883|schema cache/i.test(`${error.message || ""} ${error.code || ""}`));
@@ -225,4 +225,11 @@ export async function syncPendingTaps(email: string) {
 export async function loadMyTimeRules(): Promise<TimesheetSettings> {
   const { data, error } = await supabase.rpc("crew_time_rules");
   return readTimesheetSettings(error || !data ? {} : data);
+}
+
+/** Worker: their own overrides (break preset, geofence opt-out, hire date) from crew_time_rules().worker. */
+export async function loadMyTimeOverrides(): Promise<WorkerTimeOverrides> {
+  const { data, error } = await supabase.rpc("crew_time_rules");
+  const w = (!error && data && typeof data === "object" ? (data as Record<string, unknown>).worker : undefined) as Record<string, unknown> | undefined;
+  return readWorkerOverrides({ hireDate: w?.hireDate, timeOverrides: w || {} });
 }
