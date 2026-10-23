@@ -4,6 +4,7 @@
  * Looks right, approve / Use the schedule / Edit times, and that day's pending fix-my-time requests.
  * Edits recompute the day with the same engine (buildDay), then are saved as the day's edited minutes.
  */
+import { addDays } from "@/lib/timesheet-sync";
 import { useEffect, useState } from "react";
 import { buildDay, fmtTime, hhmmTz, wallToIso, dayTimeline, daySummary, flagReasons, hm, type DaySheet, type FixRequest, type ScheduledJob, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
 import { loadAudit, type AuditRow, type DayApproval } from "@/lib/day-events";
@@ -76,10 +77,10 @@ export default function DayDetail(props: {
   const pending = props.fixes.filter((f) => f.status === "pending");
   const approved = Boolean(props.approval?.approvedAt);
   // Same engine as the taps: edited job times become the day's "schedule" with no taps.
-  const valid = (list: typeof spans) => list.some((s) => s.start && s.end && s.end > s.start);
+  const valid = (list: typeof spans) => list.some((s) => s.start && s.end && s.end !== s.start);
   // Only recompute paid hours from complete times; a half-filled row keeps the current hours (never "0 m").
   const onSpans = (next: typeof spans) => { setSpans(next); if (valid(next)) setHours((recalc(next) / 60).toFixed(2)); };
-  const recalc = (list: typeof spans) => buildDay({ employeeId: "x", date, events: [], settings, worker: props.worker, schedule: list.filter((s) => s.start && s.end && s.end > s.start).map((s) => ({ docId: s.docId, label: s.label, start: atTime(date, s.start), end: atTime(date, s.end) })) }).paidMinutes;
+  const recalc = (list: typeof spans) => buildDay({ employeeId: "x", date, events: [], settings, worker: props.worker, schedule: list.filter((s) => s.start && s.end && s.end !== s.start).map((s) => ({ docId: s.docId, label: s.label, start: atTime(date, s.start), end: atTime(s.end < s.start ? addDays(date, 1) : date, s.end) })) }).paidMinutes;
   const scheduleMinutes = props.schedule.length ? buildDay({ employeeId: "x", date, events: [], settings, worker: props.worker, schedule: props.schedule }).paidMinutes : null;
   const editedMinutes = props.approval?.editedMinutes;
   const btn = "min-h-11 rounded-lg border px-3 text-sm";
@@ -159,6 +160,7 @@ export default function DayDetail(props: {
                 <span className="min-w-20 font-medium">{s.label || "Job"}</span>
                 <input type="time" aria-label={`${s.label || "Job"} start`} name={`ts-dd-start-${i}`} data-testid={`ts-dd-start-${i}`} className="min-h-11 rounded border bg-transparent px-2" value={s.start} onChange={(e) => onSpans(spans.map((x, j) => (j === i ? { ...x, start: e.target.value } : x)))} />
                 <span>to</span>
+                {s.start && s.end && s.end < s.start && <span className="text-xs" data-testid={`ts-dd-next-day-${i}`}>(next day)</span>}
                 <input type="time" aria-label={`${s.label || "Job"} end`} name={`ts-dd-end-${i}`} data-testid={`ts-dd-end-${i}`} className="min-h-11 rounded border bg-transparent px-2" value={s.end} onChange={(e) => onSpans(spans.map((x, j) => (j === i ? { ...x, end: e.target.value } : x)))} />
               </div>
             ))}

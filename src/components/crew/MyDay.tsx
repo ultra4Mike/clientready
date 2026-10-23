@@ -24,6 +24,7 @@ export const ACTION_LABEL: Record<Exclude<TapKind, "end_shift">, string> = {
 };
 const STEPS = ["Travel", "Arrived", "Working", "Break", "Done"] as const;
 const time = fmtTime; // account time zone, same as the owner sees
+const nextYmd = (d: string) => { const t = new Date(`${d}T12:00:00Z`); t.setUTCDate(t.getUTCDate() + 1); return t.toISOString().slice(0, 10); };
 const toIso = (date: string, hm5: string) => wallToIso(date, (hm5 || "").slice(0, 5));
 const pins = new Map<string, { lat: number; lng: number } | null>();
 export const FIX_STATUS_LABEL: Record<FixRequest["status"], string> = { pending: "Pending", approved: "Approved", denied: "Declined" };
@@ -65,7 +66,7 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
   const [geoDismissed, setGeoDismissed] = useState("");
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [worker, setWorker] = useState<WorkerTimeOverrides>({});
-  const [fixOpen, setFixOpen] = useState<{ eventId?: string; kind: TapKind; at: string; reason: string; docId?: string; date: string } | null>(null);
+  const [fixOpen, setFixOpen] = useState<{ eventId?: string; kind: TapKind; at: string; reason: string; docId?: string; date: string; nextDay?: boolean } | null>(null);
   const calToday = localDate(new Date(now));
   const yesterday = localDate(new Date(new Date(now).getTime() - 86400000));
   // Overnight shift: a day started yesterday and still open (last tap < 16 h ago) stays ONE work day, dated the Start day
@@ -179,9 +180,12 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
     setBusy(false);
   }
 
+  // Overnight: a fixed time earlier than the day's first tap is after midnight (next calendar day), unless the worker unticks it.
+  const firstHm = (date: string) => { const f = events.filter((e) => e.date === date).sort((a, b) => a.at.localeCompare(b.at))[0]; return f ? hhmmTz(f.at) : ""; };
+  const fixNextDay = (f: { date: string; at: string; kind?: string; nextDay?: boolean }) => f.nextDay ?? (f.kind !== "start_day" && !!firstHm(f.date) && !!f.at && f.at < firstHm(f.date));
   async function sendFix() {
     if (!fixOpen || !fixOpen.reason.trim() || !fixOpen.at) return;
-    const at = toIso(fixOpen.date, fixOpen.at) || fixOpen.at;
+    const at = toIso(fixNextDay(fixOpen) ? nextYmd(fixOpen.date) : fixOpen.date, fixOpen.at) || fixOpen.at;
     const { fix, error } = await requestFix({ employeeId: employeeId || "me", date: fixOpen.date, eventId: fixOpen.eventId, kind: fixOpen.kind, at, reason: fixOpen.reason.trim(), docId: fixOpen.docId }, email);
     setFixes((list) => [...list, fix]);
     setFixOpen(null);
@@ -283,6 +287,7 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
               {(Object.keys(ACTION_LABEL) as Exclude<TapKind, "end_shift">[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
             </select></label>
           <label className="block text-sm"><span className="cr-section-label">Correct time</span><input data-testid="fix-at" type="time" className="mt-1 block min-h-11 w-full rounded-lg border bg-transparent px-2" value={fixOpen.at} onChange={(e) => setFixOpen({ ...fixOpen, at: e.target.value })} /></label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="fix-next-day" checked={fixNextDay(fixOpen)} onChange={(e) => setFixOpen({ ...fixOpen, nextDay: e.target.checked })} /> After midnight (next day, {nextYmd(fixOpen.date)})</label>
           <label className="block text-sm"><span className="cr-section-label">Reason</span><input data-testid="fix-reason" maxLength={300} className="mt-1 block min-h-11 w-full rounded-lg border bg-transparent px-2" value={fixOpen.reason} onChange={(e) => setFixOpen({ ...fixOpen, reason: e.target.value })} /></label>
           <div className="flex gap-2"><button data-testid="fix-send" disabled={!fixOpen.reason.trim() || !fixOpen.at} className="cr-btn cr-btn-primary flex-1" onClick={sendFix}>Send to boss</button><button data-testid="fix-cancel" className="cr-btn cr-btn-secondary" onClick={() => setFixOpen(null)}>Cancel</button></div>
         </div>
