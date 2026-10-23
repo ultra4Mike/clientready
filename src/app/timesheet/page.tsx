@@ -13,8 +13,8 @@ import { readWorkers, type Worker } from "@/lib/schedule";
 import { weekOf } from "@/lib/pay-types";
 import Link from "next/link";
 import DayDetail from "@/components/timesheet/DayDetail";
-import { decideFix, loadOwnerTimesheet, readLocalTimesheetSettings, saveApprovals, type DayApproval } from "@/lib/day-events";
-import { needsReview, weekStatus, type DaySheet, type FixRequest, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
+import { loadAttestations, decideFix, loadOwnerTimesheet, readLocalTimesheetSettings, saveApprovals, type DayApproval } from "@/lib/day-events";
+import { dayState, DEFAULT_TIMESHEET_SETTINGS, needsReview, weekStatus, type DayStateName, type DaySheet, type FixRequest, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
 import { addDays, applyWeekToDocs, pushChangedDocs, readDocs, syncTimesheetCutover, scheduleFor, weekShares, weekSheets } from "@/lib/timesheet-sync";
 import type { DayPay } from "@/lib/timesheet-pay";
 
@@ -28,7 +28,11 @@ export default function TimesheetPage() {
   const [events, setEvents] = useState<TapEvent[]>([]);
   const [fixes, setFixes] = useState<FixRequest[]>([]);
   const [approvals, setApprovals] = useState<DayApproval[]>([]);
-  const [settings, setSettings] = useState<TimesheetSettings>(() => ({ gapMinutes: 60, transitTimeoutMinutes: 120, halfDayHours: 4 }));
+  const [settings, setSettings] = useState<TimesheetSettings>(DEFAULT_TIMESHEET_SETTINGS);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [period, setPeriod] = useState<"weekly" | "biweekly" | "semimonthly">("weekly");
+  const [attest, setAttest] = useState<Record<string, string>>({});
+  const [fixNotes, setFixNotes] = useState<Record<string, string>>({});
   // Undo history per week (newest last, up to 20 steps): each step is the approvals as they were before it.
   const [history, setHistory] = useState<Record<string, DayApproval[][]>>({});
   const undoSteps = history[week] || [];
@@ -55,6 +59,7 @@ export default function TimesheetPage() {
   useEffect(() => {
     if (!week) return;
     void loadOwnerTimesheet(week, addDays(week, 6)).then((data) => { setEvents(data.events); setFixes(data.fixes); setApprovals(data.approvals); setSettings(data.settings); });
+    void loadAttestations(week).then(setAttest);
   }, [week]);
   const { days, sheets } = useMemo(() => (week && now ? weekSheets({ workers, docs, events, fixes, settings, week, now }) : { days: [] as string[], sheets: new Map<string, DaySheet>() }), [workers, docs, events, fixes, settings, week, now]);
   const { pays, shares } = useMemo(() => weekShares({ workers, docs, days, sheets, approvals, settings }), [workers, docs, days, sheets, approvals, settings]);
@@ -113,10 +118,10 @@ export default function TimesheetPage() {
     await commit([{ employeeId: id, date, paidMinutes: mins, driveMinutes: s?.driveMinutes || 0, editedMinutes: mins, approvedAt: approve ? at : null, changedAt: approve ? null : wasApproved ? at : null }], [prev || blank(id, date)]);
     setMessage(approve ? "Used the schedule and approved." : prev?.approvedAt ? "Changed since approved, approve again." : "Hours saved.");
   }
-  async function decide(fix: FixRequest, status: "approved" | "denied") {
-    const error = await decideFix(fix.id, status);
+  async function decide(fix: FixRequest, status: "approved" | "denied", note = "") {
+    const error = await decideFix(fix.id, status, note, fix);
     if (error) { setMessage(error); return; }
-    setFixes((list) => list.map((f) => (f.id === fix.id ? { ...f, status, decidedAt: new Date().toISOString() } : f)));
+    setFixes((list) => list.map((f) => (f.id === fix.id ? { ...f, status, decidedAt: new Date().toISOString(), ...(note ? { ownerNote: note } : {}) } : f)));
     // An approved fix changes that day: clear its approval so the owner approves the new hours.
     const prev = approvalOf(fix.employeeId, fix.date);
     if (status === "approved" && prev?.approvedAt) {
@@ -141,16 +146,54 @@ export default function TimesheetPage() {
   const openDate = open?.split("|")[1] || "";
   const badgeClass = (k: string) => k === "review" ? "bg-amber-500/20 text-amber-800" : k === "ready" ? "bg-teal-500/15 text-teal-800" : k === "approved" ? "bg-emerald-500/15 text-emerald-700" : "bg-gray-500/10 text-[var(--cr-muted)]";
 
+  const payOf = (id: string, date: string) => (pays.get(id) || []).find((p) => p.date === date);
+  // Who's on the clock right now (today's taps, this week only).
+  const todayYmd = now ? localYmd(now) : "";
+  const onClock = workers.map((w) => ({ w, st: dayState(events.filter((e) => e.employeeId === w.id && e.date === todayYmd)) })).filter((x) => x.st.state !== "OFF_DUTY");
+  const stateWord: Record<DayStateName, string> = { OFF_DUTY: "Off", ON_DUTY_IDLE: "On duty", WORKING: "Working", IN_TRANSIT: "Driving", ON_BREAK: "On break" };
+  const pendingFixes = fixes.filter((f) => f.status === "pending");
+  const alerts = [
+    ...pendingFixes.map((f) => ({ key: `fix-${f.id}`, text: `${workers.find((w) => w.id === f.employeeId)?.name || "Worker"} asked to fix ${f.date}`, open: `${f.employeeId}|${f.date}` })),
+    ...rows.flatMap((r) => r.info.filter((d) => d.flagged && !d.approved && d.hasHours).map((d) => ({ key: `flag-${r.w.id}-${d.date}`, text: `${r.w.name} · ${d.date} needs review`, open: `${r.w.id}|${d.date}` }))),
+    ...events.filter((e) => e.outOfOrder || (e.deviceAt && Math.abs(new Date(e.deviceAt).getTime() - new Date(e.at).getTime()) > 300000)).map((e) => ({ key: `tap-${e.id}`, text: `${workers.find((w) => w.id === e.employeeId)?.name || "Worker"} · ${e.date}: ${e.outOfOrder ? "tap out of order" : "phone clock was off"}`, open: `${e.employeeId}|${e.date}` })),
+  ];
+  async function exportCsv() {
+    // Pay period: weekly = this week; biweekly = this + next week; semi-monthly = 1st–15th or 16th–end of the month of this week.
+    const [y, m, d] = week.split("-").map(Number);
+    let from = week, to = addDays(week, 6);
+    if (period === "biweekly") to = addDays(week, 13);
+    if (period === "semimonthly") { const first = d <= 15; from = `${y}-${String(m).padStart(2, "0")}-${first ? "01" : "16"}`; to = first ? `${y}-${String(m).padStart(2, "0")}-15` : localYmd(new Date(y, m, 0, 12).toISOString()); }
+    const lines = ["Worker,Date,Paid hours,Drive min,Unpaid break min,Rounding min,OT hours,DT hours,Break premium hours,Approved,Flags"];
+    for (let wk = weekOf(from); wk <= to; wk = addDays(wk, 7)) {
+      const data = await loadOwnerTimesheet(wk, addDays(wk, 6));
+      const ws = weekSheets({ workers, docs, events: data.events, fixes: data.fixes, settings: data.settings, week: wk, now: new Date().toISOString() });
+      const sh = weekShares({ workers, docs, days: ws.days, sheets: ws.sheets, approvals: data.approvals, settings: data.settings });
+      for (const w of workers) for (const date of ws.days) {
+        if (date < from || date > to) continue;
+        const s = ws.sheets.get(`${w.id}|${date}`); const a = data.approvals.find((x) => x.employeeId === w.id && x.date === date);
+        const mins = a?.editedMinutes != null ? a.editedMinutes : a?.approvedAt ? a.paidMinutes : s?.paidMinutes || 0;
+        if (!mins) continue;
+        const p = (sh.pays.get(w.id) || []).find((x) => x.date === date);
+        lines.push([`"${w.name.replace(/"/g, '""')}"`, date, (mins / 60).toFixed(2), Math.round(s?.driveMinutes || 0), s?.breakMinutes || 0, s?.roundingMinutes || 0, (p?.otHours || 0).toFixed(2), (p?.dtHours || 0).toFixed(2), s?.premiumHours || 0, a?.approvedAt ? "yes" : "no", `"${(s?.flags || []).join(" ")}"`].join(","));
+      }
+    }
+    const url = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" }));
+    const link = document.createElement("a"); link.href = url; link.download = `hours-${from}-to-${to}.csv`; link.click(); URL.revokeObjectURL(url);
+    setMessage(`Exported hours ${from} to ${to}.`);
+  }
   const cell = (id: string, d: { date: string; mins: number; approved: boolean; flagged: boolean }, wide = true) => {
     const s = sheets.get(`${id}|${d.date}`); const edited = approvalOf(id, d.date)?.editedMinutes != null;
     return (
-      <button type="button" className="group relative w-full rounded-lg p-2 text-left hover:bg-teal-500/10 focus:bg-teal-500/10" onClick={() => setOpen(`${id}|${d.date}`)} data-testid="ts-edit" aria-label={`${d.mins ? `${h(d.mins)} hours` : "Add hours"}, ${d.date}`}>
+      <button type="button" data-state={d.approved ? "locked" : d.flagged ? "review" : "open"} className="group relative w-full rounded-lg p-2 text-left hover:bg-teal-500/10 focus:bg-teal-500/10" onClick={() => setOpen(`${id}|${d.date}`)} data-testid="ts-edit" aria-label={`${d.mins ? `${h(d.mins)} hours` : "Add hours"}, ${d.date}`}>
         {d.mins ? (
           <>
             <b className={`tabular-nums ${wide ? "text-base" : ""}`}>{h(d.mins)} h</b>
             {d.approved && <span className="ml-1 text-emerald-600" title="Approved" data-testid="ts-approved">✓</span>}
             {d.flagged && !d.approved && <span className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-xs font-bold text-white" title="Needs review" data-testid="ts-flag-alert">!</span>}
-            {edited && <span className="ml-1 text-[11px] text-[var(--cr-muted)]" data-testid="ts-edited">edited</span>}
+            {edited && <span className="cr-chip2 ml-1 text-[11px]" data-testid="ts-edited">edited</span>}
+            {payOf(id, d.date)?.otHours ? <span className="cr-chip2 cr-tone-warn ml-1 text-[11px]" data-testid="ts-pill-ot">OT</span> : null}
+            {payOf(id, d.date)?.dtHours ? <span className="cr-chip2 cr-tone-bad ml-1 text-[11px]" data-testid="ts-pill-dt">DT</span> : null}
+            {s?.flags.some((f) => f === "meal_missed" || f === "rest_missed") ? <span className="cr-chip2 cr-tone-bad ml-1 text-[11px]" data-testid="ts-pill-break">Break</span> : null}
             {s?.driveMinutes ? <span className="block text-xs text-[var(--cr-muted)]">incl. {Math.round(s.driveMinutes)} min drive</span> : null}
           </>
         ) : <span className="text-gray-400" data-testid="ts-add">+ Add</span>}
@@ -186,9 +229,27 @@ export default function TimesheetPage() {
         </div>
         <button className="min-h-11 rounded-lg bg-teal-600 px-4 font-semibold text-white" data-testid="ts-approve-all" onClick={() => approveDays(workers.map((w) => w.id), true)}>Approve all ready ({readyCount})</button>
         {undoSteps.length > 0 && <button className="min-h-11 rounded-lg border px-3" data-testid="ts-undo" onClick={undoLast}>Undo ({undoSteps.length})</button>}
+        {selected.size > 0 && <button className="cr-btn cr-btn-primary" data-testid="ts-approve-selected" onClick={() => { void approveDays([...selected], false); setSelected(new Set()); }}>Approve selected ({selected.size})</button>}
+        <label className="flex items-center gap-1 text-sm"><span className="cr-section-label">Pay period</span>
+          <select data-testid="ts-period" className="min-h-11 rounded-lg border bg-transparent px-2" value={period} onChange={(e) => setPeriod(e.target.value as typeof period)}>
+            <option value="weekly">Weekly</option><option value="biweekly">Every 2 weeks</option><option value="semimonthly">Twice a month</option>
+          </select></label>
+        <button className="cr-btn cr-btn-secondary" data-testid="ts-export-csv" onClick={() => void exportCsv()}>Export hours (CSV)</button>
         <Link href="/help?a=timesheet-how-counted" className="text-sm underline" data-testid="ts-how">How hours are counted</Link>
       </div>
       {message && <p role="status" data-testid="ts-message" className="mb-2 text-sm">{message}</p>}
+      <section className="cr-section mb-3" data-testid="ts-on-clock">
+        <p className="cr-section-label">On the clock now ({onClock.length})</p>
+        {onClock.length ? (
+          <ul className="flex flex-wrap gap-2">{onClock.map(({ w, st }) => <li key={w.id} className="cr-chip2 cr-tone-teal" data-testid={`ts-on-clock-${w.id}`} data-state={st.state}>{w.name} · {stateWord[st.state]}{st.since ? ` since ${new Date(st.since).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}</li>)}</ul>
+        ) : <p className="text-sm text-[var(--cr-muted)]" data-testid="ts-on-clock-empty">Nobody is on the clock right now.</p>}
+      </section>
+      {alerts.length > 0 && (
+        <details className="cr-collapse mb-3" data-testid="ts-alerts" open>
+          <summary>Alerts ({alerts.length})</summary>
+          <ul className="mt-1 space-y-1 text-sm">{alerts.slice(0, 30).map((a) => <li key={a.key} data-testid="ts-alert"><button className="cr-btn-text" onClick={() => setOpen(a.open)}>{a.text}</button></li>)}</ul>
+        </details>
+      )}
       {phone ? (
         <div className="space-y-2" data-testid="ts-cards">
           {shown.map((r) => (
@@ -212,7 +273,8 @@ export default function TimesheetPage() {
             <tbody>
               {shown.map((r) => (
                 <tr key={r.w.id} className="border-t align-top" data-testid={`ts-row-${r.w.id}`}>
-                  <td className="p-2 font-semibold">{r.w.name}</td>
+                  <td className="p-2 font-semibold"><label className="flex items-center gap-2"><input type="checkbox" data-testid={`ts-select-${r.w.id}`} checked={selected.has(r.w.id)} onChange={(e) => { const n = new Set(selected); if (e.target.checked) n.add(r.w.id); else n.delete(r.w.id); setSelected(n); }} />{r.w.name}</label>
+                    {attest[r.w.id] && <span className="block text-xs font-normal cr-text-good" data-testid={`ts-attested-${r.w.id}`}>Worker confirmed {new Date(attest[r.w.id]).toLocaleDateString()}</span>}</td>
                   {r.info.map((d) => <td key={d.date} className="p-1" data-testid={`ts-cell-${r.w.id}-${d.date}`}>{cell(r.w.id, d)}</td>)}
                   <td className="p-2">{weekEnd(r)}</td>
                 </tr>
@@ -221,15 +283,16 @@ export default function TimesheetPage() {
           </table>
         </div>
       )}
-      {!shown.length && <p className="mt-2 text-sm text-[var(--cr-muted)]" data-testid="ts-empty">{filter === "review" ? "Nothing needs review this week." : "No crew yet."}</p>}
-      {fixes.some((f) => f.status === "pending") && (
-        <section className="mt-4 space-y-2" data-testid="ts-fixes">
-          <h2 className="font-bold">Fix-my-time requests</h2>
+      {!shown.length && <p className="mt-2 text-sm text-[var(--cr-muted)]" data-testid="ts-empty">{filter === "review" ? "Nothing needs review this week." : <>No crew yet. Add your crew on <Link href="/employees" className="underline">Team</Link>; their taps on My day show up here.</>}</p>}
+      {pendingFixes.length > 0 && (
+        <section className="cr-section mt-4 space-y-2" data-testid="ts-fixes">
+          <h2 className="font-bold">Fix-my-time requests <span className="cr-chip2 cr-tone-warn" data-testid="ts-fix-badge">{pendingFixes.length}</span></h2>
           {fixes.filter((f) => f.status === "pending").map((f) => (
             <div key={f.id} className="flex flex-wrap items-center gap-2 rounded-lg border p-2 text-sm">
               <span>{workers.find((w) => w.id === f.employeeId)?.name || "Worker"} · {f.date} · {f.kind.replace("_", " ")} → {new Date(f.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · “{f.reason}”</span>
-              <button className="min-h-9 rounded bg-teal-600 px-3 text-white" data-testid="ts-fix-approve" onClick={() => decide(f, "approved")}>Approve</button>
-              <button className="min-h-9 rounded border px-3" data-testid="ts-fix-deny" onClick={() => decide(f, "denied")}>Deny</button>
+              <input aria-label="Note to worker" placeholder="Note (optional)" data-testid="ts-fix-note" maxLength={300} className="min-h-9 flex-1 rounded border bg-transparent px-2" value={fixNotes[f.id] || ""} onChange={(e) => setFixNotes({ ...fixNotes, [f.id]: e.target.value })} />
+              <button className="cr-btn cr-btn-primary" data-testid="ts-fix-approve" onClick={() => decide(f, "approved", fixNotes[f.id])}>Approve</button>
+              <button className="cr-btn cr-btn-secondary" data-testid="ts-fix-deny" onClick={() => decide(f, "denied", fixNotes[f.id])}>Decline</button>
             </div>
           ))}
         </section>
@@ -238,9 +301,10 @@ export default function TimesheetPage() {
       {open && openWorker && (
         <DayDetail key={`${open}|${approvalOf(openWorker.id, openDate)?.editedMinutes ?? ""}`} workerName={openWorker.name} date={openDate} sheet={sheets.get(open)} approval={approvalOf(openWorker.id, openDate)}
           minutes={minutesOf(openWorker.id, openDate)} extraFlags={flagsOf(openWorker.id, openDate).filter((f) => f === "edited" || f === "changed_since_approved")}
-          settings={settings} schedule={scheduleFor(docs, openWorker.id, openDate)} fixes={fixes.filter((f) => f.employeeId === openWorker.id && f.date === openDate)}
+          settings={settings} schedule={scheduleFor(docs, openWorker.id, openDate)} employeeId={openWorker.id}
+          taps={events.filter((e) => e.employeeId === openWorker.id && e.date === openDate)} dayPay={payOf(openWorker.id, openDate)} fixes={fixes.filter((f) => f.employeeId === openWorker.id && f.date === openDate)}
           onApprove={() => approveDay(openWorker.id, openDate)} onUnapprove={() => unapproveDay(openWorker.id, openDate)}
-          onSetMinutes={(m, approve) => setMinutes(openWorker.id, openDate, m, approve)} onDecide={(f, st) => decide(f, st)} onClose={() => setOpen(null)} />
+          onSetMinutes={(m, approve) => setMinutes(openWorker.id, openDate, m, approve)} onDecide={(f, st, note) => decide(f, st, note)} onClose={() => setOpen(null)} />
       )}
     </AppShell>
   );

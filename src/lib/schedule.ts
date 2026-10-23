@@ -30,7 +30,7 @@ export type Schedule = {
   /** "Book anyway" decisions: this person may overlap that other job (lib/conflicts). */
   overrides?: Override[];
 };
-export type Worker = { id: string; name: string; email?: string; phone?: string; role?: string; rate?: string; active?: boolean; paySettings?: unknown };
+export type Worker = { id: string; name: string; email?: string; phone?: string; role?: string; rate?: string; active?: boolean; paySettings?: unknown; hireDate?: string; timeOverrides?: unknown };
 /** The older per-job crew/pay rows (data.crew). */
 export type CrewRow = {
   id: string; employeeId: string; name: string; rate: string; hours: string; startTime: string; endTime: string;
@@ -399,9 +399,33 @@ export async function syncCrewPayRows(doc: CloudDoc) {
   }, ((Array.isArray(data.crew) ? data.crew : []) as CrewRow[]).map((row) => followSchedule(row, schedule)));
 }
 
+/**
+ * Job pin for the geofence distance check: geocodes the job address (via /api/drive-time?geocode=) and returns
+ * data.pin {lat,lng,address}. Reuses an existing pin for the same address; null when there is no address or no key.
+ */
+export async function jobPinFor(data: Record<string, unknown> | undefined): Promise<{ lat: number; lng: number; address: string } | null> {
+  const address = String(data?.clientAddress || data?.jobAddress || "").trim();
+  if (!address || typeof fetch === "undefined") return null;
+  const old = data?.pin as { lat?: unknown; lng?: unknown; address?: unknown } | undefined;
+  if (old && old.address === address && Number.isFinite(Number(old.lat)) && Number.isFinite(Number(old.lng))) return null;
+  try {
+    const res = await fetch(`/api/drive-time?geocode=${encodeURIComponent(address)}`, { signal: AbortSignal.timeout(6000) });
+    const json = await res.json();
+    return typeof json?.lat === "number" && typeof json?.lng === "number" ? { lat: json.lat, lng: json.lng, address } : null;
+  } catch { return null; }
+}
+
 export async function saveSchedule(docId: string, schedule: Schedule | null, confirmed: string[] = []) {
   const applied = applySchedule(readDocs(), docId, schedule, confirmed);
   if (!applied) return null;
+  if (schedule) {
+    // Save the job pin with the schedule so the timesheet's distance check has coordinates (no money fields touched).
+    const pin = await jobPinFor(applied.doc.data as Record<string, unknown>);
+    if (pin) {
+      applied.doc = { ...applied.doc, data: { ...(applied.doc.data || {}), pin } };
+      applied.docs = applied.docs.map((d) => (d.id === docId ? applied.doc : d));
+    }
+  }
   window.localStorage.setItem(DOCS_KEY, JSON.stringify(applied.docs));
   const cloudId = await saveCloudDocument(applied.doc);
   // saveCloudDocument may adopt the cloud's approval/schedule and stamps updatedAt: store that copy.

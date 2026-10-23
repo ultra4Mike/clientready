@@ -1,42 +1,118 @@
 /**
  * Day timesheet engine (pure: no storage, no network).
- * A worker's day is built from tap events (Start job / Start driving / Arrive / End shift) and filled
- * from the schedule where taps are missing. Pay uses the DAY total; per-job minutes are for job costing.
- *  - Paid day = first job start -> last job end.
- *  - A gap between two jobs longer than gapMinutes (default 60) is unpaid, unless he logged driving
- *    that covers it (then only the driving part is paid, capped at the gap).
- *  - Shorter gaps and logged transit count as paid drive time. Home -> first job and last job -> home are not paid.
- *  - A missing job start/end comes from the schedule and is flagged "from schedule".
- *  - Transit with no arrival after transitTimeoutMinutes, or no End shift, ends the day at the last real stop ("auto-ended").
+ * A worker's day is built from tap events and filled from the schedule where taps are missing.
+ * Taps: Start day / Start job / Drive to next / Arrived / Start break / End break / End day (old "end_shift" = End day).
+ * A strict state machine (OFF_DUTY, ON_DUTY_IDLE, WORKING, IN_TRANSIT, ON_BREAK) decides which taps are allowed;
+ * an out-of-order tap is still counted (never dropped) and flags the day "out_of_order".
+ *  - Paid day = first job start -> last job end (portal-to-portal: home commute unpaid unless the owner turns it on,
+ *    or "start at the shop": the day starts at Start day and the drive to the first job is paid).
+ *  - A gap between two jobs longer than gapMinutes (default 60) is unpaid, unless he logged driving inside it.
+ *  - Shorter gaps are paid drive (default) or, with idleGapPaid off, only the logged driving in them is paid.
+ *  - Breaks of shortBreakPaidMinutes (default 20) or more are unpaid; shorter breaks are paid.
+ *  - Optional: auto meal deduction, California meal/rest checks + premium hours, long-drive auto-break, rounding.
+ *  - Every new behaviour defaults to the pre-phase-1 result (except the new break taps, which only exist on new data).
  */
-export type TapKind = "start_job" | "start_transit" | "arrive" | "end_shift";
+export type TapKind = "start_day" | "start_job" | "start_transit" | "arrive" | "break_start" | "break_end" | "end_day" | "end_shift";
 export type TapEvent = {
   id: string;
   employeeId: string;
   date: string; // YYYY-MM-DD (worker's local day)
   kind: TapKind;
-  at: string; // ISO
+  at: string; // ISO (server time when the tap reached the server live; device time for queued offline taps)
   docId?: string; // the job (start_job / arrive) or the destination (start_transit)
   lat?: number;
   lng?: number;
-  /** Set by the portal when GPS was off or the tap was more than ~200 m from the job. */
+  /** Set by the portal when GPS was off or the tap was farther than the geofence radius from the job. */
   notAtSite?: boolean;
+  /** The phone's own clock at the tap (kept to spot a wrong phone clock). */
+  deviceAt?: string;
+  /** The worker confirmed an out-of-order tap. */
+  outOfOrder?: boolean;
+  /** Saved on the phone, not yet on the server. */
+  pending?: boolean;
 };
 export type ScheduledJob = { docId: string; start: string; end: string; label?: string; lat?: number; lng?: number }; // ISO start/end
-export type DayFlag = "from_schedule" | "not_at_site" | "long_drive" | "auto_ended" | "fix_requested" | "edited" | "changed_since_approved";
-export type TimesheetSettings = { gapMinutes: number; transitTimeoutMinutes: number; halfDayHours: number };
-export const DEFAULT_TIMESHEET_SETTINGS: TimesheetSettings = { gapMinutes: 60, transitTimeoutMinutes: 120, halfDayHours: 4 };
+export type DayFlag = "from_schedule" | "not_at_site" | "long_drive" | "auto_ended" | "fix_requested" | "edited" | "changed_since_approved"
+  | "out_of_order" | "auto_meal" | "meal_missed" | "rest_missed" | "long_drive_break" | "clock_skew" | "ot" | "dt" | "before_hire";
+
+export type BreakPreset = "federal" | "california";
+/**
+ * Per-worker overrides (employees.time_overrides jsonb -> Employee.timeOverrides; hire date is the existing employees.hire_date).
+ * Missing/empty = the account rule.
+ */
+export type WorkerTimeOverrides = { breakPreset?: BreakPreset | ""; geofenceOptOut?: boolean; hireDate?: string };
+/** Read the overrides from an employee record ({ hireDate, timeOverrides } or raw row { hire_date, time_overrides }). */
+export function readWorkerOverrides(employee: unknown): WorkerTimeOverrides {
+  const e = (employee && typeof employee === "object" ? employee : {}) as Record<string, unknown>;
+  const raw = (e.timeOverrides ?? e.time_overrides ?? {}) as Record<string, unknown>;
+  const o = raw && typeof raw === "object" ? raw : {};
+  const hire = String(e.hireDate ?? e.hire_date ?? "").slice(0, 10);
+  return {
+    breakPreset: o.breakPreset === "california" || o.breakPreset === "federal" ? o.breakPreset : "",
+    geofenceOptOut: o.geofenceOptOut === true,
+    hireDate: /^\d{4}-\d{2}-\d{2}$/.test(hire) ? hire : "",
+  };
+}
+/** The employees.time_overrides value to save (hire date stays in employees.hire_date). */
+export function timeOverridesRow(o: WorkerTimeOverrides): { breakPreset: BreakPreset | ""; geofenceOptOut: boolean } {
+  return { breakPreset: o.breakPreset === "california" || o.breakPreset === "federal" ? o.breakPreset : "", geofenceOptOut: o.geofenceOptOut === true };
+}
+/** Account settings with the worker's break preset applied (other settings unchanged). */
+export function settingsForWorker(settings: Partial<TimesheetSettings> | undefined, worker?: WorkerTimeOverrides): Partial<TimesheetSettings> {
+  return worker?.breakPreset ? { ...(settings || {}), breakPreset: worker.breakPreset } : settings || {};
+}
+export type OtPreset = "worker" | "federal" | "california" | "custom";
+export type TimesheetSettings = {
+  gapMinutes: number; transitTimeoutMinutes: number; halfDayHours: number;
+  // Breaks
+  shortBreakPaidMinutes: number; autoMealOn: boolean; autoMealAfterHours: number; autoMealMinutes: number;
+  breakPreset: BreakPreset; caPremiumPay: boolean; idleGapPaid: boolean;
+  // Travel (portal-to-portal)
+  payFirstCommute: boolean; payLastCommute: boolean; startAtShop: boolean; commuteDeductMinutes: number; longDriveBreakMinutes: number;
+  // Rounding of the paid day total: 0 = exact; 5 / 6 = nearest 5 / 6 minutes;
+  // 15 = the "7-minute rule" (nearest quarter hour: 7 min or less rounds down, 8 or more rounds up).
+  roundingMinutes: 0 | 5 | 6 | 15;
+  // Location
+  geofenceMeters: number; jobGeofence: Record<string, number>;
+  // Overtime ("worker" = each worker's own overtime setting, today's behaviour)
+  otPreset: OtPreset; weeklyOtHours: number; dailyOtHours: number; dailyDtHours: number; seventhDayRule: boolean; bonusInRegularRate: boolean;
+  // Pay period (for export / period pickers). anchor = a period start date (YYYY-MM-DD) for biweekly.
+  payPeriod: PayPeriod; payPeriodAnchor: string;
+  // Reminders (foreground only)
+  remindMissedStartMinutes: number; remindMissedEndMinutes: number;
+};
+export type PayPeriod = "weekly" | "biweekly" | "semimonthly";
+export const DEFAULT_TIMESHEET_SETTINGS: TimesheetSettings = {
+  gapMinutes: 60, transitTimeoutMinutes: 120, halfDayHours: 4,
+  shortBreakPaidMinutes: 20, autoMealOn: false, autoMealAfterHours: 6, autoMealMinutes: 30, breakPreset: "federal", caPremiumPay: false, idleGapPaid: true,
+  payFirstCommute: false, payLastCommute: false, startAtShop: false, commuteDeductMinutes: 0, longDriveBreakMinutes: 0,
+  roundingMinutes: 0, geofenceMeters: 200, jobGeofence: {},
+  otPreset: "worker", weeklyOtHours: 40, dailyOtHours: 0, dailyDtHours: 0, seventhDayRule: false, bonusInRegularRate: true,
+  payPeriod: "weekly", payPeriodAnchor: "", remindMissedStartMinutes: 15, remindMissedEndMinutes: 60,
+};
+/** California preset values (applied by the Rules screen when the owner picks California). */
+export const CALIFORNIA_RULES: Partial<TimesheetSettings> = { breakPreset: "california", shortBreakPaidMinutes: 20, otPreset: "california", weeklyOtHours: 40, dailyOtHours: 8, dailyDtHours: 12, seventhDayRule: true };
 
 export type JobSpan = { docId: string; start: string; end: string; minutes: number; fromSchedule: boolean; notAtSite: boolean; label?: string };
-export type DriveLeg = { fromDocId?: string; toDocId?: string; start: string; end: string; minutes: number; paidMinutes: number; expectedMinutes?: number; longDrive?: boolean };
+export type DriveLeg = { fromDocId?: string; toDocId?: string; start: string; end: string; minutes: number; paidMinutes: number; expectedMinutes?: number; longDrive?: boolean; commute?: "first" | "last"; autoBreakMinutes?: number };
+export type BreakSpan = { start: string; end: string; minutes: number; paid: boolean; auto?: boolean; unpaidMinutes: number };
 export type DaySheet = {
   employeeId: string;
   date: string;
   jobs: JobSpan[];
   drives: DriveLeg[];
+  breaks: BreakSpan[];
   workMinutes: number;
   driveMinutes: number;
   unpaidGapMinutes: number;
+  /** Unpaid break minutes subtracted (taken + auto meal). */
+  breakMinutes: number;
+  /** Long-drive excess treated as unpaid unless the owner approves the full drive. */
+  autoBreakMinutes: number;
+  /** Paid total change from rounding (+/-). */
+  roundingMinutes: number;
+  /** California missed meal/rest premium hours (paid at the regular rate, on top of hours). */
+  premiumHours: number;
   paidMinutes: number;
   paidHours: number;
   flags: DayFlag[];
@@ -49,29 +125,77 @@ const mins = (a: string, b: string) => Math.max(0, (ms(b) - ms(a)) / 60000);
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 export function readTimesheetSettings(raw: unknown): TimesheetSettings {
-  const v = (raw && typeof raw === "object" ? raw : {}) as Partial<Record<keyof TimesheetSettings, unknown>>;
-  const pick = (value: unknown, fallback: number) => { const n = Number(value); return Number.isFinite(n) && n > 0 ? n : fallback; };
+  const v = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const d = DEFAULT_TIMESHEET_SETTINGS;
+  const pos = (value: unknown, fallback: number) => { const n = Number(value); return Number.isFinite(n) && n > 0 ? n : fallback; };
+  const nonneg = (value: unknown, fallback: number) => { const n = Number(value); return value !== undefined && value !== null && value !== "" && Number.isFinite(n) && n >= 0 ? n : fallback; };
+  const bool = (value: unknown, fallback: boolean) => (typeof value === "boolean" ? value : fallback);
+  const rounding = Number(v.roundingMinutes);
+  const jobGeofence: Record<string, number> = {};
+  if (v.jobGeofence && typeof v.jobGeofence === "object") for (const [k, m] of Object.entries(v.jobGeofence as Record<string, unknown>)) { const n = Number(m); if (Number.isFinite(n) && n > 0) jobGeofence[k] = n; }
   return {
-    gapMinutes: pick(v.gapMinutes, DEFAULT_TIMESHEET_SETTINGS.gapMinutes),
-    transitTimeoutMinutes: pick(v.transitTimeoutMinutes, DEFAULT_TIMESHEET_SETTINGS.transitTimeoutMinutes),
-    halfDayHours: pick(v.halfDayHours, DEFAULT_TIMESHEET_SETTINGS.halfDayHours),
+    gapMinutes: pos(v.gapMinutes, d.gapMinutes),
+    transitTimeoutMinutes: pos(v.transitTimeoutMinutes, d.transitTimeoutMinutes),
+    halfDayHours: pos(v.halfDayHours, d.halfDayHours),
+    shortBreakPaidMinutes: nonneg(v.shortBreakPaidMinutes, d.shortBreakPaidMinutes),
+    autoMealOn: bool(v.autoMealOn, d.autoMealOn), autoMealAfterHours: pos(v.autoMealAfterHours, d.autoMealAfterHours), autoMealMinutes: pos(v.autoMealMinutes, d.autoMealMinutes),
+    breakPreset: v.breakPreset === "california" ? "california" : "federal", caPremiumPay: bool(v.caPremiumPay, d.caPremiumPay), idleGapPaid: bool(v.idleGapPaid, d.idleGapPaid),
+    payFirstCommute: bool(v.payFirstCommute, d.payFirstCommute), payLastCommute: bool(v.payLastCommute, d.payLastCommute), startAtShop: bool(v.startAtShop, d.startAtShop),
+    commuteDeductMinutes: nonneg(v.commuteDeductMinutes, d.commuteDeductMinutes), longDriveBreakMinutes: nonneg(v.longDriveBreakMinutes, d.longDriveBreakMinutes),
+    roundingMinutes: (rounding === 7 ? 15 : [0, 5, 6, 15].includes(rounding) ? rounding : 0) as TimesheetSettings["roundingMinutes"],
+    geofenceMeters: pos(v.geofenceMeters, d.geofenceMeters), jobGeofence,
+    otPreset: (["worker", "federal", "california", "custom"].includes(String(v.otPreset)) ? v.otPreset : "worker") as OtPreset,
+    weeklyOtHours: nonneg(v.weeklyOtHours, d.weeklyOtHours), dailyOtHours: nonneg(v.dailyOtHours, d.dailyOtHours), dailyDtHours: nonneg(v.dailyDtHours, d.dailyDtHours),
+    seventhDayRule: bool(v.seventhDayRule, d.seventhDayRule), bonusInRegularRate: bool(v.bonusInRegularRate, d.bonusInRegularRate),
+    payPeriod: (["weekly", "biweekly", "semimonthly"].includes(String(v.payPeriod)) ? v.payPeriod : "weekly") as PayPeriod,
+    payPeriodAnchor: typeof v.payPeriodAnchor === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v.payPeriodAnchor) ? v.payPeriodAnchor : "",
+    remindMissedStartMinutes: nonneg(v.remindMissedStartMinutes, d.remindMissedStartMinutes), remindMissedEndMinutes: nonneg(v.remindMissedEndMinutes, d.remindMissedEndMinutes),
   };
 }
 
+// ---------- State machine ----------
+export type DayStateName = "OFF_DUTY" | "ON_DUTY_IDLE" | "WORKING" | "IN_TRANSIT" | "ON_BREAK";
+export const normalizeKind = (kind: TapKind): Exclude<TapKind, "end_shift"> => (kind === "end_shift" ? "end_day" : kind);
+/** Allowed transitions. Anything not listed is out of order (asked to confirm, then counted and flagged). */
+export const TRANSITIONS: Record<DayStateName, Partial<Record<Exclude<TapKind, "end_shift">, DayStateName | "RESUME">>> = {
+  OFF_DUTY: { start_day: "ON_DUTY_IDLE", start_job: "WORKING", start_transit: "IN_TRANSIT" }, // start_job/drive from off duty implies Start day (old data)
+  ON_DUTY_IDLE: { start_job: "WORKING", arrive: "WORKING", start_transit: "IN_TRANSIT", break_start: "ON_BREAK", end_day: "OFF_DUTY" },
+  WORKING: { start_job: "WORKING", start_transit: "IN_TRANSIT", break_start: "ON_BREAK", end_day: "OFF_DUTY" },
+  IN_TRANSIT: { arrive: "WORKING", start_job: "WORKING", break_start: "ON_BREAK", end_day: "OFF_DUTY" },
+  ON_BREAK: { break_end: "RESUME", end_day: "OFF_DUTY" },
+};
+const FALLBACK: Record<Exclude<TapKind, "end_shift">, DayStateName> = { start_day: "ON_DUTY_IDLE", start_job: "WORKING", arrive: "WORKING", start_transit: "IN_TRANSIT", break_start: "ON_BREAK", break_end: "ON_DUTY_IDLE", end_day: "OFF_DUTY" };
+export function isAllowed(state: DayStateName, kind: TapKind) { return Boolean(TRANSITIONS[state][normalizeKind(kind)]); }
+export function allowedTaps(state: DayStateName): Exclude<TapKind, "end_shift">[] { return Object.keys(TRANSITIONS[state]) as Exclude<TapKind, "end_shift">[]; }
+/** Next state after a tap (out-of-order taps still move to the tap's natural state). */
+export function step(cur: { state: DayStateName; resume: DayStateName; docId?: string }, event: Pick<TapEvent, "kind" | "docId">) {
+  const kind = normalizeKind(event.kind);
+  const target = TRANSITIONS[cur.state][kind];
+  const ok = Boolean(target);
+  let state: DayStateName = target === "RESUME" ? cur.resume : (target || FALLBACK[kind]);
+  if (!ok && kind === "break_end") state = cur.state === "OFF_DUTY" ? cur.resume : cur.state; // no break open: stay put
+  const resume = state === "ON_BREAK" ? (cur.state === "ON_BREAK" ? cur.resume : cur.state === "OFF_DUTY" ? "ON_DUTY_IDLE" : cur.state) : cur.resume;
+  const docId = kind === "start_job" || kind === "arrive" || kind === "start_transit" ? event.docId || cur.docId : state === "OFF_DUTY" ? undefined : cur.docId;
+  return { state, resume, docId, ok };
+}
+
 /** Current state of the worker from his taps (what the portal shows). */
-export function dayState(events: TapEvent[]): { state: "OFF_DUTY" | "WORKING" | "IN_TRANSIT"; docId?: string; since?: string } {
+export function dayState(events: TapEvent[]): { state: DayStateName; docId?: string; since?: string; outOfOrder: number } {
   const sorted = [...events].sort((a, b) => ms(a.at) - ms(b.at));
-  const last = sorted[sorted.length - 1];
-  if (!last || last.kind === "end_shift") return { state: "OFF_DUTY", since: last?.at };
-  if (last.kind === "start_transit") return { state: "IN_TRANSIT", docId: last.docId, since: last.at };
-  return { state: "WORKING", docId: last.docId, since: last.at };
+  let cur: { state: DayStateName; resume: DayStateName; docId?: string } = { state: "OFF_DUTY", resume: "ON_DUTY_IDLE" };
+  let since: string | undefined, bad = 0;
+  for (const e of sorted) { const n = step(cur, e); if (!n.ok) bad++; cur = n; since = e.at; }
+  return { state: cur.state, docId: cur.docId, since, outOfOrder: bad };
 }
 
 /**
  * Build one worker's day. `now` is used only to decide whether open transit / an open shift timed out;
- * a day in the past with no End shift is always closed at the last real stop.
+ * a day in the past with no End day is always closed at the last real stop.
  */
 const OPEN_JOB_MAX_MS = 12 * 3600000;
+const CLOCK_SKEW_MS = 5 * 60000;
+
+function overlap(a0: number, a1: number, b0: number, b1: number) { return Math.max(0, Math.min(a1, b1) - Math.max(a0, b0)) / 60000; }
 
 export function buildDay(input: {
   employeeId: string;
@@ -79,17 +203,24 @@ export function buildDay(input: {
   events: TapEvent[];
   schedule: ScheduledJob[];
   settings?: Partial<TimesheetSettings>;
+  /** Optional per-worker overrides (readWorkerOverrides(employee)). */
+  worker?: WorkerTimeOverrides;
   now?: string;
   expectedDriveMinutes?: (fromDocId: string | undefined, toDocId: string | undefined) => number | undefined;
 }): DaySheet {
-  const settings = { ...DEFAULT_TIMESHEET_SETTINGS, ...(input.settings || {}) };
+  const settings = { ...DEFAULT_TIMESHEET_SETTINGS, ...settingsForWorker(input.settings, input.worker) };
   const events = input.events.filter((e) => e.employeeId === input.employeeId && e.date === input.date).sort((a, b) => ms(a.at) - ms(b.at));
   const flags = new Set<DayFlag>();
+  // Taps dated before the worker's hire date: flagged for the owner (pay is not changed automatically).
+  if (input.worker?.hireDate && input.date < input.worker.hireDate && input.events.some((e) => e.employeeId === input.employeeId && e.date === input.date)) flags.add("before_hire");
   const jobs: JobSpan[] = [];
   const drives: DriveLeg[] = [];
+  const breaks: { start: string; end?: string }[] = [];
   let openJob: { docId: string; start: string; notAtSite: boolean } | null = null;
   let openDrive: { from?: string; to?: string; start: string } | null = null;
   let lastJobDoc: string | undefined;
+  let dayStart: string | undefined, dayEnd: string | undefined, trailingDrive: { start: string; end: string } | null = null;
+  let cur: { state: DayStateName; resume: DayStateName; docId?: string } = { state: "OFF_DUTY", resume: "ON_DUTY_IDLE" };
   const sched = new Map(input.schedule.map((job) => [job.docId, job]));
   const closeJob = (at: string, fromSchedule = false) => {
     if (!openJob) return;
@@ -97,18 +228,43 @@ export function buildDay(input: {
     lastJobDoc = openJob.docId;
     openJob = null;
   };
+  // Not at site: the portal's flag, or (when the job has a pin and the tap has GPS) farther than the job radius.
+  // Geofence opt-out (radius 0): never flagged.
+  const notAtSiteFor = (event: TapEvent) => {
+    const radius = geofenceRadius(settings, event.docId, input.worker);
+    if (!(radius > 0)) return false;
+    const pin = event.docId ? sched.get(event.docId) : undefined;
+    const kind = normalizeKind(event.kind);
+    if ((kind === "start_job" || kind === "arrive") && pin?.lat != null && pin.lng != null && event.lat != null && event.lng != null) return Boolean(event.notAtSite) || metersBetween({ lat: event.lat, lng: event.lng }, { lat: pin.lat, lng: pin.lng }) > radius;
+    return Boolean(event.notAtSite);
+  };
   for (const event of events) {
-    if (event.notAtSite) flags.add("not_at_site");
-    if (event.kind === "start_job" || event.kind === "arrive") {
+    const kind = normalizeKind(event.kind);
+    const next = step(cur, event);
+    if (!next.ok || event.outOfOrder) flags.add("out_of_order");
+    cur = next;
+    const away = notAtSiteFor(event);
+    if (away) flags.add("not_at_site");
+    if (event.deviceAt && Math.abs(ms(event.deviceAt) - ms(event.at)) > CLOCK_SKEW_MS) flags.add("clock_skew");
+    const openBreak = breaks.length && !breaks[breaks.length - 1].end ? breaks[breaks.length - 1] : null;
+    if (kind !== "break_start" && openBreak && kind !== "end_day") openBreak.end = event.at; // any tap ends an open break
+    if (kind === "start_day") { if (!dayStart) dayStart = event.at; }
+    else if (kind === "start_job" || kind === "arrive") {
       if (openDrive) { drives.push({ fromDocId: openDrive.from, toDocId: event.docId || openDrive.to, start: openDrive.start, end: event.at, minutes: mins(openDrive.start, event.at), paidMinutes: 0 }); openDrive = null; }
       if (openJob && openJob.docId !== event.docId) closeJob(event.at);
-      if (!openJob && event.docId) openJob = { docId: event.docId, start: event.at, notAtSite: Boolean(event.notAtSite) };
-    } else if (event.kind === "start_transit") {
+      if (!openJob && event.docId) openJob = { docId: event.docId, start: event.at, notAtSite: away };
+    } else if (kind === "start_transit") {
       closeJob(event.at);
       if (!openDrive) openDrive = { from: lastJobDoc, to: event.docId, start: event.at };
-    } else if (event.kind === "end_shift") {
+    } else if (kind === "break_start") {
+      if (!openBreak) breaks.push({ start: event.at });
+    } else if (kind === "break_end") {
+      if (openBreak) openBreak.end = event.at;
+    } else if (kind === "end_day") {
+      if (openBreak) openBreak.end = event.at;
       closeJob(event.at);
-      if (openDrive) { openDrive = null; } // driving home is not paid (End shift / break = OFF_DUTY; a later Start job resumes)
+      if (openDrive) { if (openDrive.from) trailingDrive = { start: openDrive.start, end: event.at }; openDrive = null; } // drive home: paid only with "pay last commute"
+      dayEnd = event.at;
     }
   }
   const nowMs = input.now ? ms(input.now) : Number.POSITIVE_INFINITY;
@@ -117,13 +273,15 @@ export function buildDay(input: {
     const drive = openDrive as { from?: string; to?: string; start: string };
     if (nowMs - ms(drive.start) > settings.transitTimeoutMinutes * 60000) { flags.add("auto_ended"); openDrive = null; }
   }
-  // Open job with no End shift: close at the scheduled end (or the job start if none), once that time has passed.
+  // Open break: closes now (still on break) or at the timeout.
+  const lastBreak = breaks[breaks.length - 1];
+  if (lastBreak && !lastBreak.end) lastBreak.end = Number.isFinite(nowMs) ? new Date(Math.min(nowMs, ms(lastBreak.start) + settings.transitTimeoutMinutes * 60000)).toISOString() : lastBreak.start;
+  // Open job with no End day: close at the scheduled end (or the job start if none), once that time has passed.
   if (openJob) {
     const job = openJob as { docId: string; start: string; notAtSite: boolean };
     const plannedEnd = sched.get(job.docId)?.end;
     if (plannedEnd && ms(plannedEnd) > ms(job.start) && nowMs > ms(plannedEnd)) { closeJob(plannedEnd, true); flags.add("auto_ended"); }
     else if (!plannedEnd && nowMs - ms(job.start) > OPEN_JOB_MAX_MS) {
-      // No schedule: end at his last real tap after the start, else start + 12 h; flag Auto-ended for review.
       const later = events.filter((e) => ms(e.at) > ms(job.start)).map((e) => e.at).pop();
       closeJob(later || new Date(ms(job.start) + OPEN_JOB_MAX_MS).toISOString(), true); flags.add("auto_ended");
     }
@@ -141,9 +299,14 @@ export function buildDay(input: {
   if (jobs.some((job) => job.fromSchedule)) flags.add("from_schedule");
   if (jobs.length && openDrive) openDrive = null; // never pay an unfinished drive
 
-  // Gaps between consecutive jobs: logged drive inside the gap is paid; otherwise short gaps are paid drive, long ones unpaid.
-  let driveMinutes = 0, unpaidGap = 0;
+  // Gaps between consecutive jobs.
+  let driveMinutes = 0, unpaidGap = 0, autoBreak = 0;
   const legs: DriveLeg[] = [];
+  const longDriveCut = (leg: DriveLeg) => {
+    if (!(settings.longDriveBreakMinutes > 0) || leg.paidMinutes <= settings.longDriveBreakMinutes) return;
+    const excess = leg.paidMinutes - settings.longDriveBreakMinutes;
+    leg.autoBreakMinutes = round2(excess); leg.paidMinutes -= excess; autoBreak += excess; flags.add("long_drive_break");
+  };
   for (let i = 1; i < jobs.length; i++) {
     const prev = jobs[i - 1], next = jobs[i];
     const gap = mins(prev.end, next.start);
@@ -151,18 +314,39 @@ export function buildDay(input: {
     const logged = drives.filter((d) => ms(d.start) >= ms(prev.end) - 60000 && ms(d.end) <= ms(next.start) + 60000);
     const loggedMin = Math.min(gap, logged.reduce((sum, d) => sum + d.minutes, 0));
     let paid: number;
-    if (gap <= settings.gapMinutes) paid = gap;
+    if (gap <= settings.gapMinutes) paid = settings.idleGapPaid ? gap : loggedMin;
     else paid = loggedMin > 0 ? Math.min(loggedMin, gap) : 0;
-    // A long gap with logged driving: pay at most the driving (and never a full free afternoon).
-    if (gap > settings.gapMinutes && loggedMin > 0) paid = Math.min(paid, loggedMin);
     const expected = input.expectedDriveMinutes?.(prev.docId, next.docId);
     const actual = loggedMin > 0 ? loggedMin : paid;
     const long = expected !== undefined && actual > 0 && isLongDrive(actual, expected);
     if (long) flags.add("long_drive");
-    legs.push({ fromDocId: prev.docId, toDocId: next.docId, start: prev.end, end: next.start, minutes: gap, paidMinutes: paid, expectedMinutes: expected, longDrive: long });
-    driveMinutes += paid;
+    const leg: DriveLeg = { fromDocId: prev.docId, toDocId: next.docId, start: prev.end, end: next.start, minutes: gap, paidMinutes: paid, expectedMinutes: expected, longDrive: long };
+    longDriveCut(leg);
+    legs.push(leg);
+    driveMinutes += leg.paidMinutes;
     unpaidGap += gap - paid;
   }
+  // Portal-to-portal: first / last commute (off by default) and "start at the shop".
+  if (jobs.length) {
+    const first = jobs[0], last = jobs[jobs.length - 1];
+    const firstDrive = drives.find((d) => ms(d.end) <= ms(first.start) + 60000 && !d.fromDocId);
+    let leadStart: string | undefined, deduct = 0;
+    if (settings.startAtShop && dayStart && ms(dayStart) < ms(first.start)) leadStart = dayStart;
+    else if (settings.payFirstCommute && firstDrive) { leadStart = firstDrive.start; deduct = settings.commuteDeductMinutes; }
+    if (leadStart) {
+      const total = mins(leadStart, first.start);
+      const leg: DriveLeg = { toDocId: first.docId, start: leadStart, end: first.start, minutes: total, paidMinutes: Math.max(0, total - deduct), commute: "first" };
+      longDriveCut(leg);
+      legs.unshift(leg); driveMinutes += leg.paidMinutes;
+    }
+    if (settings.payLastCommute && trailingDrive && ms(trailingDrive.start) >= ms(last.end) - 60000) {
+      const total = mins(trailingDrive.start, trailingDrive.end);
+      const leg: DriveLeg = { fromDocId: last.docId, toDocId: last.docId, start: trailingDrive.start, end: trailingDrive.end, minutes: total, paidMinutes: Math.max(0, total - settings.commuteDeductMinutes), commute: "last" };
+      longDriveCut(leg);
+      legs.push(leg); driveMinutes += leg.paidMinutes;
+    }
+  }
+  void dayEnd;
   // Overlapping jobs are counted once (union of time).
   let workMinutes = 0, cursor = 0;
   for (const job of jobs) {
@@ -171,10 +355,58 @@ export function buildDay(input: {
     workMinutes += (e - Math.max(s, cursor)) / 60000;
     cursor = e;
   }
-  const paidMinutes = workMinutes + driveMinutes;
+  // Breaks: unpaid when at least shortBreakPaidMinutes; only the part inside paid time is subtracted.
+  const breakSpans: BreakSpan[] = [];
+  let unpaidWork = 0, unpaidDrive = 0;
+  for (const b of breaks) {
+    if (!b.end) continue;
+    const m = mins(b.start, b.end);
+    const paid = m < settings.shortBreakPaidMinutes;
+    let inWork = 0, inDrive = 0;
+    if (!paid) {
+      const s = ms(b.start), e = ms(b.end);
+      let c2 = 0;
+      for (const job of jobs) { const js = Math.max(ms(job.start), c2), je = ms(job.end); if (je <= c2) continue; inWork += overlap(s, e, js, je); c2 = je; }
+      for (const leg of legs) inDrive += Math.min(leg.paidMinutes, overlap(s, e, ms(leg.start), ms(leg.end)));
+    }
+    unpaidWork += inWork; unpaidDrive += inDrive;
+    breakSpans.push({ start: b.start, end: b.end, minutes: round2(m), paid, unpaidMinutes: round2(inWork + inDrive) });
+  }
+  workMinutes = Math.max(0, workMinutes - unpaidWork);
+  driveMinutes = Math.max(0, driveMinutes - unpaidDrive);
+  let breakMinutes = unpaidWork + unpaidDrive;
+  // Auto meal deduction (off by default): no unpaid break taken and more than Y hours paid.
+  const takenUnpaid = breakSpans.some((b) => !b.paid);
+  if (settings.autoMealOn && !takenUnpaid && (workMinutes + driveMinutes) > settings.autoMealAfterHours * 60) {
+    const cut = Math.min(settings.autoMealMinutes, workMinutes);
+    workMinutes -= cut; breakMinutes += cut; flags.add("auto_meal");
+    const at = jobs[0] ? new Date(ms(jobs[0].start) + settings.autoMealAfterHours * 3600000).toISOString() : input.date;
+    breakSpans.push({ start: at, end: at, minutes: cut, paid: false, auto: true, unpaidMinutes: cut });
+  }
+  // California: 30-min meal starting before the 5th hour of work, 10-min rest per 4 hours (or major fraction).
+  let premiumHours = 0;
+  const firstStart = jobs[0] ? ms(jobs[0].start) : 0;
+  const workedH = (workMinutes + driveMinutes) / 60;
+  if (settings.breakPreset === "california" && jobs.length) {
+    const real = breakSpans.filter((b) => !b.auto);
+    const mealOk = workedH <= 5 || real.some((b) => b.minutes >= 30 && ms(b.start) <= firstStart + 5 * 3600000);
+    const restNeeded = workedH < 3.5 ? 0 : Math.floor((workedH + 2) / 4);
+    const restOk = real.filter((b) => b.minutes >= 10).length >= restNeeded;
+    if (!mealOk) { flags.add("meal_missed"); if (settings.caPremiumPay) premiumHours += 1; }
+    if (!restOk) { flags.add("rest_missed"); if (settings.caPremiumPay) premiumHours += 1; }
+  }
+  // Rounding of the day's paid total (nearest), the difference goes to work time.
+  let paidMinutes = workMinutes + driveMinutes, roundingMinutes = 0;
+  if (settings.roundingMinutes > 0 && paidMinutes > 0) {
+    const step = settings.roundingMinutes, rem = paidMinutes % step;
+    // Nearest step; the 15-min "7-minute rule": up to 7 min rounds down, 8+ rounds up (same as nearest for whole minutes).
+    const r = step === 15 ? paidMinutes - rem + (rem >= 8 ? 15 : 0) : Math.round(paidMinutes / step) * step;
+    roundingMinutes = r - paidMinutes; workMinutes = Math.max(0, workMinutes + roundingMinutes); paidMinutes = r;
+  }
   return {
-    employeeId: input.employeeId, date: input.date, jobs, drives: legs,
+    employeeId: input.employeeId, date: input.date, jobs, drives: legs, breaks: breakSpans,
     workMinutes: round2(workMinutes), driveMinutes: round2(driveMinutes), unpaidGapMinutes: round2(unpaidGap),
+    breakMinutes: round2(breakMinutes), autoBreakMinutes: round2(autoBreak), roundingMinutes: round2(roundingMinutes), premiumHours,
     paidMinutes: round2(paidMinutes), paidHours: round2(paidMinutes / 60),
     flags: [...flags], autoEnded: flags.has("auto_ended"),
   };
@@ -203,6 +435,21 @@ export function metersBetween(a: { lat: number; lng: number }, b: { lat: number;
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 export const SITE_RADIUS_METERS = 200;
+/** Geofence radius for a job: the job's own override, else the account radius (default 200 m). */
+/** Job radius in meters; 0 when the worker opted out of geofence prompts (geofencePrompt then never prompts). */
+export function geofenceRadius(settings: Partial<TimesheetSettings> | undefined, docId?: string, worker?: WorkerTimeOverrides) {
+  if (worker?.geofenceOptOut) return 0;
+  const own = docId ? settings?.jobGeofence?.[docId] : undefined;
+  return own && own > 0 ? own : settings?.geofenceMeters && settings.geofenceMeters > 0 ? settings.geofenceMeters : SITE_RADIUS_METERS;
+}
+/** Foreground geofence prompt for MyDay: "arrive" when driving and inside the job radius, "leave" when working and outside it. Never blocks. */
+export function geofencePrompt(state: DayStateName, pos: { lat: number; lng: number } | undefined, pin: { lat: number; lng: number } | null | undefined, radius: number): "arrive" | "leave" | null {
+  if (!pos || !pin || !(radius > 0)) return null;
+  const d = metersBetween(pos, pin);
+  if (state === "IN_TRANSIT" && d <= radius) return "arrive";
+  if (state === "WORKING" && d > radius * 1.5) return "leave";
+  return null;
+}
 
 /** Should the portal ask "Still driving?" (transit open longer than the timeout). */
 export function stillDrivingDue(events: TapEvent[], now: string, settings?: Partial<TimesheetSettings>) {
@@ -218,7 +465,7 @@ export function jobMinutes(day: DaySheet, docId: string) {
   return round2(own + drive);
 }
 
-export type FixRequest = { id: string; employeeId: string; date: string; eventId?: string; kind: TapKind; at: string; reason: string; status: "pending" | "approved" | "denied"; createdAt: string; decidedAt?: string; docId?: string };
+export type FixRequest = { id: string; employeeId: string; date: string; eventId?: string; kind: TapKind; at: string; reason: string; status: "pending" | "approved" | "denied"; createdAt: string; decidedAt?: string; docId?: string; ownerNote?: string };
 
 /** Apply approved fix requests to the events (pending/denied leave them alone). History is kept by the caller. */
 export function applyFixes(events: TapEvent[], fixes: FixRequest[]): TapEvent[] {
@@ -232,7 +479,7 @@ export function applyFixes(events: TapEvent[], fixes: FixRequest[]): TapEvent[] 
 }
 
 /** Flags that need the owner's eye before a day is "ready" (an owner edit counts as reviewed). */
-export const REVIEW_FLAGS: DayFlag[] = ["from_schedule", "not_at_site", "long_drive", "auto_ended", "fix_requested"];
+export const REVIEW_FLAGS: DayFlag[] = ["from_schedule", "not_at_site", "long_drive", "auto_ended", "fix_requested", "out_of_order", "meal_missed", "rest_missed", "long_drive_break", "clock_skew", "before_hire"];
 export const needsReview = (flags: string[], edited = false) => !edited && flags.some((f) => (REVIEW_FLAGS as string[]).includes(f));
 
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -252,7 +499,14 @@ export function flagReasons(day: DaySheet | undefined, extra: string[] = [], set
         const missed = (day?.jobs || []).filter((j) => j.fromSchedule).map((j) => j.label || "a job");
         return { flag, text: `No tap was recorded for ${missed.length ? missed.join(", ") : "part of the day"}, so the scheduled time was used. Check it's right.` };
       }
-      case "not_at_site": return { flag, text: "A tap was made with GPS off or more than 200 m from the job site." };
+      case "not_at_site": return { flag, text: `A tap was made with GPS off or more than ${s.geofenceMeters} m from the job site.` };
+      case "out_of_order": return { flag, text: "A tap was made out of order (for example End break with no break started). It was counted; check the times." };
+      case "auto_meal": return { flag, text: `No unpaid break was taken, so a ${s.autoMealMinutes}-minute meal break was taken off after ${s.autoMealAfterHours} hours.` };
+      case "meal_missed": return { flag, text: `No 30-minute meal break started before the 5th hour (California rule).${s.caPremiumPay ? " One hour of premium pay was added." : ""}` };
+      case "rest_missed": return { flag, text: `Not enough 10-minute rest breaks (one per 4 hours, California rule).${s.caPremiumPay ? " One hour of premium pay was added." : ""}` };
+      case "long_drive_break": return { flag, text: `A drive ran over ${s.longDriveBreakMinutes} min ` + `(${hm(day?.autoBreakMinutes || 0)} extra). The extra is unpaid unless you tap "Pay the full drive".` };
+      case "clock_skew": return { flag, text: "The worker's phone clock was more than 5 minutes off; the server time was used." };
+      case "before_hire": return { flag, text: "Time was logged before this worker's hire date. Check the hire date or the day." };
       case "long_drive": {
         const leg = (day?.drives || []).find((d) => d.longDrive);
         return { flag, text: leg ? `A drive took ${hm(leg.paidMinutes || leg.minutes)}, but about ${hm(leg.expectedMinutes || 0)} was expected.` : "A drive took much longer than expected." };
@@ -267,7 +521,7 @@ export function flagReasons(day: DaySheet | undefined, extra: string[] = [], set
 }
 
 /** Timeline rows for a day: job starts/ends, drives and gaps (paid or unpaid), in time order. */
-export type TimelineRow = { at: string; kind: "start" | "end" | "gap"; text: string; paid?: boolean; minutes?: number; docId?: string; fromSchedule?: boolean };
+export type TimelineRow = { at: string; kind: "start" | "end" | "gap" | "break"; text: string; paid?: boolean; minutes?: number; docId?: string; fromSchedule?: boolean };
 export function dayTimeline(day: DaySheet | undefined): TimelineRow[] {
   if (!day || !day.jobs.length) return [];
   const rows: TimelineRow[] = [];
@@ -281,7 +535,11 @@ export function dayTimeline(day: DaySheet | undefined): TimelineRow[] {
         text: unpaid < 0.5 ? `Drive ${hm(leg.paidMinutes)} (paid)` : leg.paidMinutes > 0 ? `Gap ${hm(leg.minutes)}: drive ${hm(leg.paidMinutes)} paid, ${hm(unpaid)} unpaid` : `Gap ${hm(leg.minutes)} (unpaid)` });
     } else if (i < day.jobs.length - 1) rows.push({ at: job.end, kind: "end", docId: job.docId, text: `${fmtTime(job.end)} Finished ${job.label || "job"}` });
   });
+  for (const leg of day.drives.filter((d) => d.commute)) rows.push({ at: leg.start, kind: "gap", minutes: leg.minutes, paid: true, text: `${fmtTime(leg.start)} ${leg.commute === "first" ? "Travel to first job" : "Drive home"} ${hm(leg.paidMinutes)} (paid${leg.minutes - leg.paidMinutes >= 0.5 ? `, ${hm(leg.minutes - leg.paidMinutes)} not paid` : ""})` });
+  for (const b of day.breaks || []) rows.push({ at: b.start, kind: "break", minutes: b.minutes, paid: b.paid, text: b.auto ? `Auto meal break ${hm(b.minutes)} (unpaid)` : `${fmtTime(b.start)} Break ${hm(b.minutes)} (${b.paid ? "paid, short break" : "unpaid"})` });
+  for (const leg of day.drives.filter((d) => d.autoBreakMinutes)) rows.push({ at: leg.end, kind: "break", minutes: leg.autoBreakMinutes, paid: false, text: `Long drive: ${hm(leg.autoBreakMinutes || 0)} over the limit treated as an unpaid break` });
   const last = day.jobs[day.jobs.length - 1];
+  rows.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
   rows.push({ at: last.end, kind: "end", docId: last.docId, text: `${fmtTime(last.end)} Day ended${day.autoEnded ? " (auto-ended at the last stop)" : ""}` });
   return rows;
 }
@@ -292,7 +550,8 @@ export function daySummary(day: DaySheet | undefined, paidOverride?: number | nu
   const paid = paidOverride ?? day.paidMinutes;
   const base = `Paid ${hm(paid)} = jobs ${hm(day.workMinutes)} + drive ${hm(day.driveMinutes)}.`;
   const edited = paidOverride != null && Math.round(paidOverride) !== Math.round(day.paidMinutes) ? ` (You set ${hm(paidOverride)}; taps show ${hm(day.paidMinutes)}.)` : "";
-  return `${paidOverride != null && edited ? `Paid ${hm(paid)}.${edited}` : base}${day.unpaidGapMinutes >= 0.5 ? ` Unpaid gap ${hm(day.unpaidGapMinutes)}.` : ""}`;
+  const extras = `${day.breakMinutes >= 0.5 ? ` Unpaid breaks ${hm(day.breakMinutes)}.` : ""}${Math.abs(day.roundingMinutes || 0) >= 0.5 ? ` Rounded ${day.roundingMinutes > 0 ? "+" : "−"}${hm(Math.abs(day.roundingMinutes))}.` : ""}${day.premiumHours ? ` Premium pay ${day.premiumHours} h.` : ""}`;
+  return `${paidOverride != null && edited ? `Paid ${hm(paid)}.${edited}` : base}${day.unpaidGapMinutes >= 0.5 ? ` Unpaid gap ${hm(day.unpaidGapMinutes)}.` : ""}${extras}`;
 }
 
 /** A worker's week status from his days: Needs review (n) / Ready to approve / Approved / No hours. */
@@ -306,4 +565,76 @@ export function weekStatus(days: { hasHours: boolean; approved: boolean; flagged
   if (review) return { kind: "review", review, ready, approved, label: `Needs review (${review})` };
   if (ready) return { kind: "ready", review, ready, approved, label: "Ready to approve" };
   return { kind: "approved", review, ready, approved, label: "Approved ✓" };
+}
+
+
+// ---------- Shared helpers for the UI workers (phase 1 foundation) ----------
+export type NextAction = { kind: Exclude<TapKind, "end_shift">; primary: boolean; destructive: boolean };
+/** Valid taps for a state, the main next step first. End day is marked destructive (keep it away from the main button). */
+export function nextActions(state: DayStateName, opts: { hasNextJob?: boolean; tapsToday?: number } = {}): NextAction[] {
+  const order: Record<DayStateName, Exclude<TapKind, "end_shift">[]> = {
+    OFF_DUTY: opts.tapsToday ? [] : ["start_day", "start_job", "start_transit"],
+    ON_DUTY_IDLE: opts.hasNextJob === false ? ["start_job", "arrive", "break_start", "start_transit", "end_day"] : ["start_transit", "start_job", "arrive", "break_start", "end_day"],
+    IN_TRANSIT: ["arrive", "start_job", "break_start", "end_day"],
+    WORKING: opts.hasNextJob ? ["start_transit", "break_start", "start_job", "end_day"] : ["break_start", "start_transit", "start_job", "end_day"],
+    ON_BREAK: ["break_end", "end_day"],
+  };
+  const allowed = new Set(allowedTaps(state));
+  return order[state].filter((k) => allowed.has(k)).map((kind, i) => ({ kind, primary: i === 0 && kind !== "end_day" && !(state === "WORKING" && !opts.hasNextJob && kind === "break_start"), destructive: kind === "end_day" }));
+}
+
+/** Pay period containing `date` (YYYY-MM-DD). Weeks start Monday. */
+export function payPeriodOf(date: string, period: PayPeriod, anchor = ""): { from: string; to: string } {
+  const d = new Date(`${date}T12:00:00`);
+  const ymd = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+  const plus = (x: Date, n: number) => { const y = new Date(x); y.setDate(y.getDate() + n); return y; };
+  if (period === "semimonthly") {
+    const first = d.getDate() <= 15;
+    return { from: ymd(new Date(d.getFullYear(), d.getMonth(), first ? 1 : 16, 12)), to: ymd(first ? new Date(d.getFullYear(), d.getMonth(), 15, 12) : new Date(d.getFullYear(), d.getMonth() + 1, 0, 12)) };
+  }
+  const monday = plus(d, -((d.getDay() + 6) % 7));
+  if (period === "weekly") return { from: ymd(monday), to: ymd(plus(monday, 6)) };
+  const a = anchor ? new Date(`${anchor}T12:00:00`) : new Date("2026-01-05T12:00:00");
+  const aMon = plus(a, -((a.getDay() + 6) % 7));
+  const weeks = Math.round((monday.getTime() - aMon.getTime()) / (7 * 86400000));
+  const start = plus(monday, -(((weeks % 2) + 2) % 2) * 7);
+  return { from: ymd(start), to: ymd(plus(start, 13)) };
+}
+
+/** Who is on the clock now, from today's taps (any order). */
+export type OnClock = { employeeId: string; state: DayStateName; since?: string; docId?: string };
+export function whosOnClock(events: TapEvent[], today: string): OnClock[] {
+  const by = new Map<string, TapEvent[]>();
+  for (const e of events) if (e.date === today) by.set(e.employeeId, [...(by.get(e.employeeId) || []), e]);
+  return [...by.entries()].map(([employeeId, list]) => ({ employeeId, ...dayState(list) })).filter((x) => x.state !== "OFF_DUTY").map(({ outOfOrder: _o, ...rest }) => rest);
+}
+
+/** Owner alerts (in-app). No money in them. */
+export type TimeAlertKind = "fix_pending" | "needs_review" | "out_of_order" | "clock_skew" | "forgot_end" | "late_start" | "no_show" | "break_rule" | "changed_since_approved";
+export type TimeAlert = { kind: TimeAlertKind; employeeId: string; date: string; text: string };
+const COVERED_BY_ALERT = new Set<DayFlag>(["fix_requested", "meal_missed", "rest_missed", "clock_skew", "out_of_order"]);
+export function timeAlerts(input: { sheets: Map<string, DaySheet>; fixes: FixRequest[]; events: TapEvent[]; today: string; schedule?: Map<string, ScheduledJob[]>; now?: string; lateMinutes?: number }): TimeAlert[] {
+  const out: TimeAlert[] = [];
+  for (const f of input.fixes) if (f.status === "pending") out.push({ kind: "fix_pending", employeeId: f.employeeId, date: f.date, text: "Asked for a time fix" });
+  for (const s of input.sheets.values()) {
+    if (s.flags.includes("meal_missed") || s.flags.includes("rest_missed")) out.push({ kind: "break_rule", employeeId: s.employeeId, date: s.date, text: "Break rule missed" });
+    if (s.flags.includes("clock_skew")) out.push({ kind: "clock_skew", employeeId: s.employeeId, date: s.date, text: "Phone clock was off" });
+    if (s.flags.includes("out_of_order")) out.push({ kind: "out_of_order", employeeId: s.employeeId, date: s.date, text: "Taps out of order" });
+    // "Needs review" only for review flags no specific alert already covers.
+    else if (needsReview(s.flags.filter((f) => !COVERED_BY_ALERT.has(f)))) out.push({ kind: "needs_review", employeeId: s.employeeId, date: s.date, text: "Day needs review" });
+    if (s.date < input.today && s.autoEnded) out.push({ kind: "forgot_end", employeeId: s.employeeId, date: s.date, text: "Day was never ended" });
+  }
+  const nowMs = input.now ? ms(input.now) : NaN;
+  if (input.schedule && Number.isFinite(nowMs)) for (const [key, jobs] of input.schedule) {
+    const [employeeId, date] = key.split("|");
+    if (date !== input.today || !jobs.length) continue;
+    const first = jobs.reduce((a, b) => (ms(a.start) <= ms(b.start) ? a : b));
+    const taps = input.events.filter((e) => e.employeeId === employeeId && e.date === date).sort((a, b) => ms(a.at) - ms(b.at));
+    const late = (input.lateMinutes ?? 15) * 60000;
+    if (!taps.length && nowMs > ms(first.end)) out.push({ kind: "no_show", employeeId, date, text: "No taps for a scheduled job" });
+    else if ((!taps.length && nowMs > ms(first.start) + late) || (taps.length && ms(taps[0].at) > ms(first.start) + late)) out.push({ kind: "late_start", employeeId, date, text: "Started late" });
+  }
+  // One alert per worker/day/kind (fixes, flags and schedule checks can overlap).
+  const seen = new Set<string>();
+  return out.filter((a) => { const k = `${a.employeeId}|${a.date}|${a.kind}`; if (seen.has(k)) return false; seen.add(k); return true; });
 }

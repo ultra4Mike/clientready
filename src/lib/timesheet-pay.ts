@@ -8,7 +8,8 @@
  * rows with an override keep the old per-job pay, so past invoices, Year packet and pay sheets never move.
  */
 import { dayBasePay, overtimePremium, readPaySettings, weekOf, type PayRow, type PaySettings } from "./pay-types";
-import type { DaySheet } from "./timesheet";
+import type { DaySheet, TimesheetSettings } from "./timesheet";
+import { otRules, overtimeTiers } from "./overtime-rules";
 
 const num = (value: unknown) => { const n = Number(String(value ?? "").replace(/[^0-9.-]/g, "")); return Number.isFinite(n) ? n : 0; };
 
@@ -37,7 +38,9 @@ export type DayInput = {
 };
 export type JobShare = { date: string; docId: string; cents: number; minutes: number; dayCents: number; dayMinutes: number; approved: boolean };
 /** unallocated: weekly salary with no hours that week, paid once as labor not tied to a job. */
-export type DayPay = { date: string; cents: number; workMinutes: number; driveMinutes: number; approved: boolean; shares: JobShare[]; unallocated?: boolean };
+export type DayPay = { date: string; cents: number; workMinutes: number; driveMinutes: number; approved: boolean; shares: JobShare[]; unallocated?: boolean; otHours?: number; dtHours?: number; premiumCents?: number; caPremiumHours?: number };
+/** Account rules that change pay (all optional; missing = the per-worker behaviour from before phase 1). */
+export type PayRules = { halfDayHours?: number; settings?: Partial<TimesheetSettings>; weekBonus?: Map<string, number> };
 
 /** Minutes of the day after an owner edit: drive stays as logged (capped), the rest is work. */
 function dayMinutes(day: DayInput) {
@@ -52,7 +55,7 @@ function dayMinutes(day: DayInput) {
  * Returns each day's pay in cents and its per-job shares. The cents of all days in a week add up to the week pay
  * (base + overtime premium, or the weekly salary once).
  */
-export function allocateWeek(days: DayInput[], payRaw: PaySettings | unknown, rate: string, defaults: { halfDayHours?: number } = {}): DayPay[] {
+export function allocateWeek(days: DayInput[], payRaw: PaySettings | unknown, rate: string, defaults: PayRules = {}): DayPay[] {
   const read = readPaySettings(payRaw);
   // The Timesheet rule "Half day under (h)" is the default when the worker has no half-day hours of his own.
   const pay: PaySettings = read.type === "day" && !(num(read.halfDayHours) > 0) && num(defaults.halfDayHours) > 0 ? { ...read, halfDayHours: String(defaults.halfDayHours) } : read;
@@ -74,23 +77,36 @@ export function allocateWeek(days: DayInput[], payRaw: PaySettings | unknown, ra
         continue;
       }
     }
-    // Overtime premium per day: cumulative premium after this day minus before (weekly + daily rules).
-    const entries: { date: string; hours: number; rate: number }[] = [];
+    // California missed meal/rest premium: an hour at the regular rate per missed break (only when the owner turned it on).
+    const caHours = list.map((d) => d.sheet?.premiumHours || 0);
+    // Overtime premium per day: account preset (OT / double time / 7th day, FLSA regular rate) or the worker's own rule.
     const premium: number[] = [];
-    let before = 0;
-    list.forEach((d, i) => {
-      const hours = (mins[i].work + mins[i].drive) / 60;
-      if ((pay.type === "hourly" || pay.type === "shift") && hours > 0) entries.push({ date: d.date, hours, rate: base[i] / hours });
-      const now = overtimePremium(entries, pay).premium;
-      premium.push(now - before);
-      before = now;
-    });
+    const ot: { ot: number; dt: number }[] = list.map(() => ({ ot: 0, dt: 0 }));
+    const rules = defaults.settings ? otRules({ otPreset: "worker", weeklyOtHours: 40, dailyOtHours: 0, dailyDtHours: 0, seventhDayRule: false, ...defaults.settings }) : null;
+    const hourlyLike = pay.type === "hourly" || pay.type === "shift";
+    if (rules && hourlyLike) {
+      const bonus = defaults.settings?.bonusInRegularRate === false ? 0 : defaults.weekBonus?.get(weekOf(list[0].date)) || 0;
+      const res = overtimeTiers(list.map((d, i) => ({ date: d.date, hours: (mins[i].work + mins[i].drive) / 60, straight: base[i] })), rules, bonus);
+      res.days.forEach((r, i) => { premium.push(r.premium); ot[i] = { ot: r.otHours, dt: r.dtHours }; });
+    } else {
+      const entries: { date: string; hours: number; rate: number }[] = [];
+      let before = 0;
+      list.forEach((d, i) => {
+        const hours = (mins[i].work + mins[i].drive) / 60;
+        if (hourlyLike && hours > 0) entries.push({ date: d.date, hours, rate: base[i] / hours });
+        const r = overtimePremium(entries, pay);
+        premium.push(r.premium - before);
+        ot[i] = { ot: Math.max(0, r.hours - ot.slice(0, i).reduce((s2, x) => s2 + x.ot, 0)), dt: 0 };
+        before = r.premium;
+      });
+    }
+    list.forEach((_, i) => { if (caHours[i] > 0 && num(rate) > 0) premium[i] += caHours[i] * num(rate); });
     const exact = list.map((_, i) => base[i] + premium[i]);
     const weekCents = Math.round(exact.reduce((s, x) => s + x, 0) * 100);
     const dayCents = splitCents(weekCents, exact.map((x) => Math.max(0, x)));
     list.forEach((d, i) => {
       const cents = exact.every((x) => x <= 0) ? 0 : dayCents[i];
-      out.push({ date: d.date, cents, workMinutes: mins[i].work, driveMinutes: mins[i].drive, approved: d.approved, shares: shareDay(d, cents, mins[i], pay, rate) });
+      out.push({ date: d.date, cents, workMinutes: mins[i].work, driveMinutes: mins[i].drive, approved: d.approved, shares: shareDay(d, cents, mins[i], pay, rate), otHours: ot[i].ot, dtHours: ot[i].dt, premiumCents: Math.round(premium[i] * 100), caPremiumHours: caHours[i] });
     });
   }
   return out;
