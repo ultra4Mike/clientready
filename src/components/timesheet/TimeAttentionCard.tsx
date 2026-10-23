@@ -3,21 +3,25 @@
 import { TIMESHEET_CHANGED_EVENT } from "@/lib/timesheet-sync";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { loadPtoRequests } from "@/lib/phase2-data";
 import { loadTimeWeek, localYmd, timeAttention, type TimeAttention } from "@/lib/time-owner";
 
 export default function TimeAttentionCard() {
   const [t, setT] = useState<TimeAttention | null>(null);
+  const [ptoPending, setPtoPending] = useState(0);
   useEffect(() => {
     let live = true;
-    const load = () => { const now = new Date().toISOString(); void loadTimeWeek(localYmd(), now).then((w) => { if (live && w.workers.length) setT(timeAttention(w, now)); }).catch(() => undefined); };
+    const load = () => { const now = new Date().toISOString(); void loadTimeWeek(localYmd(), now).then((w) => { if (live && w.workers.length) setT(timeAttention(w, now)); }).catch(() => undefined); void loadPtoRequests(localYmd().slice(0, 4)).then((r) => { if (live) setPtoPending(r.filter((x) => x.status === "pending").length); }).catch(() => undefined); };
     load();
     window.addEventListener(TIMESHEET_CHANGED_EVENT, load);
     return () => { live = false; window.removeEventListener(TIMESHEET_CHANGED_EVENT, load); };
   }, []);
-  if (!t || (!t.onClock.length && !t.alerts.length)) return null;
+  if ((!t || (!t.onClock.length && !t.alerts.length)) && !ptoPending) return null;
+  if (!t) return (
+    <section className="cr-section rounded-xl border px-4 py-3 text-sm" data-testid="dash-time" data-state="attention"><Link href="/timesheet#pto" className="cr-chip2 cr-tone-warn" data-testid="dash-time-pto">{ptoPending} time-off request{ptoPending === 1 ? "" : "s"} waiting</Link></section>);
   const word: Record<string, string> = { ON_DUTY_IDLE: "on duty", WORKING: "working", IN_TRANSIT: "driving", ON_BREAK: "on break" };
   return (
-    <section className="cr-section rounded-xl border px-4 py-3 text-sm" data-testid="dash-time" data-state={t.alerts.length ? "attention" : "ok"}>
+    <section className="cr-section rounded-xl border px-4 py-3 text-sm" data-testid="dash-time" data-state={t.alerts.length || ptoPending ? "attention" : "ok"}>
       <div className="flex items-center justify-between gap-2">
         <h3 className="font-semibold">Time tracking</h3>
         <Link href="/timesheet" className="cr-btn cr-btn-text" data-testid="dash-time-open">Open timesheet</Link>
@@ -29,6 +33,7 @@ export default function TimeAttentionCard() {
         {t.noShows > 0 && <Link href="/timesheet?filter=review" className="cr-chip2 cr-tone-bad" data-testid="dash-time-no-shows">{t.noShows} no-show{t.noShows === 1 ? "" : "s"}</Link>}
         {t.lateStarts > 0 && <Link href="/timesheet?filter=review" className="cr-chip2 cr-tone-warn" data-testid="dash-time-late">{t.lateStarts} late start{t.lateStarts === 1 ? "" : "s"}</Link>}
         {t.needsReview > 0 && <Link href="/timesheet?filter=review" className="cr-chip2 cr-tone-warn" data-testid="dash-time-review">{t.needsReview} day{t.needsReview === 1 ? "" : "s"} need{t.needsReview === 1 ? "s" : ""} review</Link>}
+        {ptoPending > 0 && <Link href="/timesheet#pto" className="cr-chip2 cr-tone-warn" data-testid="dash-time-pto">{ptoPending} time-off request{ptoPending === 1 ? "" : "s"} waiting</Link>}
         {t.pendingFixes > 0 && <span className="cr-chip2 cr-tone-warn" data-testid="dash-time-fixes">{t.pendingFixes} fix request{t.pendingFixes === 1 ? "" : "s"}</span>}
       </div>
       {t.alerts.length > 0 && <ul className="mt-1 space-y-0.5" data-testid="dash-time-alerts">{t.alerts.slice(0, 6).map((a, i) => (

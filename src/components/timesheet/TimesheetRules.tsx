@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { loadOwnerTimesheet, readLocalTimesheetSettings, saveTimesheetSettings } from "@/lib/day-events";
-import { CALIFORNIA_RULES, DEFAULT_TIMESHEET_SETTINGS, type TimesheetSettings } from "@/lib/timesheet";
+import { CALIFORNIA_RULES, CA_SICK, DEFAULT_TIMESHEET_SETTINGS, type TimesheetSettings } from "@/lib/timesheet";
 import { syncTimesheetCutover, addDays, readDocs } from "@/lib/timesheet-sync";
 import { weekOf } from "@/lib/pay-types";
 import TimeAuditLog from "@/components/timesheet/TimeAuditLog";
@@ -40,6 +40,7 @@ export default function TimesheetRules() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [jobs, setJobs] = useState<{ id: string; label: string }[]>([]);
+  const [taskName, setTaskName] = useState(""); const [taskRate, setTaskRate] = useState("");
   const [jobPick, setJobPick] = useState(""); const [jobMeters, setJobMeters] = useState("");
   useEffect(() => {
     let live = true;
@@ -160,6 +161,39 @@ export default function TimesheetRules() {
           {num("remindMissedEndMinutes", "Remind about a missed end after (min, 0 = off)", "ts-remind-end")}
         </div>
         {preview(p.period, "ts-preview-period")}
+      </section>
+
+      <section className={card} data-testid="ts-rules-pay" aria-labelledby="ts-h-pay">
+        <h3 id="ts-h-pay" className="cr-section-label font-semibold">Pay rules (piece rate, commission, day/salary)</h3>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          {num("minWage", "Minimum wage ($/h, 0 = off)", "ts-min-wage", "Piece, commission and day pay are topped up to this for every hour worked.")}
+          {tog("flsaNonHourly", "Overtime for non-hourly pay (FLSA: ½ × week pay ÷ hours, over 40 h)", "ts-flsa-nonhourly")}
+        </div>
+        <p className="mt-3 text-sm font-medium">Job / task rates ($/h, override a worker&apos;s hourly rate on that task)</p>
+        <ul className="mt-1 space-y-1" data-testid="ts-task-rates">{Object.entries(settings.taskRates).map(([k, v]) => (
+          <li key={k} className="flex items-center gap-2" data-testid={`ts-task-${k}`}><span className="min-w-32">{k}</span><span className="tabular-nums">${v.toFixed(2)}/h</span>
+            <button type="button" className="cr-btn-text text-xs" data-testid="ts-task-remove" onClick={() => { const next = { ...settings.taskRates }; delete next[k]; set({ taskRates: next }); }}>Remove</button></li>))}</ul>
+        <div className="mt-1 flex flex-wrap items-end gap-2">
+          <input name="ts-task-name" aria-label="Task name" placeholder="Task (e.g. Prevailing wage)" data-testid="ts-task-name" className={field} value={taskName} onChange={(e) => setTaskName(e.target.value)} />
+          <input name="ts-task-rate" aria-label="Rate per hour" placeholder="$/h" inputMode="decimal" data-testid="ts-task-rate" className={`${field} w-24`} value={taskRate} onChange={(e) => setTaskRate(e.target.value)} />
+          <button type="button" className="cr-btn cr-btn-secondary" data-testid="ts-task-add" onClick={() => { const r = Number(taskRate); if (taskName.trim() && r > 0) { set({ taskRates: { ...settings.taskRates, [taskName.trim().slice(0, 40)]: r } }); setTaskName(""); setTaskRate(""); } }}>Add rate</button>
+        </div>
+        <p className="cr-preview mt-2 text-sm text-[var(--cr-muted)]" data-testid="ts-preview-pay">{settings.minWage > 0 ? `Non-hourly pay is topped up to $${settings.minWage.toFixed(2)}/h.` : "No minimum-wage top-up."} {settings.flsaNonHourly ? "Non-hourly workers get FLSA overtime over 40 h." : ""}</p>
+      </section>
+
+      <section className={card} data-testid="ts-rules-pto" aria-labelledby="ts-h-pto">
+        <h3 id="ts-h-pto" className="cr-section-label font-semibold">Paid time off / sick</h3>
+        <label className="mt-2 block text-sm"><span className="font-medium">Rules</span>
+          <select name="ts-pto-preset" data-testid="ts-pto-preset" className={field} value={settings.ptoPreset} onChange={(e) => { const v = e.target.value as TimesheetSettings["ptoPreset"]; set(v === "california" ? { ptoPreset: v, ...CA_SICK } : v === "off" ? { ptoPreset: v, ptoPerHours: 0 } : { ptoPreset: v }); }}>
+            <option value="off">Off</option><option value="california">California sick leave (1 h per 30 h, cap 80, use 40, after 90 days)</option><option value="custom">Custom</option>
+          </select></label>
+        {settings.ptoPreset === "custom" && <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          {num("ptoPerHours", "1 h earned per … h worked", "ts-pto-per")}
+          {num("ptoCapHours", "Most hours that can build up (0 = no cap)", "ts-pto-cap")}
+          {num("ptoUseCapHours", "Most hours usable per year (0 = no cap)", "ts-pto-use-cap")}
+          {num("ptoWaitDays", "Usable after … days from hire", "ts-pto-wait")}
+        </div>}
+        <p className="cr-preview mt-2 text-sm text-[var(--cr-muted)]" data-testid="ts-preview-pto">{settings.ptoPreset === "off" || !(settings.ptoPerHours > 0) ? "No paid time off is earned." : `1 h earned per ${settings.ptoPerHours} h worked${settings.ptoCapHours ? `, up to ${settings.ptoCapHours} h` : ""}${settings.ptoUseCapHours ? `, ${settings.ptoUseCapHours} h usable a year` : ""}${settings.ptoWaitDays ? `, after ${settings.ptoWaitDays} days` : ""}.`}</p>
       </section>
 
       <div className="mt-3 flex flex-wrap items-center gap-3">

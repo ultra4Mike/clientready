@@ -15,6 +15,8 @@ import { weekOf } from "@/lib/pay-types";
 import Link from "next/link";
 import DayDetail from "@/components/timesheet/DayDetail";
 import PtoOwnerCard from "@/components/phase2/PtoOwnerCard";
+import { loadPtoRequests } from "@/lib/phase2-data";
+import { ptoDays } from "@/lib/pay-phase2";
 import { loadBusinessTz, loadAttestations, decideFix, loadOwnerTimesheet, readLocalTimesheetSettings, saveApprovals, type DayApproval } from "@/lib/day-events";
 import { dayState, DEFAULT_TIMESHEET_SETTINGS, reviewDayInfo, weekStatus, type DayStateName, type DaySheet, type FixRequest, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
 import { addDays, applyWeekToDocs, pushChangedDocs, readDocs, syncTimesheetCutover, scheduleFor, weekShares, weekSheets } from "@/lib/timesheet-sync";
@@ -186,7 +188,10 @@ export default function TimesheetPage() {
   async function exportCsv() {
     // Pay period: weekly = this week; biweekly = this + next week; semi-monthly = 1st–15th or 16th–end of the month of this week.
     const { from, to } = payPeriodOf(week, period, period === settings.payPeriod ? settings.payPeriodAnchor : "");
-    const lines = ["Worker,Date,Paid hours,Drive min,Unpaid break min,Rounding min,OT hours,DT hours,Break premium hours,Approved,Flags"];
+    const lines = ["Worker,Date,Paid hours,Drive min,Unpaid break min,Rounding min,OT hours,DT hours,Break premium hours,Units,Commission,Min-wage top-up,PTO hours,PTO pay,Approved,Flags"];
+    const ptoReqs = (await Promise.all([...new Set([from.slice(0, 4), to.slice(0, 4)])].map((y) => loadPtoRequests(y).catch(() => [])))).flat();
+    const pto = ptoDays(ptoReqs, workers as never, from, to);
+    const crewOn = (id: string, date: string) => docs.flatMap((d) => ((d.data as { crew?: { employeeId?: string; workDate?: string; units?: string; commissionPct?: string; commissionBase?: string }[] } | undefined)?.crew || []).filter((c) => c.employeeId === id && c.workDate === date));
     for (let wk = weekOf(from); wk <= to; wk = addDays(wk, 7)) {
       const data = await loadOwnerTimesheet(wk, addDays(wk, 6));
       const ws = weekSheets({ workers, docs, events: data.events, fixes: data.fixes, settings: data.settings, week: wk, now: new Date().toISOString() });
@@ -195,9 +200,13 @@ export default function TimesheetPage() {
         if (date < from || date > to) continue;
         const s = ws.sheets.get(`${w.id}|${date}`); const a = data.approvals.find((x) => x.employeeId === w.id && x.date === date);
         const mins = a?.editedMinutes != null ? a.editedMinutes : a?.approvedAt ? a.paidMinutes : s?.paidMinutes || 0;
-        if (!mins) continue;
+        const off = pto.get(`${w.id}|${date}`);
+        if (!mins && !off) continue;
         const p = (sh.pays.get(w.id) || []).find((x) => x.date === date);
-        lines.push([`"${w.name.replace(/"/g, '""')}"`, date, (mins / 60).toFixed(2), Math.round(s?.driveMinutes || 0), s?.breakMinutes || 0, s?.roundingMinutes || 0, (p?.otHours || 0).toFixed(2), (p?.dtHours || 0).toFixed(2), s?.premiumHours || 0, a?.approvedAt ? "yes" : "no", `"${(s?.flags || []).join(" ")}"`].join(","));
+        const cr = crewOn(w.id, date);
+        const units = cr.reduce((t, c) => t + (Number(c.units) || 0), 0);
+        const comm = cr.reduce((t, c) => t + ((Number(c.commissionPct) || 0) / 100) * (Number(c.commissionBase) || 0), 0);
+        lines.push([`"${w.name.replace(/"/g, '""')}"`, date, (mins / 60).toFixed(2), Math.round(s?.driveMinutes || 0), s?.breakMinutes || 0, s?.roundingMinutes || 0, (p?.otHours || 0).toFixed(2), (p?.dtHours || 0).toFixed(2), s?.premiumHours || 0, units || "", comm ? comm.toFixed(2) : "", p?.topUpCents ? (p.topUpCents / 100).toFixed(2) : "", off ? off.hours.toFixed(2) : "", off ? (off.cents / 100).toFixed(2) : "", a?.approvedAt ? "yes" : "no", `"${(s?.flags || []).join(" ")}"`].join(","));
       }
     }
     const url = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" }));

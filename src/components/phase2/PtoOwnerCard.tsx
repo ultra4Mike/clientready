@@ -33,7 +33,7 @@ export default function PtoOwnerCard({ workers, settings, today }: { workers: W[
   const name = (id: string) => workers.find((w) => w.id === id)?.name || "Worker";
   const input = "min-h-11 rounded-lg border bg-transparent px-2";
   return (
-    <section className="cr-panel mt-4 rounded-xl border p-3 text-sm" data-testid="pto-card">
+    <section id="pto" className="cr-panel mt-4 rounded-xl border p-3 text-sm" data-testid="pto-card">
       <h2 className="font-semibold">Time off &amp; sick ({year})</h2>
       <table className="mt-2 w-full tabular-nums" data-testid="pto-balances"><thead><tr><th className="text-left">Worker</th><th className="text-right">Earned</th><th className="text-right">Used</th><th className="text-right">Pending</th><th className="text-right">Available</th></tr></thead>
         <tbody>{rows.map(({ w, b }) => <tr key={w.id} data-testid={`pto-row-${w.id}`}><td>{w.name}{b.waitUntil ? <span className="ml-1 text-xs text-[var(--cr-muted)]">usable from {b.waitUntil}</span> : null}</td><td className="text-right">{b.accrued} h</td><td className="text-right">{b.taken} h</td><td className="text-right">{b.pending} h</td><td className="text-right font-semibold" data-testid="pto-available">{b.available} h</td></tr>)}</tbody></table>
