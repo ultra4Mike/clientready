@@ -38,13 +38,17 @@ export function isEmptyLocalDoc(doc: LocalDoc): boolean {
 export function sweepEmptyLocalDocs(storage: Storage = window.localStorage): string[] {
   try {
     const raw = storage.getItem("clientready-documents");
-    if (!raw) return [];
-    const docs = JSON.parse(raw) as LocalDoc[];
+    const docs = JSON.parse(raw || "[]") as LocalDoc[];
     if (!Array.isArray(docs)) return [];
     const gone = docs.filter(isEmptyLocalDoc).map((d) => String(d.id));
-    if (!gone.length) return [];
-    storage.setItem("clientready-documents", JSON.stringify(docs.filter((d) => !gone.includes(String(d?.id)))));
-    try { if (pendingIds().some((id) => gone.includes(id))) markSynced(...gone); } catch { /* no sync marks here */ }
+    if (gone.length) storage.setItem("clientready-documents", JSON.stringify(docs.filter((d) => !gone.includes(String(d?.id)))));
+    // "Saved on this device (n)" marks for documents that no longer exist on this device can never upload;
+    // they only keep the pill amber forever. Queued deletes ("delete:<id>") are left alone.
+    const kept = new Set(docs.map((d) => String(d?.id)).filter((id) => !gone.includes(id)));
+    try {
+      const orphans = pendingIds().filter((id) => !id.startsWith("delete:") && !kept.has(id));
+      if (orphans.length) markSynced(...orphans);
+    } catch { /* no sync marks here */ }
     return gone;
   } catch { return []; }
 }

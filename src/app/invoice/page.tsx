@@ -58,6 +58,7 @@ import { newDocDraftStale, wantsFreshDoc } from "@/lib/draft-stale";
 import { docHasContent, type DocContent } from "@/lib/empty-docs";
 
 /** A new form with no client, items or payments: never kept as a draft (Help retest: empty restore banner). */
+const HOLD_NOTE = "Add a client or a line item and Save. The job goes on the calendar once the document is saved.";
 function isBlankNewDoc(v: unknown) { return !docHasContent(v as DocContent); }
 
 function readDocsForDraftCheck() {
@@ -1049,7 +1050,7 @@ export default function NewInvoicePage() {
         pendingScheduleRef.current = next;
         setSchedule(next);
         if (next) { setJobStart(next.startTime || ""); setJobEnd(next.endTime || ""); }
-        setSaveMessage(next ? "Add a client or a line item and Save. The job goes on the calendar once the document is saved." : "");
+        setSaveMessage(next ? HOLD_NOTE : "");
         return;
       }
       if (!id) {
@@ -1371,7 +1372,7 @@ export default function NewInvoicePage() {
                 {schedule && <span className="text-xs" data-testid="schedule-summary">{schedule.date}{schedule.startTime ? ` ${schedule.startTime}` : ""}{schedule.endTime ? `–${schedule.endTime}` : ""} · {STATUS_LABEL[schedule.status]}</span>}
               </div>
               {!locked
-                ? <ScheduleEditor key={scheduleKey} autoSave docId={docId} value={schedule} workers={workers} onSave={saveJobSchedule} confirmRemove={(ids) => confirmRemoval(workLogged(crew, ids, clockHoursFor(docId)))} />
+                ? <ScheduleEditor key={scheduleKey} autoSave holdNote={!docId && !docHasContent({ clientName, clientCompany, contactName, clientEmail, clientPhone, clientAddress, clientId: docClientId, items, payments }) ? HOLD_NOTE : ""} docId={docId} value={schedule} workers={workers} onSave={saveJobSchedule} confirmRemove={(ids) => confirmRemoval(workLogged(crew, ids, clockHoursFor(docId)))} />
                 : <p className="text-xs text-slate-600">Save the document first, then schedule the job here or on the Calendar.</p>}
               {!isProposal && <VisitNotes notes={visitNotes} onChange={setVisitNotes} today={ymd(new Date())} disabled={locked} />}
               {docId && <OwnerVisitNotes docId={docId} />}

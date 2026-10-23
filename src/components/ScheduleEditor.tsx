@@ -34,10 +34,13 @@ type Props = {
   docId?: string;
   /** R53: save changes automatically (invoice page), so a change can't be lost by not clicking Save. */
   autoSave?: boolean;
+  /** Never-saved blank document: nothing auto-saves; this note shows instead of "Saving…". */
+  holdNote?: string;
 };
 
 /** Date, start/end time, assigned workers and status for one job. */
-export default function ScheduleEditor({ value, workers, defaults, onSave, onCancel, confirmRemove, saveLabel = "Save schedule", docId = "", autoSave = false }: Props) {
+export default function ScheduleEditor({ value, workers, defaults, onSave, onCancel, confirmRemove, saveLabel = "Save schedule", docId = "", autoSave: autoSaveProp = false, holdNote = "" }: Props) {
+  const autoSave = autoSaveProp && !holdNote;
   const [autoState, setAutoState] = useState<"" | "waiting" | "saved" | "unsaved">("");
   const changes = useRef(0);
   const confirmedRef = useRef<string[]>([]);
@@ -258,6 +261,7 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
         )}
       </div>
       {error && <p className="text-red-600">{error}</p>}
+      {holdNote && <p role="status" data-testid="schedule-hold-note" className="text-xs text-amber-700 dark:text-amber-300">{holdNote}</p>}
       {autoSave && autoState && (
         <p role="status" data-testid="schedule-autosave" data-state={autoState} className={`text-xs ${autoState === "unsaved" ? "text-amber-700 dark:text-amber-300" : "text-[var(--cr-muted)]"}`}>
           {autoState === "saved" ? "Saved automatically." : autoState === "waiting" ? "Saving…" : `Not saved yet: ${problem() || "check the fields."}`}
