@@ -1,1 +1,2 @@
 - 2026-10-23 01:57 CDT: deploy d63504f (change-order chain credits, portal $160 fix); tsc, corev.unit, corev.js, signed-out passed.
+- 2026-10-23 deploy 21/25: multi-day scheduling UI + holiday leave (6b43282), next 16.4.1 + uuid override (0d0728a); tsc, build, 21 unit tests, 7 browser checks all pass
