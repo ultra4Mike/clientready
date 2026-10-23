@@ -228,12 +228,23 @@ export function buildDay(input: {
     lastJobDoc = openJob.docId;
     openJob = null;
   };
+  // Not at site: the portal's flag, or (when the job has a pin and the tap has GPS) farther than the job radius.
+  // Geofence opt-out (radius 0): never flagged.
+  const notAtSiteFor = (event: TapEvent) => {
+    const radius = geofenceRadius(settings, event.docId, input.worker);
+    if (!(radius > 0)) return false;
+    const pin = event.docId ? sched.get(event.docId) : undefined;
+    const kind = normalizeKind(event.kind);
+    if ((kind === "start_job" || kind === "arrive") && pin?.lat != null && pin.lng != null && event.lat != null && event.lng != null) return Boolean(event.notAtSite) || metersBetween({ lat: event.lat, lng: event.lng }, { lat: pin.lat, lng: pin.lng }) > radius;
+    return Boolean(event.notAtSite);
+  };
   for (const event of events) {
     const kind = normalizeKind(event.kind);
     const next = step(cur, event);
     if (!next.ok || event.outOfOrder) flags.add("out_of_order");
     cur = next;
-    if (event.notAtSite) flags.add("not_at_site");
+    const away = notAtSiteFor(event);
+    if (away) flags.add("not_at_site");
     if (event.deviceAt && Math.abs(ms(event.deviceAt) - ms(event.at)) > CLOCK_SKEW_MS) flags.add("clock_skew");
     const openBreak = breaks.length && !breaks[breaks.length - 1].end ? breaks[breaks.length - 1] : null;
     if (kind !== "break_start" && openBreak && kind !== "end_day") openBreak.end = event.at; // any tap ends an open break
@@ -241,7 +252,7 @@ export function buildDay(input: {
     else if (kind === "start_job" || kind === "arrive") {
       if (openDrive) { drives.push({ fromDocId: openDrive.from, toDocId: event.docId || openDrive.to, start: openDrive.start, end: event.at, minutes: mins(openDrive.start, event.at), paidMinutes: 0 }); openDrive = null; }
       if (openJob && openJob.docId !== event.docId) closeJob(event.at);
-      if (!openJob && event.docId) openJob = { docId: event.docId, start: event.at, notAtSite: Boolean(event.notAtSite) };
+      if (!openJob && event.docId) openJob = { docId: event.docId, start: event.at, notAtSite: away };
     } else if (kind === "start_transit") {
       closeJob(event.at);
       if (!openDrive) openDrive = { from: lastJobDoc, to: event.docId, start: event.at };
@@ -601,6 +612,7 @@ export function whosOnClock(events: TapEvent[], today: string): OnClock[] {
 /** Owner alerts (in-app). No money in them. */
 export type TimeAlertKind = "fix_pending" | "needs_review" | "out_of_order" | "clock_skew" | "forgot_end" | "late_start" | "no_show" | "break_rule" | "changed_since_approved";
 export type TimeAlert = { kind: TimeAlertKind; employeeId: string; date: string; text: string };
+const COVERED_BY_ALERT = new Set<DayFlag>(["fix_requested", "meal_missed", "rest_missed", "clock_skew", "out_of_order"]);
 export function timeAlerts(input: { sheets: Map<string, DaySheet>; fixes: FixRequest[]; events: TapEvent[]; today: string; schedule?: Map<string, ScheduledJob[]>; now?: string; lateMinutes?: number }): TimeAlert[] {
   const out: TimeAlert[] = [];
   for (const f of input.fixes) if (f.status === "pending") out.push({ kind: "fix_pending", employeeId: f.employeeId, date: f.date, text: "Asked for a time fix" });
@@ -608,7 +620,8 @@ export function timeAlerts(input: { sheets: Map<string, DaySheet>; fixes: FixReq
     if (s.flags.includes("meal_missed") || s.flags.includes("rest_missed")) out.push({ kind: "break_rule", employeeId: s.employeeId, date: s.date, text: "Break rule missed" });
     if (s.flags.includes("clock_skew")) out.push({ kind: "clock_skew", employeeId: s.employeeId, date: s.date, text: "Phone clock was off" });
     if (s.flags.includes("out_of_order")) out.push({ kind: "out_of_order", employeeId: s.employeeId, date: s.date, text: "Taps out of order" });
-    else if (needsReview(s.flags)) out.push({ kind: "needs_review", employeeId: s.employeeId, date: s.date, text: "Day needs review" });
+    // "Needs review" only for review flags no specific alert already covers.
+    else if (needsReview(s.flags.filter((f) => !COVERED_BY_ALERT.has(f)))) out.push({ kind: "needs_review", employeeId: s.employeeId, date: s.date, text: "Day needs review" });
     if (s.date < input.today && s.autoEnded) out.push({ kind: "forgot_end", employeeId: s.employeeId, date: s.date, text: "Day was never ended" });
   }
   const nowMs = input.now ? ms(input.now) : NaN;
@@ -621,5 +634,7 @@ export function timeAlerts(input: { sheets: Map<string, DaySheet>; fixes: FixReq
     if (!taps.length && nowMs > ms(first.end)) out.push({ kind: "no_show", employeeId, date, text: "No taps for a scheduled job" });
     else if ((!taps.length && nowMs > ms(first.start) + late) || (taps.length && ms(taps[0].at) > ms(first.start) + late)) out.push({ kind: "late_start", employeeId, date, text: "Started late" });
   }
-  return out;
+  // One alert per worker/day/kind (fixes, flags and schedule checks can overlap).
+  const seen = new Set<string>();
+  return out.filter((a) => { const k = `${a.employeeId}|${a.date}|${a.kind}`; if (seen.has(k)) return false; seen.add(k); return true; });
 }
