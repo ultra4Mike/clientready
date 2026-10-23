@@ -11,6 +11,9 @@ import { dayBasePay, overtimePremium, readPaySettings, weekOf, type PayRow, type
 import type { DaySheet, TimesheetSettings } from "./timesheet";
 import { otRules, overtimeTiers } from "./overtime-rules";
 
+/** FLSA weekly overtime threshold for non-hourly pay (federal: 40 h). */
+export const FLSA_WEEK_HOURS = 40;
+
 const num = (value: unknown) => { const n = Number(String(value ?? "").replace(/[^0-9.-]/g, "")); return Number.isFinite(n) ? n : 0; };
 
 /** Split `totalCents` by `weights` so the parts are whole cents and add up exactly (largest remainder). */
@@ -38,7 +41,7 @@ export type DayInput = {
 };
 export type JobShare = { date: string; docId: string; cents: number; minutes: number; dayCents: number; dayMinutes: number; approved: boolean };
 /** unallocated: weekly salary with no hours that week, paid once as labor not tied to a job. */
-export type DayPay = { date: string; cents: number; workMinutes: number; driveMinutes: number; approved: boolean; shares: JobShare[]; unallocated?: boolean; otHours?: number; dtHours?: number; premiumCents?: number; caPremiumHours?: number; topUpCents?: number };
+export type DayPay = { date: string; cents: number; workMinutes: number; driveMinutes: number; approved: boolean; shares: JobShare[]; unallocated?: boolean; otHours?: number; dtHours?: number; premiumCents?: number; caPremiumHours?: number; topUpCents?: number; prevailingTopUpCents?: number };
 /** Account rules that change pay (all optional; missing = the per-worker behaviour from before phase 1). */
 export type PayRules = { halfDayHours?: number; settings?: Partial<TimesheetSettings>; weekBonus?: Map<string, number>;
   /** Phase 2: job/prevailing rate per job (docId -> $/h) that overrides the base hourly rate for that job's minutes. */
@@ -92,6 +95,21 @@ export function allocateWeek(days: DayInput[], payRaw: PaySettings | unknown, ra
     const extra = defaults.weekExtra?.get(weekKey) || 0;
     const hoursOf = (i: number) => (mins[i].work + mins[i].drive) / 60;
     const weekHours = list.reduce((s2, _, i) => s2 + hoursOf(i), 0);
+    // Prevailing wage on non-hourly pay (day, set amount per job, piece, commission, shift): the job rate is a floor.
+    // The week's pay is shared over hours; when the part for prevailing-wage job hours is under rate x hours, pay the gap
+    // (spread over those days). Counted in the FLSA regular rate below.
+    const pwTop = list.map(() => 0);
+    if (pay.type !== "hourly" && pay.type !== "hybrid" && pay.type !== "salary" && defaults.jobRates?.size && weekHours > 0) {
+      const pwHours = list.map(() => 0); let floor = 0;
+      list.forEach((d, i) => {
+        if (d.approvedMinutes != null && d.approvedMinutes !== d.sheet?.paidMinutes) return; // edited day: no job split to trust
+        for (const j of d.sheet?.jobs || []) { const jr = defaults.jobRates?.get(j.docId); if (jr != null && jr > 0) { pwHours[i] += j.minutes / 60; floor += (j.minutes / 60) * jr; } }
+      });
+      const covered = pwHours.reduce((a, b) => a + b, 0);
+      const paidPart = covered > 0 ? ((base.reduce((a, b) => a + b, 0) + extra) * covered) / weekHours : 0;
+      const gap = Math.round((floor - paidPart) * 100);
+      if (covered > 0 && gap > 0) splitCents(gap, pwHours).forEach((c, i) => { pwTop[i] = c / 100; base[i] += c / 100; });
+    }
     // California missed meal/rest premium: an hour at the regular rate per missed break (only when the owner turned it on).
     const caHours = list.map((d) => d.sheet?.premiumHours || 0);
     // Overtime premium per day: account preset (OT / double time / 7th day, FLSA regular rate) or the worker's own rule.
@@ -100,11 +118,12 @@ export function allocateWeek(days: DayInput[], payRaw: PaySettings | unknown, ra
     const rules = defaults.settings ? otRules({ otPreset: "worker", weeklyOtHours: 40, dailyOtHours: 0, dailyDtHours: 0, seventhDayRule: false, ...defaults.settings }) : null;
     const hourlyLike = pay.type === "hourly" || pay.type === "shift" || pay.type === "hybrid";
     const nonHourly = pay.type === "day" || pay.type === "job" || pay.type === "piece" || pay.type === "commission";
-    if (nonHourly && defaults.settings?.flsaNonHourly && weekHours > 40) {
-      // FLSA for piece / day-rate / commission: regular rate = all pay / all hours; each hour over 40 earns 0.5x more.
+    if (nonHourly && defaults.settings?.flsaNonHourly && weekHours > FLSA_WEEK_HOURS) {
+      // FLSA for piece / day-rate / commission: regular rate = all straight-time pay (incl. piece/commission extras and
+      // prevailing-wage top-up) / all hours; each hour over 40 earns 0.5x that rate on top (straight pay already covers 1x).
       const regular = (base.reduce((s2, x) => s2 + x, 0) + extra) / weekHours;
       let seen = 0;
-      list.forEach((_, i) => { const h = hoursOf(i); const over = Math.max(0, seen + h - 40) - Math.max(0, seen - 40); seen += h; premium.push(over * regular * 0.5); ot[i] = { ot: over, dt: 0 }; });
+      list.forEach((_, i) => { const h = hoursOf(i); const over = Math.max(0, seen + h - FLSA_WEEK_HOURS) - Math.max(0, seen - FLSA_WEEK_HOURS); seen += h; premium.push(over * regular * 0.5); ot[i] = { ot: over, dt: 0 }; });
     } else if (rules && hourlyLike) {
       const bonus = (defaults.settings?.bonusInRegularRate === false ? 0 : defaults.weekBonus?.get(weekKey) || 0) + (pay.type === "hybrid" ? extra : 0);
       const res = overtimeTiers(list.map((d, i) => ({ date: d.date, hours: (mins[i].work + mins[i].drive) / 60, straight: base[i] })), rules, bonus);
@@ -135,7 +154,7 @@ export function allocateWeek(days: DayInput[], payRaw: PaySettings | unknown, ra
     const dayCents = splitCents(weekCents, exact.map((x) => Math.max(0, x)));
     list.forEach((d, i) => {
       const cents = exact.every((x) => x <= 0) ? 0 : dayCents[i];
-      out.push({ date: d.date, cents, workMinutes: mins[i].work, driveMinutes: mins[i].drive, approved: d.approved, shares: shareDay(d, cents, mins[i], pay, rate, defaults.jobRates), otHours: ot[i].ot, dtHours: ot[i].dt, premiumCents: Math.round(premium[i] * 100), caPremiumHours: caHours[i], ...(topUp[i] ? { topUpCents: Math.round(topUp[i] * 100) } : {}) });
+      out.push({ date: d.date, cents, workMinutes: mins[i].work, driveMinutes: mins[i].drive, approved: d.approved, shares: shareDay(d, cents, mins[i], pay, rate, defaults.jobRates), otHours: ot[i].ot, dtHours: ot[i].dt, premiumCents: Math.round(premium[i] * 100), caPremiumHours: caHours[i], ...(pwTop[i] ? { prevailingTopUpCents: Math.round(pwTop[i] * 100) } : {}), ...(topUp[i] ? { topUpCents: Math.round(topUp[i] * 100) } : {}) });
     });
   }
   return out;
