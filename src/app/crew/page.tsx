@@ -1052,7 +1052,7 @@ export default function CrewPage() {
             ))}
           </section>
         )}
-        {userId && <p className="pt-4 text-center text-xs text-[var(--cr-muted)]">You only see your own jobs, time and expenses. Prices and company costs are not shown.</p>}
+        {userId && <p className="cr-crew-footnote pt-4 text-center text-xs text-[var(--cr-muted)]">You only see your own jobs, time and expenses. Prices and company costs are not shown.</p>}
         <footer className="crew-account mt-10 border-t border-teal-500/15 pt-4 pb-6" aria-label="Profile">
           <details className="cr-collapse" data-testid="crew-profile">
             <summary>Profile</summary>
