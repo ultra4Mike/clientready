@@ -130,7 +130,9 @@ export function jobScheduleFromForm(base: Schedule | null, form: { jobStart: str
     const derived = readSchedule({ jobStart: form.jobStart, jobEnd: form.jobEnd, invoiceDate: form.invoiceDate, crew: form.crew });
     return derived ? { ...derived, updatedAt: stamp } : null;
   }
-  const edited = form.crew.find((row) => !row.paidToWorker && isoDate(row.workDate) && row.workDate !== base.date);
+  const days = scheduleDays(base, form.crew);
+  // A row on another day of a multi-day job is per-day crew, not a reschedule.
+  const edited = form.crew.find((row) => !row.paidToWorker && isoDate(row.workDate) && !days.has(String(row.workDate)));
   const next: Schedule = { ...base };
   if (edited) next.date = isoDate(edited.workDate);
   if (isTime(form.jobStart)) {
@@ -215,14 +217,39 @@ export function crewIds(crew: unknown) {
  * (so the crew page, timesheets and the owner calendar agree after a reschedule); a row already
  * paid to the worker keeps its recorded date as history.
  */
-export function followSchedule<R extends { workDate?: string; startTime?: string; endTime?: string; paidToWorker?: boolean }>(row: R, schedule: Pick<Schedule, "date" | "startTime" | "endTime"> | null): R {
+/** How far past the schedule's first day a per-day crew row can sit and still count as part of the job. */
+export const MULTI_DAY_SPAN = 30;
+type DatedRow = { workDate?: string; paidToWorker?: boolean };
+/**
+ * The days a job runs on. The schedule stores one first day; a multi-day job is expressed by its unpaid
+ * per-day crew rows: when at least one unpaid row sits on the schedule's day, other unpaid rows dated
+ * within MULTI_DAY_SPAN days after it are further days of the same job. Without an anchor row on the
+ * schedule's day (e.g. the whole job was rescheduled) the job is the schedule's single day.
+ */
+export function scheduleDays(schedule: Pick<Schedule, "date"> | null | undefined, crew: DatedRow[] = []): Set<string> {
+  const days = new Set<string>();
+  if (!schedule?.date || !isDate(schedule.date)) return days;
+  days.add(schedule.date);
+  const unpaid = crew.filter((row) => !row.paidToWorker && isDate(row.workDate)).map((row) => String(row.workDate));
+  if (!unpaid.includes(schedule.date)) return days;
+  const last = new Date(`${schedule.date}T12:00:00Z`); last.setUTCDate(last.getUTCDate() + MULTI_DAY_SPAN);
+  const max = last.toISOString().slice(0, 10);
+  for (const d of unpaid) if (d > schedule.date && d <= max) days.add(d);
+  return days;
+}
+
+export function followSchedule<R extends { workDate?: string; startTime?: string; endTime?: string; paidToWorker?: boolean }>(row: R, schedule: Pick<Schedule, "date" | "startTime" | "endTime"> | null, siblings?: DatedRow[]): R {
   if (!schedule?.date || row.paidToWorker) return row;
+  // Multi-day: a row on a later day of the job keeps its own day (and its own times when it has them).
+  if (siblings && row.workDate && row.workDate !== schedule.date && scheduleDays(schedule, siblings).has(row.workDate)) {
+    return { ...row, startTime: row.startTime || schedule.startTime || "", endTime: row.endTime || schedule.endTime || "" };
+  }
   return { ...row, workDate: schedule.date, startTime: schedule.startTime || row.startTime || "", endTime: schedule.endTime || row.endTime || "" };
 }
 
 export function crewForWorkers(crew: CrewRow[], workerIds: string[], schedule: Pick<Schedule, "date" | "startTime" | "endTime"> | null, people: Worker[] = allEmployees()) {
   const keep = new Set(workerIds);
-  const kept = crew.filter((row) => keep.has(row.employeeId)).map((row) => followSchedule(row, schedule));
+  const kept = crew.filter((row) => keep.has(row.employeeId)).map((row) => followSchedule(row, schedule, crew));
   const have = new Set(kept.map((row) => row.employeeId));
   const byId = new Map(people.map((person) => [person.id, person]));
   const added = workerIds.filter((id) => !have.has(id)).map((id) => ({
@@ -398,7 +425,7 @@ export async function syncCrewPayRows(doc: CloudDoc) {
     status: String(data.status || ""),
     startTime: schedule?.startTime || String(data.jobStart || ""),
     endTime: schedule ? schedule.endTime || "" : String(data.jobEnd || ""),
-  }, ((Array.isArray(data.crew) ? data.crew : []) as CrewRow[]).map((row) => followSchedule(row, schedule)));
+  }, ((Array.isArray(data.crew) ? data.crew : []) as CrewRow[]).map((row, _i, all) => followSchedule(row, schedule, all)));
 }
 
 /**
@@ -493,8 +520,10 @@ async function syncScheduleCrewJobsInner(doc: CloudDoc) {
   const data = doc.data || {};
   // (3) Pay rows show on the crew app too: keep their date/time with the schedule on every save (not paid ones).
   const payRows = (Array.isArray(data.crew) ? data.crew : []) as CrewRow[];
-  await Promise.all(payRows.filter((row) => row && row.id && !row.paidToWorker).map((row) =>
-    supabase.from("crew_jobs").update({ job_date: schedule.date, start_time: schedule.startTime || row.startTime || "", end_time: schedule.endTime || row.endTime || "" })
+  // Multi-day: a row on a later day of the job keeps its own day.
+  const followed = payRows.filter((row) => row && row.id && !row.paidToWorker).map((row) => followSchedule(row, schedule, payRows));
+  await Promise.all(followed.map((row) =>
+    supabase.from("crew_jobs").update({ job_date: row.workDate || schedule.date, start_time: row.startTime || schedule.startTime || "", end_time: row.endTime || schedule.endTime || "" })
       .eq("owner_id", user.id).eq("id", `${doc.id}-${row.id}`).then(() => undefined, () => undefined)));
   const rows = dedupeWorkerIds(schedule.workerIds).map((workerId) => ({
       id: `${doc.id}-sched-${workerId}`,
@@ -503,7 +532,8 @@ async function syncScheduleCrewJobsInner(doc: CloudDoc) {
       worker_name: workers.get(workerId)?.name || "",
       worker_email: workers.get(workerId)?.email || "",
       doc_id: doc.id,
-      job_date: schedule.date,
+      // A worker only on later days of a multi-day job sees the job on their first day.
+      job_date: followed.some((row) => row.employeeId === workerId && row.workDate === schedule.date) ? schedule.date : (followed.filter((row) => row.employeeId === workerId && row.workDate).map((row) => String(row.workDate)).sort()[0] || schedule.date),
       invoice_number: String(data.invoiceNumber || doc.title || ""),
       hours: "",
       rate: "",

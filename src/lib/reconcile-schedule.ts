@@ -23,8 +23,9 @@ export function planReconcile(docs: Doc[]): ReconcileChange[] {
     const when = (d?: string, t?: string) => `${d || "no date"}${t ? ` ${t}` : ""}`;
     // R113: a job with a start time but no stored schedule is ALREADY on the calendar (same resolver, lib/job-when),
     // so it is not listed as "Unscheduled". Only crew rows that differ from the resolved time are listed.
-    for (const row of (Array.isArray(data.crew) ? data.crew : []) as Row[]) {
-      const next = followSchedule(row, schedule);
+    const rows = (Array.isArray(data.crew) ? data.crew : []) as Row[];
+    for (const row of rows) {
+      const next = followSchedule(row, schedule, rows);
       if ((next.workDate || "") !== (row.workDate || "") || (next.startTime || "") !== (row.startTime || "")) {
         out.push({ docId: doc.id, number, client, what: `Crew: ${row.name || "worker"}`, from: when(row.workDate, row.startTime), to: when(next.workDate, next.startTime) });
       }

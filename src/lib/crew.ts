@@ -70,7 +70,8 @@ export async function saveCrewJobs(
       worker_name: row.name,
       worker_email: emailById.get(row.employeeId) || "",
       doc_id: docId,
-      job_date: (job.date && !row.paidToWorker ? job.date : row.workDate) || "",
+      // Rows arrive already following the schedule (multi-day rows keep their own day).
+      job_date: (row.paidToWorker ? row.workDate : row.workDate || job.date) || "",
       invoice_number: job.invoiceNumber,
       hours: row.hours,
       rate: row.rate,

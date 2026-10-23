@@ -647,7 +647,7 @@ export default function NewInvoicePage() {
       setCrewReport(readCrewReport((data as Record<string, unknown>).crewReport));
       { const fix = (data as Record<string, unknown>).crewKindFix; setCrewKindFix(fix && typeof fix === "object" ? Object.fromEntries(Object.entries(fix as Record<string, unknown>).filter(([, k]) => isCostKey(k))) as Record<string, CostKey> : {}); }
       setCrewUndo(readCrewUndo((data as Record<string, unknown>).crewUndo));
-      setCrew(loadedCrew.map((row) => followSchedule({ ...row, bonus: row.bonus || "" }, (data as Record<string, unknown>).schedule ? readSchedule(data as Record<string, unknown>) : null)));
+      setCrew(loadedCrew.map((row) => followSchedule({ ...row, bonus: row.bonus || "" }, (data as Record<string, unknown>).schedule ? readSchedule(data as Record<string, unknown>) : null, loadedCrew)));
       // Clock entries from the crew app feed each worker's hours (see feedClockHours).
       refreshOwnerClock().then((entries) => {
         setClockEntries(entries);
@@ -1012,7 +1012,7 @@ export default function NewInvoicePage() {
     // Scheduling has one source of truth (data.schedule). A changed Job start/end or crew work date
     // here moves the schedule; a job with a start time and no schedule yet gets one (on the calendar).
     const storedSchedule = isProposal ? (stored?.data?.schedule ? readSchedule(stored.data) : null) : jobScheduleFromForm(stored?.data?.schedule ? readSchedule(stored.data) : null, { jobStart, jobEnd, invoiceDate, crew });
-    const savedCrew = crew.map((row) => followSchedule(row, storedSchedule));
+    const savedCrew = crew.map((row) => followSchedule(row, storedSchedule, crew));
     const keptNotes = mergeChangeOrderNotes(readChangeOrderNotes(stored?.data?.changeOrderNotes), changeOrderNotes);
     const recurring = isProposal ? null : scheduleFromForm(readRecurring(stored?.data?.recurring), { frequency: recFreq, intervalDays: recInterval, nextRunDate: recNext, loadedNextRunDate: recLoadedNext, today: ymd(new Date()) });
     const nextDoc = {
