@@ -5,6 +5,9 @@ import { mailtoHref } from "@/lib/reminders";
 
 import TimesheetExport from "@/components/TimesheetExport";
 import TimesheetRules from "@/components/timesheet/TimesheetRules";
+import WorkerOvertimeFields from "@/components/timesheet/WorkerOvertimeFields";
+import { loadOwnerTimesheet, readLocalTimesheetSettings } from "@/lib/day-events";
+import { multWords, usesAccountOvertime } from "@/lib/overtime-rules";
 import EmptyState from "@/components/EmptyState";
 import { FormEvent, useEffect, useState } from "react";
 import FormDraft from "@/components/FormDraft";
@@ -83,6 +86,13 @@ function toRow(person: Employee, userId: string) {
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [form, setForm] = useState(emptyForm);
+  // Account overtime rules (Timesheet rules / Settings), for "Use account overtime rules" on the worker form.
+  const [accountRules, setAccountRules] = useState(() => readLocalTimesheetSettings());
+  useEffect(() => {
+    let live = true; const d = new Date(); const wk = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7)); const ymd = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+    void loadOwnerTimesheet(ymd(wk), ymd(new Date(wk.getTime() + 6 * 86400000))).then((t) => { if (live) setAccountRules(t.settings); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
   const [editingId, setEditingId] = useState("");
   const [raiseRate, setRaiseRate] = useState("");
   const [raiseDate, setRaiseDate] = useState("");
@@ -332,12 +342,7 @@ export default function EmployeesPage() {
                 <label className="block text-sm font-medium text-[var(--cr-muted)]">Carried-in hours<input id="worker-pto-start" name="ptoStartHours" data-testid="worker-pto-start" inputMode="decimal" placeholder="0" className="mt-1.5 block min-h-11 w-full rounded-lg border bg-transparent px-3 text-right" value={form.timeOverrides.ptoStartHours || ""} onChange={(event) => setForm({ ...form, timeOverrides: { ...form.timeOverrides, ptoStartHours: Number(event.target.value) || undefined } })} /></label>
               </div>
             </div>
-            <label className="flex min-h-11 items-center gap-2"><input type="checkbox" name="payOtOn" data-testid="pay-ot-on" checked={Boolean(form.paySettings.overtime?.on)} onChange={(event) => setForm({ ...form, paySettings: { ...form.paySettings, overtime: { weekly: "40", daily: "", multiplier: "1.5", ...form.paySettings.overtime, on: event.target.checked } } })} />Pay overtime (hourly hours)</label>
-            {form.paySettings.overtime?.on && <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-3">
-              <label className="block text-sm font-medium text-[var(--cr-muted)]">Weekly over (h)<input name="payOtWeekly" data-testid="pay-ot-weekly" inputMode="decimal" className="mt-1.5 block min-h-11 w-full rounded-lg border border-teal-500/30 bg-transparent px-2 text-right tabular-nums outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={form.paySettings.overtime.weekly || ""} onChange={(event) => setForm({ ...form, paySettings: { ...form.paySettings, overtime: { ...form.paySettings.overtime!, weekly: event.target.value } } })} /></label>
-              <label className="block text-sm font-medium text-[var(--cr-muted)]">Daily over (h, optional)<input name="payOtDaily" data-testid="pay-ot-daily" inputMode="decimal" className="mt-1.5 block min-h-11 w-full rounded-lg border border-teal-500/30 bg-transparent px-2 text-right tabular-nums outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={form.paySettings.overtime.daily || ""} onChange={(event) => setForm({ ...form, paySettings: { ...form.paySettings, overtime: { ...form.paySettings.overtime!, daily: event.target.value } } })} /></label>
-              <label className="block text-sm font-medium text-[var(--cr-muted)]">Multiplier<input name="payOtMultiplier" data-testid="pay-ot-multiplier" inputMode="decimal" className="mt-1.5 block min-h-11 w-full rounded-lg border border-teal-500/30 bg-transparent px-2 text-right tabular-nums outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={form.paySettings.overtime.multiplier || ""} onChange={(event) => setForm({ ...form, paySettings: { ...form.paySettings, overtime: { ...form.paySettings.overtime!, multiplier: event.target.value } } })} /></label>
-            </div>}
+            <WorkerOvertimeFields overtime={form.paySettings.overtime} account={accountRules} onChange={(overtime) => setForm({ ...form, paySettings: { ...form.paySettings, overtime } })} />
           </fieldset>
         </div>
         <button type="submit" className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 sm:self-end sm:px-8">
@@ -354,7 +359,7 @@ export default function EmployeesPage() {
         {employees.length === 0 && <EmptyState icon="👥" title="No employees yet." line="Add a person with the form to track crew hours and pay." className="rounded-2xl border border-dashed border-teal-500/30 lg:col-span-2" />}
         {employees.map((person) => (
           <div key={person.id} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
-            <p className="text-base font-semibold">{person.name} <span className="font-medium text-teal-600 dark:text-teal-300" data-testid="pay-label">· {payLabel(readPaySettings(person.paySettings), person.rate)}{person.paySettings?.overtime?.on ? ` · OT ${person.paySettings.overtime.multiplier || "1.5"}x` : ""}</span></p>
+            <p className="text-base font-semibold">{person.name} <span className="font-medium text-teal-600 dark:text-teal-300" data-testid="pay-label">· {payLabel(readPaySettings(person.paySettings), person.rate)}{person.paySettings?.overtime?.on && !usesAccountOvertime(person.paySettings, accountRules.otPreset) ? ` · own OT ${multWords(person.paySettings.overtime.multiplier)}` : ""}</span></p>
             <p className="text-sm text-[var(--cr-muted)]">
               {person.kind} · {person.role || "No role"} · {person.active ? "Active" : "Inactive"}
               {person.hireDate ? <> · <span className="whitespace-nowrap">hired {person.hireDate}</span></> : ""}

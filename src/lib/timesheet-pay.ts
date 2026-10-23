@@ -9,7 +9,7 @@
  */
 import { dayBasePay, overtimePremium, readPaySettings, weekOf, type PayRow, type PaySettings } from "./pay-types";
 import type { DaySheet, TimesheetSettings } from "./timesheet";
-import { otRules, overtimeTiers } from "./overtime-rules";
+import { countedOffHours, otRules, overtimeTiers, usesAccountOvertime, workerOtRules } from "./overtime-rules";
 
 /** FLSA weekly overtime threshold for non-hourly pay (federal: 40 h). */
 export const FLSA_WEEK_HOURS = 40;
@@ -47,7 +47,9 @@ export type PayRules = { halfDayHours?: number; settings?: Partial<TimesheetSett
   /** Phase 2: job/prevailing rate per job (docId -> $/h) that overrides the base hourly rate for that job's minutes. */
   jobRates?: Map<string, number>;
   /** Phase 2: piece / commission / hybrid extras paid per week (Monday) on the job rows; counted in the FLSA regular rate and min-wage check. */
-  weekExtra?: Map<string, number> };
+  weekExtra?: Map<string, number>;
+  /** Approved paid-off hours per week (Monday): counted toward the weekly OT threshold only when the owner (or the worker override) says so. */
+  weekOff?: Map<string, { pto?: number; sick?: number }> };
 
 /** Minutes of the day after an owner edit: drive stays as logged (capped), the rest is work. */
 function dayMinutes(day: DayInput) {
@@ -124,18 +126,31 @@ export function allocateWeek(days: DayInput[], payRaw: PaySettings | unknown, ra
     // Overtime premium per day: account preset (OT / double time / 7th day, FLSA regular rate) or the worker's own rule.
     const premium: number[] = [];
     const ot: { ot: number; dt: number }[] = list.map(() => ({ ot: 0, dt: 0 }));
-    const rules = defaults.settings ? otRules({ otPreset: "worker", weeklyOtHours: 40, dailyOtHours: 0, dailyDtHours: 0, seventhDayRule: false, ...defaults.settings }) : null;
+    // Account rules unless the worker overrides (Team > edit); "Use account rules" with account overtime off = no overtime.
+    const accountOt = usesAccountOvertime(pay, defaults.settings?.otPreset);
+    const rules = accountOt && defaults.settings ? otRules({ otPreset: "worker", weeklyOtHours: 40, dailyOtHours: 0, dailyDtHours: 0, seventhDayRule: false, ...defaults.settings }) : null;
+    const ownPay: PaySettings = accountOt ? { ...pay, overtime: undefined } : pay;
+    const own = accountOt ? null : workerOtRules(pay.overtime);
+    // PTO / sick counted toward the weekly threshold (account switch, or the worker's own when overriding). Off = federal.
+    const counted = countedOffHours(defaults.weekOff?.get(weekKey), accountOt ? { pto: defaults.settings?.otCountPto, sick: defaults.settings?.otCountSick } : { pto: pay.overtime?.countPto, sick: pay.overtime?.countSick });
+    // Worker override that needs tiers (second tier or counted PTO); plain old overrides keep overtimePremium exactly as before.
+    const ownTiers = own && (own.double > 0 || counted > 0) ? own : null;
+    const tierRules = rules || ownTiers;
+    // FLSA non-hourly uses the same weekly threshold and multiplier (40 h / 1.5x unless changed).
+    const flsaRule = rules || own;
+    const flsaWeek = flsaRule?.weekly && flsaRule.weekly > 0 ? flsaRule.weekly : FLSA_WEEK_HOURS;
+    const flsaMult = Math.max(1, flsaRule?.mult ?? 1.5);
     const hourlyLike = pay.type === "hourly" || pay.type === "shift" || pay.type === "hybrid";
     const nonHourly = pay.type === "day" || pay.type === "job" || pay.type === "piece" || pay.type === "commission";
-    if (nonHourly && defaults.settings?.flsaNonHourly && weekHours > FLSA_WEEK_HOURS) {
+    if (nonHourly && defaults.settings?.flsaNonHourly && weekHours + counted > flsaWeek) {
       // FLSA for piece / day-rate / commission: regular rate = all straight-time pay (incl. piece/commission extras and
-      // prevailing-wage and min-wage top-ups) / all hours; each hour over 40 earns 0.5x that rate on top (straight pay already covers 1x).
+      // prevailing-wage and min-wage top-ups) / all hours; each hour over the weekly threshold (40) earns (multiplier - 1) x that rate on top (0.5x at 1.5x) (straight pay already covers 1x).
       const regular = (base.reduce((s2, x) => s2 + x, 0) + extra + topUp.reduce((s2, x) => s2 + x, 0)) / weekHours;
-      let seen = 0;
-      list.forEach((_, i) => { const h = hoursOf(i); const over = Math.max(0, seen + h - FLSA_WEEK_HOURS) - Math.max(0, seen - FLSA_WEEK_HOURS); seen += h; premium.push(over * regular * 0.5); ot[i] = { ot: over, dt: 0 }; });
-    } else if (rules && hourlyLike) {
+      let seen = counted;
+      list.forEach((_, i) => { const h = hoursOf(i); const over = Math.max(0, seen + h - flsaWeek) - Math.max(0, seen - flsaWeek); seen += h; premium.push(over * regular * (flsaMult - 1)); ot[i] = { ot: over, dt: 0 }; });
+    } else if (tierRules && hourlyLike) {
       const bonus = (defaults.settings?.bonusInRegularRate === false ? 0 : defaults.weekBonus?.get(weekKey) || 0) + (pay.type === "hybrid" ? extra : 0);
-      const res = overtimeTiers(list.map((d, i) => ({ date: d.date, hours: (mins[i].work + mins[i].drive) / 60, straight: base[i] })), rules, bonus);
+      const res = overtimeTiers(list.map((d, i) => ({ date: d.date, hours: (mins[i].work + mins[i].drive) / 60, straight: base[i] })), tierRules, bonus, counted);
       res.days.forEach((r, i) => { premium.push(r.premium); ot[i] = { ot: r.otHours, dt: r.dtHours }; });
     } else {
       const entries: { date: string; hours: number; rate: number }[] = [];
@@ -143,7 +158,7 @@ export function allocateWeek(days: DayInput[], payRaw: PaySettings | unknown, ra
       list.forEach((d, i) => {
         const hours = (mins[i].work + mins[i].drive) / 60;
         if (hourlyLike && hours > 0) entries.push({ date: d.date, hours, rate: base[i] / hours });
-        const r = overtimePremium(entries, pay);
+        const r = overtimePremium(entries, ownPay);
         premium.push(r.premium - before);
         ot[i] = { ot: Math.max(0, r.hours - ot.slice(0, i).reduce((s2, x) => s2 + x.ot, 0)), dt: 0 };
         before = r.premium;

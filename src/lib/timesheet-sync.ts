@@ -4,6 +4,7 @@
  * cost through the usual path (jobCosts.labor = sum of crew row pay) and the crew pay rows (crew_jobs).
  * Works without migration 20261026110000: approvals/taps come from localStorage then.
  */
+import { readLocalPtoRequests } from "@/lib/phase2-data";
 import { DOCS_KEY } from "@/lib/doc-sync";
 import { readOwnerClock } from "@/lib/clock";
 import { readHoursApprovals } from "@/lib/hours-approval";
@@ -126,7 +127,11 @@ export function weekShares(input: { workers: Worker[]; docs: Doc[]; days: string
       const e = rowExtraPay(r.payType === "commission" && !r.commissionBase ? { ...r, commissionBase: String(jobPrice(doc as never)) } : r);
       if (e > 0) weekExtra.set(wk, (weekExtra.get(wk) || 0) + e);
     }
-    const week = allocateWeek(list, w.paySettings, w.rate || "", { halfDayHours: input.settings?.halfDayHours, settings: input.settings, weekBonus, weekExtra, jobRates: jobRates(input.docs as never, input.settings) });
+    // Approved PTO / sick hours this week (only counted toward OT when the owner turned that on).
+    const off = { pto: 0, sick: 0 };
+    for (const r of readLocalPtoRequests()) if (r.employeeId === w.id && r.status === "approved" && input.days.includes(r.date)) off[r.kind === "sick" ? "sick" : "pto"] += Number(r.hours) || 0;
+    const weekOff = new Map([[wk, off]]);
+    const week = allocateWeek(list, w.paySettings, w.rate || "", { halfDayHours: input.settings?.halfDayHours, settings: input.settings, weekBonus, weekExtra, weekOff, jobRates: jobRates(input.docs as never, input.settings) });
     // Unallocated salary only for weeks from the pay cutover / his pay start up to this week (same rule as Year packet).
     if (week.some((d) => d.unallocated)) {
       const owed = unallocatedSalaryWeeks({ workers: [w], docs: [], cutover: readCutover() || timesheetCutover(), today: localYmd(new Date().toISOString()) }).some((u) => u.week === weekOf(input.days[0]));

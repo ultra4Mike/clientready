@@ -183,7 +183,8 @@ export async function loadOwnerTimesheet(from: string, to: string): Promise<Owne
     events: ev.error ? [] : dedupeTaps(((ev.data || []) as EventRow[]).map(fromRow)),
     fixes: fx.error ? [] : ((fx.data || []) as FixRow[]).map(fixFromRow),
     approvals: approvals.filter((a) => a.date >= from && a.date <= to),
-    settings: s ? readTimesheetSettings({ ...localSettings, ...((s.rules as object) || {}), gapMinutes: s.gap_minutes, transitTimeoutMinutes: s.transit_timeout_minutes, halfDayHours: s.half_day_hours }) : localSettings,
+    // A saved server row whose rules predate the overtime default keeps "each worker's own setting" (no silent pay change).
+    settings: s ? readTimesheetSettings({ ...localSettings, ...(s.rules && typeof s.rules === "object" && Object.keys(s.rules).length && !("otPreset" in (s.rules as object)) ? { otPreset: "worker" } : {}), ...((s.rules as object) || {}), gapMinutes: s.gap_minutes, transitTimeoutMinutes: s.transit_timeout_minutes, halfDayHours: s.half_day_hours }) : localSettings,
     cloud,
     cloudError,
   };

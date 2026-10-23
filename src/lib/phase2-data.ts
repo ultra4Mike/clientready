@@ -10,6 +10,9 @@ const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? c
 type Row = { id: string; employee_id: string; work_date: string; hours: number | string; kind: PtoKind; note: string | null; status: PtoRequest["status"]; created_at: string; decided_at: string | null };
 const fromRow = (r: Row): PtoRequest => ({ id: r.id, employeeId: r.employee_id, date: String(r.work_date).slice(0, 10), hours: Number(r.hours) || 0, kind: r.kind, note: r.note || "", status: r.status, createdAt: r.created_at, decidedAt: r.decided_at });
 
+/** This device's copy of PTO requests (owner; kept fresh by loadPtoRequests). Used to count paid-off hours toward OT. */
+export function readLocalPtoRequests(): PtoRequest[] { return typeof window === "undefined" ? [] : readLocal(); }
+
 /** Owner: all requests for a year (cloud wins; this device's copy when signed out / table missing). */
 export async function loadPtoRequests(year: string): Promise<PtoRequest[]> {
   const local = readLocal().filter((r) => r.date.startsWith(year));

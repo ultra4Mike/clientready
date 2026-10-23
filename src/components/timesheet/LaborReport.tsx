@@ -1,19 +1,23 @@
 "use client";
 /** Reports > Labor: hours and cost by worker, job and week, from the same approved-timesheet day pay (incl. OT/DT/premium). */
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { addDays } from "@/lib/timesheet-sync";
 import { laborRows, loadTimeWeek, localYmd, type LaborRow } from "@/lib/time-owner";
 import { weekOf } from "@/lib/pay-types";
 import { csvText, downloadCsv } from "@/lib/csv";
 import { loadPtoRequests } from "@/lib/phase2-data";
 import { ptoDays } from "@/lib/pay-phase2";
+import { readLocalTimesheetSettings } from "@/lib/day-events";
+import { otSummary } from "@/lib/overtime-rules";
 
+const noSub = () => () => {};
 type By = "worker" | "job" | "week";
 export default function LaborReport({ docs }: { docs: { id: string; title?: string; clientName?: string; data?: Record<string, unknown> }[] }) {
   const [weeks, setWeeks] = useState(4);
   const [by, setBy] = useState<By>("worker");
   const [rows, setRows] = useState<LaborRow[] | null>(null);
+  const otRule = useSyncExternalStore(noSub, () => otSummary(readLocalTimesheetSettings()), () => "");
   useEffect(() => {
     let live = true;
     const start = weekOf(localYmd());
@@ -49,6 +53,7 @@ export default function LaborReport({ docs }: { docs: { id: string; title?: stri
     <section className="cr-section mb-6 rounded-2xl border p-4" data-testid="labor-report">
       <h2 className="text-base font-semibold">Labor hours &amp; cost</h2>
       <p className="text-xs text-[var(--cr-muted)]">From the timesheet: approved days are final, others are estimates. Includes overtime, double time, break premium, minimum-wage and prevailing-wage top-ups and approved PTO / sick.</p>
+      <p className="text-xs text-[var(--cr-muted)]" data-testid="labor-ot-rule">{otRule} Workers with their own override use theirs.</p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <div role="group" aria-label="Group by" className="flex gap-1">{(["worker", "job", "week"] as By[]).map((b) => (
           <button key={b} type="button" className="cr-btn cr-btn-secondary" data-testid={`labor-by-${b}`} data-state={by === b ? "on" : "off"} aria-pressed={by === b} onClick={() => setBy(b)}>By {b}</button>))}</div>
