@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { stageName, depositRemainderStages, installmentStages, STAGE_KIND_LABEL, stagePlan, todayYmd, type PlanEvery, type Stage } from "@/lib/stages";
+import { asAmountStage, stageAmounts, stageName, stageRowText, stageSummary, depositRemainderStages, installmentStages, STAGE_KIND_LABEL, stagePlan, todayYmd, type PlanEvery, type Stage } from "@/lib/stages";
 
 const STATE_LABEL = { paid: "Paid", due: "Due now", overdue: "Overdue", upcoming: "Upcoming" } as const;
 const STATE_CLASS = { paid: "cr-tone-good border-emerald-300 bg-emerald-50 text-emerald-700", due: "cr-tone-teal border-teal-300 bg-teal-50 font-semibold text-teal-700", overdue: "cr-tone-bad border-rose-300 bg-rose-50 font-semibold text-red-600", upcoming: "border-slate-300 text-slate-500" } as const;
@@ -64,10 +64,13 @@ export function StageEditor({ stages, onChange, total, balance, dueDate = "" }: 
   const plan = stagePlan(total, balance, stages, todayYmd());
   const field = "mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm";
   const update = (id: string, patch: Partial<Stage>) => onChange(stages.map((stage) => (stage.id === id ? { ...stage, ...patch } : stage)));
+  // Owner preference: dollar amounts by default. New stages are $; percent stages show their $ and become $ only when edited.
+  const asAmounts = (list: Stage[]) => { const amts = stageAmounts(total, list); return list.map((stage, i) => asAmountStage(stage, amts[i])); };
+  const editAmount = (row: (typeof plan.rows)[number], value: string) => update(row.id, { mode: "amount", value });
   function add() {
     const kind = stages.length === 0 ? "deposit" : "final";
     const next = stages.map((stage) => (stage.kind === "final" ? { ...stage, kind: "progress" as const } : stage));
-    onChange([...next, { id: `${Date.now()}`, label: "", kind, mode: "percent", value: kind === "deposit" ? "30" : "", dueDate: "" }]);
+    onChange([...next, { id: `${Date.now()}`, label: "", kind, mode: "amount", value: kind === "deposit" ? (Math.round(total * 30) / 100).toFixed(2) : "", dueDate: "" }]);
   }
   return (
     <div className="space-y-2 rounded-xl border border-slate-200 p-4" data-testid="stage-editor">
@@ -75,12 +78,16 @@ export function StageEditor({ stages, onChange, total, balance, dueDate = "" }: 
         <h2 className="min-w-0 font-medium">Payment stages (optional)</h2>
         <button type="button" className="tap min-h-11 shrink-0 whitespace-nowrap rounded-lg border border-teal-500/40 px-3 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 sm:min-h-10 dark:text-teal-300" onClick={add} data-testid="stage-add">Add stage</button>
       </div>
+      {stages.length > 0 && (() => { const sum = stageSummary(total, balance, stages); return <>
+        <p className="text-xs font-medium text-slate-700 dark:text-slate-200" data-testid="stage-summary">{sum.text}</p>
+        {sum.warn && <p className="text-xs font-medium text-amber-700 dark:text-amber-300" data-testid="stage-summary-warn">{sum.warn}</p>}
+      </>; })()}
       <PlanMaker total={total} balance={balance} hasStages={stages.length > 0} onMake={onChange} />
       {stages.length === 0 && balance > 0.004 && (
-        <button type="button" data-testid="stage-preset-deposit" onClick={() => onChange(depositRemainderStages(30, todayYmd(), dueDate, total - balance))} className="tap min-h-11 w-full rounded-lg border border-teal-500/50 bg-teal-500/5 px-4 py-2.5 text-left text-sm font-semibold leading-snug text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">
+        <button type="button" data-testid="stage-preset-deposit" onClick={() => onChange(asAmounts(depositRemainderStages(30, todayYmd(), dueDate, total - balance)))} className="tap min-h-11 w-full rounded-lg border border-teal-500/50 bg-teal-500/5 px-4 py-2.5 text-left text-sm font-semibold leading-snug text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">
           {total - balance > 0.004
             ? <>Use the ${(total - balance).toFixed(2)} already paid as the deposit + remaining balance ${balance.toFixed(2)} {dueDate ? `due ${dueDate}` : "later"}</>
-            : <>Deposit now + remaining balance {dueDate ? `due ${dueDate}` : "later"} <span className="font-normal text-slate-500">(30% / 70%, edit below)</span></>}
+            : <>Deposit now + remaining balance {dueDate ? `due ${dueDate}` : "later"} <span className="font-normal text-slate-500">(${(Math.round(total * 30) / 100).toFixed(2)} deposit, edit below)</span></>}
         </button>
       )}
       {stages.length === 0 && <p className="text-xs text-slate-500">Split this invoice into deposit / progress / final payments with due dates. The invoice total does not change.</p>}
@@ -89,21 +96,20 @@ export function StageEditor({ stages, onChange, total, balance, dueDate = "" }: 
           <label className="text-xs text-slate-600">Stage<select aria-label="Stage type" className={field} value={row.kind} onChange={(event) => update(row.id, { kind: event.target.value as Stage["kind"] })}>
             <option value="deposit">Deposit</option><option value="progress">Progress</option><option value="final">Final</option></select></label>
           <label className="text-xs text-slate-600">Name<input aria-label="Stage name" className={field} placeholder={STAGE_KIND_LABEL[row.kind]} value={row.label} onChange={(event) => update(row.id, { label: event.target.value })} /></label>
-          <label className="text-xs text-slate-600">% or $<select aria-label="Stage mode" className={field} value={row.mode} onChange={(event) => update(row.id, { mode: event.target.value as Stage["mode"] })}>
-            <option value="percent">% of total</option><option value="amount">$ amount</option></select></label>
-          <label className="text-xs text-slate-600">{row.mode === "percent" ? "Percent" : "Amount"}<input aria-label="Stage value" inputMode="decimal" className={field} placeholder={row.kind === "final" ? "rest" : ""} value={row.value} onChange={(event) => update(row.id, { value: event.target.value })} /></label>
+          <label className="text-xs text-slate-600">Amount ($)<input aria-label="Stage amount" data-testid="stage-amount-input" inputMode="decimal" className={field} placeholder={row.kind === "final" ? "rest" : ""} value={row.mode === "percent" ? (row.kind === "final" && row.value.trim() === "" ? "" : row.amount.toFixed(2)) : row.value} onChange={(event) => (row.mode === "percent" ? editAmount(row, event.target.value) : update(row.id, { value: event.target.value }))} /></label>
+          <details className="text-xs text-slate-600" data-testid="stage-percent-option">
+            <summary className="mt-5 cursor-pointer text-teal-700 dark:text-teal-300">{row.mode === "percent" ? `${row.value || "rest"}% of invoice total` : "% instead"}</summary>
+            {row.mode === "percent"
+              ? <><input aria-label="Stage percent" inputMode="decimal" className={field} placeholder={row.kind === "final" ? "rest" : ""} value={row.value} onChange={(event) => update(row.id, { value: event.target.value })} /><button type="button" className="mt-1 underline" onClick={() => editAmount(row, row.kind === "final" && row.value.trim() === "" ? "" : row.amount.toFixed(2))}>Use $ amount</button></>
+              : <button type="button" className="mt-1 underline" data-testid="stage-use-percent" onClick={() => update(row.id, { mode: "percent", value: row.kind === "final" && row.value.trim() === "" ? "" : total > 0 ? String(Math.round((row.amount / total) * 1000) / 10) : "" })}>Use % of invoice total</button>}
+          </details>
           <label className="text-xs text-slate-600">Due date<input aria-label="Stage due date" type="date" className={field} value={row.dueDate} onChange={(event) => update(row.id, { dueDate: event.target.value })} /></label>
           <p className="col-span-2 flex items-center justify-between text-xs text-slate-600 sm:col-span-5">
-            <span data-testid="stage-edit-amount">${row.amount.toFixed(2)}{row.paid > 0 ? ` · $${row.paid.toFixed(2)} paid` : ""} · {row.state === "paid" ? "Paid" : row.state === "due" ? "Due now" : row.state === "overdue" ? "Overdue" : "Upcoming"}</span>
+            <span data-testid="stage-edit-amount" className={row.state === "overdue" ? "font-medium text-red-700 dark:text-red-300" : row.state === "paid" ? "font-medium text-emerald-700 dark:text-emerald-300" : ""}>{stageRowText(row)}</span>
             <button type="button" className="tap min-h-11 rounded-lg border border-rose-500/40 px-3 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10 sm:min-h-10 dark:text-rose-300" onClick={() => onChange(stages.filter((stage) => stage.id !== row.id))}>Remove</button>
           </p>
         </div>
       ))}
-      {stages.length > 0 && Math.abs(plan.mismatch) > 0.004 && (
-        <p className="text-xs font-medium text-amber-700" data-testid="stage-mismatch">
-          Stages add up to ${plan.planned.toFixed(2)}, invoice total is ${total.toFixed(2)} ({plan.mismatch > 0 ? `$${plan.mismatch.toFixed(2)} not scheduled` : `$${(-plan.mismatch).toFixed(2)} too much`}).
-        </p>
-      )}
     </div>
   );
 }
@@ -122,7 +128,8 @@ function PlanMaker({ total, balance, hasStages, onMake }: { total: number; balan
   }
   return (
     <details className="rounded-lg border border-dashed border-teal-500/40 p-3 text-sm" data-testid="plan-maker">
-      <summary className="cursor-pointer font-medium text-teal-700 dark:text-teal-300">Payment plan: split ${balance.toFixed(2)} owed into payments</summary>
+      <summary className="cursor-pointer font-medium text-teal-700 dark:text-teal-300" data-testid="plan-maker-label">{hasStages ? `Re-split the $${balance.toFixed(2)} still owed into new payments` : `Payment plan: split $${balance.toFixed(2)} owed into payments`}</summary>
+      {hasStages && <p className="mt-1 text-xs text-slate-500" data-testid="plan-maker-replace-note">This replaces the stages above with new payments for what's still owed. Money already paid stays recorded as &quot;Paid so far&quot;.</p>}
       <div className="mt-2 grid grid-cols-3 gap-2">
         <label className="text-xs text-slate-600">Payments<input aria-label="Number of payments" data-testid="plan-count" inputMode="numeric" className={field} value={count} onChange={(event) => setCount(event.target.value)} /></label>
         <label className="text-xs text-slate-600">Every<select aria-label="How often" data-testid="plan-every" className={field} value={every} onChange={(event) => setEvery(event.target.value as PlanEvery)}><option value="week">Week</option><option value="2weeks">2 weeks</option><option value="month">Month</option></select></label>

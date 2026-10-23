@@ -148,3 +148,38 @@ export function installmentStages(total: number, balance: number, count: number,
   }
   return out;
 }
+
+/* ---- Display only: clear stage math for the owner editor (nothing stored or calculated differently). ---- */
+const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const shortYmd = (ymd: string) => { const [, m, d] = ymd.split("-").map(Number); return m && d ? `${MON[m - 1]} ${d}` : ymd; };
+
+/** "Invoice total $1,000.00 · Stages add up to $1,000.00 (100%) · Paid $250.00 · Still owed $750.00", plus warn when off. */
+export function stageSummary(total: number, balance: number, stages: Stage[]) {
+  const planned = round(stageAmounts(total, stages).reduce((sum, amount) => sum + amount, 0));
+  const pct = total > 0.004 ? Math.round((planned / total) * 1000) / 10 : 0;
+  const paid = round(Math.max(total - balance, 0));
+  const text = `Invoice total ${usd(total)} · Stages add up to ${usd(planned)} (${pct}%) · Paid ${usd(paid)} · Still owed ${usd(Math.max(balance, 0))}`;
+  const off = round(total - planned);
+  const warn = Math.abs(off) > 0.004 ? `Stages add up to ${pct}% of the invoice total, ${off > 0 ? `${usd(off)} not scheduled` : `${usd(-off)} too much`}.` : "";
+  return { text, warn, planned, pct, paid };
+}
+
+/** "$300.00 · $250.00 paid · $50.00 left · Due Oct 25", "$400.00 · $400.00 left · Due Oct 28", or "$300.00 · Paid in full". */
+export function stageRowText(row: Pick<StageRow, "amount" | "paid" | "remaining" | "dueDate" | "state">) {
+  const parts = [usd(row.amount)];
+  if (row.state === "paid" || row.remaining <= 0.004) return `${parts[0]} · Paid in full`;
+  if (row.paid > 0.004) parts.push(`${usd(row.paid)} paid`);
+  parts.push(`${usd(row.remaining)} left`);
+  if (row.state === "due") parts.push(row.dueDate ? `Due now (${shortYmd(row.dueDate)})` : "Due now");
+  else if (row.dueDate) parts.push(`Due ${shortYmd(row.dueDate)}`);
+  if (row.state === "overdue") parts.push("Overdue");
+  return parts.join(" · ");
+}
+
+/** Owner preference: stages in fixed $ by default. Turns percent stages into their $ amount (blank "rest" finals stay blank). Only used for new stages or a stage the owner edits. */
+export function asAmountStage(stage: Stage, amount: number): Stage {
+  if (stage.mode === "amount") return stage;
+  if (stage.kind === "final" && stage.value.trim() === "") return { ...stage, mode: "amount" };
+  return { ...stage, mode: "amount", value: round(amount).toFixed(2) };
+}
