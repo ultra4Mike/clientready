@@ -32,6 +32,8 @@ export type TapEvent = {
   pending?: boolean;
   /** Sent later from an offline queue: the phone time was kept (server time unknown). */
   offline?: boolean;
+  /** Time set by an owner-approved fix (or an owner edit): never flagged out of order or clock skew. */
+  fixed?: boolean;
 };
 export type ScheduledJob = { docId: string; start: string; end: string; label?: string; lat?: number; lng?: number }; // ISO start/end
 export type DayFlag = "from_schedule" | "not_at_site" | "long_drive" | "auto_ended" | "fix_requested" | "edited" | "changed_since_approved"
@@ -42,7 +44,11 @@ export type BreakPreset = "federal" | "california";
  * Per-worker overrides (employees.time_overrides jsonb -> Employee.timeOverrides; hire date is the existing employees.hire_date).
  * Missing/empty = the account rule.
  */
-export type WorkerTimeOverrides = { breakPreset?: BreakPreset | ""; geofenceOptOut?: boolean; hireDate?: string };
+export type WorkerTimeOverrides = { breakPreset?: BreakPreset | ""; geofenceOptOut?: boolean; hireDate?: string;
+  /** Phase 2 crew lead: his crew (employee ids) and what the owner lets him do. */
+  lead?: boolean; crewIds?: string[]; leadPerms?: { seeHours: boolean; clockTeam: boolean };
+  /** Phase 2 PTO override: off, own accrual (1 h per N worked), carried-in hours. */
+  ptoOff?: boolean; ptoPerHours?: number; ptoStartHours?: number };
 /** Read the overrides from an employee record ({ hireDate, timeOverrides } or raw row { hire_date, time_overrides }). */
 export function readWorkerOverrides(employee: unknown): WorkerTimeOverrides {
   const e = (employee && typeof employee === "object" ? employee : {}) as Record<string, unknown>;
@@ -53,11 +59,22 @@ export function readWorkerOverrides(employee: unknown): WorkerTimeOverrides {
     breakPreset: o.breakPreset === "california" || o.breakPreset === "federal" ? o.breakPreset : "",
     geofenceOptOut: o.geofenceOptOut === true,
     hireDate: /^\d{4}-\d{2}-\d{2}$/.test(hire) ? hire : "",
+    ...phase2Overrides(o),
   };
 }
+function phase2Overrides(o: Record<string, unknown>) {
+  const out: Pick<WorkerTimeOverrides, "lead" | "crewIds" | "leadPerms" | "ptoOff" | "ptoPerHours" | "ptoStartHours"> = {};
+  if (o.lead === true) out.lead = true;
+  if (Array.isArray(o.crewIds)) out.crewIds = o.crewIds.map(String).filter(Boolean).slice(0, 100);
+  if (o.leadPerms && typeof o.leadPerms === "object") { const p = o.leadPerms as Record<string, unknown>; out.leadPerms = { seeHours: p.seeHours !== false, clockTeam: p.clockTeam !== false }; }
+  if (o.ptoOff === true) out.ptoOff = true;
+  const per = Number(o.ptoPerHours); if (per > 0) out.ptoPerHours = per;
+  const start = Number(o.ptoStartHours); if (start > 0) out.ptoStartHours = start;
+  return out;
+}
 /** The employees.time_overrides value to save (hire date stays in employees.hire_date). */
-export function timeOverridesRow(o: WorkerTimeOverrides): { breakPreset: BreakPreset | ""; geofenceOptOut: boolean } {
-  return { breakPreset: o.breakPreset === "california" || o.breakPreset === "federal" ? o.breakPreset : "", geofenceOptOut: o.geofenceOptOut === true };
+export function timeOverridesRow(o: WorkerTimeOverrides): { breakPreset: BreakPreset | ""; geofenceOptOut: boolean } & ReturnType<typeof phase2Overrides> {
+  return { breakPreset: o.breakPreset === "california" || o.breakPreset === "federal" ? o.breakPreset : "", geofenceOptOut: o.geofenceOptOut === true, ...phase2Overrides(o as Record<string, unknown>) };
 }
 /** Account settings with the worker's break preset applied (other settings unchanged). */
 export function settingsForWorker(settings: Partial<TimesheetSettings> | undefined, worker?: WorkerTimeOverrides): Partial<TimesheetSettings> {
@@ -82,7 +99,22 @@ export type TimesheetSettings = {
   payPeriod: PayPeriod; payPeriodAnchor: string;
   // Reminders (foreground only)
   remindMissedStartMinutes: number; remindMissedEndMinutes: number;
+  // Phase 2 pay rules
+  /** Minimum wage per hour (0 = off). A week whose straight pay / hours is under it gets a top-up. */
+  minWage: number;
+  /** FLSA overtime for day-rate, piece, commission and set-amount pay: regular rate = week pay / hours, 0.5x for hours over 40. */
+  flsaNonHourly: boolean;
+  /** Task rates (prevailing wage / job rates): task name -> hourly rate that replaces the base wage on jobs of that task. */
+  taskRates: Record<string, number>;
+  /** Paid time off / sick: accrual of 1 hour per `ptoPerHours` hours worked (0 = off); caps in hours (0 = no cap). */
+  ptoPreset: PtoPreset; ptoPerHours: number; ptoCapHours: number; ptoUseCapHours: number; ptoWaitDays: number;
 };
+export type PtoPreset = "off" | "california" | "custom";
+/** California paid sick leave: 1 h per 30 h worked, accrual cap 80 h, use cap 40 h (5 days) a year, usable after 90 days. */
+export const CA_SICK = { ptoPerHours: 30, ptoCapHours: 80, ptoUseCapHours: 40, ptoWaitDays: 90 };
+export const MIN_WAGE_PRESETS: { id: string; label: string; rate: number }[] = [
+  { id: "off", label: "Off", rate: 0 }, { id: "federal", label: "Federal ($7.25)", rate: 7.25 }, { id: "california", label: "California ($16.90)", rate: 16.9 },
+];
 export type PayPeriod = "weekly" | "biweekly" | "semimonthly";
 export const DEFAULT_TIMESHEET_SETTINGS: TimesheetSettings = {
   gapMinutes: 60, transitTimeoutMinutes: 120, halfDayHours: 4,
@@ -91,6 +123,7 @@ export const DEFAULT_TIMESHEET_SETTINGS: TimesheetSettings = {
   roundingMinutes: 0, geofenceMeters: 200, jobGeofence: {},
   otPreset: "worker", weeklyOtHours: 40, dailyOtHours: 0, dailyDtHours: 0, seventhDayRule: false, bonusInRegularRate: true,
   payPeriod: "weekly", payPeriodAnchor: "", remindMissedStartMinutes: 15, remindMissedEndMinutes: 60,
+  minWage: 0, flsaNonHourly: false, taskRates: {}, ptoPreset: "off", ptoPerHours: 0, ptoCapHours: 0, ptoUseCapHours: 0, ptoWaitDays: 0,
 };
 /** California preset values (applied by the Rules screen when the owner picks California). */
 export const CALIFORNIA_RULES: Partial<TimesheetSettings> = { breakPreset: "california", shortBreakPaidMinutes: 20, otPreset: "california", weeklyOtHours: 40, dailyOtHours: 8, dailyDtHours: 12, seventhDayRule: true };
@@ -135,6 +168,8 @@ export function readTimesheetSettings(raw: unknown): TimesheetSettings {
   const rounding = Number(v.roundingMinutes);
   const jobGeofence: Record<string, number> = {};
   if (v.jobGeofence && typeof v.jobGeofence === "object") for (const [k, m] of Object.entries(v.jobGeofence as Record<string, unknown>)) { const n = Number(m); if (Number.isFinite(n) && n > 0) jobGeofence[k] = n; }
+  const taskRates: Record<string, number> = {};
+  if (v.taskRates && typeof v.taskRates === "object") for (const [k, m] of Object.entries(v.taskRates as Record<string, unknown>)) { const n = Number(m); if (k.trim() && Number.isFinite(n) && n > 0) taskRates[k.trim().slice(0, 40)] = n; }
   return {
     gapMinutes: pos(v.gapMinutes, d.gapMinutes),
     transitTimeoutMinutes: pos(v.transitTimeoutMinutes, d.transitTimeoutMinutes),
@@ -152,6 +187,9 @@ export function readTimesheetSettings(raw: unknown): TimesheetSettings {
     payPeriod: (["weekly", "biweekly", "semimonthly"].includes(String(v.payPeriod)) ? v.payPeriod : "weekly") as PayPeriod,
     payPeriodAnchor: typeof v.payPeriodAnchor === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v.payPeriodAnchor) ? v.payPeriodAnchor : "",
     remindMissedStartMinutes: nonneg(v.remindMissedStartMinutes, d.remindMissedStartMinutes), remindMissedEndMinutes: nonneg(v.remindMissedEndMinutes, d.remindMissedEndMinutes),
+    minWage: nonneg(v.minWage, 0), flsaNonHourly: bool(v.flsaNonHourly, false), taskRates,
+    ptoPreset: (["off", "california", "custom"].includes(String(v.ptoPreset)) ? v.ptoPreset : "off") as PtoPreset,
+    ...(v.ptoPreset === "california" ? CA_SICK : { ptoPerHours: v.ptoPreset === "custom" ? nonneg(v.ptoPerHours, 0) : 0, ptoCapHours: nonneg(v.ptoCapHours, 0), ptoUseCapHours: nonneg(v.ptoUseCapHours, 0), ptoWaitDays: nonneg(v.ptoWaitDays, 0) }),
   };
 }
 
@@ -243,7 +281,7 @@ export function buildDay(input: {
   for (const event of events) {
     const kind = normalizeKind(event.kind);
     const next = step(cur, event);
-    if (!next.ok || event.outOfOrder) flags.add("out_of_order");
+    if ((!next.ok && !event.fixed) || (event.outOfOrder && !event.fixed)) flags.add("out_of_order");
     cur = next;
     const away = notAtSiteFor(event);
     if (away) flags.add("not_at_site");
@@ -449,7 +487,7 @@ export function geofenceRadius(settings: Partial<TimesheetSettings> | undefined,
 export function geofencePrompt(state: DayStateName, pos: { lat: number; lng: number } | undefined, pin: { lat: number; lng: number } | null | undefined, radius: number): "arrive" | "leave" | null {
   if (!pos || !pin || !(radius > 0)) return null;
   const d = metersBetween(pos, pin);
-  if (state === "IN_TRANSIT" && d <= radius) return "arrive";
+  if ((state === "IN_TRANSIT" || state === "ON_DUTY_IDLE") && d <= radius) return "arrive";
   if (state === "WORKING" && d > radius * 1.5) return "leave";
   return null;
 }
@@ -470,13 +508,30 @@ export function jobMinutes(day: DaySheet, docId: string) {
 
 export type FixRequest = { id: string; employeeId: string; date: string; eventId?: string; kind: TapKind; at: string; reason: string; status: "pending" | "approved" | "denied"; createdAt: string; decidedAt?: string; docId?: string; ownerNote?: string };
 
+/**
+ * One copy of each tap: same id, or the same worker/day/kind within 2 seconds (a re-sent offline tap that got a new
+ * id). The server copy wins over a phone-only copy. Re-syncing never adds hours.
+ */
+export function dedupeTaps(events: TapEvent[]): TapEvent[] {
+  const byId = new Map<string, TapEvent>();
+  for (const e of events) { const had = byId.get(e.id); if (!had || (had.pending && !e.pending)) byId.set(e.id, e); }
+  const out: TapEvent[] = [];
+  for (const e of [...byId.values()].sort((a, b) => (a.pending === b.pending ? 0 : a.pending ? 1 : -1))) {
+    const t = new Date(e.at).getTime();
+    if (out.some((x) => x.employeeId === e.employeeId && x.date === e.date && normalizeKind(x.kind) === normalizeKind(e.kind) && x.docId === e.docId && Math.abs(new Date(x.at).getTime() - t) < 2000)) continue;
+    out.push(e);
+  }
+  return out;
+}
+
 /** Apply approved fix requests to the events (pending/denied leave them alone). History is kept by the caller. */
 export function applyFixes(events: TapEvent[], fixes: FixRequest[]): TapEvent[] {
   let out = [...events];
   for (const fix of fixes.filter((f) => f.status === "approved")) {
     const target = fix.eventId ? out.find((e) => e.id === fix.eventId) : undefined;
-    if (target) out = out.map((e) => (e.id === target.id ? { ...e, at: fix.at } : e));
-    else out.push({ id: `fix-${fix.id}`, employeeId: fix.employeeId, date: fix.date, kind: fix.kind, at: fix.at, docId: fix.docId });
+    // A fixed tap is the owner-approved time: no phone time (no clock_skew) and never "out of order".
+    if (target) out = out.map((e) => (e.id === target.id ? { ...e, at: fix.at, deviceAt: undefined, outOfOrder: false, fixed: true } : e));
+    else out.push({ id: `fix-${fix.id}`, employeeId: fix.employeeId, date: fix.date, kind: fix.kind, at: fix.at, docId: fix.docId, fixed: true });
   }
   return out;
 }
@@ -485,12 +540,45 @@ export function applyFixes(events: TapEvent[], fixes: FixRequest[]): TapEvent[] 
 export const REVIEW_FLAGS: DayFlag[] = ["from_schedule", "not_at_site", "long_drive", "auto_ended", "fix_requested", "out_of_order", "meal_missed", "rest_missed", "long_drive_break", "clock_skew", "offline_tap", "before_hire"];
 export const needsReview = (flags: string[], edited = false) => !edited && flags.some((f) => (REVIEW_FLAGS as string[]).includes(f));
 
-const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-/** "2 h 10 m" / "40 m". */
+/**
+ * Business time zone: every time on the timesheet and the crew portal is shown (and every typed time is read) in the
+ * account's zone (profiles.timezone, default America/Chicago), never the phone/browser zone, so owner and crew agree.
+ */
+let BIZ_TZ = "America/Chicago";
+export function setBusinessTz(tz?: string | null) {
+  if (!tz) return;
+  try { new Intl.DateTimeFormat("en-US", { timeZone: tz }); BIZ_TZ = tz; } catch { /* not a valid zone: keep */ }
+}
+export const businessTz = () => BIZ_TZ;
+const partsIn = (t: number) => {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: BIZ_TZ, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(new Date(t)).map((x) => [x.type, x.value]));
+  return { y: +p.year, mo: +p.month, d: +p.day, h: +p.hour % 24, mi: +p.minute, s: +p.second };
+};
+/** "10:16 PM" in the business zone. */
+export const fmtTime = (iso: string) => (iso ? new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: BIZ_TZ }) : "");
+/** "22:16" (for time inputs) in the business zone. */
+export const hhmmTz = (iso: string) => { const p = partsIn(new Date(iso).getTime()); return `${String(p.h).padStart(2, "0")}:${String(p.mi).padStart(2, "0")}`; };
+/** "2026-10-22": the business-zone date of an instant. */
+export const ymdTz = (d: Date) => { const p = partsIn(d.getTime()); return `${p.y}-${String(p.mo).padStart(2, "0")}-${String(p.d).padStart(2, "0")}`; };
+/** A wall-clock date + "HH:MM" in the business zone as an ISO instant (DST safe). */
+export function wallToIso(date: string, hhmm: string) {
+  if (!date || !/^\d{1,2}:\d{2}/.test(hhmm || "")) return "";
+  const [y, mo, d] = date.split("-").map(Number); const [h, mi] = hhmm.split(":").map(Number);
+  const guess = Date.UTC(y, mo - 1, d, h, mi);
+  const off = (t: number) => { const p = partsIn(t); return Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi, p.s) - t; };
+  let t = guess - off(guess);
+  const o2 = off(t); if (guess - o2 !== t) t = guess - o2;
+  return new Date(t).toISOString();
+}
+/** "2 h 10 m" / "40 m" / "<1 m" (any time under half a minute that is not zero). Never negative. */
 export function hm(minutes: number) {
-  const m = Math.round(minutes || 0), hh = Math.floor(m / 60), mm = m % 60;
+  const raw = Math.max(0, minutes || 0);
+  if (raw > 0 && raw < 0.5) return "<1 m";
+  const m = Math.round(raw), hh = Math.floor(m / 60), mm = m % 60;
   return hh ? `${hh} h${mm ? ` ${mm} m` : ""}` : `${mm} m`;
 }
+/** Break / stopwatch clock "m:ss", clamped at 0 (never "-1:-8"). */
+export function clockMs(msIn: number) { const t = Math.max(0, Math.floor((msIn || 0) / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`; }
 
 /** Plain-English reason for each flag on a day (shown on the day detail). */
 export function flagReasons(day: DaySheet | undefined, extra: string[] = [], settings: Partial<TimesheetSettings> = {}): { flag: string; text: string }[] {
@@ -581,6 +669,17 @@ export function daySummary(day: DaySheet | undefined, paidOverride?: number | nu
 
 /** A worker's week status from his days: Needs review (n) / Ready to approve / Approved / No hours. */
 export type WeekStatus = { kind: "none" | "review" | "ready" | "approved"; review: number; ready: number; approved: number; label: string };
+/** One day's review info, the same rule the timesheet grid uses (edited minutes win, approved minutes, else the sheet). */
+export function reviewDayInfo(sheet: DaySheet | undefined, a?: { paidMinutes: number; editedMinutes?: number | null; approvedAt?: string | null }) {
+  const mins = a?.editedMinutes != null ? a.editedMinutes : a?.approvedAt ? a.paidMinutes : sheet?.paidMinutes || 0;
+  return { mins, approved: Boolean(a?.approvedAt), flagged: needsReview(sheet?.flags || [], a?.editedMinutes != null), hasHours: mins > 0 };
+}
+/** "Needs review" day count for a week (timesheet "Needs review only" and the dashboard use this one count). */
+export function reviewCount(workerIds: string[], days: string[], sheets: Map<string, DaySheet>, approvals: { employeeId: string; date: string; paidMinutes: number; editedMinutes?: number | null; approvedAt?: string | null }[]) {
+  let n = 0;
+  for (const id of workerIds) n += weekStatus(days.map((d) => reviewDayInfo(sheets.get(`${id}|${d}`), approvals.find((a) => a.employeeId === id && a.date === d)))).review;
+  return n;
+}
 export function weekStatus(days: { hasHours: boolean; approved: boolean; flagged: boolean }[]): WeekStatus {
   const worked = days.filter((d) => d.hasHours);
   const approved = worked.filter((d) => d.approved).length;
@@ -632,6 +731,15 @@ export function whosOnClock(events: TapEvent[], today: string): OnClock[] {
   const by = new Map<string, TapEvent[]>();
   for (const e of events) if (e.date === today) by.set(e.employeeId, [...(by.get(e.employeeId) || []), e]);
   return [...by.entries()].map(([employeeId, list]) => ({ employeeId, ...dayState(list) })).filter((x) => x.state !== "OFF_DUTY").map(({ outOfOrder: _o, ...rest }) => rest);
+}
+
+/** Minutes the first tap came after the first planned start, past the grace (15 min): 0 when on time. Same rule as the owner's "Started late". */
+export function lateStartMinutes(taps: TapEvent[], schedule: ScheduledJob[], graceMinutes = 15) {
+  const first = [...schedule].sort((a, b) => ms(a.start) - ms(b.start))[0];
+  const tap = [...taps].sort((a, b) => ms(a.at) - ms(b.at))[0];
+  if (!first || !tap) return 0;
+  const late = (ms(tap.at) - ms(first.start)) / 60000;
+  return late > graceMinutes ? Math.round(late) : 0;
 }
 
 /** Owner alerts (in-app). No money in them. */

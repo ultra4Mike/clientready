@@ -26,6 +26,9 @@ export default function TimeAttentionCard() {
       <div className="mt-1 flex flex-wrap gap-1">
         {t.missingClockOuts > 0 && <span className="cr-chip2 cr-tone-warn" data-testid="dash-time-missing-out">{t.missingClockOuts} missing clock-out{t.missingClockOuts === 1 ? "" : "s"}</span>}
         {t.missedBreaks > 0 && <span className="cr-chip2 cr-tone-bad" data-testid="dash-time-missed-breaks">{t.missedBreaks} missed break{t.missedBreaks === 1 ? "" : "s"}</span>}
+        {t.noShows > 0 && <Link href="/timesheet?filter=review" className="cr-chip2 cr-tone-bad" data-testid="dash-time-no-shows">{t.noShows} no-show{t.noShows === 1 ? "" : "s"}</Link>}
+        {t.lateStarts > 0 && <Link href="/timesheet?filter=review" className="cr-chip2 cr-tone-warn" data-testid="dash-time-late">{t.lateStarts} late start{t.lateStarts === 1 ? "" : "s"}</Link>}
+        {t.needsReview > 0 && <Link href="/timesheet?filter=review" className="cr-chip2 cr-tone-warn" data-testid="dash-time-review">{t.needsReview} day{t.needsReview === 1 ? "" : "s"} need{t.needsReview === 1 ? "s" : ""} review</Link>}
         {t.pendingFixes > 0 && <span className="cr-chip2 cr-tone-warn" data-testid="dash-time-fixes">{t.pendingFixes} fix request{t.pendingFixes === 1 ? "" : "s"}</span>}
       </div>
       {t.alerts.length > 0 && <ul className="mt-1 space-y-0.5" data-testid="dash-time-alerts">{t.alerts.slice(0, 6).map((a, i) => (

@@ -261,7 +261,7 @@ export default function EmployeesPage() {
           <h2 className="col-span-full text-xs font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-300">Pay & start date</h2>
         <label className="block min-w-0 text-sm font-medium">
           Hourly rate
-          <input name="rate" autoComplete="off" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="24" value={form.rate} onChange={(event) => setForm({ ...form, rate: event.target.value })} />
+          <input name="rate" autoComplete="off" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="e.g. 24" data-testid="emp-rate" value={form.rate} onChange={(event) => setForm({ ...form, rate: event.target.value })} />
         </label>
         <label className="block min-w-0 text-sm font-medium">
           Hire date
@@ -275,7 +275,17 @@ export default function EmployeesPage() {
               <option value="job">Set amount per job</option>
               <option value="shift">Set shift (4, 8, 10 h or custom)</option>
               <option value="salary">Salary (weekly amount)</option>
+              <option value="piece">Piece rate (per unit)</option>
+              <option value="commission">Commission (% of the job)</option>
+              <option value="hybrid">Hourly + per unit + per job</option>
             </select>
+            {(form.paySettings.type === "piece" || form.paySettings.type === "hybrid") && <div className="grid grid-cols-2 gap-3">
+              <label className="block text-sm font-medium text-[var(--cr-muted)]">$ per unit<input name="payPieceRate" data-testid="pay-piece-rate" inputMode="decimal" placeholder="e.g. 2.50" className="mt-1.5 block min-h-11 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 text-right tabular-nums outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={form.paySettings.pieceRate || ""} onChange={(event) => setForm({ ...form, paySettings: { ...form.paySettings, pieceRate: event.target.value } })} /></label>
+              <label className="block text-sm font-medium text-[var(--cr-muted)]">Unit name<input name="payPieceUnit" data-testid="pay-piece-unit" placeholder="e.g. sq ft, window" className="mt-1.5 block min-h-11 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 outline-none" value={form.paySettings.pieceUnit || ""} onChange={(event) => setForm({ ...form, paySettings: { ...form.paySettings, pieceUnit: event.target.value } })} /></label>
+            </div>}
+            {form.paySettings.type === "hybrid" && <label className="block text-sm font-medium text-[var(--cr-muted)]">Plus per job $ (optional)<input name="payHybridJob" data-testid="pay-hybrid-job" inputMode="decimal" className="mt-1.5 block min-h-11 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 text-right tabular-nums outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={form.paySettings.jobAmount || ""} onChange={(event) => setForm({ ...form, paySettings: { ...form.paySettings, jobAmount: event.target.value } })} /></label>}
+            {form.paySettings.type === "commission" && <label className="block text-sm font-medium text-[var(--cr-muted)]">Commission % of the job price (before tax)<input name="payCommissionPct" data-testid="pay-commission-pct" inputMode="decimal" placeholder="e.g. 10" className="mt-1.5 block min-h-11 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 text-right tabular-nums outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={form.paySettings.commissionPct || ""} onChange={(event) => setForm({ ...form, paySettings: { ...form.paySettings, commissionPct: event.target.value } })} /></label>}
+            {(form.paySettings.type === "piece" || form.paySettings.type === "commission") && <p className="text-xs text-[var(--cr-muted)]" data-testid="pay-minwage-note">Hours still count: the account minimum wage and overtime rules (Timesheet rules) top this up when on.</p>}
             {form.paySettings.type === "day" && <div className="grid grid-cols-2 gap-3">
               <label className="block text-sm font-medium text-[var(--cr-muted)]">Hours per day<input name="payDayHours" data-testid="pay-day-hours" inputMode="decimal" placeholder="8" className="mt-1.5 block min-h-11 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 text-right tabular-nums outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={form.paySettings.dayHours || ""} onChange={(event) => setForm({ ...form, paySettings: { ...form.paySettings, dayHours: event.target.value } })} /></label>
               <label className="block text-sm font-medium text-[var(--cr-muted)]">or Day rate $<input name="payDayRate" data-testid="pay-day-rate" inputMode="decimal" className="mt-1.5 block min-h-11 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 text-right tabular-nums outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={form.paySettings.dayRate || ""} onChange={(event) => setForm({ ...form, paySettings: { ...form.paySettings, dayRate: event.target.value } })} /></label>
@@ -298,6 +308,29 @@ export default function EmployeesPage() {
               <p className="cr-section-label text-xs font-semibold">Timesheet (blank = account rules)</p>
               <label className="block text-sm font-medium text-[var(--cr-muted)]">Break rules<select name="payBreakPreset" data-testid="worker-break-preset" className="mt-1.5 block min-h-11 w-full rounded-lg border bg-transparent px-3" value={form.timeOverrides.breakPreset || ""} onChange={(event) => setForm({ ...form, timeOverrides: { ...form.timeOverrides, breakPreset: event.target.value as WorkerTimeOverrides["breakPreset"] } })}><option value="">Account rules</option><option value="federal">Federal</option><option value="california">California</option></select></label>
               <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" name="payGeofenceOff" data-testid="worker-geofence-off" checked={Boolean(form.timeOverrides.geofenceOptOut)} onChange={(event) => setForm({ ...form, timeOverrides: { ...form.timeOverrides, geofenceOptOut: event.target.checked } })} />Skip the job-site distance check for this worker</label>
+            </div>
+            <div className="cr-section grid gap-2 rounded-lg border p-2" data-testid="worker-lead-settings">
+              <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" name="leadOn" data-testid="worker-lead" checked={Boolean(form.timeOverrides.lead)} onChange={(event) => setForm({ ...form, timeOverrides: { ...form.timeOverrides, lead: event.target.checked || undefined } })} />Crew lead (sees the crew&apos;s hours, never prices or pay)</label>
+              {form.timeOverrides.lead && <>
+                <p className="text-xs font-semibold">Their crew</p>
+                <div className="flex flex-wrap gap-2" data-testid="worker-lead-crew">
+                  {employees.filter((e) => e.active && e.id !== editingId).map((e) => {
+                    const on = (form.timeOverrides.crewIds || []).includes(e.id);
+                    return <label key={e.id} className="flex min-h-11 items-center gap-1.5 rounded-lg border px-2 text-sm"><input type="checkbox" data-testid={`worker-lead-crew-${e.id}`} checked={on} onChange={() => setForm({ ...form, timeOverrides: { ...form.timeOverrides, crewIds: on ? (form.timeOverrides.crewIds || []).filter((x) => x !== e.id) : [...(form.timeOverrides.crewIds || []), e.id] } })} />{e.name}</label>;
+                  })}
+                </div>
+                <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" data-testid="worker-lead-see-hours" checked={form.timeOverrides.leadPerms?.seeHours !== false} onChange={(event) => setForm({ ...form, timeOverrides: { ...form.timeOverrides, leadPerms: { clockTeam: form.timeOverrides.leadPerms?.clockTeam !== false, seeHours: event.target.checked } } })} />Can see the crew&apos;s hours</label>
+                <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" data-testid="worker-lead-clock-team" checked={form.timeOverrides.leadPerms?.clockTeam !== false} onChange={(event) => setForm({ ...form, timeOverrides: { ...form.timeOverrides, leadPerms: { seeHours: form.timeOverrides.leadPerms?.seeHours !== false, clockTeam: event.target.checked } } })} />Can clock the crew in and out</label>
+                <p className="text-xs text-[var(--cr-muted)]">The crew needs an email on Team. Every lead tap is in Change history with the lead&apos;s name.</p>
+              </>}
+            </div>
+            <div className="cr-section grid gap-2 rounded-lg border p-2" data-testid="worker-pto-settings">
+              <p className="cr-section-label text-xs font-semibold">Paid time off / sick (blank = account rules)</p>
+              <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" id="worker-pto-off" name="ptoOff" data-testid="worker-pto-off" checked={Boolean(form.timeOverrides.ptoOff)} onChange={(event) => setForm({ ...form, timeOverrides: { ...form.timeOverrides, ptoOff: event.target.checked || undefined } })} />No PTO for this worker</label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block text-sm font-medium text-[var(--cr-muted)]">1 h per … h worked<input id="worker-pto-per" name="ptoPerHours" data-testid="worker-pto-per" inputMode="decimal" placeholder="account" className="mt-1.5 block min-h-11 w-full rounded-lg border bg-transparent px-3 text-right" value={form.timeOverrides.ptoPerHours || ""} onChange={(event) => setForm({ ...form, timeOverrides: { ...form.timeOverrides, ptoPerHours: Number(event.target.value) || undefined } })} /></label>
+                <label className="block text-sm font-medium text-[var(--cr-muted)]">Carried-in hours<input id="worker-pto-start" name="ptoStartHours" data-testid="worker-pto-start" inputMode="decimal" placeholder="0" className="mt-1.5 block min-h-11 w-full rounded-lg border bg-transparent px-3 text-right" value={form.timeOverrides.ptoStartHours || ""} onChange={(event) => setForm({ ...form, timeOverrides: { ...form.timeOverrides, ptoStartHours: Number(event.target.value) || undefined } })} /></label>
+              </div>
             </div>
             <label className="flex min-h-11 items-center gap-2"><input type="checkbox" name="payOtOn" data-testid="pay-ot-on" checked={Boolean(form.paySettings.overtime?.on)} onChange={(event) => setForm({ ...form, paySettings: { ...form.paySettings, overtime: { weekly: "40", daily: "", multiplier: "1.5", ...form.paySettings.overtime, on: event.target.checked } } })} />Pay overtime (hourly hours)</label>
             {form.paySettings.overtime?.on && <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-3">

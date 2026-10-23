@@ -6,7 +6,7 @@
  * Pay comes from the APPROVED day (from the cutover date on): approving or undoing here rewrites each job's share of
  * the day on its crew rows, so job labor/profit, Crew pay, Year packet and Reports follow. Unapproved days are estimates.
  */
-import { readWorkerOverrides, timeAlerts, payPeriodOf, type ScheduledJob } from "@/lib/timesheet";
+import { fmtTime, ymdTz, readWorkerOverrides, timeAlerts, payPeriodOf, type ScheduledJob } from "@/lib/timesheet";
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
@@ -14,12 +14,13 @@ import { readWorkers, type Worker } from "@/lib/schedule";
 import { weekOf } from "@/lib/pay-types";
 import Link from "next/link";
 import DayDetail from "@/components/timesheet/DayDetail";
-import { loadAttestations, decideFix, loadOwnerTimesheet, readLocalTimesheetSettings, saveApprovals, type DayApproval } from "@/lib/day-events";
-import { dayState, DEFAULT_TIMESHEET_SETTINGS, needsReview, weekStatus, type DayStateName, type DaySheet, type FixRequest, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
+import { loadBusinessTz, loadAttestations, decideFix, loadOwnerTimesheet, readLocalTimesheetSettings, saveApprovals, type DayApproval } from "@/lib/day-events";
+import { dayState, DEFAULT_TIMESHEET_SETTINGS, reviewDayInfo, weekStatus, type DayStateName, type DaySheet, type FixRequest, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
 import { addDays, applyWeekToDocs, pushChangedDocs, readDocs, syncTimesheetCutover, scheduleFor, weekShares, weekSheets } from "@/lib/timesheet-sync";
 import type { DayPay } from "@/lib/timesheet-pay";
 
-const localYmd = (iso: string) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+// Day keys are business-zone dates (account time zone), the same keys the crew portal saves taps under.
+const localYmd = (iso: string) => ymdTz(new Date(iso));
 const h = (m: number) => (m / 60).toFixed(2);
 
 export default function TimesheetPage() {
@@ -41,6 +42,7 @@ export default function TimesheetPage() {
   const [filter, setFilter] = useState<"all" | "review">("all");
   const [phone, setPhone] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [cloud, setCloud] = useState(true);
   useEffect(() => { const mq = window.matchMedia("(max-width: 639px)"); const on = () => setPhone(mq.matches); on(); mq.addEventListener("change", on); return () => mq.removeEventListener("change", on); }, []);
   const [message, setMessage] = useState("");
   const [now, setNow] = useState("");
@@ -48,10 +50,11 @@ export default function TimesheetPage() {
   // Browser-only data, loaded once after the owner's shared pay cutover is synced (async, so no setState during the effect).
   useEffect(() => {
     let live = true;
-    void syncTimesheetCutover().then((day) => {
+    void loadBusinessTz().then(() => syncTimesheetCutover()).then((day) => {
       if (!live) return;
       const q = new URLSearchParams(window.location.search).get("date");
       setCutover(day);
+      if (new URLSearchParams(window.location.search).get("filter") === "review") setFilter("review");
       setWeek(weekOf(q && /^\d{4}-\d{2}-\d{2}$/.test(q) ? q : localYmd(new Date().toISOString())));
       setWorkers(readWorkers()); setDocs(readDocs()); setSettings(readLocalTimesheetSettings()); setNow(new Date().toISOString());
     });
@@ -59,29 +62,37 @@ export default function TimesheetPage() {
   }, []);
   useEffect(() => {
     if (!week) return;
-    void loadOwnerTimesheet(week, addDays(week, 6)).then((data) => { setEvents(data.events); setFixes(data.fixes); setApprovals(data.approvals); setSettings(data.settings); });
+    void loadOwnerTimesheet(week, addDays(week, 6)).then((data) => { setCloud(data.cloud); setEvents(data.events); setFixes(data.fixes); setApprovals(data.approvals); setSettings(data.settings); });
     void loadAttestations(week).then(setAttest);
   }, [week]);
   const { days, sheets } = useMemo(() => (week && now ? weekSheets({ workers, docs, events, fixes, settings, week, now }) : { days: [] as string[], sheets: new Map<string, DaySheet>() }), [workers, docs, events, fixes, settings, week, now]);
   const { pays, shares } = useMemo(() => weekShares({ workers, docs, days, sheets, approvals, settings }), [workers, docs, days, sheets, approvals, settings]);
   // Keep the jobs in step with the week (estimates for unapproved days, the approved day's split otherwise).
   useEffect(() => {
-    if (!week || !now || !cutover || !shares.size) return;
+    if (!week || !now || !cutover || !shares.size || !cloud) return; // never push estimates built from a failed/empty cloud read
     const res = applyWeekToDocs(readDocs(), shares, cutover);
     if (res.changed.length) void pushChangedDocs(res.changed);
-  }, [shares, week, now, cutover]);
+  }, [shares, week, now, cutover, cloud]);
   const approvalOf = (id: string, date: string) => approvals.find((a) => a.employeeId === id && a.date === date);
   const minutesOf = (id: string, date: string) => { const a = approvalOf(id, date); const s = sheets.get(`${id}|${date}`); return a?.editedMinutes != null ? a.editedMinutes : a?.approvedAt ? a.paidMinutes : s?.paidMinutes || 0; };
 
-  async function commit(rows: DayApproval[], before: DayApproval[], record = true) {
+  async function commit(rows: DayApproval[], before: DayApproval[], record = true, note = "") {
     const keys = new Set(rows.map((r) => `${r.employeeId}|${r.date}`));
+    rows = rows.map((r) => (r.approvedAt ? { ...r, changedAt: null } : r)); // approved is never "changed since approved"
     setApprovals((list) => [...list.filter((a) => !keys.has(`${a.employeeId}|${a.date}`)), ...rows]);
     if (record && before.length) setHistory((all) => ({ ...all, [week]: [...(all[week] || []), before].slice(-20) }));
-    await saveApprovals(rows);
+    const error = await saveApprovals(rows, note);
+    if (error) {
+      // Not saved: show what the server has, never a fake "Approved".
+      setApprovals((list) => [...list.filter((a) => !keys.has(`${a.employeeId}|${a.date}`)), ...before]);
+      setMessage(`Not saved: ${error}`);
+      return false;
+    }
+    return true;
   }
   const blank = (employeeId: string, date: string): DayApproval => ({ employeeId, date, paidMinutes: 0, driveMinutes: 0, editedMinutes: null, approvedAt: null, changedAt: null });
   const flagsOf = (id: string, date: string) => { const s = sheets.get(`${id}|${date}`); const a = approvalOf(id, date); return [...(s?.flags || []), ...(a?.editedMinutes != null ? ["edited"] : []), ...(a?.changedAt && !a?.approvedAt ? ["changed_since_approved"] : [])]; };
-  const dayInfo = (id: string, date: string) => { const a = approvalOf(id, date); const mins = minutesOf(id, date); return { mins, approved: Boolean(a?.approvedAt), flagged: needsReview(sheets.get(`${id}|${date}`)?.flags || [], a?.editedMinutes != null), hasHours: mins > 0 }; };
+  const dayInfo = (id: string, date: string) => reviewDayInfo(sheets.get(`${id}|${date}`), approvalOf(id, date));
   const approvedRow = (id: string, date: string, prev?: DayApproval): DayApproval => { const s = sheets.get(`${id}|${date}`); return { employeeId: id, date, paidMinutes: prev?.editedMinutes ?? s?.paidMinutes ?? 0, driveMinutes: s?.driveMinutes || 0, editedMinutes: prev?.editedMinutes ?? null, approvedAt: new Date().toISOString(), changedAt: null }; };
   /** Approve days with hours that aren't approved yet; `onlyReady` skips flagged days. */
   async function approveDays(ids: string[], onlyReady: boolean) {
@@ -94,7 +105,7 @@ export default function TimesheetPage() {
     }
     const skip = skipped ? ` Skipped ${skipped} day${skipped === 1 ? "" : "s"} that need${skipped === 1 ? "s" : ""} review.` : "";
     if (!rows.length) { setMessage(`Nothing ready to approve this week.${skip}`); return; }
-    await commit(rows, before);
+    if (!(await commit(rows, before))) return;
     setMessage(`Approved ${rows.length} day${rows.length === 1 ? "" : "s"}.${skip}`);
   }
   async function unapproveWeek(id: string) {
@@ -102,21 +113,21 @@ export default function TimesheetPage() {
     for (const date of days) { const prev = approvalOf(id, date); if (!prev?.approvedAt) continue; before.push(prev); rows.push({ ...prev, approvedAt: null }); }
     if (rows.length) { await commit(rows, before); setMessage(`Unapproved ${rows.length} day${rows.length === 1 ? "" : "s"}.`); }
   }
-  async function approveDay(id: string, date: string) { const prev = approvalOf(id, date); await commit([approvedRow(id, date, prev)], [prev || blank(id, date)]); setMessage("Approved 1 day."); }
+  async function approveDay(id: string, date: string) { const prev = approvalOf(id, date); if (await commit([approvedRow(id, date, prev)], [prev || blank(id, date)])) setMessage("Approved 1 day."); }
   async function unapproveDay(id: string, date: string) { const prev = approvalOf(id, date); if (prev?.approvedAt) await commit([{ ...prev, approvedAt: null }], [prev]); }
   async function undoLast() {
     const step = undoSteps[undoSteps.length - 1];
     if (!step) return;
     setHistory((all) => ({ ...all, [week]: (all[week] || []).slice(0, -1) }));
-    await commit(step, [], false);
+    if (!(await commit(step, [], false))) return;
     setMessage(`Undone. ${undoSteps.length - 1} more step${undoSteps.length - 1 === 1 ? "" : "s"} to undo.`);
   }
-  async function setMinutes(id: string, date: string, mins: number, approve: boolean) {
+  async function setMinutes(id: string, date: string, mins: number, approve: boolean, note = "") {
     const prev = approvalOf(id, date); const s = sheets.get(`${id}|${date}`);
     // Editing an approved day clears its approval: pay goes back to the estimate until approved again.
     const wasApproved = Boolean(prev?.approvedAt) || Boolean(prev?.changedAt);
     const at = new Date().toISOString();
-    await commit([{ employeeId: id, date, paidMinutes: mins, driveMinutes: s?.driveMinutes || 0, editedMinutes: mins, approvedAt: approve ? at : null, changedAt: approve ? null : wasApproved ? at : null }], [prev || blank(id, date)]);
+    if (!await commit([{ employeeId: id, date, paidMinutes: mins, driveMinutes: s?.driveMinutes || 0, editedMinutes: mins, approvedAt: approve ? at : null, changedAt: approve ? null : wasApproved ? at : null }], [prev || blank(id, date)], true, note)) return;
     setMessage(approve ? "Used the schedule and approved." : prev?.approvedAt ? "Changed since approved, approve again." : "Hours saved.");
   }
   async function decide(fix: FixRequest, status: "approved" | "denied", note = "") {
@@ -140,6 +151,9 @@ export default function TimesheetPage() {
     const estimated = wkDays.some((d) => !d.approved && d.cents);
     return { w, info, status, cents, total, estimated, unallocated: wkDays.some((d) => d.unallocated) };
   });
+  // Saved taps/approvals whose worker id is not on the Team list: never hidden silently.
+  const known = new Set(workers.map((w) => w.id));
+  const orphans = [...new Set([...events.map((e) => e.employeeId), ...approvals.filter((a) => a.approvedAt || a.editedMinutes != null).map((a) => a.employeeId)].filter((id) => id && !known.has(id)))];
   const shown = rows.filter((r) => filter === "all" || r.status.kind === "review");
   const readyCount = rows.reduce((n, r) => n + r.status.ready, 0);
   const reviewCount = rows.reduce((n, r) => n + r.status.review, 0);
@@ -249,7 +263,7 @@ export default function TimesheetPage() {
       <section className="cr-section mb-3" data-testid="ts-on-clock">
         <p className="cr-section-label">On the clock now ({onClock.length})</p>
         {onClock.length ? (
-          <ul className="flex flex-wrap gap-2">{onClock.map(({ w, st }) => <li key={w.id} className="cr-chip2 cr-tone-teal" data-testid={`ts-on-clock-${w.id}`} data-state={st.state}>{w.name} · {stateWord[st.state]}{st.since ? ` since ${new Date(st.since).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}</li>)}</ul>
+          <ul className="flex flex-wrap gap-2">{onClock.map(({ w, st }) => <li key={w.id} className="cr-chip2 cr-tone-teal" data-testid={`ts-on-clock-${w.id}`} data-state={st.state}>{w.name} · {stateWord[st.state]}{st.since ? ` since ${fmtTime(st.since)}` : ""}</li>)}</ul>
         ) : <p className="text-sm text-[var(--cr-muted)]" data-testid="ts-on-clock-empty">Nobody is on the clock right now.</p>}
       </section>
       {alerts.length > 0 && (
@@ -291,13 +305,15 @@ export default function TimesheetPage() {
           </table>
         </div>
       )}
+      {!cloud && <p className="cr-panel cr-tone-warn mt-2 text-sm" data-testid="ts-cloud-offline" role="status">Couldn&apos;t read the saved timesheet (signed out or offline). Showing this device&apos;s copy; nothing was deleted. Sign in again or refresh.</p>}
+      {orphans.length > 0 && <p className="cr-panel cr-tone-warn mt-2 text-sm" data-testid="ts-orphan-hours" role="status">Hours saved for {orphans.length} crew record{orphans.length === 1 ? "" : "s"} not on your Team list this week ({orphans.join(", ")}). They are kept, not deleted. Check Team for a removed or re-added person.</p>}
       {!shown.length && <p className="mt-2 text-sm text-[var(--cr-muted)]" data-testid="ts-empty">{filter === "review" ? "Nothing needs review this week." : <>No crew yet. Add your crew on <Link href="/employees" className="underline">Team</Link>; their taps on My day show up here.</>}</p>}
       {pendingFixes.length > 0 && (
         <section className="cr-section mt-4 space-y-2" data-testid="ts-fixes">
           <h2 className="font-bold">Fix-my-time requests <span className="cr-chip2 cr-tone-warn" data-testid="ts-fix-badge">{pendingFixes.length}</span></h2>
           {fixes.filter((f) => f.status === "pending").map((f) => (
             <div key={f.id} className="flex flex-wrap items-center gap-2 rounded-lg border p-2 text-sm">
-              <span>{workers.find((w) => w.id === f.employeeId)?.name || "Worker"} · {f.date} · {f.kind.replace("_", " ")} → {new Date(f.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · “{f.reason}”</span>
+              <span>{workers.find((w) => w.id === f.employeeId)?.name || "Worker"} · {f.date} · {f.kind.replace("_", " ")} → {fmtTime(f.at)} · “{f.reason}”</span>
               <input aria-label="Note to worker" placeholder="Note (optional)" name="ts-fix-note" data-testid="ts-fix-note" maxLength={300} className="min-h-9 flex-1 rounded border bg-transparent px-2" value={fixNotes[f.id] || ""} onChange={(e) => setFixNotes({ ...fixNotes, [f.id]: e.target.value })} />
               <button className="cr-btn cr-btn-primary" data-testid="ts-fix-approve" onClick={() => decide(f, "approved", fixNotes[f.id])}>Approve</button>
               <button className="cr-btn cr-btn-secondary" data-testid="ts-fix-deny" onClick={() => decide(f, "denied", fixNotes[f.id])}>Decline</button>
@@ -305,14 +321,14 @@ export default function TimesheetPage() {
           ))}
         </section>
       )}
-      <p className="mt-4 text-xs text-[var(--cr-muted)]">Rules (gap, “Still driving?”, half day) are on <Link href="/employees" className="underline">Team</Link> under Timesheet rules.</p>
+      <p className="mt-4 text-xs text-[var(--cr-muted)]" data-testid="ts-footer-hint">Rules (gap, “Still driving?”, half day) are on <Link href="/employees" className="underline">Team</Link> under Timesheet rules.</p>
       {open && openWorker && (
         <DayDetail key={`${open}|${approvalOf(openWorker.id, openDate)?.editedMinutes ?? ""}`} workerName={openWorker.name} date={openDate} sheet={sheets.get(open)} approval={approvalOf(openWorker.id, openDate)}
           minutes={minutesOf(openWorker.id, openDate)} extraFlags={flagsOf(openWorker.id, openDate).filter((f) => f === "edited" || f === "changed_since_approved")}
           settings={settings} schedule={scheduleFor(docs, openWorker.id, openDate)} employeeId={openWorker.id} worker={readWorkerOverrides(openWorker)}
           taps={events.filter((e) => e.employeeId === openWorker.id && e.date === openDate)} dayPay={payOf(openWorker.id, openDate)} fixes={fixes.filter((f) => f.employeeId === openWorker.id && f.date === openDate)}
           onApprove={() => approveDay(openWorker.id, openDate)} onUnapprove={() => unapproveDay(openWorker.id, openDate)}
-          onSetMinutes={(m, approve) => setMinutes(openWorker.id, openDate, m, approve)} onDecide={(f, st, note) => decide(f, st, note)} onClose={() => setOpen(null)} />
+          onSetMinutes={(m, approve, note) => setMinutes(openWorker.id, openDate, m, approve, note)} onDecide={(f, st, note) => decide(f, st, note)} onClose={() => setOpen(null)} />
       )}
     </AppShell>
   );

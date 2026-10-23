@@ -1,10 +1,11 @@
 // Owner-only timesheet CSV from crew clock entries. Hours only (no pay), one row per entry plus a total per worker.
 import { entryHours, type ClockEntry } from "@/lib/clock";
 import { overtimePremium, readPaySettings } from "@/lib/pay-types";
+import { hhmmTz, ymdTz } from "@/lib/timesheet";
 
 const pad = (n: number) => String(n).padStart(2, "0");
-export const localYmd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const localTime = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+export const localYmd = (d: Date) => ymdTz(d);
+const localTime = (d: Date) => hhmmTz(d.toISOString());
 
 /** Monday..Sunday of the week containing `day`. */
 export function weekRange(day = new Date()) {

@@ -7,7 +7,7 @@
 import { readWorkers, type Worker } from "@/lib/schedule";
 import { weekOf } from "@/lib/pay-types";
 import { loadOwnerTimesheet, type DayApproval } from "@/lib/day-events";
-import { timeAlerts, whosOnClock, type DaySheet, type FixRequest, type OnClock, type ScheduledJob, type TapEvent, type TimeAlert, type TimesheetSettings } from "@/lib/timesheet";
+import { reviewCount, timeAlerts, whosOnClock, type DaySheet, type FixRequest, type OnClock, type ScheduledJob, type TapEvent, type TimeAlert, type TimesheetSettings } from "@/lib/timesheet";
 import { addDays, readDocs, scheduleFor, weekShares, weekSheets } from "@/lib/timesheet-sync";
 import type { DayPay } from "@/lib/timesheet-pay";
 
@@ -36,7 +36,7 @@ export async function loadTimeWeek(date: string, now = new Date().toISOString())
   return { week, days, workers, events: data.events, fixes: data.fixes, approvals: data.approvals, settings: data.settings, sheets, pays, schedule };
 }
 
-export type TimeAttention = { onClock: (OnClock & { name: string })[]; alerts: (TimeAlert & { name: string })[]; pendingFixes: number; missingClockOuts: number; missedBreaks: number };
+export type TimeAttention = { onClock: (OnClock & { name: string })[]; alerts: (TimeAlert & { name: string })[]; pendingFixes: number; missingClockOuts: number; missedBreaks: number; noShows: number; lateStarts: number; needsReview: number };
 export function timeAttention(w: TimeWeek, now = new Date().toISOString()): TimeAttention {
   const today = localYmd(new Date(now));
   const name = (id: string) => w.workers.find((x) => x.id === id)?.name || "Worker";
@@ -50,6 +50,9 @@ export function timeAttention(w: TimeWeek, now = new Date().toISOString()): Time
     pendingFixes: w.fixes.filter((f) => f.status === "pending").length,
     missingClockOuts: alerts.filter((a) => a.kind === "forgot_end").length,
     missedBreaks: alerts.filter((a) => a.kind === "break_rule").length,
+    noShows: alerts.filter((a) => a.kind === "no_show").length,
+    lateStarts: alerts.filter((a) => a.kind === "late_start").length,
+    needsReview: reviewCount(w.workers.map((x) => x.id), w.days, w.sheets, w.approvals),
   };
 }
 

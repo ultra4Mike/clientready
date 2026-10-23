@@ -4,7 +4,7 @@
  * everything keeps working on this device's localStorage. A worker only ever writes his own taps.
  */
 import { supabase } from "@/lib/supabase";
-import { readTimesheetSettings, readWorkerOverrides, type WorkerTimeOverrides, type FixRequest, type TapEvent, type TapKind, type TimesheetSettings } from "@/lib/timesheet";
+import { readTimesheetSettings, readWorkerOverrides, setBusinessTz, ymdTz, dedupeTaps, type WorkerTimeOverrides, type FixRequest, type TapEvent, type TapKind, type TimesheetSettings } from "@/lib/timesheet";
 
 const missing = (error: { message?: string; code?: string } | null | undefined) =>
   Boolean(error && /could not find|does not exist|PGRST202|PGRST205|42P01|42883|schema cache/i.test(`${error.message || ""} ${error.code || ""}`));
@@ -20,7 +20,8 @@ function writeLocal(key: string, value: unknown) {
   try { window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage full: Supabase still has it */ }
 }
 
-export const localDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/** The business-zone date (account time zone), not the phone's zone. */
+export const localDate = (d: Date) => ymdTz(d);
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
 type EventRow = { id: string; employee_id: string; work_date: string; kind: TapKind; at: string; doc_id: string; lat: number | null; lng: number | null; not_at_site: boolean; device_at?: string | null; out_of_order?: boolean | null; offline?: boolean | null; created_at?: string };
@@ -48,6 +49,37 @@ export function currentPosition(): Promise<{ lat: number; lng: number } | undefi
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
     );
   });
+}
+
+/**
+ * Location permission as the browser reports it: "granted" / "denied" / "prompt", or "unknown" when the browser has
+ * no Permissions API. Only "denied" means location is off; a slow GPS fix (timeout) is not "off".
+ */
+export async function locationPermission(): Promise<"granted" | "denied" | "prompt" | "unknown"> {
+  try {
+    if (typeof navigator === "undefined" || !navigator.permissions?.query) return "unknown";
+    const st = await navigator.permissions.query({ name: "geolocation" as PermissionName });
+    return st.state as "granted" | "denied" | "prompt";
+  } catch { return "unknown"; }
+}
+
+/** The account's time zone (profiles.timezone) for showing every time the same on every device. */
+export async function loadBusinessTz(asCrew = false) {
+  try {
+    if (asCrew) { const { data, error } = await supabase.rpc("crew_time_zone"); if (!error && typeof data === "string") setBusinessTz(data); return; }
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return;
+    const { data } = await supabase.from("profiles").select("timezone").eq("id", u.user.id).maybeSingle();
+    setBusinessTz((data as { timezone?: string | null } | null)?.timezone);
+  } catch { /* keep the default zone */ }
+}
+
+/** Worker: the owner's decision per day (approved / edited minutes): the one number both sides show. Hours only. */
+export type MyDayStatus = { date: string; minutes: number | null; approved: boolean; changed: boolean };
+export async function loadMyDayStatus(from: string, to: string): Promise<MyDayStatus[]> {
+  const { data, error } = await supabase.rpc("crew_my_day_status", { p_from: from, p_to: to });
+  if (error || !Array.isArray(data)) return [];
+  return (data as { work_date: string; minutes: number | null; approved: boolean; changed: boolean }[]).map((r) => ({ date: String(r.work_date).slice(0, 10), minutes: r.minutes == null ? null : Number(r.minutes), approved: Boolean(r.approved), changed: Boolean(r.changed) }));
 }
 
 /** Worker: record a tap. Saved on the phone first, then sent (an older server keeps the phone copy). */
@@ -79,7 +111,7 @@ export async function loadMyTaps(email: string): Promise<TapEvent[]> {
   if (error) return local;
   const server = ((data || []) as EventRow[]).map(fromRow);
   const ids = new Set(server.map((e) => e.id));
-  return [...server, ...local.filter((e) => !ids.has(e.id))];
+  return dedupeTaps([...server, ...local.filter((e) => !ids.has(e.id))]);
 }
 
 export async function requestFix(fix: Omit<FixRequest, "id" | "status" | "createdAt">, email: string) {
@@ -115,11 +147,17 @@ export async function loadOwnerTimesheet(from: string, to: string): Promise<Owne
     supabase.from("crew_day_approvals").select("*").gte("work_date", from).lte("work_date", to),
     supabase.from("crew_timesheet_settings").select("*").maybeSingle(),
   ]);
-  const cloud = !ev.error;
-  const approvals = ap.error ? localApprovals : ((ap.data || []) as Record<string, unknown>[]).map((r) => ({ employeeId: String(r.employee_id), date: String(r.work_date).slice(0, 10), paidMinutes: Number(r.paid_minutes) || 0, driveMinutes: Number(r.drive_minutes) || 0, editedMinutes: r.edited_minutes == null ? null : Number(r.edited_minutes), approvedAt: (r.approved_at as string) || null, changedAt: (r.changed_at as string) || null }));
+  // Signed out / expired session: RLS returns empty lists with no error. Never show that as "No hours";
+  // fall back to this device's copy and report cloud=false so the page can say so.
+  const { data: auth } = await supabase.auth.getSession();
+  const signedIn = Boolean(auth.session?.user);
+  const cloud = signedIn && !ev.error;
+  const cloudApprovals = !signedIn || ap.error ? [] : ((ap.data || []) as Record<string, unknown>[]).map((r) => ({ employeeId: String(r.employee_id), date: String(r.work_date).slice(0, 10), paidMinutes: Number(r.paid_minutes) || 0, driveMinutes: Number(r.drive_minutes) || 0, editedMinutes: r.edited_minutes == null ? null : Number(r.edited_minutes), approvedAt: (r.approved_at as string) || null, changedAt: (r.changed_at as string) || null }));
+  const seen = new Set(cloudApprovals.map((a) => `${a.employeeId}|${a.date}`));
+  const approvals = !signedIn || ap.error ? localApprovals : [...cloudApprovals, ...localApprovals.filter((a) => !seen.has(`${a.employeeId}|${a.date}`) && a.approvedAt)];
   const s = st.data as Record<string, unknown> | null;
   return {
-    events: ev.error ? [] : ((ev.data || []) as EventRow[]).map(fromRow),
+    events: ev.error ? [] : dedupeTaps(((ev.data || []) as EventRow[]).map(fromRow)),
     fixes: fx.error ? [] : ((fx.data || []) as FixRow[]).map(fixFromRow),
     approvals: approvals.filter((a) => a.date >= from && a.date <= to),
     settings: s ? readTimesheetSettings({ ...localSettings, ...((s.rules as object) || {}), gapMinutes: s.gap_minutes, transitTimeoutMinutes: s.transit_timeout_minutes, halfDayHours: s.half_day_hours }) : localSettings,
@@ -133,7 +171,7 @@ export async function saveTimesheetSettings(settings: TimesheetSettings, previou
   writeLocal(KEY_SETTINGS, settings);
   const { data } = await supabase.auth.getUser();
   // Rules change pay: refresh this week and last week (older weeks are usually approved/paid and stay as they are).
-  const today = new Date().toLocaleDateString("en-CA"), last = new Date(Date.now() - 7 * 86400000).toLocaleDateString("en-CA");
+  const today = ymdTz(new Date()), last = ymdTz(new Date(Date.now() - 7 * 86400000));
   if (!data.user) { await queuePayRefresh([today, last], "settings"); return; }
   const row = { owner_id: data.user.id, gap_minutes: Math.round(settings.gapMinutes), transit_timeout_minutes: Math.round(settings.transitTimeoutMinutes), half_day_hours: settings.halfDayHours, updated_at: new Date().toISOString() };
   const { error } = await supabase.from("crew_timesheet_settings").upsert({ ...row, rules: settings });
@@ -148,6 +186,22 @@ export async function saveTimesheetSettings(settings: TimesheetSettings, previou
 // ---------- Audit log (owner only; rows are never deleted) ----------
 export type AuditRow = { id?: string; at: string; actor: string; employeeId: string; date: string | null; action: string; oldValue: unknown; newValue: unknown };
 const KEY_AUDIT = "clientready-time-audit";
+/** Fired after every audit row is written (locally, then again once the cloud insert lands). */
+const KEY_AUDIT_PENDING = "clientready-time-audit-pending";
+/** Audit rows not yet saved to the cloud (shown as "N changes not synced yet"). */
+export const pendingAuditCount = () => readLocal<AuditRow[]>(KEY_AUDIT_PENDING, []).length;
+export const AUDIT_SAVED_EVENT = "clientready:time-audit-saved";
+const auditSaved = () => { if (typeof window !== "undefined") window.dispatchEvent(new Event(AUDIT_SAVED_EVENT)); };
+/** Who did it, for people: the owner's name only when the actor is the owner's own account, a worker / crew lead by
+ * his email, else the email itself (or "Unknown"). "system" rows read "System". */
+export function actorLabel(actor: string, workers: { name: string; email?: string }[] = [], owner: { name?: string; email?: string } = {}) {
+  const a = (actor || "").trim().toLowerCase();
+  if (a === "system") return "System";
+  if (a === "owner" || (a && a === (owner.email || "").trim().toLowerCase())) return owner.name || "Owner";
+  const w = a ? workers.find((x) => (x.email || "").trim().toLowerCase() === a) : undefined;
+  if (w?.name) return w.name;
+  return actor ? actor.trim() : "Unknown";
+}
 /** Owner: write one audit row (taps are logged by the database trigger). */
 export async function logAudit(row: { action: string; employeeId?: string; date?: string | null; oldValue?: unknown; newValue?: unknown }) {
   // Session from local storage (no network), so this device's copy is written right away, even offline.
@@ -155,8 +209,19 @@ export async function logAudit(row: { action: string; employeeId?: string; date?
   const data = { user: sess.session?.user || null };
   const full: AuditRow = { at: new Date().toISOString(), actor: data.user?.email || "owner", employeeId: row.employeeId || "", date: row.date ?? null, action: row.action, oldValue: row.oldValue ?? null, newValue: row.newValue ?? null };
   writeLocal(KEY_AUDIT, [...readLocal<AuditRow[]>(KEY_AUDIT, []), full].slice(-2000));
-  if (!data.user) return;
-  await supabase.from("crew_time_audit").insert({ owner_id: data.user.id, actor_email: full.actor, employee_id: full.employeeId, work_date: full.date, action: full.action, old_value: full.oldValue, new_value: full.newValue });
+  if (!data.user) { auditSaved(); return; }
+  const userId = data.user.id;
+  // Failed cloud inserts stay in a pending queue and are retried with the next audit write (never dropped silently).
+  const queue = [...readLocal<AuditRow[]>(KEY_AUDIT_PENDING, []), full];
+  const failed: AuditRow[] = [];
+  let lastError = "";
+  for (const r of queue) {
+    const { error } = await supabase.from("crew_time_audit").insert({ owner_id: userId, actor_email: r.actor, employee_id: r.employeeId, work_date: r.date, action: r.action, old_value: r.oldValue, new_value: r.newValue }).then((x) => x, (e) => ({ error: { message: String(e) } }));
+    if (error) { failed.push(r); lastError = error.message; }
+  }
+  writeLocal(KEY_AUDIT_PENDING, failed.slice(-500));
+  auditSaved();
+  return lastError ? { error: lastError, pending: failed.length } : undefined;
 }
 /** Owner: audit rows (newest first), optionally for one worker/day. Falls back to this device's copy. */
 export async function loadAudit(filter: { employeeId?: string; date?: string; limit?: number } = {}): Promise<AuditRow[]> {
@@ -190,23 +255,28 @@ export async function loadAttestations(week: string): Promise<Record<string, str
 }
 
 /** Owner: save (or clear with approvedAt null) day approvals. Hours only, never money. */
-export async function saveApprovals(rows: DayApproval[]) {
+/** Save day approvals; returns "" or the server error (the caller shows it, the day is not shown approved). */
+export async function saveApprovals(rows: DayApproval[], note = ""): Promise<string> {
   const all = readLocal<DayApproval[]>(KEY_APPROVALS, []);
   const keyOf = (a: DayApproval) => `${a.employeeId}|${a.date}`;
   const next = new Map(all.map((a) => [keyOf(a), a]));
   const before = new Map(all.map((a) => [keyOf(a), a]));
+  rows = rows.map((r) => (r.approvedAt ? { ...r, changedAt: null } : r));
   for (const row of rows) next.set(keyOf(row), row);
   writeLocal(KEY_APPROVALS, [...next.values()]);
   for (const row of rows) {
     const old = before.get(keyOf(row));
-    const action = row.approvedAt ? (old?.approvedAt && old.editedMinutes === row.editedMinutes ? "" : row.editedMinutes != null && row.editedMinutes !== old?.editedMinutes ? "edit_approve" : "approve") : old?.approvedAt ? "unapprove" : row.editedMinutes != null ? "edit" : "";
-    if (action) void logAudit({ action, employeeId: row.employeeId, date: row.date, oldValue: old ? { paidMinutes: old.paidMinutes, editedMinutes: old.editedMinutes ?? null, approved: Boolean(old.approvedAt) } : null, newValue: { paidMinutes: row.paidMinutes, editedMinutes: row.editedMinutes ?? null, approved: Boolean(row.approvedAt) } });
+    // An hours change is always logged as an edit (also when it reopens an approved day).
+    const edited = row.editedMinutes != null && row.editedMinutes !== (old?.editedMinutes ?? null);
+    const action = edited ? (row.approvedAt ? "edit_approve" : "edit") : row.approvedAt ? (old?.approvedAt ? "" : "approve") : old?.approvedAt ? "unapprove" : "";
+    if (action) void logAudit({ action, employeeId: row.employeeId, date: row.date, oldValue: old ? { paidMinutes: old.paidMinutes, editedMinutes: old.editedMinutes ?? null, approved: Boolean(old.approvedAt) } : null, newValue: { paidMinutes: row.paidMinutes, editedMinutes: row.editedMinutes ?? null, approved: Boolean(row.approvedAt), ...(note ? { note } : {}) } });
   }
   const { data } = await supabase.auth.getUser();
-  if (!data.user) { await queuePayRefresh(rows.map((r) => r.date), "approvals"); return; }
+  if (!data.user) { await queuePayRefresh(rows.map((r) => r.date), "approvals"); return ""; }
   const uid = data.user.id;
-  await supabase.from("crew_day_approvals").upsert(rows.map((r) => ({ owner_id: uid, employee_id: r.employeeId, work_date: r.date, paid_minutes: r.paidMinutes, drive_minutes: r.driveMinutes, edited_minutes: r.editedMinutes ?? null, approved_at: r.approvedAt ?? null, changed_at: r.changedAt ?? null, updated_at: new Date().toISOString() })));
+  const { error } = await supabase.from("crew_day_approvals").upsert(rows.map((r) => ({ owner_id: uid, employee_id: r.employeeId, work_date: r.date, paid_minutes: r.paidMinutes, drive_minutes: r.driveMinutes, edited_minutes: r.editedMinutes ?? null, approved_at: r.approvedAt ?? null, changed_at: r.changedAt ?? null, updated_at: new Date().toISOString() })));
   await queuePayRefresh(rows.map((r) => r.date), "approvals");
+  return error && !missing(error) ? error.message : "";
 }
 
 export async function decideFix(id: string, status: "approved" | "denied", note = "", fix?: FixRequest) {
@@ -226,7 +296,13 @@ export function directionsUrl(address: string) {
 
 /** Re-send taps that were saved only on this phone (offline). The server keeps an owner edit: a late tap on an
  * approved day is flagged "changed since approved" for the owner instead of overwriting the approved hours. */
-export async function syncPendingTaps(email: string) {
+let syncing: Promise<{ sent: number; left: number }> | null = null;
+export function syncPendingTaps(email: string) {
+  // One sync at a time (mount + "online" can fire together); each tap keeps its client id, so the server keeps one copy.
+  if (!syncing) syncing = syncPendingTapsOnce(email).finally(() => { syncing = null; });
+  return syncing;
+}
+async function syncPendingTapsOnce(email: string) {
   const key = `${KEY_EVENTS}:${email.toLowerCase()}`;
   const pending = readLocal<TapEvent[]>(key, []).filter((e) => e.pending);
   let sent = 0;

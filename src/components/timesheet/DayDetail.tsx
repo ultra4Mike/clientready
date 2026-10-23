@@ -5,7 +5,7 @@
  * Edits recompute the day with the same engine (buildDay), then are saved as the day's edited minutes.
  */
 import { useEffect, useState } from "react";
-import { buildDay, dayTimeline, daySummary, flagReasons, hm, type DaySheet, type FixRequest, type ScheduledJob, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
+import { buildDay, fmtTime, hhmmTz, wallToIso, dayTimeline, daySummary, flagReasons, hm, type DaySheet, type FixRequest, type ScheduledJob, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
 import { loadAudit, type AuditRow, type DayApproval } from "@/lib/day-events";
 import type { DayPay } from "@/lib/timesheet-pay";
 import { KIND_LABEL } from "@/components/crew/MyDay";
@@ -26,7 +26,7 @@ const kindLabel = (k: unknown) => KIND_LABEL[k as keyof typeof KIND_LABEL] || St
 
 export function auditText(r: AuditRow) {
   const v = (r.newValue || {}) as Record<string, unknown>; const o = (r.oldValue || {}) as Record<string, unknown>;
-  const t = (x: unknown) => (typeof x === "string" && x ? new Date(x).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "");
+  const t = (x: unknown) => (typeof x === "string" && x ? fmtTime(x) : "");
   const mins = (x: unknown) => (typeof x === "number" ? hm(x) : "—");
   switch (r.action) {
     case "tap": return `Tap: ${kindLabel(v.kind)} at ${t(v.at)}${v.device_at && Math.abs(new Date(String(v.device_at)).getTime() - new Date(String(v.at)).getTime()) > 300000 ? ` (phone said ${t(v.device_at)})` : ""}${v.offline ? " · sent later (offline)" : ""}${v.out_of_order ? " · out of order" : ""}${v.not_at_site ? " · not at site" : ""}`;
@@ -35,8 +35,8 @@ export function auditText(r: AuditRow) {
     case "fix_request": return `Fix requested: ${kindLabel(v.kind)} → ${t(v.at)} “${v.reason || ""}”`;
     case "fix_approved": case "fix_denied": return `Fix ${r.action === "fix_approved" ? "approved" : "declined"}${v.note ? `: “${v.note}”` : ""}`;
     case "approve": return `Approved ${mins(v.paidMinutes)}`;
-    case "edit_approve": return `Edited ${mins(o.editedMinutes ?? o.paidMinutes)} → ${mins(v.editedMinutes)} and approved`;
-    case "edit": return `Edited ${mins(o.editedMinutes ?? o.paidMinutes)} → ${mins(v.editedMinutes)}`;
+    case "edit_approve": return `Edited ${mins(o.editedMinutes ?? o.paidMinutes)} → ${mins(v.editedMinutes)} and approved${v.note ? ` · ${v.note}` : ""}`;
+    case "edit": return `Edited ${mins(o.editedMinutes ?? o.paidMinutes)} → ${mins(v.editedMinutes)}${o.approved ? " (reopened)" : ""}${v.note ? ` · ${v.note}` : ""}`;
     case "unapprove": return "Approval undone";
     case "attest": return `Worker confirmed the week (${mins(v.minutes)})`;
     case "settings": return `Rules changed: ${settingDiff(o, v)}`;
@@ -45,15 +45,15 @@ export function auditText(r: AuditRow) {
   }
 }
 
-const hhmm = (iso: string) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
-const atTime = (date: string, t: string) => new Date(`${date}T${t}:00`).toISOString();
+const hhmm = (iso: string) => (iso ? hhmmTz(iso) : ""); // account time zone
+const atTime = (date: string, t: string) => wallToIso(date, t);
 
 export default function DayDetail(props: {
   worker?: import("@/lib/timesheet").WorkerTimeOverrides;
   workerName: string; date: string; sheet?: DaySheet; approval?: DayApproval; minutes: number; extraFlags: string[];
   settings: TimesheetSettings; schedule: ScheduledJob[]; fixes: FixRequest[];
   employeeId?: string; taps?: TapEvent[]; dayPay?: DayPay;
-  onApprove: () => void; onUnapprove: () => void; onSetMinutes: (minutes: number, approve: boolean) => void;
+  onApprove: () => void; onUnapprove: () => void; onSetMinutes: (minutes: number, approve: boolean, note?: string) => void;
   onDecide: (fix: FixRequest, status: "approved" | "denied", note?: string) => void; onClose: () => void;
 }) {
   const [history, setHistory] = useState<AuditRow[] | null>(null);
@@ -61,17 +61,31 @@ export default function DayDetail(props: {
   useEffect(() => { if (history === null && props.employeeId) void loadAudit({ employeeId: props.employeeId, date: props.date, limit: 100 }).then(setHistory); }, [history, props.employeeId, props.date]);
   const { sheet, date, settings } = props;
   const [editing, setEditing] = useState(false);
-  const [spans, setSpans] = useState(() => (sheet?.jobs || []).map((j) => ({ docId: j.docId, label: j.label, start: hhmm(j.start), end: hhmm(j.end) })));
+  // Editor rows: the day's jobs; a day with taps but no job span (e.g. Start day / breaks only) gets one "Day" row
+  // from the first to the last tap, so reopening never loses the start time.
+  const [spans, setSpans] = useState(() => {
+    const jobs = (sheet?.jobs || []).map((j) => ({ docId: j.docId, label: j.label, start: hhmm(j.start), end: hhmm(j.end) }));
+    if (jobs.length) return jobs;
+    const taps = [...(props.taps || [])].sort((a, b) => a.at.localeCompare(b.at));
+    const first = taps[0]?.at, last = taps[taps.length - 1]?.at;
+    return first ? [{ docId: "day", label: "Day", start: hhmm(first), end: last && last !== first ? hhmm(last) : "" }] : [];
+  });
   const [hours, setHours] = useState(() => (props.minutes / 60).toFixed(2));
   const timeline = dayTimeline(sheet);
   const reasons = flagReasons(sheet, props.extraFlags, settings);
   const pending = props.fixes.filter((f) => f.status === "pending");
   const approved = Boolean(props.approval?.approvedAt);
   // Same engine as the taps: edited job times become the day's "schedule" with no taps.
-  const recalc = (list: typeof spans) => buildDay({ employeeId: "x", date, events: [], settings, worker: props.worker, schedule: list.filter((s) => s.start && s.end).map((s) => ({ docId: s.docId, label: s.label, start: atTime(date, s.start), end: atTime(date, s.end) })) }).paidMinutes;
+  const valid = (list: typeof spans) => list.some((s) => s.start && s.end && s.end > s.start);
+  // Only recompute paid hours from complete times; a half-filled row keeps the current hours (never "0 m").
+  const onSpans = (next: typeof spans) => { setSpans(next); if (valid(next)) setHours((recalc(next) / 60).toFixed(2)); };
+  const recalc = (list: typeof spans) => buildDay({ employeeId: "x", date, events: [], settings, worker: props.worker, schedule: list.filter((s) => s.start && s.end && s.end > s.start).map((s) => ({ docId: s.docId, label: s.label, start: atTime(date, s.start), end: atTime(date, s.end) })) }).paidMinutes;
   const scheduleMinutes = props.schedule.length ? buildDay({ employeeId: "x", date, events: [], settings, worker: props.worker, schedule: props.schedule }).paidMinutes : null;
   const editedMinutes = props.approval?.editedMinutes;
   const btn = "min-h-11 rounded-lg border px-3 text-sm";
+  // Esc closes the day detail.
+  const { onClose } = props;
+  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [onClose]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" role="dialog" aria-modal="true" aria-label={`${props.workerName} ${date}`} onClick={props.onClose}>
@@ -100,7 +114,7 @@ export default function DayDetail(props: {
         </div>
         {sheet && (sheet.breaks.length > 0 || sheet.roundingMinutes !== 0 || sheet.autoBreakMinutes > 0) && (
           <div className="cr-panel mb-3 space-y-1" data-testid="ts-dd-breaks">
-            {sheet.breaks.map((b, i) => <p key={i} data-testid="ts-dd-break" data-state={b.paid ? "paid" : "unpaid"}>{b.auto ? "Auto meal break" : "Break"} {hhmm(b.start)}–{hhmm(b.end)} · {b.minutes} min · {b.paid ? "paid" : `${b.unpaidMinutes} min unpaid`}</p>)}
+            {sheet.breaks.map((b, i) => <p key={i} data-testid="ts-dd-break" data-state={b.paid ? "paid" : "unpaid"}>{b.auto ? "Auto meal break" : "Break"} {hhmm(b.start)}–{hhmm(b.end)} · {hm(b.minutes)} · {b.paid ? "paid" : `${hm(b.unpaidMinutes)} unpaid`}</p>)}
             {sheet.autoBreakMinutes > 0 && (
               <p data-testid="ts-dd-long-drive">Long drive: {sheet.autoBreakMinutes} min not paid.{" "}
                 {!approved && <button className="cr-btn-text" data-testid="ts-dd-pay-drive" onClick={() => props.onSetMinutes(props.minutes + sheet.autoBreakMinutes, false)}>Pay the full drive</button>}</p>
@@ -130,7 +144,7 @@ export default function DayDetail(props: {
             <p className="font-semibold">Fix-my-time requests</p>
             {pending.map((f) => (
               <div key={f.id} className="flex flex-wrap items-center gap-2 rounded-lg border p-2">
-                <span>{kindLabel(f.kind)} → {new Date(f.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · “{f.reason}”</span>
+                <span>{kindLabel(f.kind)} → {fmtTime(f.at)} · “{f.reason}”</span>
                 <input aria-label="Note to worker" placeholder="Note to worker (optional)" name="ts-dd-fix-note" data-testid="ts-dd-fix-note" maxLength={300} className="min-h-9 flex-1 rounded border bg-transparent px-2" value={notes[f.id] || ""} onChange={(e) => setNotes({ ...notes, [f.id]: e.target.value })} />
                 <button className="cr-btn cr-btn-primary" data-testid="ts-dd-fix-approve" onClick={() => props.onDecide(f, "approved", notes[f.id])}>Approve</button>
                 <button className="cr-btn cr-btn-secondary" data-testid="ts-dd-fix-deny" onClick={() => props.onDecide(f, "denied", notes[f.id])}>Decline</button>
@@ -143,14 +157,14 @@ export default function DayDetail(props: {
             {spans.map((s, i) => (
               <div key={i} className="flex flex-wrap items-center gap-2">
                 <span className="min-w-20 font-medium">{s.label || "Job"}</span>
-                <input type="time" aria-label={`${s.label || "Job"} start`} name={`ts-dd-start-${i}`} data-testid={`ts-dd-start-${i}`} className="min-h-11 rounded border bg-transparent px-2" value={s.start} onChange={(e) => { const next = spans.map((x, j) => (j === i ? { ...x, start: e.target.value } : x)); setSpans(next); setHours((recalc(next) / 60).toFixed(2)); }} />
+                <input type="time" aria-label={`${s.label || "Job"} start`} name={`ts-dd-start-${i}`} data-testid={`ts-dd-start-${i}`} className="min-h-11 rounded border bg-transparent px-2" value={s.start} onChange={(e) => onSpans(spans.map((x, j) => (j === i ? { ...x, start: e.target.value } : x)))} />
                 <span>to</span>
-                <input type="time" aria-label={`${s.label || "Job"} end`} name={`ts-dd-end-${i}`} data-testid={`ts-dd-end-${i}`} className="min-h-11 rounded border bg-transparent px-2" value={s.end} onChange={(e) => { const next = spans.map((x, j) => (j === i ? { ...x, end: e.target.value } : x)); setSpans(next); setHours((recalc(next) / 60).toFixed(2)); }} />
+                <input type="time" aria-label={`${s.label || "Job"} end`} name={`ts-dd-end-${i}`} data-testid={`ts-dd-end-${i}`} className="min-h-11 rounded border bg-transparent px-2" value={s.end} onChange={(e) => onSpans(spans.map((x, j) => (j === i ? { ...x, end: e.target.value } : x)))} />
               </div>
             ))}
             <label className="flex items-center gap-2">Paid hours<input aria-label="Paid hours" name="ts-edit-hours" data-testid="ts-edit-hours" className="min-h-11 w-24 rounded border bg-transparent px-2" inputMode="decimal" value={hours} onChange={(e) => setHours(e.target.value)} /></label>
             <div className="flex gap-2">
-              <button className="min-h-11 rounded-lg bg-teal-600 px-4 font-semibold text-white" data-testid="ts-edit-save" onClick={() => { props.onSetMinutes(Math.max(0, Number(hours) * 60 || 0), false); setEditing(false); }}>Save</button>
+              <button className="min-h-11 rounded-lg bg-teal-600 px-4 font-semibold text-white" data-testid="ts-edit-save" onClick={() => { props.onSetMinutes(Math.max(0, Number(hours) * 60 || 0), false, spans.filter((x) => x.start || x.end).map((x) => `${x.label || "Job"} ${x.start || "?"}–${x.end || "?"}`).join(", ")); setEditing(false); }}>Save</button>
               <button className={btn} onClick={() => setEditing(false)}>Cancel</button>
             </div>
           </div>

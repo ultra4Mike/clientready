@@ -7,9 +7,9 @@
  * Only this worker's own taps are written. No prices or pay are shown here, only minutes.
  */
 import { useEffect, useMemo, useState } from "react";
-import { currentPosition, directionsUrl, loadMyFixes, loadMyTaps, loadMyTimeOverrides, loadMyTimeRules, localDate, recordTap, requestFix, syncPendingTaps } from "@/lib/day-events";
+import { currentPosition, directionsUrl, loadBusinessTz, loadMyDayStatus, locationPermission, loadMyFixes, loadMyTaps, loadMyTimeOverrides, loadMyTimeRules, localDate, recordTap, requestFix, syncPendingTaps } from "@/lib/day-events";
 import {
-  allowedTaps, buildDay, dayState, DEFAULT_TIMESHEET_SETTINGS, crewFlagReasons, geofencePrompt, geofenceRadius, hm, isAllowed, metersBetween, nextActions, stillDrivingDue,
+  allowedTaps, applyFixes, buildDay, clockMs, fmtTime, hhmmTz, wallToIso, lateStartMinutes, dayState, DEFAULT_TIMESHEET_SETTINGS, crewFlagReasons, geofencePrompt, geofenceRadius, hm, isAllowed, metersBetween, nextActions, stillDrivingDue,
   type DayStateName, type FixRequest, type WorkerTimeOverrides, type ScheduledJob, type TapEvent, type TapKind, type TimesheetSettings,
 } from "@/lib/timesheet";
 
@@ -23,8 +23,8 @@ export const ACTION_LABEL: Record<Exclude<TapKind, "end_shift">, string> = {
   break_start: "Start break", break_end: "End break", end_day: "End day",
 };
 const STEPS = ["Travel", "Arrived", "Working", "Break", "Done"] as const;
-const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-const toIso = (date: string, hm5: string) => (date && /^\d{1,2}:\d{2}/.test(hm5) ? new Date(`${date}T${hm5.slice(0, 5)}:00`).toISOString() : "");
+const time = fmtTime; // account time zone, same as the owner sees
+const toIso = (date: string, hm5: string) => wallToIso(date, (hm5 || "").slice(0, 5));
 const pins = new Map<string, { lat: number; lng: number } | null>();
 export const FIX_STATUS_LABEL: Record<FixRequest["status"], string> = { pending: "Pending", approved: "Approved", denied: "Declined" };
 
@@ -44,7 +44,7 @@ async function jobPin(address: string) {
 export function stepStates(state: DayStateName, events: TapEvent[]): Record<(typeof STEPS)[number], "done" | "current" | "locked"> {
   const had = (k: TapKind) => events.some((e) => e.kind === k);
   const ended = state === "OFF_DUTY" && events.length > 0;
-  const cur: (typeof STEPS)[number] | null = ended ? "Done" : state === "IN_TRANSIT" ? "Travel" : state === "ON_BREAK" ? "Break" : state === "WORKING" ? "Working" : state === "ON_DUTY_IDLE" ? "Arrived" : null;
+  const cur: (typeof STEPS)[number] | null = ended ? "Done" : state === "IN_TRANSIT" ? "Travel" : state === "ON_BREAK" ? "Break" : state === "WORKING" ? "Working" : state === "ON_DUTY_IDLE" ? "Travel" : null; // after Start day the next step is Travel (Arrived = on the job)
   const done = { Travel: had("start_transit"), Arrived: had("arrive") || had("start_job"), Working: had("start_job") || had("arrive"), Break: had("break_end"), Done: ended };
   return Object.fromEntries(STEPS.map((s) => [s, s === cur ? "current" : done[s] || ended ? "done" : "locked"])) as Record<(typeof STEPS)[number], "done" | "current" | "locked">;
 }
@@ -57,6 +57,8 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
   const [note, setNote] = useState("");
   const [now, setNow] = useState(() => new Date().toISOString());
   const [locDenied, setLocDenied] = useState(false);
+  const [, setTzReady] = useState(0);
+  const [dayStatus, setDayStatus] = useState<{ minutes: number | null; approved: boolean } | null>(null);
   const [confirmTap, setConfirmTap] = useState<{ kind: TapKind; job?: MyDayJob } | null>(null);
   const [geoSheet, setGeoSheet] = useState<"arrive" | "leave" | null>(null);
   const [geoDismissed, setGeoDismissed] = useState("");
@@ -69,7 +71,9 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
   useEffect(() => {
     if (!email) return;
     const load = () => { void loadMyTaps(email).then(setEvents); void loadMyFixes(email).then(setFixes); };
-    load(); void loadMyTimeRules().then(setRules); void loadMyTimeOverrides().then(setWorker);
+    load(); void loadBusinessTz(true).then(() => setTzReady((n) => n + 1));
+    void locationPermission().then((p) => setLocDenied(p === "denied"));
+    void loadMyTimeRules().then(setRules); void loadMyTimeOverrides().then(setWorker);
     const online = () => void syncPendingTaps(email).then(load);
     window.addEventListener("online", online);
     void syncPendingTaps(email).then((r) => r.sent && load());
@@ -77,7 +81,9 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
   }, [email]);
   useEffect(() => { const t = window.setInterval(() => setNow(new Date().toISOString()), 15000); return () => window.clearInterval(t); }, []);
 
-  const todays = useMemo(() => events.filter((e) => e.date === today).sort((a, b) => a.at.localeCompare(b.at)), [events, today]);
+  // Owner-approved fixes replace the tapped time here too (same as the owner's timesheet).
+  const todays = useMemo(() => applyFixes(events.filter((e) => e.date === today), fixes.filter((f) => f.date === today)).sort((a, b) => a.at.localeCompare(b.at)), [events, fixes, today]);
+  useEffect(() => { if (email) void loadMyDayStatus(today, today).then((r) => setDayStatus(r[0] || null)); }, [email, today, events, fixes]);
   const yesterdays = useMemo(() => events.filter((e) => e.date === yesterday), [events, yesterday]);
   const plan = useMemo(() => jobs.filter((j) => j.date === today).sort((a, b) => a.startTime.localeCompare(b.startTime)), [jobs, today]);
   const ds = dayState(todays);
@@ -89,7 +95,10 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
   const sheet = buildDay({ employeeId: employeeId || "me", date: today, events: todays.map((e) => ({ ...e, employeeId: employeeId || "me" })), schedule, now, settings: rules, worker });
   const askStillDriving = stillDrivingDue(todays, now, rules);
   const forgotYesterday = yesterdays.length > 0 && dayState(yesterdays).state !== "OFF_DUTY" && !fixes.some((f) => f.date === yesterday && (f.kind === "end_day" || f.kind === "end_shift"));
-  const breakMs = state === "ON_BREAK" && ds.since ? new Date(now).getTime() - new Date(ds.since).getTime() : 0;
+  // Break clock: server time of the break start vs. this phone's clock corrected by the last live tap's offset. Never < 0.
+  const lastLive = [...todays].reverse().find((e) => e.deviceAt && !e.offline && !e.pending && !e.fixed);
+  const skewMs = lastLive ? new Date(lastLive.at).getTime() - new Date(lastLive.deviceAt!).getTime() : 0;
+  const breakMs = state === "ON_BREAK" && ds.since ? Math.max(0, new Date(now).getTime() + skewMs - new Date(ds.since).getTime()) : 0;
   const workedMin = sheet.workMinutes + sheet.driveMinutes;
   const hadBreak = todays.some((e) => e.kind === "break_start");
   const breakDueAfter = rules.breakPreset === "california" ? 4.5 * 60 : rules.autoMealOn ? rules.autoMealAfterHours * 60 - 30 : 0;
@@ -119,13 +128,13 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
     try { new Notification("My day", { body: msg }); } catch { /* not supported */ }
   }, [askStillDriving, reminder]);
   useEffect(() => {
-    const target = state === "IN_TRANSIT" ? current || next : state === "WORKING" ? current : undefined;
+    const target = state === "IN_TRANSIT" ? current || next : state === "ON_DUTY_IDLE" ? next || plan[0] : state === "WORKING" ? current : undefined;
     if (!target || document.visibilityState !== "visible") return;
     let off = false;
     void (async () => {
       const pos = await currentPosition();
       if (off) return;
-      if (!pos) { setLocDenied(true); return; }
+      if (!pos) { setLocDenied((await locationPermission()) === "denied"); return; } // slow GPS is not "off"
       setLocDenied(false);
       const pin = await jobPin(target.address);
       const radius = geofenceRadius(rules, target.docId, worker);
@@ -142,7 +151,7 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
     setBusy(true); setNote(""); setConfirmTap(null); setGeoSheet(null);
     const at = new Date().toISOString();
     const pos = await currentPosition();
-    setLocDenied(!pos);
+    setLocDenied(pos ? false : (await locationPermission()) === "denied");
     let notAtSite = false;
     if (kind === "start_job" || kind === "arrive") {
       if (!pos) notAtSite = geofenceRadius(rules, job?.docId, worker) > 0;
@@ -152,7 +161,10 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
     if (typeof Notification !== "undefined" && Notification.permission === "default") void Notification.requestPermission().catch(() => undefined);
     const { event, saved, local } = await recordTap({ employeeId: employeeId || "me", date: today, kind, at, deviceAt: at, docId: job?.docId || (kind === "start_job" ? (next || plan[0])?.docId : undefined), ...(pos || {}), notAtSite, ...(confirmed ? { outOfOrder: true } : {}) }, email);
     setEvents((list) => [...list.filter((e) => e.id !== event.id), event]);
-    setNote(saved !== "ok" ? `Saved on this phone, will send when online: ${saved}` : `${KIND_LABEL[kind]} at ${time(at)}.${notAtSite ? " Marked “not at job site” for your boss to check. That's okay." : ""}${confirmed ? " Flagged for your boss to check." : ""}${local ? " Saved on this phone, will send when online." : ""}`);
+    // Show the time the server saved (the same one in the list and on the owner's timesheet).
+    let shown = at;
+    if (!local) { const fresh = await loadMyTaps(email); setEvents(fresh); shown = fresh.find((e) => e.id === event.id)?.at || at; }
+    setNote(saved !== "ok" ? `Saved on this phone, will send when online: ${saved}` : `${KIND_LABEL[kind]} at ${time(shown)}.${notAtSite ? " Marked “not at job site” for your boss to check. That's okay." : ""}${confirmed ? " Flagged for your boss to check." : ""}${local ? " Saved on this phone, will send when online." : ""}`);
     setBusy(false);
   }
 
@@ -166,7 +178,8 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
   }
 
   const steps = stepStates(state, todays);
-  const reasons = crewFlagReasons(sheet, [], rules);
+  const late = lateStartMinutes(todays, schedule);
+  const reasons = [...crewFlagReasons(sheet, [], rules), ...(late > 0 ? [{ flag: "late_start", text: `Started ${hm(late)} after the planned start. Your boss sees this too.` }] : [])];
   const paidBreak = sheet.breaks.filter((b) => b.paid).reduce((s, b) => s + b.minutes, 0);
   const stateText = state === "WORKING" ? `Working${current ? ` · ${current.label}` : ""}` : state === "IN_TRANSIT" ? "Driving" : state === "ON_BREAK" ? "On break" : state === "ON_DUTY_IDLE" ? "On duty" : todays.length ? "Day ended" : "Off duty";
   const more = (Object.keys(ACTION_LABEL) as Exclude<TapKind, "end_shift">[]).filter((k) => k !== primary?.kind && k !== "end_day" && k !== "break_start" && k !== "break_end");
@@ -194,12 +207,12 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
       )}
       {(allowed.includes("break_start") || state === "ON_BREAK") && (
         <button data-testid="tap-break" data-state={state === "ON_BREAK" ? "on" : "off"} disabled={busy} className="cr-btn cr-btn-secondary w-full" onClick={() => tap(state === "ON_BREAK" ? "break_end" : "break_start")}>
-          {state === "ON_BREAK" ? <span data-testid="break-timer-wrap"><span data-testid="tap-break-label">On break</span> <span data-testid="break-timer" className="tabular-nums">{Math.floor(breakMs / 60000)}:{String(Math.floor((breakMs % 60000) / 1000)).padStart(2, "0")}</span>{breakMs / 60000 < rules.shortBreakPaidMinutes ? ` · paid under ${rules.shortBreakPaidMinutes} min` : " · unpaid"}</span> : <span data-testid="tap-break-label">Start break</span>}
+          {state === "ON_BREAK" ? <span data-testid="break-timer-wrap"><span data-testid="tap-break-label">On break</span> <span data-testid="break-timer" className="tabular-nums">{clockMs(breakMs)}</span>{breakMs / 60000 < rules.shortBreakPaidMinutes ? ` · paid under ${rules.shortBreakPaidMinutes} min` : " · unpaid"}</span> : <span data-testid="tap-break-label">Start break</span>}
         </button>
       )}
       {note && <p data-testid="my-day-note" role="status" className="text-sm">{note}</p>}
       <div data-testid="my-day-totals" className="cr-stat-row grid grid-cols-2 gap-2 text-sm tabular-nums">
-        <p data-testid="my-day-hours">Today: <b className="tabular-nums">{hm(sheet.paidMinutes)}</b> paid · day total <b data-testid="my-day-total" className="tabular-nums">{hm(sheet.paidMinutes + sheet.breakMinutes + sheet.unpaidGapMinutes)}</b></p>
+        <p data-testid="my-day-hours" data-source={dayStatus?.minutes != null ? "owner" : "taps"}>Today: <b className="tabular-nums">{hm(dayStatus?.minutes ?? sheet.paidMinutes)}</b> paid{dayStatus?.approved ? <span data-testid="my-day-approved" className="cr-chip2 cr-tone-good ml-1">Approved</span> : null} · day total <b data-testid="my-day-total" className="tabular-nums">{hm(sheet.paidMinutes + sheet.breakMinutes + sheet.unpaidGapMinutes)}</b></p>
         <p data-testid="my-day-breaks">Breaks: <b>{hm(sheet.breakMinutes + paidBreak)}</b> ({hm(paidBreak)} paid, {hm(sheet.breakMinutes)} unpaid)</p>
         {sheet.driveMinutes > 0 && <p data-testid="my-day-drive">Driving: {hm(sheet.driveMinutes)}</p>}
         {sheet.unpaidGapMinutes > 0 && <p data-testid="my-day-unpaid">Unpaid gaps: {hm(sheet.unpaidGapMinutes)}</p>}
@@ -212,7 +225,7 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
           <li key={e.id} data-testid="my-day-tap" data-pending={e.pending ? "true" : "false"} className="flex items-center justify-between gap-2">
             <span>{time(e.at)} · {KIND_LABEL[e.kind]}{e.docId ? ` · ${plan.find((j) => j.docId === e.docId)?.label || ""}` : ""}{e.notAtSite ? " · not at job site" : ""}{e.outOfOrder ? " · flagged" : ""}
               {e.pending && <span data-testid="pending-sync" className="cr-chip2 cr-tone-warn ml-1">Not sent yet</span>}</span>
-            <button className="cr-btn-text shrink-0 text-xs" data-testid="fix-time" onClick={() => setFixOpen({ eventId: e.id, kind: e.kind, at: new Date(e.at).toTimeString().slice(0, 5), reason: "", docId: e.docId, date: today })}>Fix time</button>
+            <button className="cr-btn-text shrink-0 text-xs" data-testid="fix-time" onClick={() => setFixOpen({ eventId: e.id, kind: e.kind, at: hhmmTz(e.at), reason: "", docId: e.docId, date: today })}>Fix time</button>
           </li>
         ))}
       </ol>
@@ -263,7 +276,7 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
       {fixes.length > 0 && (
         <ul data-testid="fix-history" className="space-y-1 text-xs"><li className="cr-section-label">My time fixes</li>
           {[...fixes].sort((x, y) => y.createdAt.localeCompare(x.createdAt)).slice(0, 10).map((f) => (
-            <li key={f.id} data-testid="fix-status" data-fix-id={f.id} data-state={f.status}>{f.date} · {KIND_LABEL[f.kind]} → {time(f.at)} · <span className={`cr-chip2 ${f.status === "approved" ? "cr-tone-good" : f.status === "denied" ? "cr-tone-bad" : "cr-tone-warn"}`}>{FIX_STATUS_LABEL[f.status]}</span>{f.ownerNote ? <span data-testid="fix-owner-note"> · Boss: “{f.ownerNote}”</span> : null}</li>
+            <li key={f.id} data-testid="fix-status" data-reason={f.reason || ""} data-fix-id={f.id} data-state={f.status}>{[f.date, `${KIND_LABEL[f.kind]} → ${time(f.at)}`, f.reason ? `“${f.reason}”` : ""].filter(Boolean).join(" · ")}{" "}<span className={`cr-chip2 ${f.status === "approved" ? "cr-tone-good" : f.status === "denied" ? "cr-tone-bad" : "cr-tone-warn"}`}>{FIX_STATUS_LABEL[f.status]}</span>{f.ownerNote ? <span data-testid="fix-owner-note"> · Boss: “{f.ownerNote}”</span> : null}</li>
           ))}
         </ul>
       )}

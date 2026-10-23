@@ -6,7 +6,9 @@
  *  - job:    a set amount per job.
  * Overtime (off by default) adds (multiplier - 1) x rate for hourly hours over the weekly and/or daily limit.
  */
-export type PayType = "hourly" | "day" | "job" | "shift" | "salary";
+export type PayType = "hourly" | "day" | "job" | "shift" | "salary" | "piece" | "commission" | "hybrid";
+/** Phase 2 pay types: piece (per unit/task), commission (% of the job's price, owner-side only), hybrid (hourly + per job/unit + bonus). */
+export const PHASE2_TYPES: PayType[] = ["piece", "commission", "hybrid"];
 export type PaySettings = {
   type: PayType;
   /** day: under this many worked hours pays half the day (blank = off, old behavior). */
@@ -25,6 +27,13 @@ export type PaySettings = {
   dayRate?: string;
   jobAmount?: string;
   overtime?: { on: boolean; weekly?: string; daily?: string; multiplier?: string };
+  /** piece / hybrid: pay per unit (e.g. per window, per lawn, per task) logged on the job. */
+  pieceRate?: string;
+  /** piece / hybrid: what one unit is called ("unit", "window", "lawn"). */
+  pieceUnit?: string;
+  /** commission: percent of the job's price before tax (computed on the owner side; workers only see the pay). */
+  commissionPct?: string;
+  /** hybrid: set amount per job on top of the hourly pay (jobAmount is reused). */
 };
 export const DEFAULT_PAY: PaySettings = { type: "hourly" };
 
@@ -36,7 +45,7 @@ export const cents = (value: number) => Math.round(value * 100) / 100;
 
 export function readPaySettings(raw: unknown): PaySettings {
   const value = (raw && typeof raw === "object" ? raw : {}) as Partial<PaySettings>;
-  const type: PayType = value.type === "day" || value.type === "job" || value.type === "shift" || value.type === "salary" ? value.type : "hourly";
+  const type: PayType = (["day", "job", "shift", "salary", "piece", "commission", "hybrid"] as const).includes(value.type as never) ? (value.type as PayType) : "hourly";
   const ot = value.overtime && typeof value.overtime === "object" ? value.overtime : undefined;
   return {
     type,
@@ -49,6 +58,9 @@ export function readPaySettings(raw: unknown): PaySettings {
     ...(value.salaryWeekly ? { salaryWeekly: String(value.salaryWeekly) } : {}),
     ...(value.payStart && /^\d{4}-\d{2}-\d{2}$/.test(String(value.payStart)) ? { payStart: String(value.payStart) } : {}),
     ...(value.travelRate ? { travelRate: String(value.travelRate) } : {}),
+    ...(value.pieceRate ? { pieceRate: String(value.pieceRate) } : {}),
+    ...(value.pieceUnit ? { pieceUnit: String(value.pieceUnit).slice(0, 30) } : {}),
+    ...(value.commissionPct ? { commissionPct: String(value.commissionPct) } : {}),
     ...(ot ? { overtime: { on: Boolean(ot.on), weekly: String(ot.weekly ?? "40"), daily: String(ot.daily ?? ""), multiplier: String(ot.multiplier ?? "1.5") } } : {}),
   };
 }
@@ -59,6 +71,9 @@ export function payProblem(pay: PaySettings, rate: string) {
   if (pay.type === "job" && !(num(pay.jobAmount) > 0)) return "Per-job pay needs an amount.";
   if (pay.type === "shift" && !(num(pay.shiftHours) > 0 && num(rate) > 0)) return "A set shift needs shift hours and the hourly rate.";
   if (pay.type === "salary" && !(num(pay.salaryWeekly) > 0)) return "Salary needs a weekly amount.";
+  if (pay.type === "piece" && !(num(pay.pieceRate) > 0)) return "Piece rate needs an amount per unit.";
+  if (pay.type === "commission" && !(num(pay.commissionPct) > 0 && num(pay.commissionPct) <= 100)) return "Commission needs a percent between 0 and 100.";
+  if (pay.type === "hybrid" && !(num(rate) > 0 || num(pay.jobAmount) > 0 || num(pay.pieceRate) > 0)) return "Hybrid pay needs an hourly rate, a per-job amount or a per-unit amount.";
   if (pay.overtime?.on) {
     if (!(num(pay.overtime.weekly) > 0) && !(num(pay.overtime.daily) > 0)) return "Overtime needs a weekly or daily limit.";
     if (!(num(pay.overtime.multiplier) >= 1)) return "Overtime multiplier must be 1 or more (e.g. 1.5).";
@@ -77,6 +92,17 @@ export type PayRow = {
   bonus?: string;
   hoursFromClock?: boolean;
   clockMinutes?: number;
+  /** piece / hybrid: units done on this job (owner or worker logs them). */
+  units?: string;
+  /** Snapshot: per-unit pay (piece / hybrid). */
+  pieceRate?: string;
+  /** Snapshot: commission percent, and the job price it is a percent of (owner side). */
+  commissionPct?: string;
+  commissionBase?: string;
+  /** Snapshot: hybrid set amount per job (paid on top of the hourly/timesheet pay). */
+  hybridJobAmount?: string;
+  /** Job/task rate (prevailing wage) that replaced the base wage on this job. */
+  jobRate?: string;
   /** Snapshot of the worker's pay type when added to the job (missing = hourly). */
   payType?: PayType;
   /** Snapshot of the fixed amount (day or job) for payType day/job. */
@@ -97,21 +123,34 @@ export function rowHours(row: PayRow) {
 }
 
 /** Pay for one crew row on one job, unrounded (round once at the money step). */
+/** Phase 2 per-job extras on a row: piece units, commission, hybrid set amount (0 for older rows). */
+export function rowExtraPay(row: PayRow) {
+  if (row.payType === "piece") return num(row.units) * num(row.pieceRate);
+  if (row.payType === "commission") return (num(row.commissionBase) * num(row.commissionPct)) / 100;
+  if (row.payType === "hybrid") return num(row.units) * num(row.pieceRate) + num(row.hybridJobAmount);
+  return 0;
+}
+
 export function rowPayExact(row: PayRow) {
   const extra = num(row.bonus || "");
   if (String(row.payOverride ?? "").trim() !== "") return num(row.payOverride) + extra;
   // From the cutover on: the job's share of the day timesheet (already includes drive, overtime, salary, day rules).
-  if (row.paySource === "timesheet" && row.timesheetPay !== undefined) return num(row.timesheetPay) + extra;
+  if (row.paySource === "timesheet" && row.timesheetPay !== undefined) return num(row.timesheetPay) + extra + rowExtraPay(row);
+  if (row.payType === "piece" || row.payType === "commission") return rowExtraPay(row) + extra;
+  if (row.payType === "hybrid") return rowHours(row) * num(row.jobRate || row.rate) + rowExtraPay(row) + extra;
   if (row.payType === "job") return num(row.fixedPay) + extra;
   if (row.payType === "day") return (row.dayCounted ? 0 : num(row.fixedPay)) + extra;
   // salary: fixedPay = hourly equivalent (weekly / 40) for job costing only; week pay totals use weekPay once.
   if (row.payType === "salary") return rowHours(row) * num(row.fixedPay) + extra;
-  return rowHours(row) * num(row.rate) + extra;
+  return rowHours(row) * num(row.jobRate || row.rate) + extra;
 }
 export const rowPayMoney = (row: PayRow) => cents(rowPayExact(row));
 
 /** Snapshot fields to store on a crew row when a worker is added to a job. */
-export function paySnapshot(pay: PaySettings, rate: string): Pick<PayRow, "payType" | "fixedPay"> {
+export function paySnapshot(pay: PaySettings, rate: string): Pick<PayRow, "payType" | "fixedPay" | "pieceRate" | "commissionPct" | "hybridJobAmount"> {
+  if (pay.type === "piece") return { payType: "piece", pieceRate: String(num(pay.pieceRate)) };
+  if (pay.type === "commission") return { payType: "commission", commissionPct: String(num(pay.commissionPct)) };
+  if (pay.type === "hybrid") return { payType: "hybrid", pieceRate: String(num(pay.pieceRate)), hybridJobAmount: String(num(pay.jobAmount)) };
   if (pay.type === "job") return { payType: "job", fixedPay: String(num(pay.jobAmount)) };
   if (pay.type === "day") return { payType: "day", fixedPay: String(cents(dayPay(pay, rate))) };
   if (pay.type === "salary") return { payType: "salary", fixedPay: String(cents(num(pay.salaryWeekly) / 40)) };
@@ -182,7 +221,7 @@ export function shiftMinHours(pay: PaySettings) {
 export function dayBasePay(pay: PaySettings, rate: string, workMinutes: number, driveMinutes: number) {
   const r = num(rate), tr = num(pay.travelRate) > 0 ? num(pay.travelRate) : r;
   const hours = (workMinutes + driveMinutes) / 60;
-  if (pay.type === "hourly") return (workMinutes / 60) * r + (driveMinutes / 60) * tr;
+  if (pay.type === "hourly" || pay.type === "hybrid") return (workMinutes / 60) * r + (driveMinutes / 60) * tr;
   if (pay.type === "shift") return hours >= shiftMinHours(pay) ? num(pay.shiftHours) * r : (workMinutes / 60) * r + (driveMinutes / 60) * tr;
   if (pay.type === "day") {
     const full = dayPay(pay, rate);
@@ -221,6 +260,9 @@ export function payLabel(pay: PaySettings, rate: string) {
   if (pay.type === "salary") return `$${num(pay.salaryWeekly).toFixed(2)}/week salary`;
   if (pay.type === "job") return `$${num(pay.jobAmount).toFixed(2)}/job`;
   if (pay.type === "day") return `$${dayPay(pay, rate).toFixed(2)}/day`;
+  if (pay.type === "piece") return `$${num(pay.pieceRate).toFixed(2)}/${pay.pieceUnit || "unit"}`;
+  if (pay.type === "commission") return `${num(pay.commissionPct)}% commission`;
+  if (pay.type === "hybrid") return `$${num(rate).toFixed(2)}/hr + $${num(pay.pieceRate).toFixed(2)}/${pay.pieceUnit || "unit"}${num(pay.jobAmount) > 0 ? ` + $${num(pay.jobAmount).toFixed(2)}/job` : ""}`;
   return `$${num(rate).toFixed(2)}/hr`;
 }
 

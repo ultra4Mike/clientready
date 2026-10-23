@@ -38,9 +38,13 @@ export type DayInput = {
 };
 export type JobShare = { date: string; docId: string; cents: number; minutes: number; dayCents: number; dayMinutes: number; approved: boolean };
 /** unallocated: weekly salary with no hours that week, paid once as labor not tied to a job. */
-export type DayPay = { date: string; cents: number; workMinutes: number; driveMinutes: number; approved: boolean; shares: JobShare[]; unallocated?: boolean; otHours?: number; dtHours?: number; premiumCents?: number; caPremiumHours?: number };
+export type DayPay = { date: string; cents: number; workMinutes: number; driveMinutes: number; approved: boolean; shares: JobShare[]; unallocated?: boolean; otHours?: number; dtHours?: number; premiumCents?: number; caPremiumHours?: number; topUpCents?: number };
 /** Account rules that change pay (all optional; missing = the per-worker behaviour from before phase 1). */
-export type PayRules = { halfDayHours?: number; settings?: Partial<TimesheetSettings>; weekBonus?: Map<string, number> };
+export type PayRules = { halfDayHours?: number; settings?: Partial<TimesheetSettings>; weekBonus?: Map<string, number>;
+  /** Phase 2: job/prevailing rate per job (docId -> $/h) that overrides the base hourly rate for that job's minutes. */
+  jobRates?: Map<string, number>;
+  /** Phase 2: piece / commission / hybrid extras paid per week (Monday) on the job rows; counted in the FLSA regular rate and min-wage check. */
+  weekExtra?: Map<string, number> };
 
 /** Minutes of the day after an owner edit: drive stays as logged (capped), the rest is work. */
 function dayMinutes(day: DayInput) {
@@ -77,15 +81,32 @@ export function allocateWeek(days: DayInput[], payRaw: PaySettings | unknown, ra
         continue;
       }
     }
+    // Job / prevailing wage rates: those job minutes pay the job rate instead of the base rate (hourly and hybrid).
+    if ((pay.type === "hourly" || pay.type === "hybrid") && defaults.jobRates?.size) {
+      list.forEach((d, i) => {
+        if (d.approvedMinutes != null && d.approvedMinutes !== d.sheet?.paidMinutes) return; // edited day: keep the base rate
+        for (const j of d.sheet?.jobs || []) { const jr = defaults.jobRates?.get(j.docId); if (jr != null && jr > 0) base[i] += (j.minutes / 60) * (jr - num(rate)); }
+      });
+    }
+    const weekKey = weekOf(list[0].date);
+    const extra = defaults.weekExtra?.get(weekKey) || 0;
+    const hoursOf = (i: number) => (mins[i].work + mins[i].drive) / 60;
+    const weekHours = list.reduce((s2, _, i) => s2 + hoursOf(i), 0);
     // California missed meal/rest premium: an hour at the regular rate per missed break (only when the owner turned it on).
     const caHours = list.map((d) => d.sheet?.premiumHours || 0);
     // Overtime premium per day: account preset (OT / double time / 7th day, FLSA regular rate) or the worker's own rule.
     const premium: number[] = [];
     const ot: { ot: number; dt: number }[] = list.map(() => ({ ot: 0, dt: 0 }));
     const rules = defaults.settings ? otRules({ otPreset: "worker", weeklyOtHours: 40, dailyOtHours: 0, dailyDtHours: 0, seventhDayRule: false, ...defaults.settings }) : null;
-    const hourlyLike = pay.type === "hourly" || pay.type === "shift";
-    if (rules && hourlyLike) {
-      const bonus = defaults.settings?.bonusInRegularRate === false ? 0 : defaults.weekBonus?.get(weekOf(list[0].date)) || 0;
+    const hourlyLike = pay.type === "hourly" || pay.type === "shift" || pay.type === "hybrid";
+    const nonHourly = pay.type === "day" || pay.type === "job" || pay.type === "piece" || pay.type === "commission";
+    if (nonHourly && defaults.settings?.flsaNonHourly && weekHours > 40) {
+      // FLSA for piece / day-rate / commission: regular rate = all pay / all hours; each hour over 40 earns 0.5x more.
+      const regular = (base.reduce((s2, x) => s2 + x, 0) + extra) / weekHours;
+      let seen = 0;
+      list.forEach((_, i) => { const h = hoursOf(i); const over = Math.max(0, seen + h - 40) - Math.max(0, seen - 40); seen += h; premium.push(over * regular * 0.5); ot[i] = { ot: over, dt: 0 }; });
+    } else if (rules && hourlyLike) {
+      const bonus = (defaults.settings?.bonusInRegularRate === false ? 0 : defaults.weekBonus?.get(weekKey) || 0) + (pay.type === "hybrid" ? extra : 0);
       const res = overtimeTiers(list.map((d, i) => ({ date: d.date, hours: (mins[i].work + mins[i].drive) / 60, straight: base[i] })), rules, bonus);
       res.days.forEach((r, i) => { premium.push(r.premium); ot[i] = { ot: r.otHours, dt: r.dtHours }; });
     } else {
@@ -101,19 +122,27 @@ export function allocateWeek(days: DayInput[], payRaw: PaySettings | unknown, ra
       });
     }
     list.forEach((_, i) => { if (caHours[i] > 0 && num(rate) > 0) premium[i] += caHours[i] * num(rate); });
-    const exact = list.map((_, i) => base[i] + premium[i]);
+    // Minimum wage top-up: when all the week's pay (incl. piece / commission extras) is under min wage x hours, pay the gap, spread by hours.
+    const minWage = num(defaults.settings?.minWage);
+    const topUp = list.map(() => 0);
+    if (minWage > 0 && weekHours > 0 && pay.type !== "salary") {
+      const paid = base.reduce((s2, x) => s2 + x, 0) + extra;
+      const gap = Math.round((minWage * weekHours - paid) * 100);
+      if (gap > 0) splitCents(gap, list.map((_, i) => hoursOf(i))).forEach((c, i) => { topUp[i] = c / 100; });
+    }
+    const exact = list.map((_, i) => base[i] + premium[i] + topUp[i]);
     const weekCents = Math.round(exact.reduce((s, x) => s + x, 0) * 100);
     const dayCents = splitCents(weekCents, exact.map((x) => Math.max(0, x)));
     list.forEach((d, i) => {
       const cents = exact.every((x) => x <= 0) ? 0 : dayCents[i];
-      out.push({ date: d.date, cents, workMinutes: mins[i].work, driveMinutes: mins[i].drive, approved: d.approved, shares: shareDay(d, cents, mins[i], pay, rate), otHours: ot[i].ot, dtHours: ot[i].dt, premiumCents: Math.round(premium[i] * 100), caPremiumHours: caHours[i] });
+      out.push({ date: d.date, cents, workMinutes: mins[i].work, driveMinutes: mins[i].drive, approved: d.approved, shares: shareDay(d, cents, mins[i], pay, rate, defaults.jobRates), otHours: ot[i].ot, dtHours: ot[i].dt, premiumCents: Math.round(premium[i] * 100), caPremiumHours: caHours[i], ...(topUp[i] ? { topUpCents: Math.round(topUp[i] * 100) } : {}) });
     });
   }
   return out;
 }
 
 /** Split one day's cents across its jobs: work pay by work minutes, drive pay to the job driven TO. */
-export function shareDay(day: DayInput, cents: number, m: { work: number; drive: number }, pay: PaySettings, rate: string): JobShare[] {
+export function shareDay(day: DayInput, cents: number, m: { work: number; drive: number }, pay: PaySettings, rate: string, jobRates?: Map<string, number>): JobShare[] {
   const sheet = day.sheet;
   const docIds: string[] = [];
   const add = (id?: string) => { if (id && !docIds.includes(id)) docIds.push(id); };
@@ -121,12 +150,14 @@ export function shareDay(day: DayInput, cents: number, m: { work: number; drive:
   if (!docIds.length) (day.fallbackDocIds || []).forEach(add);
   if (!docIds.length) return [];
   const workW = docIds.map((id) => sheet?.jobs.filter((j) => j.docId === id).reduce((s, j) => s + j.minutes, 0) || 0);
+  // Job rates: a job paid at a higher rate gets that much more of the day's work pay.
+  if ((pay.type === "hourly" || pay.type === "hybrid") && jobRates?.size && num(rate) > 0) docIds.forEach((id, i) => { const jr = jobRates.get(id); if (jr != null && jr > 0) workW[i] *= jr / num(rate); });
   const driveW = docIds.map((id) => sheet?.drives.filter((d) => d.toDocId === id).reduce((s, d) => s + d.paidMinutes, 0) || 0);
   const driveTotal = driveW.reduce((s, x) => s + x, 0);
   // Share of the day's pay that is drive pay (travel rate aware for hourly / short shift days).
   const r = num(rate), tr = num(pay.travelRate) > 0 ? num(pay.travelRate) : r;
   const baseAll = dayBasePay(pay, rate, m.work, m.drive);
-  const hourlyLike = pay.type === "hourly" || (pay.type === "shift" && baseAll !== num(pay.shiftHours) * r);
+  const hourlyLike = pay.type === "hourly" || pay.type === "hybrid" || (pay.type === "shift" && baseAll !== num(pay.shiftHours) * r);
   let driveFrac = 0;
   if (m.drive > 0 && driveTotal > 0) driveFrac = hourlyLike && baseAll > 0 ? ((m.drive / 60) * tr) / baseAll : m.drive / (m.work + m.drive);
   const exact = docIds.map((_, i) => {

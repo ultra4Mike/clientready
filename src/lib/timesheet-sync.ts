@@ -8,18 +8,19 @@ import { DOCS_KEY } from "@/lib/doc-sync";
 import { readOwnerClock } from "@/lib/clock";
 import { readHoursApprovals } from "@/lib/hours-approval";
 import { readSchedule, readWorkers, type Worker } from "@/lib/schedule";
-import { rowPayMoney, weekOf, type PayRow } from "@/lib/pay-types";
+import { rowExtraPay, rowPayMoney, weekOf, type PayRow } from "@/lib/pay-types";
 import { loadOwnerTimesheet, type DayApproval } from "@/lib/day-events";
-import { applyFixes, buildDay, readWorkerOverrides, estimateDriveMinutes, type DaySheet, type FixRequest, type ScheduledJob, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
+import { applyFixes, buildDay, dedupeTaps, wallToIso, ymdTz, readWorkerOverrides, estimateDriveMinutes, type DaySheet, type FixRequest, type ScheduledJob, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
 import { readRouteMinutes } from "@/lib/route-cache";
+import { jobPrice, jobRates } from "@/lib/pay-phase2";
 import { allocateWeek, applySharesToCrew, unallocatedSalaryWeeks, type DayPay, type JobShare } from "@/lib/timesheet-pay";
 
 export const CUTOVER_KEY = "clientready-timesheet-pay-cutover";
 type Doc = { id: string; type?: string; title?: string; clientName?: string; data?: Record<string, unknown> };
 
 export const addDays = (date: string, n: number) => { const d = new Date(`${date}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
-const localYmd = (iso: string) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
-const toIso = (date: string, hm: string) => (date && /^\d{1,2}:\d{2}/.test(hm || "") ? new Date(`${date}T${hm.slice(0, 5)}:00`).toISOString() : "");
+const localYmd = (iso: string) => ymdTz(new Date(iso));
+const toIso = (date: string, hm: string) => wallToIso(date, (hm || "").slice(0, 5));
 
 /**
  * First day paid from the timesheet. Set once, the first time this runs after the switch, to the NEXT day, so
@@ -83,7 +84,9 @@ export function weekSheets(input: { workers: Worker[]; docs: Doc[]; events: TapE
     { id: `clk-${c.id}-in`, employeeId: c.employee_id, date: localYmd(c.started_at), kind: "start_job" as const, at: c.started_at, docId: c.doc_id },
     ...(c.ended_at ? [{ id: `clk-${c.id}-out`, employeeId: c.employee_id, date: localYmd(c.started_at), kind: "end_shift" as const, at: c.ended_at, docId: c.doc_id }] : []),
   ]);
-  const events = applyFixes([...input.events, ...clockTaps], input.fixes);
+  // Old per-job clock entries count only on days with no My day taps (never both: no double hours).
+  const tapDays = new Set(input.events.map((e) => `${e.employeeId}|${e.date}`));
+  const events = applyFixes(dedupeTaps([...input.events, ...clockTaps.filter((c) => !tapDays.has(`${c.employeeId}|${c.date}`))]), input.fixes);
   const days = Array.from({ length: 7 }, (_, i) => addDays(input.week, i));
   const sheets = new Map<string, DaySheet>();
   for (const worker of input.workers) for (const date of days) {
@@ -116,7 +119,14 @@ export function weekShares(input: { workers: Worker[]; docs: Doc[]; days: string
       if (r.employeeId !== w.id || r.bonusDiscretionary || !input.days.includes(rowDate(r, doc))) continue;
       const b = Number(String(r.bonus ?? "").replace(/[^0-9.-]/g, "")); if (b > 0) weekBonus.set(wk, (weekBonus.get(wk) || 0) + b);
     }
-    const week = allocateWeek(list, w.paySettings, w.rate || "", { halfDayHours: input.settings?.halfDayHours, settings: input.settings, weekBonus });
+    // Piece / commission / hybrid extras on his rows this week (FLSA regular rate + min-wage check).
+    const weekExtra = new Map<string, number>();
+    for (const doc of input.docs) for (const r of ((doc.data?.crew || []) as (PayRow & { employeeId?: string; workDate?: string })[])) {
+      if (r.employeeId !== w.id || !input.days.includes(rowDate(r, doc))) continue;
+      const e = rowExtraPay(r.payType === "commission" && !r.commissionBase ? { ...r, commissionBase: String(jobPrice(doc as never)) } : r);
+      if (e > 0) weekExtra.set(wk, (weekExtra.get(wk) || 0) + e);
+    }
+    const week = allocateWeek(list, w.paySettings, w.rate || "", { halfDayHours: input.settings?.halfDayHours, settings: input.settings, weekBonus, weekExtra, jobRates: jobRates(input.docs as never, input.settings) });
     // Unallocated salary only for weeks from the pay cutover / his pay start up to this week (same rule as Year packet).
     if (week.some((d) => d.unallocated)) {
       const owed = unallocatedSalaryWeeks({ workers: [w], docs: [], cutover: readCutover() || timesheetCutover(), today: localYmd(new Date().toISOString()) }).some((u) => u.week === weekOf(input.days[0]));
@@ -145,6 +155,9 @@ export function applyWeekToDocs(docs: Doc[], shares: Map<string, JobShare>, cuto
     // Rows with no workDate use the schedule date for matching.
     const dated = crew.map((row) => ({ ...row, workDate: rowDate(row, doc) }));
     const res = applySharesToCrew(dated, doc.id, mine, cutover, oldIds);
+    // Commission rows not paid yet follow the job price (before tax).
+    const price = (jobPrice(doc as never)).toFixed(2);
+    res.crew = res.crew.map((row) => { if (row.payType !== "commission" || row.paidToWorker || row.commissionBase === price) return row; res.changed = true; return { ...row, commissionBase: price }; });
     if (!res.changed) return doc;
     const out = res.crew.map((row, i) => ({ ...row, workDate: crew[i].workDate ?? row.workDate }));
     const costs = (doc.data?.jobCosts || {}) as Record<string, unknown>;
