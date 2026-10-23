@@ -10,7 +10,8 @@ import ScheduleEditor from "@/components/ScheduleEditor";
 import { uniqueDocs } from "@/lib/change-orders";
 import { scheduledJobs } from "@/lib/scheduled-jobs";
 import { expandJobDays, dragPayload, readDragPayload } from "@/lib/job-days";
-import { allConflicts, bookingConflicts, clockText, nextOpenSlot, readOverrides, splitConflicts } from "@/lib/conflicts";
+import { chipTimeRange } from "@/lib/chip-time";
+import { allConflicts, bookingConflicts, clashPrompts, clockText, nextOpenSlot, readOverrides, splitConflicts } from "@/lib/conflicts";
 import { ignoresTentative, isTentative, PRESETS, readCalendarFilter, saveCalendarFilter, visibleOnCalendar, type CalendarFilter } from "@/lib/calendar-filter";
 import { belongsInUnscheduled, isDueInvoice } from "@/lib/doc-status";
 import CalendarFilterBar from "@/components/CalendarFilterBar";
@@ -92,14 +93,18 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
   const unscheduled = jobDocs.filter((doc) => belongsInUnscheduled(doc, jobDocs, Boolean(readSchedule(doc.data))));
 
   async function save(docId: string, schedule: Schedule | null, options?: { keepOpen?: boolean; confirmed?: string[] }) {
+    // Retest bug 1: report what really happened (a refused or failed save no longer shows "Booked anyway").
+    let saved = false;
     try {
-      await saveSchedule(docId, schedule, options?.confirmed);
+      saved = Boolean(await saveSchedule(docId, schedule, options?.confirmed));
       setState((prev) => ({ ...prev, docs: readDocs() }));
-      setMessage(schedule ? "Schedule saved" : "Job unscheduled");
+      setMessage(saved ? (schedule ? "Schedule saved" : "Job unscheduled") : "Not saved: this job could not be moved (see the job for details).");
     } catch {
       setMessage("Could not save the schedule.");
     }
+    if (!saved) setConflictNote((note) => (note ? { state: "blocked", text: "Not moved: the schedule could not be saved." } : note));
     if (!options?.keepOpen) setEditing(null);
+    return saved;
   }
 
   /**
@@ -151,12 +156,13 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
         const who = clash.map((c) => `${workerName.get(c.workerId) || "Worker"} is already on ${c.title} ${clockText(c.start)}–${clockText(c.end)}`).join("\n");
         const length = jobMinutes(next.startTime, next.endTime);
         const slot = nextOpenSlot(docs, docId, date, next.workerIds, length, next.startTime ? toMin(next.startTime) : undefined, { ignoreTentative: skipTentative }) || nextOpenSlot(docs, docId, date, next.workerIds, length, undefined, { ignoreTentative: skipTentative });
-        if (slot && window.confirm(`Double-booked:\n${who}\n\nMove it to the next open time, ${clockText(toMin(slot))}, instead?`)) {
+        const prompts = clashPrompts(who, slot ? clockText(toMin(slot)) : "");
+        if (slot && window.confirm(prompts.move)) {
           const moved = moveSchedule(next, date, slot);
           setConflictNote({ state: "moved", text: `Moved to the next open time, ${clockText(toMin(slot))}.` });
           return save(docId, moved);
         }
-        if (!window.confirm(`Book anyway?\n${who}\n\nThey'll be on two jobs at once. This is saved on the job. Cancel keeps it where it was.`)) {
+        if (!window.confirm(prompts.anyway)) {
           setConflictNote({ state: "blocked", text: "Not moved: someone on this job is already booked then." });
           return;
         }
@@ -190,12 +196,12 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
       >
         {agenda ? (
           <span className="flex min-w-0 items-baseline gap-2">
-            <span className="shrink-0 font-semibold tabular-nums">{job.schedule.startTime ? timeLabel(job.schedule.startTime) : "Any time"}{crossesMidnight(job.schedule.startTime, job.schedule.endTime) ? `–${timeLabel(job.schedule.endTime || "")} (next day)` : ""}</span>{" "}
+            <span data-testid={`${tid}chip-time`} className="shrink-0 font-semibold tabular-nums">{job.schedule.startTime ? chipTimeRange(job.schedule.startTime, job.schedule.endTime) : "Any time"}{crossesMidnight(job.schedule.startTime, job.schedule.endTime) ? " (next day)" : ""}</span>{" "}
             <span className="min-w-0 truncate">{job.doc.title}{job.doc.clientName ? <span className="opacity-80"> · {job.doc.clientName}</span> : null}</span>
           </span>
         ) : (
           <>
-            {job.schedule.startTime && <span className="font-semibold">{timeLabel(job.schedule.startTime)}{crossesMidnight(job.schedule.startTime, job.schedule.endTime) ? `–${timeLabel(job.schedule.endTime || "")} ☾` : ""} </span>}
+            {job.schedule.startTime && <span data-testid={`${tid}chip-time`} className="block text-[11px] font-semibold tabular-nums">{chipTimeRange(job.schedule.startTime, job.schedule.endTime)}{crossesMidnight(job.schedule.startTime, job.schedule.endTime) ? " ☾" : ""}</span>}
             {job.day && <span data-testid={`${tid}day-label`} className="mr-1 inline-block rounded bg-black/10 px-1 text-[10px] font-semibold uppercase tracking-wide dark:bg-white/10">Day {job.day.index} of {job.day.count}</span>}
             {job.doc.clientName || job.doc.title}
           </>

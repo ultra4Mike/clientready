@@ -5,7 +5,7 @@ import { derivedWhen, isoDate } from "@/lib/job-when";
 import { readChecklist, type ChecklistItem } from "@/lib/checklist";
 import { supabase } from "@/lib/supabase";
 import { isUuid, saveCloudDocument, type CloudDoc } from "@/lib/cloud-docs";
-import { moneySnapshot } from "@/lib/change-orders";
+import { crewHandoff, moneySnapshot } from "@/lib/change-orders";
 import { holdsSchedule, isRevision, parentOf } from "@/lib/change-order-revision";
 import { readOverrides, type Override } from "@/lib/conflicts";
 import { addDaysYmd as addDayOvernight, jobMinutes } from "@/lib/overnight";
@@ -31,7 +31,29 @@ export type Schedule = {
   checklist?: ChecklistItem[];
   /** "Book anyway" decisions: this person may overlap that other job (lib/conflicts). */
   overrides?: Override[];
+  /** Retest bug 5: the job's later days (day 2+), stored on the schedule so a day exists with no crew assigned. */
+  days?: ScheduleDay[];
 };
+export type ScheduleDay = { date: string; startTime?: string; endTime?: string };
+/** Stored later days: valid dates after day 1, within the span, sorted, no duplicates. */
+export function readScheduleDays(value: unknown, day1?: string): ScheduleDay[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: ScheduleDay[] = [];
+  for (const raw of value as Partial<ScheduleDay>[]) {
+    const date = String(raw?.date || "");
+    if (!isDate(date) || seen.has(date) || (day1 && date <= day1)) continue;
+    seen.add(date);
+    out.push({ date, ...(isTime(raw.startTime) ? { startTime: String(raw.startTime) } : {}), ...(isTime(raw.endTime) ? { endTime: String(raw.endTime) } : {}) });
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+/** Moves the stored later days with day 1 (same offsets). */
+export function shiftScheduleDays(days: ScheduleDay[] | undefined, from: string, to: string): ScheduleDay[] | undefined {
+  if (!days || !from || !to || from === to) return days;
+  const delta = Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86400000);
+  return days.map((d) => { const x = new Date(`${d.date}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + delta); return { ...d, date: x.toISOString().slice(0, 10) }; });
+}
 export type Worker = { id: string; name: string; email?: string; phone?: string; role?: string; rate?: string; active?: boolean; paySettings?: unknown; hireDate?: string; timeOverrides?: unknown };
 /** The older per-job crew/pay rows (data.crew). */
 export type CrewRow = {
@@ -108,6 +130,7 @@ export function readSchedule(data: Record<string, unknown> | undefined): Schedul
       ...(raw.onMyWayBy ? { onMyWayBy: String(raw.onMyWayBy).slice(0, 80) } : {}),
       ...(readChecklist(raw.checklist).length ? { checklist: readChecklist(raw.checklist) } : {}),
       ...(readOverrides(raw.overrides).length ? { overrides: readOverrides(raw.overrides) } : {}),
+      ...(readScheduleDays(raw.days, String(raw.date)).length ? { days: readScheduleDays(raw.days, String(raw.date)) } : {}),
     };
   }
   // A job with a start time but no schedule is still on the calendar (shared rule: lib/job-when).
@@ -171,7 +194,8 @@ export function moveSchedule(schedule: Schedule, date: string, startTime?: strin
   if (startTime && schedule.startTime && schedule.endTime) {
     endTime = hhmm((minutes(startTime) + jobMinutes(schedule.startTime, schedule.endTime)) % 1440); // cal24: keeps an overnight length
   }
-  return { ...schedule, date, startTime: start, ...(endTime ? { endTime } : {}) };
+  const days = shiftScheduleDays(schedule.days, schedule.date, date);
+  return { ...schedule, date, startTime: start, ...(endTime ? { endTime } : {}), ...(days ? { days } : {}) };
 }
 
 function allEmployees(): Worker[] {
@@ -241,15 +265,16 @@ export function shiftCrewDays<R extends DatedRow>(crew: R[], from: Pick<Schedule
  * within MULTI_DAY_SPAN days after it are further days of the same job. Without an anchor row on the
  * schedule's day (e.g. the whole job was rescheduled) the job is the schedule's single day.
  */
-export function scheduleDays(schedule: Pick<Schedule, "date"> | null | undefined, crew: DatedRow[] = []): Set<string> {
+export function scheduleDays(schedule: (Pick<Schedule, "date"> & { days?: unknown }) | null | undefined, crew: DatedRow[] = []): Set<string> {
   const days = new Set<string>();
   if (!schedule?.date || !isDate(schedule.date)) return days;
   days.add(schedule.date);
-  const unpaid = crew.filter((row) => !lockedRow(row) && isDate(row.workDate)).map((row) => String(row.workDate));
-  if (!unpaid.includes(schedule.date)) return days;
   const last = new Date(`${schedule.date}T12:00:00Z`); last.setUTCDate(last.getUTCDate() + MULTI_DAY_SPAN);
   const max = last.toISOString().slice(0, 10);
-  for (const d of unpaid) if (d > schedule.date && d <= max) days.add(d);
+  // Retest bug 5: stored days count even with nobody on them.
+  for (const d of readScheduleDays(schedule.days, schedule.date)) if (d.date <= max) days.add(d.date);
+  const unpaid = crew.filter((row) => !lockedRow(row) && isDate(row.workDate)).map((row) => String(row.workDate));
+  if (unpaid.includes(schedule.date)) for (const d of unpaid) if (d > schedule.date && d <= max) days.add(d);
   return days;
 }
 
@@ -386,7 +411,11 @@ export function applySchedule<T extends CloudDoc>(docs: T[], docId: string, sche
   const prev = data.schedule ? readSchedule(data) : null;
   if (schedule) {
     const ids = dedupeWorkerIds(data.schedule ? schedule.workerIds : [...schedule.workerIds, ...crewIds(crew)]);
-    data.schedule = { ...schedule, workerIds: ids, updatedAt: new Date().toISOString() };
+    // Retest bug 5: a schedule written without its days (schedule editor, crew assign) keeps the stored ones,
+    // moved with day 1; an explicit `days` (even []) replaces them.
+    const days = "days" in schedule ? readScheduleDays(schedule.days, schedule.date) : readScheduleDays(shiftScheduleDays(prev?.days, prev?.date || "", schedule.date), schedule.date);
+    const { days: _drop, ...rest } = schedule; void _drop;
+    data.schedule = { ...rest, ...(days.length ? { days } : {}), workerIds: ids, updatedAt: new Date().toISOString() };
     data.crew = crewForWorkers(shiftCrewDays(crew, prev, schedule.date), ids, schedule);
   } else {
     delete data.schedule;
@@ -464,17 +493,26 @@ export async function jobPinFor(data: Record<string, unknown> | undefined): Prom
 }
 
 export async function saveSchedule(docId: string, schedule: Schedule | null, confirmed: string[] = []) {
-  const applied = applySchedule(readDocs(), docId, schedule, confirmed);
-  if (!applied) return null;
-  if (schedule) {
-    // Save the job pin with the schedule so the timesheet's distance check has coordinates (no money fields touched).
-    const pin = await jobPinFor(applied.doc.data as Record<string, unknown>);
-    if (pin) {
-      applied.doc = { ...applied.doc, data: { ...(applied.doc.data || {}), pin } };
-      applied.docs = applied.docs.map((d) => (d.id === docId ? applied.doc : d));
-    }
+  const first = applySchedule(readDocs(), docId, schedule, confirmed);
+  if (!first) return null;
+  // Save the job pin with the schedule so the timesheet's distance check has coordinates (no money fields touched).
+  const pin = schedule ? await jobPinFor(first.doc.data as Record<string, unknown>) : null;
+  // Retest bug 4: the pin lookup waits on the network. Apply the schedule to the list as it is NOW, so an invoice
+  // save made meanwhile (Sent $350) is not overwritten by the copy read before it (Draft $300).
+  const applied = applySchedule(readDocs(), docId, schedule, confirmed) || first;
+  if (pin) {
+    applied.doc = { ...applied.doc, data: { ...(applied.doc.data || {}), pin } };
+    applied.docs = applied.docs.map((d) => (d.id === docId ? applied.doc : d));
+  }
+  // Retest bug 1: moving a sent revision made before the crew hand-off existed also takes the unworked crew
+  // rows off the replaced version (else they stay booked there).
+  const handoff = isRevision(applied.doc) ? crewHandoff(parentOf(applied.docs, applied.doc), applied.doc) : null;
+  if (handoff) {
+    applied.doc = handoff.rev;
+    applied.docs = applied.docs.map((d) => (d.id === handoff.parent.id ? handoff.parent : d.id === docId ? applied.doc : d));
   }
   window.localStorage.setItem(DOCS_KEY, JSON.stringify(applied.docs));
+  if (handoff) await saveCloudDocument(handoff.parent).catch(() => handoff.parent.id);
   const cloudId = await saveCloudDocument(applied.doc);
   // saveCloudDocument may adopt the cloud's approval/schedule and stamps updatedAt: store that copy.
   const latest = readDocs().map((doc) => (doc.id === docId ? { ...applied.doc, id: cloudId } : doc));

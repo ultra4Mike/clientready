@@ -1,6 +1,7 @@
 import { derivedWhen } from "./job-when";
 import { isUnsentDraft, needsApproval } from "./doc-status";
 import { addDaysYmd, DAY_MINUTES, jobMinutes } from "./overnight";
+import { holdsSchedule, isRevision, rootIdOf } from "./change-order-revision";
 
 /** Clash rule: an unapproved proposal / pending change order or an unsent draft invoice is tentative (soft warning); approved or sent work is hard. */
 export const softClash = (doc: Doc, allDocs: Doc[] = []) => { const d = doc as Doc & { type?: string }; return needsApproval(d, allDocs) || (d.type !== "proposal" && isUnsentDraft(d)); };
@@ -54,6 +55,8 @@ const fromId = (doc?: Doc) => String((doc?.data?.fromProposal as { id?: string }
 function sameJob(a: Doc, b?: Doc) {
   if (!b) return false;
   if (fromId(a) === b.id || fromId(b) === a.id) return true;
+  // Retest bug 1: a revised-version change order and the version it revises are one job (same root), never a clash.
+  if ((isRevision(a as never) || isRevision(b as never)) && rootIdOf(a as never) === rootIdOf(b as never)) return true;
   const n = (d: Doc) => String(d.data?.invoiceNumber || "").trim().toLowerCase();
   return Boolean(n(a)) && n(a) === n(b) && (a as { type?: string }).type === (b as { type?: string }).type && (a as { clientName?: string }).clientName === (b as { clientName?: string }).clientName;
 }
@@ -66,6 +69,8 @@ export function bookedBlocks(docs: Doc[], docId: string, date: string, workerIds
   const byId = new Map(docs.map((doc) => [doc.id, doc]));
   for (const doc of docs) {
     if (!doc || doc.id === docId || sameJob(doc, byId.get(docId))) continue;
+    // Retest bug 1: a replaced version (its sent revision holds the job), a draft or void revision never blocks anyone.
+    if (!holdsSchedule(docs as never, doc as never)) continue;
     const s = sched(doc);
     if (!s || s.status === "done") continue;
     // cal24: the day before (an overnight job still running after midnight) and the day after (my overnight job runs into it),
@@ -118,6 +123,7 @@ export function allConflicts(docs: Doc[]) {
   const seen = new Set<string>();
   const out: { docId: string; otherDocId: string; workerId: string; title: string; otherTitle: string; date: string; start: number; end: number; tentative: boolean }[] = [];
   for (const doc of docs) {
+    if (!holdsSchedule(docs as never, doc as never)) continue;
     const s = sched(doc);
     if (!s) continue;
     for (const c of bookingConflicts(docs, doc.id, s)) {
@@ -151,4 +157,15 @@ export function moveToNextOpen(docs: Doc[], doc: Doc): { startTime: string; endT
 export function clashingIds(docs: Doc[], { includeTentative = false }: { includeTentative?: boolean } = {}) {
   // R127: a clash with a job that isn't approved is a soft heads-up, not counted here unless asked.
   return new Set(allConflicts(docs).filter((c) => includeTentative || !c.tentative).flatMap((c) => [c.docId, c.otherDocId]));
+}
+
+/**
+ * Retest bug 1: the two calendar double-booking prompts, worded the same way (what OK does, what Cancel does),
+ * so the second never contradicts the first. `slot` = the next open time text, or "" when there is none.
+ */
+export function clashPrompts(who: string, slot: string) {
+  return {
+    move: `Double-booked:\n${who}\n\nOK: move it to the next open time, ${slot}.\nCancel: don't move it there (you can still book it here anyway).`,
+    anyway: `Book anyway?\n${who}\n\nOK: book it here anyway (they'll be on two jobs at once; this is saved on the job).\nCancel: keep it where it was.`,
+  };
 }

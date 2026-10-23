@@ -117,13 +117,45 @@ export function readBase(id: string): Data | null {
   return readBases()[id] || null;
 }
 
+// Retest bug 4 (silent save loss): a few earlier synced versions per document, keyed by their updatedAt, so a save
+// from a copy read before a newer save (a background sync or schedule write that awaited the network) merges
+// against the version it was really made from, instead of overwriting the newer save field by field.
+const HISTORY_KEY = "clientready-doc-history";
+const HISTORY_PER_DOC = 3;
+const HISTORY_DOCS = 40;
+type History = Record<string, Data[]>;
+function readHistory(): History {
+  if (typeof window === "undefined") return {};
+  try { return JSON.parse(window.localStorage.getItem(HISTORY_KEY) || "{}") as History; } catch { return {}; }
+}
+/** The synced version of this document stamped `stamp` (its data.updatedAt), if this device still has it. */
+export function readAncestor(id: string, stamp: unknown): Data | null {
+  if (!stamp) return null;
+  const current = readBase(id);
+  if (current && current.updatedAt === stamp) return current;
+  return (readHistory()[id] || []).find((d) => d.updatedAt === stamp) || null;
+}
+function remember(history: History, id: string, data: Data) {
+  if (!data.updatedAt) return;
+  const list = (history[id] || []).filter((d) => d.updatedAt !== data.updatedAt);
+  delete history[id];
+  history[id] = [data, ...list].slice(0, HISTORY_PER_DOC);
+}
+
 export function writeBases(entries: { id: string; data: Data | null | undefined }[]) {
   if (typeof window === "undefined" || !entries.length) return;
   const all = readBases();
+  const history = readHistory();
   for (const { id, data } of entries) {
+    if (all[id]) remember(history, id, all[id]);
     if (data) all[id] = slim(data) as Data;
-    else delete all[id];
+    else { delete all[id]; delete history[id]; }
   }
+  try {
+    const ids = Object.keys(history);
+    for (const id of ids.slice(0, Math.max(0, ids.length - HISTORY_DOCS))) delete history[id];
+    window.localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  } catch { /* history is best effort */ }
   try {
     window.localStorage.setItem(BASE_KEY, JSON.stringify(all));
   } catch {

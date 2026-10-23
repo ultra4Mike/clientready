@@ -6,7 +6,7 @@ import { csvText, downloadCsv } from "@/lib/csv";
 import EmptyState from "@/components/EmptyState";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { fetchCloudDocuments, deleteCloudDocument, getUserId } from "@/lib/cloud-docs";
-import { mergeDocs, OWNER_KEY } from "@/lib/doc-sync";
+import { mergeDocs, OWNER_KEY, writeLocalDocsKeepingNewer } from "@/lib/doc-sync";
 import { runDueRecurring } from "@/lib/recurring";
 import { ApprovalBadge } from "@/components/Approval";
 import { needsCoSignature } from "@/lib/co-signature";
@@ -106,6 +106,7 @@ export default function DocumentsPage({ initialView = "all" }: { initialView?: "
     }
 
     async function syncDocs() {
+      const startedAt = Date.now();
       const raw = window.localStorage.getItem("clientready-documents");
       const local = raw ? JSON.parse(raw) : [];
       if (local.length) setDocuments(local);
@@ -121,8 +122,8 @@ export default function DocumentsPage({ initialView = "all" }: { initialView?: "
       // Cloud copies are the merge base for documents this device isn't about to upload (see three-way.ts).
       const pending = new Set(pushUp.map((doc) => doc.id));
       writeBases((cloud as SavedDocument[]).filter((doc) => !pending.has(doc.id)).map((doc) => ({ id: doc.id, data: doc.data as Record<string, unknown> })));
-      setDocuments(merged);
-      window.localStorage.setItem("clientready-documents", JSON.stringify(merged));
+      // Retest bug 4: keep anything saved on this device while the fetch was out.
+      setDocuments(writeLocalDocsKeepingNewer(merged, startedAt).docs);
     }
     load();
   }, []);

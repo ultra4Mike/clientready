@@ -14,7 +14,8 @@ import JobDonePanel from "@/components/JobDonePanel";
 import { StageEditor, StageSchedule } from "@/components/StageSchedule";
 import { balanceLabel, readStages, type Stage } from "@/lib/stages";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { deleteCloudDocument, saveCloudDocument } from "@/lib/cloud-docs";
+import { deleteCloudDocument, isUuid, saveCloudDocument } from "@/lib/cloud-docs";
+import { unsyncedIds } from "@/lib/sync-status";
 import { displayStatus, jobMessageKind, rowStage } from "@/lib/doc-status";
 import InventoryUse, { type StockUse } from "@/components/InventoryUse";
 import { OwnerVisitNotes } from "@/components/CrewVisitNote";
@@ -51,8 +52,8 @@ import { ownerRating, starsText, type Rating } from "@/lib/ratings";
 import { applyPackage, deletePackage, readPackages, savePackage, syncPackages, type JobPackage } from "@/lib/packages";
 import ReminderPanel from "@/components/ReminderPanel";
 import { normalizeCategory, type LineCategory } from "@/lib/line-split";
-import { chainCredits, childRevision, creditLabel, newestDescendant, revisionOwed } from "@/lib/change-order-revision";
-import { appendChangeOrderNote, changeOrdersFor, revisionData, mergeChangeOrderNotes, readChangeOrderNotes, readChangeOrderOf, type ChangeOrderNote, type ChangeOrderOf } from "@/lib/change-orders";
+import { chainCredits, childRevision, creditLabel, newestDescendant, parentOf, revisionOwed } from "@/lib/change-order-revision";
+import { appendChangeOrderNote, changeOrdersFor, crewHandoff, revisionData, mergeChangeOrderNotes, readChangeOrderNotes, readChangeOrderOf, type ChangeOrderNote, type ChangeOrderOf } from "@/lib/change-orders";
 import ChangeOrderNotes from "@/components/ChangeOrderNotes";
 import { ApprovalBadge, ApprovalShare } from "@/components/Approval";
 import { useAutosaveDraft } from "@/hooks/useAutosaveDraft";
@@ -60,6 +61,7 @@ import { newDocDraftStale, wantsFreshDoc } from "@/lib/draft-stale";
 import { docHasContent, type DocContent } from "@/lib/empty-docs";
 
 /** A new form with no client, items or payments: never kept as a draft (Help retest: empty restore banner). */
+const SAVE_FAILED_NOTE = "Saved on this device only: it could not be saved to your account, so other devices and your crew still see the old version. Check your connection and press Save again.";
 const HOLD_NOTE = "Add a client or a line item and Save. The job goes on the calendar once the document is saved.";
 function isBlankNewDoc(v: unknown) { return !docHasContent(v as DocContent); }
 
@@ -72,7 +74,7 @@ import ScheduleEditor from "@/components/ScheduleEditor";
 import { entryHours, fmtHours, hoursByWorker, ownerEditClock, fixTimeProblem, crewFixReason, refreshOwnerClock, type ClockEntry } from "@/lib/clock";
 import MultiDayEditor from "@/components/MultiDayEditor";
 import { allDayWorkerIds, jobDays } from "@/lib/job-days";
-import { confirmRemoval, jobDonePhotos, crewForWorkers, followSchedule, jobScheduleFromForm, crewIds, workLogged, clockHoursFor, dedupeWorkerIds, readSchedule, readWorkers, saveAssignment, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
+import { confirmRemoval, jobDonePhotos, crewForWorkers, followSchedule, jobScheduleFromForm, crewIds, workLogged, clockHoursFor, dedupeWorkerIds, readSchedule, readScheduleDays, readWorkers, shiftScheduleDays, saveAssignment, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
 import { createClientFromInvoice } from "@/lib/client-create";
 import { defaultInvoiceTerms } from "@/lib/terms";
 import { followDueDate } from "@/lib/stages";
@@ -1025,6 +1027,14 @@ export default function NewInvoicePage() {
       const ids = allDayWorkerIds(storedSchedule, crew);
       if (ids.length !== storedSchedule.workerIds.length) storedSchedule = { ...storedSchedule, workerIds: ids, updatedAt: new Date().toISOString() };
     }
+    // Retest bug 5: later days added in the Days box (stored on the schedule, crew or not) are saved with the document.
+    if (storedSchedule && !isProposal && schedule) {
+      const days = readScheduleDays(shiftScheduleDays(schedule.days, schedule.date, storedSchedule.date), storedSchedule.date);
+      if (JSON.stringify(days) !== JSON.stringify(readScheduleDays(storedSchedule.days, storedSchedule.date))) {
+        const { days: _old, ...rest } = storedSchedule; void _old;
+        storedSchedule = { ...rest, ...(days.length ? { days } : {}), updatedAt: new Date().toISOString() };
+      }
+    }
     const savedCrew = crew.map((row) => followSchedule(row, storedSchedule, crew));
     const keptNotes = mergeChangeOrderNotes(readChangeOrderNotes(stored?.data?.changeOrderNotes), changeOrderNotes);
     const recurring = isProposal ? null : scheduleFromForm(readRecurring(stored?.data?.recurring), { frequency: recFreq, intervalDays: recInterval, nextRunDate: recNext, loadedNextRunDate: recLoadedNext, today: ymd(new Date()) });
@@ -1036,10 +1046,28 @@ export default function NewInvoicePage() {
       createdAt: new Date().toLocaleDateString(),
       data: { clientName, ...(linkedClientId ? { clientId: linkedClientId } : {}), clientCompany, ...(contactName.trim() ? { contactName: contactName.trim() } : {}), ...(stockUsed.length ? { stockUsed } : {}), ...(isProposal && Number(depositPercent) > 0 ? { depositPercent: String(Math.min(Number(depositPercent), 100)) } : {}), clientEmail, clientPhone, clientAddress, invoiceNumber: fixedNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Number(jobRate) > 0 && !isProposal ? { jobRate: String(Number(jobRate)) } : {}), ...(taskType.trim() && !isProposal ? { taskType: taskType.trim().slice(0, 40) } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), ...(rebillRefund ? { rebillRefund: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(revision && !isProposal ? revision : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(storedSchedule && (stored?.data?.schedule || !isProposal) ? { schedule: storedSchedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.autoSent ? { autoSent: (stored?.data as Record<string, unknown>).autoSent } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviewAskedAt ? { reviewAskedAt: (stored?.data as Record<string, unknown>).reviewAskedAt } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew: savedCrew, ...(crewReport ? { crewReport } : {}), ...(Object.keys(crewKindFix).length ? { crewKindFix } : {}), ...(crewUndo.length ? { crewUndo } : {}) },
     };
+    // Retest bug 1: a sent revision takes the job's unworked crew rows off the version it replaces (and gives
+    // them back when voided / back to draft), so the replaced invoice no longer holds the crew.
+    const handoff = !isProposal ? crewHandoff(parentOf(docs as SavedDocument[], nextDoc as never) as SavedDocument | null, nextDoc as never as SavedDocument) : null;
+    if (handoff && handoff.rev !== (nextDoc as never)) nextDoc.data.crew = (handoff.rev.data as { crew: typeof savedCrew }).crew;
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
+    if (handoff) {
+      const parentDoc = handoff.parent;
+      try {
+        const now = JSON.parse(window.localStorage.getItem("clientready-documents") || "[]") as SavedDocument[];
+        window.localStorage.setItem("clientready-documents", JSON.stringify(now.map((d) => (d.id === parentDoc.id ? parentDoc : d))));
+      } catch { /* the cloud copy below still carries it */ }
+      await saveCloudDocument(parentDoc as never).catch(() => parentDoc.id);
+    }
+    // Retest bug 4: the cloud save cannot have reached the account (offline / rejected): say so, not "saved".
+    const notInCloud = isUuid(cloudId) && unsyncedIds().includes(cloudId);
+    // Retest bug 4: re-read the list after the network wait; writing the list read before it put back
+    // copies a background sync had just changed (and could undo another save made meanwhile).
+    let latestDocs: { id: string }[] = docs;
+    try { latestDocs = JSON.parse(window.localStorage.getItem("clientready-documents") || "[]"); } catch { latestDocs = docs; }
     try {
-      window.localStorage.setItem("clientready-documents", JSON.stringify([...docs.filter((item: { id: string }) => item.id !== localId && item.id !== cloudId), nextDoc]));
+      window.localStorage.setItem("clientready-documents", JSON.stringify([...latestDocs.filter((item: { id: string }) => item.id !== localId && item.id !== cloudId), nextDoc]));
     } catch (error) {
       setDocId(cloudId);
       setSaveMessage(isQuotaError(error)
@@ -1079,6 +1107,10 @@ export default function NewInvoicePage() {
       const same = (x: Schedule | null, y: Schedule | null) => Boolean(x && y) && x!.date === y!.date && (x!.startTime || "") === (y!.startTime || "") && (x!.endTime || "") === (y!.endTime || "") && [...x!.workerIds].sort().join() === [...y!.workerIds].sort().join();
       const changedSchedule = !same(storedSchedule, schedule);
       setSchedule(storedSchedule); setJobStart(storedSchedule.startTime || jobStart); setJobEnd(storedSchedule.endTime || ""); setCrew(savedCrew); if (changedSchedule) setScheduleKey((key) => key + 1); }
+    if (notInCloud) {
+      setSaveMessage(SAVE_FAILED_NOTE);
+      return cloudId;
+    }
     setSaveMessage(isProposal ? `Proposal saved${carried}` : "Invoice saved");
     draft.clear(cloudId);
     return cloudId;
@@ -1444,7 +1476,7 @@ export default function NewInvoicePage() {
               {!locked
                 ? <ScheduleEditor key={scheduleKey} autoSave holdNote={!docId && !docHasContent({ clientName, clientCompany, contactName, clientEmail, clientPhone, clientAddress, clientId: docClientId, items, payments }) ? HOLD_NOTE : ""} docId={docId} value={schedule} workers={workers} onSave={saveJobSchedule} confirmRemove={(ids) => confirmRemoval(workLogged(crew, ids, clockHoursFor(docId)))} />
                 : <p className="text-xs text-slate-600">Save the document first, then schedule the job here or on the Calendar.</p>}
-              {!locked && !isProposal && schedule && <MultiDayEditor schedule={schedule} crew={crew} workers={workers} onChange={setCrew} />}
+              {!locked && !isProposal && schedule && <MultiDayEditor schedule={schedule} crew={crew} workers={workers} onChange={(nextCrew, nextSchedule) => { setCrew(nextCrew); setSchedule(nextSchedule); }} />}
               {!isProposal && <VisitNotes notes={visitNotes} onChange={setVisitNotes} today={ymd(new Date())} disabled={locked} />}
               {docId && <OwnerVisitNotes docId={docId} />}
               {docId && <JobDonePanel docId={docId} schedule={schedule} onConfirmed={(next) => { setSchedule(next); setScheduleKey((key) => key + 1); }} />}

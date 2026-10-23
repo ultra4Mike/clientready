@@ -99,7 +99,7 @@ export function flsaWords(s: OtSettings): { label: string; preview: string } {
   const week = r?.weekly && r.weekly > 0 ? r.weekly : 40;
   const mult = Math.max(1, Math.round((r?.mult ?? 1.5) * 100) / 100);
   return {
-    label: `Overtime for non-hourly pay (FLSA: (${mult} - 1) x regular rate for hours over ${week} h)`,
+    label: `Overtime for day-rate and piece-rate pay: (${mult} - 1) x regular rate after ${week} h`,
     preview: `Non-hourly workers get FLSA overtime: (${mult} - 1) x regular rate for hours over ${week} h.`,
   };
 }

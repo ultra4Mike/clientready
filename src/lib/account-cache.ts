@@ -30,7 +30,7 @@ function lateFeeFields(row: Record<string, unknown>) {
     reviewLink: "review_link" in row ? row.review_link ?? "" : local.reviewLink ?? "",
   };
 }
-import { DOCS_KEY, mergeDocs, OWNER_KEY, parkDocsFor, parkUnsyncedDocs, syncLocalDocs, takeParkedDocs } from "@/lib/doc-sync";
+import { DOCS_KEY, mergeDocs, OWNER_KEY, parkDocsFor, parkUnsyncedDocs, syncLocalDocs, takeParkedDocs, writeLocalDocsKeepingNewer } from "@/lib/doc-sync";
 
 const keys = [
   "clientready-profile",
@@ -100,6 +100,7 @@ async function fetchProfile(userId: string, switching: boolean) {
 }
 
 async function loadAccountOnce(): Promise<boolean> {
+  const startedAt = Date.now();
   // Speed audit #1: the stored session (no network trip), then profile / clients / team / deletes+documents in parallel.
   const { data: sessionData } = await supabase.auth.getSession();
   let user = sessionData.session?.user || null;
@@ -178,7 +179,8 @@ async function loadAccountOnce(): Promise<boolean> {
   window.localStorage.setItem(DOCS_KEY, JSON.stringify(merged));
   window.localStorage.setItem(OWNER_KEY, user.id);
   const synced = await syncLocalDocs(merged, pushUp);
-  window.localStorage.setItem(DOCS_KEY, JSON.stringify(synced));
+  // Retest bug 4: never write the pre-upload list over a document saved on this device while it uploaded.
+  writeLocalDocsKeepingNewer(synced, startedAt);
   // Help retest: "Saved on this device (n)" marks that can never upload are cleared after a good fetch:
   // a cloud doc that was not pushed (the cloud copy is the same or newer, so nothing is left to send),
   // or a mark for a document that is no longer on this device. Local-only docs keep their mark.

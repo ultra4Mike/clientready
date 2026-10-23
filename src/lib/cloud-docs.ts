@@ -14,7 +14,7 @@ export type CloudDoc = {
   data: Record<string, unknown>;
 };
 
-import { mergeData, readBase, writeBases } from "@/lib/three-way";
+import { mergeData, readAncestor, readBase, writeBases } from "@/lib/three-way";
 
 export function isUuid(id: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
@@ -71,6 +71,8 @@ export async function saveCloudDocument(doc: CloudDoc) {
   // Every save records when it happened, so cloud/local merges can keep the newer copy.
   // (Mutates doc.data so callers that store the same object locally keep the same stamp.)
   doc.data = doc.data || {};
+  // The version this copy was read from (before it is re-stamped below): used to spot a stale writer.
+  const readStamp = doc.data.updatedAt;
   doc.data.updatedAt = new Date().toISOString();
   await materializeSchedule(doc);
   // R112: every path that saves a time or crew (recurring, crew draft, duplicate/change order, API sync...)
@@ -101,7 +103,13 @@ export async function saveCloudDocument(doc: CloudDoc) {
       .maybeSingle();
     if (!readError && current) {
       // Changes saved from another device since this one last synced are kept (field/entry-level merge).
-      const base = readBase(doc.id);
+      // Retest bug 4: a copy read before a newer save (its stamp is older than the cloud's) merges against the
+      // version it was made from, so only what it really changed is applied and the newer save is kept.
+      const cloudStamp = String((current.data as Record<string, unknown> | null)?.updatedAt || "");
+      const stale = typeof readStamp === "string" && Boolean(readStamp) && cloudStamp > readStamp;
+      // Without that version on this device the newer cloud save wins field by field (the schedule block still
+      // merges on its own stamp below), never the stale copy.
+      const base = stale ? readAncestor(doc.id, readStamp) || { ...doc.data } : readBase(doc.id);
       if (base && current.data) {
         const stamp = doc.data.updatedAt;
         const { data: mergedData } = mergeData(base, doc.data, current.data as Record<string, unknown>);

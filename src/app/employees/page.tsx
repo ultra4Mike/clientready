@@ -5,6 +5,7 @@ import { mailtoHref } from "@/lib/reminders";
 
 import TimesheetExport from "@/components/TimesheetExport";
 import TimesheetRules from "@/components/timesheet/TimesheetRules";
+import PtoOwnerCard from "@/components/phase2/PtoOwnerCard";
 import WorkerOvertimeFields from "@/components/timesheet/WorkerOvertimeFields";
 import { loadOwnerTimesheet, readLocalTimesheetSettings } from "@/lib/day-events";
 import { multWords, usesAccountOvertime } from "@/lib/overtime-rules";
@@ -381,6 +382,10 @@ export default function EmployeesPage() {
               <input type="date" name={`raise-date-${person.id}`} aria-label={`Raise start date for ${person.name}`} className="min-w-0 flex-1 basis-36 rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={editingId === person.id ? raiseDate : ""} onChange={(event) => { setEditingId(person.id); setRaiseDate(event.target.value); }} />
               <button type="button" onClick={() => giveRaise(person)} className="w-full shrink-0 whitespace-nowrap rounded-lg sm:w-auto border border-teal-500/40 px-3 py-2.5 text-sm font-medium transition hover:border-teal-400 hover:bg-teal-500/10">Save raise</button>
             </div>
+            </details>
+            <details className="mt-3 rounded-xl border border-teal-500/15" data-testid={`emp-time-off-${person.id}`}>
+              <summary className="flex min-h-11 cursor-pointer list-none items-center px-3 text-sm font-medium [&::-webkit-details-marker]:hidden" data-testid="emp-add-time-off">Add time off (PTO / Sick / Holiday)</summary>
+              <PtoOwnerCard workers={[{ id: person.id, name: person.name, hireDate: person.hireDate, pto: person.timeOverrides }]} settings={accountRules} today={new Date().toISOString().slice(0, 10)} only={person.id} />
             </details>
           </div>
         ))}

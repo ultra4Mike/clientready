@@ -12,26 +12,38 @@ const people = [{ id: "e1", name: "Ann", rate: "25", active: true }, { id: "e2",
 
 // + Add day on a single-day job with no rows yet
 ok(jobDays(sched, []).length === 1 && dayLabel(jobDays(sched, [])[0]) === "", "single day: one day, no label");
-const c1 = addJobDay(sched, [], people)!;
+const c1 = addJobDay(sched, [], people)!.crew;
 ok(!!c1 && c1.filter((r) => r.workDate === "2026-11-02").length === 2 && c1.filter((r) => r.workDate === "2026-11-03").length === 2, "add day: day-1 anchors + day 2 for day-1 crew");
 const d1 = jobDays(sched, c1);
 ok(d1.length === 2 && dayLabel(d1[1]) === "Day 2 of 2" && d1[1].startTime === "08:00", "Day 2 of 2 label, day-1 times");
-const c2 = addJobDay(sched, c1, people)!;
+const c2 = addJobDay(sched, c1, people)!.crew;
 ok(jobDays(sched, c2).map((d) => d.date).join() === "2026-11-02,2026-11-03,2026-11-04" && dayLabel(jobDays(sched, c2)[0]) === "Day 1 of 3", "third day on the next date; Day 1 of 3");
-ok(addJobDay({ ...sched, workerIds: [] }, [], people) === null, "no crew: cannot add a day");
+// Retest bug 5: + Add day works with no crew; the day is stored on the schedule.
+{
+  const none = addJobDay({ ...sched, workerIds: [] }, [], people)!;
+  ok(!!none && none.crew.length === 0 && none.schedule.days?.[0]?.date === "2026-11-03" && none.schedule.days?.[0]?.startTime === "08:00", "no crew: day 2 stored on the schedule");
+  const two = addJobDay(none.schedule, none.crew, people)!;
+  ok(jobDays(two.schedule, two.crew).map((d) => `${d.index}/${d.count}`).join() === "1/3,2/3,3/3" && dayLabel(jobDays(two.schedule, [])[1]) === "Day 2 of 3", "no crew: Day 2 of 3, Day 3 of 3");
+  const timed = updateJobDay(two.schedule, [], "2026-11-04", { startTime: "13:00" }, people);
+  ok(jobDays(timed.schedule, [])[2].startTime === "13:00", "a crewless day keeps its own times");
+  const staffed = updateJobDay(timed.schedule, [], "2026-11-04", { workerIds: ["e1"] }, people);
+  ok(staffed.crew.length === 1 && staffed.crew[0].workDate === "2026-11-04" && jobDays(staffed.schedule, staffed.crew)[2].workerIds.join() === "e1", "crew can be added to a stored day later");
+  ok(removeJobDay(two.schedule, [], "2026-11-03").schedule.days?.map((d) => d.date).join() === "2026-11-04", "remove a stored day");
+  ok([...scheduleDays(two.schedule, [])].length === 3, "stored days count as job days (calendar)");
+}
 // edit a day: date, time, crew
-const c3 = updateJobDay(sched, c2, "2026-11-04", { date: "2026-11-06", startTime: "07:00", workerIds: ["e2", "e3"] }, people);
+const c3 = updateJobDay(sched, c2, "2026-11-04", { date: "2026-11-06", startTime: "07:00", workerIds: ["e2", "e3"] }, people).crew;
 const day3 = jobDays(sched, c3)[2];
 ok(day3.date === "2026-11-06" && day3.startTime === "07:00" && day3.workerIds.sort().join() === "e2,e3", "edit day 3: date, start, crew");
 ok(c3.find((r) => r.employeeId === "e3")?.fixedPay === "0", "per-job pay is not repeated on extra days");
-ok(updateJobDay(sched, c2, "2026-11-04", { workerIds: [] }, people) === c2, "a day keeps at least one person");
+ok(updateJobDay(sched, c2, "2026-11-04", { workerIds: [] }, people).crew === c2, "a day keeps at least one person");
 ok(dayDateProblem(sched, c2, "2026-11-04", "2026-11-01") !== "" && dayDateProblem(sched, c2, "2026-11-04", "2026-11-03") !== "" && dayDateProblem(sched, c2, "2026-11-04", "2026-12-30") !== "", "bad dates rejected");
 ok(allDayWorkerIds(sched, c3).sort().join() === "e1,e2,e3", "schedule crew = union of all days");
 // remove a day keeps locked rows
 const paidRow = { ...c3.find((r) => r.workDate === "2026-11-03")!, id: "paid", paidToWorker: true };
-const c4 = removeJobDay(sched, [...c3, paidRow], "2026-11-03");
+const c4 = removeJobDay(sched, [...c3, paidRow], "2026-11-03").crew;
 ok(c4.filter((r) => r.workDate === "2026-11-03").map((r) => r.id).join() === "paid", "remove day: paid row stays");
-ok(removeJobDay(sched, c3, "2026-11-02") === c3, "day 1 cannot be removed");
+ok(removeJobDay(sched, c3, "2026-11-02").crew === c3, "day 1 cannot be removed");
 // calendar expand + drag payload
 const exp = expandJobDays([{ doc: { id: "d", data: { crew: c2 } }, schedule: sched }]);
 ok(exp.length === 3 && exp[2].schedule.date === "2026-11-04" && exp[2].day?.offset === 2 && exp[0].day?.index === 1, "calendar shows the job on each day");
@@ -47,7 +59,7 @@ const rev = revisionData(orig as never, orig as never, "INV-2", "2026-10-23", "2
 ok(jobDays(rev.schedule || sched, rev.crew).length === 3, "change order copies all days");
 
 // FLSA words
-ok(flsaWords({ ...DEFAULT_TIMESHEET_SETTINGS, otPreset: "federal", otMultiplier: 1.5, weeklyOtHours: 40 } as never).label.includes("(1.5 - 1) x regular rate for hours over 40 h"), "FLSA label uses 1.5 and 40");
+ok(flsaWords({ ...DEFAULT_TIMESHEET_SETTINGS, otPreset: "federal", otMultiplier: 1.5, weeklyOtHours: 40 } as never).label === "Overtime for day-rate and piece-rate pay: (1.5 - 1) x regular rate after 40 h", "FLSA label uses 1.5 and 40");
 ok(flsaWords({ ...DEFAULT_TIMESHEET_SETTINGS, otPreset: "custom", otMultiplier: 2, weeklyOtHours: 44 } as never).preview.includes("(2 - 1) x regular rate for hours over 44 h"), "FLSA preview uses actual multiplier/threshold");
 
 // Holiday

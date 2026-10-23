@@ -1,12 +1,12 @@
 "use client";
 
 import { type TimesheetSettings } from "@/lib/timesheet";
-import { multWords, otRules, otSummary } from "@/lib/overtime-rules";
+import { flsaWords, multWords, otRules, otSummary } from "@/lib/overtime-rules";
 import { useState } from "react";
 
 const field = "mt-1 block min-h-11 w-full rounded-lg border bg-transparent px-2 tabular-nums";
 
-export const OT_KEYS = ["otPreset", "weeklyOtHours", "dailyOtHours", "dailyDtHours", "seventhDayRule", "bonusInRegularRate", "otMultiplier", "dtMultiplier", "otCountPto", "otCountSick", "otCountHoliday"] as const;
+export const OT_KEYS = ["otPreset", "weeklyOtHours", "dailyOtHours", "dailyDtHours", "seventhDayRule", "bonusInRegularRate", "otMultiplier", "dtMultiplier", "otCountPto", "otCountSick", "otCountHoliday", "flsaNonHourly"] as const;
 /** Only the overtime keys from `ot` go on top of the latest full rules (Settings card never overwrites other rules). */
 export function mergeOt(latest: TimesheetSettings, ot: TimesheetSettings): TimesheetSettings {
   const out = { ...latest } as Record<string, unknown>;
@@ -86,7 +86,13 @@ export default function OvertimeRulesFields({ settings, set, p = "ts" }: { setti
         </fieldset>
         {chk("Include job bonuses in the overtime rate (FLSA)", `${p}-bonus-regular`, settings.bonusInRegularRate, (v) => set({ bonusInRegularRate: v }))}
       </>}
-      <p className="mt-1 text-xs text-[var(--cr-muted)]" data-testid={`${p}-ot-worker-note`}>Every worker uses these rules unless you untick Use account overtime rules on their page. Day-rate and piece-rate overtime is a separate switch (off by default).</p>
+      {/* Retest bug 3: the FLSA day-rate / piece-rate switch, in Settings > Overtime and Timesheet rules alike,
+          worded from the real multiplier and threshold; separate from "Include job bonuses in the overtime rate". */}
+      <div className="mt-2 rounded-lg border border-slate-200 p-2" data-testid={`${p}-flsa-box`}>
+        {chk(flsaWords(settings).label, `${p}-flsa-nonhourly`, Boolean(settings.flsaNonHourly), (v) => set({ flsaNonHourly: v }))}
+        <p className="text-xs text-[var(--cr-muted)]">Off by default. For workers paid by the day, the job or the piece (and commission): {flsaWords(settings).preview.replace(/^Non-hourly workers get FLSA overtime: /, "")}</p>
+      </div>
+      <p className="mt-1 text-xs text-[var(--cr-muted)]" data-testid={`${p}-ot-worker-note`}>Every worker uses these rules unless you untick Use account overtime rules on their page.</p>
       <p className="cr-preview mt-2 text-sm text-[var(--cr-muted)]" data-testid={`${p}-preview-ot`}>{otSummary(settings)}{on && (settings.otCountPto || settings.otCountSick || settings.otCountHoliday) ? ` ${[settings.otCountPto && "PTO", settings.otCountSick && "sick", settings.otCountHoliday && "holiday"].filter(Boolean).join(" and ")} hours count toward the weekly threshold.` : ""}</p>
     </>
   );

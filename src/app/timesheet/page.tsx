@@ -16,7 +16,7 @@ import Link from "next/link";
 import DayDetail from "@/components/timesheet/DayDetail";
 import PtoOwnerCard from "@/components/phase2/PtoOwnerCard";
 import { loadPtoForRange, loadPtoRequests } from "@/lib/phase2-data";
-import { ptoDays, type PtoRequest } from "@/lib/pay-phase2";
+import { ptoDays, ptoKindLabel, type PtoRequest } from "@/lib/pay-phase2";
 import { loadBusinessTz, loadAttestations, decideFix, loadOwnerTimesheet, readLocalTimesheetSettings, saveApprovals, type DayApproval } from "@/lib/day-events";
 import { dayState, DEFAULT_TIMESHEET_SETTINGS, reviewDayInfo, weekStatus, type DayStateName, type DaySheet, type FixRequest, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
 import { addDays, applyWeekToDocs, pushChangedDocs, readDocs, syncTimesheetCutover, scheduleFor, weekShares, weekSheets } from "@/lib/timesheet-sync";
@@ -72,6 +72,7 @@ export default function TimesheetPage() {
     void loadAttestations(week).then(setAttest);
   }, [week]);
   const { days, sheets } = useMemo(() => (week && now ? weekSheets({ workers, docs, events, fixes, settings, week, now }) : { days: [] as string[], sheets: new Map<string, DaySheet>() }), [workers, docs, events, fixes, settings, week, now]);
+  const offDays = useMemo(() => (week ? ptoDays(weekPto || [], workers as never, week, addDays(week, 6)) : new Map<string, { hours: number; kind: string }>()), [weekPto, workers, week]);
   const { pays, shares } = useMemo(() => weekShares({ workers, docs, days, sheets, approvals, settings, pto: weekPto }), [workers, docs, days, sheets, approvals, settings, weekPto]);
   // Keep the jobs in step with the week (estimates for unapproved days, the approved day's split otherwise).
   useEffect(() => {
@@ -216,6 +217,9 @@ export default function TimesheetPage() {
     setMessage(`Exported hours ${from} to ${to}.`);
   }
   const cell = (id: string, d: { date: string; mins: number; approved: boolean; flagged: boolean }, wide = true) => {
+    const off = offDays.get(`${id}|${d.date}`);
+    // Retest bug 2: approved PTO / sick / holiday shows in its day, worked hours or not.
+    const offPill = off ? <span className={`cr-chip2 ${off.kind === "holiday" ? "cr-tone-good" : ""} ml-1 text-[11px]`} data-testid="ts-pill-off" data-kind={off.kind}>{ptoKindLabel(off.kind)} {off.hours} h</span> : null;
     const s = sheets.get(`${id}|${d.date}`); const edited = approvalOf(id, d.date)?.editedMinutes != null;
     return (
       <button type="button" data-state={d.approved ? "locked" : d.flagged ? "review" : "open"} className="group relative w-full rounded-lg p-2 text-left hover:bg-teal-500/10 focus:bg-teal-500/10" onClick={() => setOpen(`${id}|${d.date}`)} data-testid="ts-edit" aria-label={`${d.mins ? `${h(d.mins)} hours` : "Add hours"}, ${d.date}`}>
@@ -229,9 +233,10 @@ export default function TimesheetPage() {
             {payOf(id, d.date)?.dtHours ? <span className="cr-chip2 cr-tone-bad ml-1 text-[11px]" data-testid="ts-pill-dt">DT</span> : null}
             {s?.flags.some((f) => f === "meal_missed" || f === "rest_missed") ? <span className="cr-chip2 cr-tone-bad ml-1 text-[11px]" data-testid="ts-pill-break">Break</span> : null}
             {s?.flags.includes("before_hire") ? <span className="cr-chip2 cr-tone-warn ml-1 text-[11px]" data-testid="ts-pill-before-hire">Before hire</span> : null}
+            {offPill}
             {s?.driveMinutes ? <span className="block text-xs text-[var(--cr-muted)]">incl. {Math.round(s.driveMinutes)} min drive</span> : null}
           </>
-        ) : <span className="text-gray-400" data-testid="ts-add">+ Add</span>}
+        ) : <>{off ? offPill : <span className="text-gray-400" data-testid="ts-add">+ Add</span>}</>}
         <span aria-hidden="true" className="absolute right-1 top-1 text-xs text-[var(--cr-muted)] opacity-0 group-hover:opacity-100 group-focus:opacity-100">✎</span>
       </button>
     );
@@ -254,7 +259,7 @@ export default function TimesheetPage() {
   return (
     <AppShell title="Timesheet">
       <PageHeader title="Weekly timesheet" subtitle="Tap any day to see its timeline, fix it or approve it." />
-      {todayYmd && <PtoOwnerCard workers={workers.map((w) => ({ id: w.id, name: w.name, hireDate: w.hireDate, pto: readWorkerOverrides(w) }))} settings={settings} today={todayYmd} />}
+      {todayYmd && <PtoOwnerCard workers={workers.map((w) => ({ id: w.id, name: w.name, hireDate: w.hireDate, pto: readWorkerOverrides(w) }))} settings={settings} today={todayYmd} onAdded={() => { if (week) void loadPtoForRange(week, addDays(week, 6)).then(setWeekPto).catch(() => {}); }} />}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <button className="min-h-11 rounded-lg border px-3" onClick={() => setWeek(addDays(week, -7))} data-testid="ts-prev" aria-label="Previous week">‹</button>
         <span className="font-semibold" data-testid="ts-week">Week of {week}</span>

@@ -4,7 +4,7 @@ import { CA_SICK, type TimesheetSettings } from "@/lib/timesheet";
 
 const field = "mt-1 block min-h-11 w-full rounded-lg border bg-transparent px-2 tabular-nums";
 
-export const PTO_KEYS = ["ptoPreset", "ptoAllowNegative", "ptoPerHours", "ptoCapHours", "ptoUseCapHours", "ptoWaitDays", "ptoDayHours", "ptoRequestsOn"] as const;
+export const PTO_KEYS = ["ptoPreset", "ptoAllowNegative", "ptoPerHours", "ptoCapHours", "ptoUseCapHours", "ptoWaitDays", "ptoDayHours", "ptoRequestsOn", "otCountHoliday"] as const;
 /** Only the PTO keys from `pto` go on top of the latest full rules, so other timesheet rules are never overwritten. */
 export function mergePto(latest: TimesheetSettings, pto: TimesheetSettings): TimesheetSettings {
   const out = { ...latest } as Record<string, unknown>;
@@ -48,6 +48,15 @@ export default function PtoRulesFields({ settings, set, p = "ts", account = fals
         {num("ptoDayHours", "Hours in one day off", `${p}-pto-day-hours`)}
         {tog("ptoRequestsOn", "Workers can ask for time off in the crew app", `${p}-pto-requests-on`)}
       </div>}
+      {account && <fieldset className="mt-3 rounded-lg border p-2" data-testid={`${p}-leave-types`}>
+        <legend className="px-1 text-sm font-medium">Leave types</legend>
+        <ul className="space-y-1 text-sm">
+          <li data-testid={`${p}-leave-pto`}><b>PTO</b>: comes out of the balance above. Workers can ask for it when requests are on.</li>
+          <li data-testid={`${p}-leave-sick`}><b>Sick</b>: comes out of the same balance.</li>
+          <li data-testid={`${p}-leave-holiday`}><b>Holiday</b>: paid at the worker&apos;s normal rate. Only you (the owner) add it, from Timesheet or a worker&apos;s page. It never comes out of the PTO balance.</li>
+        </ul>
+        {tog("otCountHoliday", "Count holiday hours toward overtime", `${p}-pto-count-holiday`)}
+      </fieldset>}
       <p className="mt-1 text-xs text-[var(--cr-muted)]" data-testid={`${p}-pto-worker-note`}>Each worker uses these rules. On a worker&apos;s page, leave the PTO fields blank to keep them, or set their own rate / starting hours / off.</p>
       <p className="cr-preview mt-2 text-sm text-[var(--cr-muted)]" data-testid={`${p}-preview-pto`}>{ptoPreview(settings)}</p>
     </>

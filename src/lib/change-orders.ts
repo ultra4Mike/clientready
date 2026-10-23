@@ -1,3 +1,4 @@
+import { isRevision, revisionLive } from "@/lib/change-order-revision";
 export type ChangeOrderOf = { id: string; number: string };
 
 type Doc = { id: string; type: string; title: string; clientName?: string; createdAt?: string; data?: Record<string, unknown> };
@@ -145,4 +146,40 @@ export function uniqueDocs<T extends { id: string }>(docs: T[]) {
 export function noteDate(createdAt: string) {
   const date = new Date(createdAt);
   return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+type CrewRow = Record<string, unknown> & { id?: unknown };
+/** A crew row with work on it (paid, clocked, or hours entered) stays on the version it was worked on. */
+const workedRow = (row: CrewRow) => Boolean(row.paidToWorker) || (Number(row.clockMinutes) || 0) > 0 || Boolean(row.hoursFromClock) || (Number(row.hours) || 0) > 0;
+
+/**
+ * Retest bug 1: once a revision is sent, the job's unworked crew rows move off the version it replaces onto
+ * the revision (rows with work logged stay where they were worked; the parent remembers what moved in
+ * data.crewMovedTo / crewMoved). Voiding or un-sending the revision gives the moved rows back. Pure: returns
+ * the updated parent and revision, or null when nothing changes.
+ */
+export function crewHandoff<D extends Doc>(parent: D | null | undefined, rev: D): { parent: D; rev: D } | null {
+  if (!parent || !isRevision(rev as never)) return null;
+  const pData = (parent.data || {}) as Record<string, unknown>;
+  const pCrew = (Array.isArray(pData.crew) ? pData.crew : []) as CrewRow[];
+  const rData = (rev.data || {}) as Record<string, unknown>;
+  const rCrew = (Array.isArray(rData.crew) ? rData.crew : []) as CrewRow[];
+  if (revisionLive(rev as never)) {
+    const moving = pCrew.filter((row) => !workedRow(row));
+    if (!moving.length) return null;
+    const have = new Set(rCrew.map((row) => String(row.id)));
+    const added = moving.filter((row) => !have.has(String(row.id))).map((row) => revisionCrewRow(row));
+    const earlier = pData.crewMovedTo === rev.id && Array.isArray(pData.crewMoved) ? (pData.crewMoved as CrewRow[]) : [];
+    const moved = [...earlier.filter((row) => !moving.some((m) => String(m.id) === String(row.id))), ...moving];
+    return {
+      parent: { ...parent, data: { ...pData, crew: pCrew.filter(workedRow), crewMovedTo: rev.id, crewMoved: moved } },
+      rev: added.length ? { ...rev, data: { ...rData, crew: [...rCrew, ...added] } } : rev,
+    };
+  }
+  if (pData.crewMovedTo !== rev.id) return null;
+  const back = (Array.isArray(pData.crewMoved) ? pData.crewMoved : []) as CrewRow[];
+  const have = new Set(pCrew.map((row) => String(row.id)));
+  const next: Record<string, unknown> = { ...pData, crew: [...pCrew, ...back.filter((row) => !have.has(String(row.id)))] };
+  delete next.crewMovedTo; delete next.crewMoved;
+  return { parent: { ...parent, data: next }, rev };
 }

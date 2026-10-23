@@ -84,6 +84,34 @@ export function mergeDocs<T extends AnyDoc>(allLocal: T[], allCloud: T[]) {
   return { merged, pushUp };
 }
 
+/**
+ * Retest bug 4: a background sync reads the local list, awaits the network, then writes its result. A document
+ * saved on this device meanwhile (newer updatedAt than the copy in `list`, or new since `since`) is kept as it is
+ * now on the device instead of being overwritten by the older copy. Pure: `current` = the local list right now.
+ */
+export function keepNewerLocal<T extends AnyDoc>(list: T[], current: T[], since = 0): { docs: T[]; kept: string[] } {
+  const now = new Map(current.map((doc) => [doc.id, doc]));
+  const kept: string[] = [];
+  const docs = list.map((doc) => {
+    const fresh = now.get(doc.id);
+    if (fresh && stampOf(fresh) > stampOf(doc)) { kept.push(doc.id); return fresh; }
+    return doc;
+  });
+  const have = new Set(list.map((doc) => doc.id));
+  const deleted = typeof window === "undefined" ? {} : localTombstones();
+  for (const doc of current) if (!have.has(doc.id) && !deleted[doc.id] && since > 0 && stampOf(doc) >= since) { kept.push(doc.id); docs.push(doc); }
+  return { docs, kept };
+}
+
+/** Writes a synced list to this device without overwriting anything saved here since (see keepNewerLocal). */
+export function writeLocalDocsKeepingNewer<T extends AnyDoc>(list: T[], since = 0): { docs: T[]; kept: string[] } {
+  let current: T[] = [];
+  try { current = JSON.parse(window.localStorage.getItem(DOCS_KEY) || "[]") as T[]; } catch { current = []; }
+  const out = keepNewerLocal(list, Array.isArray(current) ? current : [], since);
+  window.localStorage.setItem(DOCS_KEY, JSON.stringify(out.docs));
+  return out;
+}
+
 /** Replaces references to a document id inside other documents (change-order links). */
 function remapReferences(docs: Doc[], from: string, to: string) {
   const changed: Doc[] = [];
@@ -130,7 +158,13 @@ export async function syncLocalDocs(docs: Doc[], pushUp: Doc[]) {
   for (const doc of pushUp) if (isUuid(doc.id)) toResave.set(doc.id, list.find((item) => item.id === doc.id) || doc);
   // Speed audit #2: re-saves of existing cloud docs go up in parallel (4 at a time), not one by one.
   const queue = [...toResave.values()].map((doc) => list.find((item) => item.id === doc.id) || doc).filter((doc) => isUuid(doc.id));
-  for (let i = 0; i < queue.length; i += 4) await Promise.all(queue.slice(i, i + 4).map((doc) => saveCloudDocument(doc).catch(() => doc.id)));
+  // Retest bug 4: a document saved on this device since the snapshot was taken already went up with that save;
+  // re-saving the older snapshot would put the old content back over it (Sent $350 back to Draft $300).
+  const freshNow = () => { try { return new Map((JSON.parse(window.localStorage.getItem(DOCS_KEY) || "[]") as Doc[]).map((d) => [d.id, d])); } catch { return new Map<string, Doc>(); } };
+  for (let i = 0; i < queue.length; i += 4) {
+    const now = freshNow();
+    await Promise.all(queue.slice(i, i + 4).filter((doc) => { const live = now.get(doc.id); return !live || stampOf(live) <= stampOf(doc); }).map((doc) => saveCloudDocument(doc).catch(() => doc.id)));
+  }
   return list;
 }
 

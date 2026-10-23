@@ -159,7 +159,7 @@ export default function TimesheetRules() {
         <h3 id="ts-h-pay" className="cr-section-label font-semibold">Pay rules (piece rate, commission, day/salary)</h3>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {num("minWage", "Minimum wage ($/h, 0 = off)", "ts-min-wage", "Piece, commission and day pay are topped up to this for every hour worked.")}
-          {tog("flsaNonHourly", flsaWords(settings).label, "ts-flsa-nonhourly")}
+          <p className="text-xs text-[var(--cr-muted)]" data-testid="ts-flsa-where">Overtime for day-rate and piece-rate pay is set under Overtime above.</p>
         </div>
         <p className="mt-3 text-sm font-medium">Job / task rates ($/h, override a worker&apos;s hourly rate on that task)</p>
         <ul className="mt-1 space-y-1" data-testid="ts-task-rates">{Object.entries(settings.taskRates).map(([k, v]) => (

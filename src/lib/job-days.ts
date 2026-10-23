@@ -3,12 +3,21 @@
  * day is a set of unpaid per-day crew rows dated 1..MULTI_DAY_SPAN days after it. No schema change: these helpers
  * only add, edit or drop those rows. Paid or clocked rows are history and are never moved or removed.
  */
-import { lockedRow, MULTI_DAY_SPAN, scheduleDays, type CrewRow, type Schedule, type Worker } from "@/lib/schedule";
+import { lockedRow, MULTI_DAY_SPAN, readScheduleDays, scheduleDays, type CrewRow, type Schedule, type ScheduleDay, type Worker } from "@/lib/schedule";
 import { paySnapshot, readPaySettings } from "@/lib/pay-types";
 
 export type JobDay = { date: string; startTime: string; endTime: string; workerIds: string[]; index: number; count: number; locked: boolean };
 type Row = CrewRow & { clockMinutes?: number; hoursFromClock?: boolean };
-type Sched = Pick<Schedule, "date" | "startTime" | "endTime" | "workerIds">;
+type Sched = Pick<Schedule, "date" | "startTime" | "endTime" | "workerIds"> & { days?: ScheduleDay[] };
+/** A day change: the crew rows and the schedule (its stored days). */
+export type DayChange<S extends Sched = Sched> = { crew: Row[]; schedule: S };
+const storedDays = (schedule: Sched) => readScheduleDays(schedule.days, schedule.date);
+const withDays = <S extends Sched>(schedule: S, days: ScheduleDay[]): S => {
+  const next = { ...schedule } as S;
+  const clean = readScheduleDays(days, schedule.date);
+  if (clean.length) next.days = clean; else next.days = [];
+  return next;
+};
 
 const isDate = (v: unknown) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 export const addDaysYmd = (date: string, days: number) => { const d = new Date(`${date}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); };
@@ -27,7 +36,8 @@ export function jobDays(schedule: Sched | null | undefined, crew: Row[] = []): J
     }
     const rows = crew.filter((r) => r.workDate === date && r.employeeId);
     const open = rows.find((r) => !lockedRow(r)) || rows[0];
-    return { date, startTime: open?.startTime || schedule.startTime || "", endTime: open?.endTime || schedule.endTime || "", workerIds: [...new Set(rows.map((r) => r.employeeId))], index: i + 1, count: dates.length, locked: rows.some((r) => lockedRow(r)) };
+    const stored = storedDays(schedule).find((d) => d.date === date);
+    return { date, startTime: open?.startTime || stored?.startTime || schedule.startTime || "", endTime: open?.endTime || stored?.endTime || schedule.endTime || "", workerIds: [...new Set(rows.map((r) => r.employeeId))], index: i + 1, count: dates.length, locked: rows.some((r) => lockedRow(r)) };
   });
 }
 
@@ -58,24 +68,29 @@ export function nextDayDate(schedule: Sched, crew: Row[]) {
   return "";
 }
 
-/** + Add day: same crew and times as day 1, on the day after the last day. Null when day 1 has no crew or no room. */
-export function addJobDay(schedule: Sched, crew: Row[], people: Worker[] = []): Row[] | null {
+/**
+ * + Add day: same crew and times as day 1, on the day after the last day. Retest bug 5: works with no crew too;
+ * the day is stored on the schedule (schedule.days). Null only when the 30-day span is full.
+ */
+export function addJobDay<S extends Sched>(schedule: S, crew: Row[], people: Worker[] = []): DayChange<S> | null {
   const days = jobDays(schedule, crew);
   const first = days[0];
   const date = nextDayDate(schedule, crew);
-  if (!first || !first.workerIds.length || !date) return null;
+  if (!first || !date) return null;
+  const nextSchedule = withDays(schedule, [...storedDays(schedule), { date, ...(schedule.startTime ? { startTime: schedule.startTime } : {}), ...(schedule.endTime ? { endTime: schedule.endTime } : {}) }]);
+  if (!first.workerIds.length) return { crew, schedule: nextSchedule };
   let next = [...crew];
   // A single-day job's day-1 crew must exist as rows on day 1, or the engine can't anchor the later days.
   for (const id of first.workerIds) {
     if (!next.some((r) => r.employeeId === id && r.workDate === schedule.date && !lockedRow(r))) next = [...next, newRow(id, schedule.date, schedule.startTime || "", schedule.endTime || "", next, people)];
   }
-  return [...next, ...first.workerIds.map((id) => newRow(id, date, schedule.startTime || "", schedule.endTime || "", next, people))];
+  return { crew: [...next, ...first.workerIds.map((id) => newRow(id, date, schedule.startTime || "", schedule.endTime || "", next, people))], schedule: nextSchedule };
 }
 
 /** Remove a later day: its unpaid, unclocked rows go; paid/clocked rows stay as history. Day 1 can't be removed here. */
-export function removeJobDay(schedule: Sched, crew: Row[], date: string): Row[] {
-  if (!schedule?.date || date === schedule.date) return crew;
-  return crew.filter((r) => r.workDate !== date || lockedRow(r));
+export function removeJobDay<S extends Sched>(schedule: S, crew: Row[], date: string): DayChange<S> {
+  if (!schedule?.date || date === schedule.date) return { crew, schedule };
+  return { crew: crew.filter((r) => r.workDate !== date || lockedRow(r)), schedule: withDays(schedule, storedDays(schedule).filter((d) => d.date !== date)) };
 }
 
 export type DayPatch = { date?: string; startTime?: string; endTime?: string; workerIds?: string[] };
@@ -88,23 +103,29 @@ export function dayDateProblem(schedule: Sched, crew: Row[], from: string, to: s
   return "";
 }
 
-/** Edit a later day (date, times, crew). Paid/clocked rows keep their date and times; at least one person stays. */
-export function updateJobDay(schedule: Sched, crew: Row[], date: string, patch: DayPatch, people: Worker[] = []): Row[] {
-  if (!schedule?.date || date === schedule.date) return crew;
-  if (patch.date !== undefined && patch.date !== date && dayDateProblem(schedule, crew, date, patch.date)) return crew;
+/** Edit a later day (date, times, crew). Paid/clocked rows keep their date and times; a day with crew keeps one person
+ * unless the day is stored on the schedule (then it may have nobody yet). */
+export function updateJobDay<S extends Sched>(schedule: S, crew: Row[], date: string, patch: DayPatch, people: Worker[] = []): DayChange<S> {
+  const same = { crew, schedule };
+  if (!schedule?.date || date === schedule.date) return same;
+  if (patch.date !== undefined && patch.date !== date && dayDateProblem(schedule, crew, date, patch.date)) return same;
   const day = jobDays(schedule, crew).find((d) => d.date === date);
-  if (!day) return crew;
+  if (!day) return same;
   const to = patch.date ?? date;
   const start = patch.startTime ?? day.startTime;
   const end = patch.endTime ?? day.endTime;
+  const stored = storedDays(schedule);
+  const isStored = stored.some((d) => d.date === date);
   let next = crew.map((r) => (r.workDate === date && !lockedRow(r) ? { ...r, workDate: to, startTime: start, endTime: end } : r));
   if (patch.workerIds) {
     const want = new Set(patch.workerIds);
-    if (!want.size) return crew;
+    if (!want.size && !isStored) return same;
     next = next.filter((r) => r.workDate !== to || lockedRow(r) || want.has(r.employeeId));
     for (const id of patch.workerIds) if (!next.some((r) => r.workDate === to && r.employeeId === id)) next.push(newRow(id, to, start, end, next, people));
   }
-  return next;
+  const entry = { date: to, ...(start ? { startTime: start } : {}), ...(end ? { endTime: end } : {}) };
+  const days = isStored ? stored.map((d) => (d.date === date ? entry : d)) : [...stored, entry];
+  return { crew: next, schedule: withDays(schedule, days) };
 }
 
 /** Everyone on any day of the job: the schedule's crew list must include later-day people, or a schedule save drops their rows. */
