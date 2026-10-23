@@ -908,3 +908,35 @@ html.dark :is([data-testid="crew-pto"],[data-testid="crew-pto-card"],[data-testi
   font-size: .8125rem; font-variant-numeric: tabular-nums;
 }
 [data-testid="ts-footer-hint"] { font-size: .75rem; opacity: .7; text-align: center; padding: 12px 8px; line-height: 1.4; }
+
+/* ===== Phase 2 live-check fixes: crew My week / contrast / My day ===== */
+/* Older rule made [my-week-day-*] rows display:flex, which broke column alignment. Restore table rows. */
+[data-testid="my-week-table"] { table-layout: fixed; width: 100%; }
+[data-testid="my-week-table"] tr[data-testid^="my-week-day-"],
+[data-testid="my-week-table"] tr[data-testid="my-week-total"] { display: table-row; min-height: 0; padding: 0; border: 0; font-size: inherit; }
+[data-testid="my-week-table"] :is(td,th) { padding: 10px 8px; vertical-align: middle; }
+[data-testid="my-week-table"] :is(td,th):not(:first-child) { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+[data-testid="my-week-table"] :is(td,th):first-child { padding-left: 4px; }
+[data-testid="my-week-table"] tbody td, [data-testid="my-week-table"] tfoot td { border-top: 1px solid rgba(148,163,184,.18); }
+[data-testid="my-week-table"] tfoot td { border-top: 2px solid rgba(148,163,184,.35); font-weight: 700; font-size: .9375rem; }
+html.dark [data-testid="my-week-table"] thead th, [data-testid="my-week-table"] thead th { color: #94a3b8 !important; opacity: 1; }
+html.dark [data-testid="my-week-table"] :is(th,td)[data-testid^="my-week-h-"] { color: #94a3b8 !important; opacity: 1; }
+
+/* Crew tabs contrast */
+html.dark nav[role="tablist"] .crew-tab.crew-tab-active { background-color: #14b8a6 !important; color: #042f2e !important; font-weight: 700; }
+html.dark nav[role="tablist"] .crew-tab.crew-tab-idle { color: #cbd5e1 !important; }
+nav[role="tablist"] .crew-tab.crew-tab-idle { color: #334155; }
+/* Call button phone subtext */
+a[data-testid^="call-"] .opacity-80 { opacity: 1; }
+html.dark a[data-testid^="call-"] .opacity-80 { color: #94a3b8 !important; }
+/* Disabled Save note */
+html.dark button[data-testid^="visit-note-save-"]:disabled { opacity: 1; color: #94a3b8 !important; border-color: rgba(148,163,184,.35) !important; }
+button[data-testid^="visit-note-save-"]:disabled { opacity: 1; color: #64748b; }
+
+/* My day readability */
+[data-testid="step-tracker"] > li { font-size: 11.5px; letter-spacing: .03em; font-weight: 600; }
+[data-testid="location-status"] { font-size: 13px; opacity: 1; }
+html.dark [data-testid="location-status"], html.dark [data-testid="my-day-since-approval"] { color: #94a3b8 !important; }
+[data-testid="my-day-totals"] { font-size: 13px; align-items: baseline; column-gap: 1rem; }
+[data-testid="my-day-totals"] > p { margin: 0; }
+[data-testid="my-day-totals"] b { font-variant-numeric: tabular-nums; }
