@@ -1,3 +1,4 @@
+import "./helpers/test-setup";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { approvalBadgeApplies } from "@/lib/approval";

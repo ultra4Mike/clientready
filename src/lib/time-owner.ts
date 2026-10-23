@@ -57,16 +57,16 @@ export function timeAttention(w: TimeWeek, now = new Date().toISOString()): Time
 }
 
 /** Labor rows (worker × day × job) for reports: hours and cost from the same approved-timesheet day pay. */
-export type LaborRow = { employeeId: string; name: string; date: string; week: string; docId: string; minutes: number; cents: number; otHours: number; dtHours: number; premiumCents: number; approved: boolean; topUpCents?: number; ptoHours?: number };
+export type LaborRow = { employeeId: string; name: string; date: string; week: string; docId: string; minutes: number; cents: number; otHours: number; dtHours: number; premiumCents: number; approved: boolean; topUpCents?: number; prevailingTopUpCents?: number; ptoHours?: number };
 export function laborRows(w: TimeWeek): LaborRow[] {
   const out: LaborRow[] = [];
   for (const worker of w.workers) for (const day of w.pays.get(worker.id) || []) {
     const totalMin = day.shares.reduce((s, x) => s + x.minutes, 0) || 1;
     for (const s of day.shares) {
       const f = s.minutes / totalMin;
-      out.push({ employeeId: worker.id, name: worker.name, date: day.date, week: w.week, docId: s.docId, minutes: s.minutes, cents: s.cents, otHours: (day.otHours || 0) * f, dtHours: (day.dtHours || 0) * f, premiumCents: Math.round((day.premiumCents || 0) * f), approved: day.approved, topUpCents: Math.round((day.topUpCents || 0) * f) });
+      out.push({ employeeId: worker.id, name: worker.name, date: day.date, week: w.week, docId: s.docId, minutes: s.minutes, cents: s.cents, otHours: (day.otHours || 0) * f, dtHours: (day.dtHours || 0) * f, premiumCents: Math.round((day.premiumCents || 0) * f), approved: day.approved, topUpCents: Math.round((day.topUpCents || 0) * f), prevailingTopUpCents: Math.round((day.prevailingTopUpCents || 0) * f) });
     }
-    if (!day.shares.length && day.cents) out.push({ employeeId: worker.id, name: worker.name, date: day.date, week: w.week, docId: "", minutes: day.workMinutes + day.driveMinutes, cents: day.cents, otHours: day.otHours || 0, dtHours: day.dtHours || 0, premiumCents: day.premiumCents || 0, approved: day.approved, topUpCents: day.topUpCents || 0 });
+    if (!day.shares.length && day.cents) out.push({ employeeId: worker.id, name: worker.name, date: day.date, week: w.week, docId: "", minutes: day.workMinutes + day.driveMinutes, cents: day.cents, otHours: day.otHours || 0, dtHours: day.dtHours || 0, premiumCents: day.premiumCents || 0, approved: day.approved, topUpCents: day.topUpCents || 0, prevailingTopUpCents: day.prevailingTopUpCents || 0 });
   }
   return out;
 }

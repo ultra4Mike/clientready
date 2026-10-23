@@ -110,6 +110,15 @@ export function allocateWeek(days: DayInput[], payRaw: PaySettings | unknown, ra
       const gap = Math.round((floor - paidPart) * 100);
       if (covered > 0 && gap > 0) splitCents(gap, pwHours).forEach((c, i) => { pwTop[i] = c / 100; base[i] += c / 100; });
     }
+    // Minimum wage top-up: when all the week's pay (incl. piece / commission extras) is under min wage x hours, pay the gap, spread by hours.
+    // Computed BEFORE overtime so the FLSA regular rate includes it (straight-time only; OT premium is not counted here).
+    const minWage = num(defaults.settings?.minWage);
+    const topUp = list.map(() => 0);
+    if (minWage > 0 && weekHours > 0 && pay.type !== "salary") {
+      const paid = base.reduce((s2, x) => s2 + x, 0) + extra;
+      const gap = Math.round((minWage * weekHours - paid) * 100);
+      if (gap > 0) splitCents(gap, list.map((_, i) => hoursOf(i))).forEach((c, i) => { topUp[i] = c / 100; });
+    }
     // California missed meal/rest premium: an hour at the regular rate per missed break (only when the owner turned it on).
     const caHours = list.map((d) => d.sheet?.premiumHours || 0);
     // Overtime premium per day: account preset (OT / double time / 7th day, FLSA regular rate) or the worker's own rule.
@@ -120,8 +129,8 @@ export function allocateWeek(days: DayInput[], payRaw: PaySettings | unknown, ra
     const nonHourly = pay.type === "day" || pay.type === "job" || pay.type === "piece" || pay.type === "commission";
     if (nonHourly && defaults.settings?.flsaNonHourly && weekHours > FLSA_WEEK_HOURS) {
       // FLSA for piece / day-rate / commission: regular rate = all straight-time pay (incl. piece/commission extras and
-      // prevailing-wage top-up) / all hours; each hour over 40 earns 0.5x that rate on top (straight pay already covers 1x).
-      const regular = (base.reduce((s2, x) => s2 + x, 0) + extra) / weekHours;
+      // prevailing-wage and min-wage top-ups) / all hours; each hour over 40 earns 0.5x that rate on top (straight pay already covers 1x).
+      const regular = (base.reduce((s2, x) => s2 + x, 0) + extra + topUp.reduce((s2, x) => s2 + x, 0)) / weekHours;
       let seen = 0;
       list.forEach((_, i) => { const h = hoursOf(i); const over = Math.max(0, seen + h - FLSA_WEEK_HOURS) - Math.max(0, seen - FLSA_WEEK_HOURS); seen += h; premium.push(over * regular * 0.5); ot[i] = { ot: over, dt: 0 }; });
     } else if (rules && hourlyLike) {
@@ -141,14 +150,6 @@ export function allocateWeek(days: DayInput[], payRaw: PaySettings | unknown, ra
       });
     }
     list.forEach((_, i) => { if (caHours[i] > 0 && num(rate) > 0) premium[i] += caHours[i] * num(rate); });
-    // Minimum wage top-up: when all the week's pay (incl. piece / commission extras) is under min wage x hours, pay the gap, spread by hours.
-    const minWage = num(defaults.settings?.minWage);
-    const topUp = list.map(() => 0);
-    if (minWage > 0 && weekHours > 0 && pay.type !== "salary") {
-      const paid = base.reduce((s2, x) => s2 + x, 0) + extra;
-      const gap = Math.round((minWage * weekHours - paid) * 100);
-      if (gap > 0) splitCents(gap, list.map((_, i) => hoursOf(i))).forEach((c, i) => { topUp[i] = c / 100; });
-    }
     const exact = list.map((_, i) => base[i] + premium[i] + topUp[i]);
     const weekCents = Math.round(exact.reduce((s, x) => s + x, 0) * 100);
     const dayCents = splitCents(weekCents, exact.map((x) => Math.max(0, x)));

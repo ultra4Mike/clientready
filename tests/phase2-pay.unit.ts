@@ -49,4 +49,13 @@ const f = flsaWeek(1000, 50); ok(f.regularRate === 20 && f.otHours === 10 && f.p
 // Edited day keeps no prevailing split (pay already decided by owner)
 const edited = allocateWeek([{ ...day(wk[0], 8), approvedMinutes: 420 }], { type: "day", dayRate: "200", dayHours: "8" }, "", { jobRates: new Map([["A", 40]]) });
 ok(!edited[0].prevailingTopUpCents, "edited day: no prevailing top-up");
+// Min-wage top-up counts in the FLSA regular rate: piece $250 over 50 h, min $10 -> top-up $250, RR $500/50 = $10, 10 h x $5 = $50
+const mwSettings = { flsaNonHourly: true, minWage: 10 } as never;
+const pcMw = allocateWeek(wk.map((d) => day(d, 10)), { type: "piece", pieceRate: "10" }, "", { settings: mwSettings, weekExtra: new Map([[wk[0], 250]]) });
+const pcMwPrem = pcMw.reduce((s, d) => s + (d.premiumCents || 0), 0), pcMwTop = pcMw.reduce((s, d) => s + (d.topUpCents || 0), 0);
+ok(pcMwPrem === 5000 && pcMwTop === 25000 && tot(pcMw) === 30000, `piece + min wage FLSA premium $50 (got premium ${pcMwPrem / 100}, top-up ${pcMwTop / 100})`);
+// Prevailing top-up on piece pay counts in the RR: piece $250 over 50 h on a $20 job -> floor $1000, top-up $750, RR $20, 10 h x $10 = $100
+const pcPw = allocateWeek(wk.map((d) => day(d, 10)), { type: "piece", pieceRate: "10" }, "", { settings: mwSettings, jobRates: new Map([["A", 20]]), weekExtra: new Map([[wk[0], 250]]) });
+const pcPwPrem = pcPw.reduce((s, d) => s + (d.premiumCents || 0), 0), pcPwTop = pcPw.reduce((s, d) => s + (d.prevailingTopUpCents || 0), 0);
+ok(pcPwPrem === 10000 && pcPwTop === 75000 && !pcPw.some((d) => d.topUpCents), `piece + prevailing FLSA premium $100 (got premium ${pcPwPrem / 100}, pw top-up ${pcPwTop / 100})`);
 console.log(fails ? `FAILED ${fails}` : "ALL PASS");

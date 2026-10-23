@@ -33,12 +33,12 @@ export default function LaborReport({ docs }: { docs: { id: string; title?: stri
   }, [weeks]);
   const jobName = (id: string) => { const d = docs.find((x) => x.id === id); return id === "pto" ? "PTO / sick" : id ? `${d?.data?.invoiceNumber || ""} ${d?.clientName || d?.title || ""}`.trim() || id.slice(0, 8) : "Salary (no job)"; };
   const groups = useMemo(() => {
-    const m = new Map<string, { label: string; minutes: number; cents: number; ot: number; dt: number; premium: number; estimated: boolean; topUp: number; pto: number }>();
+    const m = new Map<string, { label: string; minutes: number; cents: number; ot: number; dt: number; premium: number; estimated: boolean; topUp: number; pwTop: number; pto: number }>();
     for (const r of rows || []) {
       const key = by === "worker" ? r.employeeId : by === "job" ? r.docId : r.week;
       const label = by === "worker" ? r.name : by === "job" ? jobName(r.docId) : `Week of ${r.week}`;
-      const g = m.get(key) || { label, minutes: 0, cents: 0, ot: 0, dt: 0, premium: 0, estimated: false, topUp: 0, pto: 0 };
-      g.minutes += r.minutes; g.cents += r.cents; g.ot += r.otHours; g.dt += r.dtHours; g.premium += r.premiumCents; g.estimated ||= !r.approved; g.topUp += r.topUpCents || 0; g.pto += r.ptoHours || 0;
+      const g = m.get(key) || { label, minutes: 0, cents: 0, ot: 0, dt: 0, premium: 0, estimated: false, topUp: 0, pwTop: 0, pto: 0 };
+      g.minutes += r.minutes; g.cents += r.cents; g.ot += r.otHours; g.dt += r.dtHours; g.premium += r.premiumCents; g.estimated ||= !r.approved; g.topUp += r.topUpCents || 0; g.pwTop += r.prevailingTopUpCents || 0; g.pto += r.ptoHours || 0;
       m.set(key, g);
     }
     return [...m.entries()].sort((a, b) => b[1].cents - a[1].cents);
@@ -48,21 +48,21 @@ export default function LaborReport({ docs }: { docs: { id: string; title?: stri
   return (
     <section className="cr-section mb-6 rounded-2xl border p-4" data-testid="labor-report">
       <h2 className="text-base font-semibold">Labor hours &amp; cost</h2>
-      <p className="text-xs text-[var(--cr-muted)]">From the timesheet: approved days are final, others are estimates. Includes overtime, double time, break premium, minimum-wage top-up and approved PTO / sick.</p>
+      <p className="text-xs text-[var(--cr-muted)]">From the timesheet: approved days are final, others are estimates. Includes overtime, double time, break premium, minimum-wage and prevailing-wage top-ups and approved PTO / sick.</p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <div role="group" aria-label="Group by" className="flex gap-1">{(["worker", "job", "week"] as By[]).map((b) => (
           <button key={b} type="button" className="cr-btn cr-btn-secondary" data-testid={`labor-by-${b}`} data-state={by === b ? "on" : "off"} aria-pressed={by === b} onClick={() => setBy(b)}>By {b}</button>))}</div>
         <label className="text-sm">Weeks <select name="labor-weeks" data-testid="labor-weeks" className="min-h-11 rounded-lg border bg-transparent px-2" value={weeks} onChange={(e) => { setRows(null); setWeeks(Number(e.target.value)); }}>{[1, 2, 4, 8, 13].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
-        <button type="button" className="cr-btn cr-btn-secondary" data-testid="labor-export" disabled={!groups.length} onClick={() => downloadCsv(`labor-by-${by}.csv`, csvText(["Name", "Hours", "OT hours", "DT hours", "Break premium", "Min-wage top-up", "PTO hours", "Cost", "Status"], groups.map(([, g]) => [g.label, (g.minutes / 60).toFixed(2), g.ot.toFixed(2), g.dt.toFixed(2), (g.premium / 100).toFixed(2), (g.topUp / 100).toFixed(2), g.pto.toFixed(2), (g.cents / 100).toFixed(2), g.estimated ? "estimated" : "approved"])))}>Export (CSV)</button>
+        <button type="button" className="cr-btn cr-btn-secondary" data-testid="labor-export" disabled={!groups.length} onClick={() => downloadCsv(`labor-by-${by}.csv`, csvText(["Name", "Hours", "OT hours", "DT hours", "Break premium", "Min-wage top-up", "Prevailing-wage top-up", "PTO hours", "Cost", "Status"], groups.map(([, g]) => [g.label, (g.minutes / 60).toFixed(2), g.ot.toFixed(2), g.dt.toFixed(2), (g.premium / 100).toFixed(2), (g.topUp / 100).toFixed(2), (g.pwTop / 100).toFixed(2), g.pto.toFixed(2), (g.cents / 100).toFixed(2), g.estimated ? "estimated" : "approved"])))}>Export (CSV)</button>
       </div>
       {rows === null ? <p className="mt-2 text-[var(--cr-muted)]" data-testid="labor-loading">Loading…</p> : !groups.length ? <p className="mt-2 text-[var(--cr-muted)]" data-testid="labor-empty">No crew hours in this range yet.</p> : (
         <table className="mt-2 w-full text-sm" data-testid="labor-table">
-          <thead><tr><th className="text-left">Name</th><th className="text-right">Hours</th><th className="text-right">OT / DT</th><th className="text-right">Top-up / PTO h</th><th className="text-right">Cost</th></tr></thead>
+          <thead><tr><th className="text-left">Name</th><th className="text-right">Hours</th><th className="text-right">OT / DT</th><th className="text-right">Min-wage top-up</th><th className="text-right">Prevailing top-up</th><th className="text-right">PTO h</th><th className="text-right">Cost</th></tr></thead>
           <tbody>{groups.map(([k, g]) => (
             <tr key={k} className="border-t" data-testid="labor-row" data-key={k} data-state={g.estimated ? "estimated" : "approved"}>
-              <td>{by === "job" && docs.some((x) => x.id === k) ? <Link href={`/invoice?id=${encodeURIComponent(k)}`} data-testid="labor-doc-link" data-doc-id={k} className="cr-doc-link">{g.label}</Link> : g.label}</td><td className="text-right tabular-nums">{(g.minutes / 60).toFixed(2)}</td><td className="text-right tabular-nums">{g.ot.toFixed(2)} / {g.dt.toFixed(2)}</td><td className="text-right tabular-nums" data-testid="labor-topup-pto">${(g.topUp / 100).toFixed(2)} / {g.pto.toFixed(2)}</td>
+              <td>{by === "job" && docs.some((x) => x.id === k) ? <Link href={`/invoice?id=${encodeURIComponent(k)}`} data-testid="labor-doc-link" data-doc-id={k} className="cr-doc-link">{g.label}</Link> : g.label}</td><td className="text-right tabular-nums">{(g.minutes / 60).toFixed(2)}</td><td className="text-right tabular-nums">{g.ot.toFixed(2)} / {g.dt.toFixed(2)}</td><td className="text-right tabular-nums" data-testid="labor-topup">${(g.topUp / 100).toFixed(2)}</td><td className="text-right tabular-nums" data-testid="labor-pw-topup">${(g.pwTop / 100).toFixed(2)}</td><td className="text-right tabular-nums" data-testid="labor-pto">{g.pto.toFixed(2)}</td>
               <td className="text-right tabular-nums" data-testid="labor-cost">${(g.cents / 100).toFixed(2)}{g.estimated ? " est." : ""}</td></tr>))}
-            <tr className="border-t font-semibold" data-testid="labor-total"><td>Total</td><td className="text-right tabular-nums">{(total.minutes / 60).toFixed(2)}</td><td /><td /><td className="text-right tabular-nums">${(total.cents / 100).toFixed(2)}</td></tr>
+            <tr className="border-t font-semibold" data-testid="labor-total"><td>Total</td><td className="text-right tabular-nums">{(total.minutes / 60).toFixed(2)}</td><td /><td /><td /><td /><td className="text-right tabular-nums">${(total.cents / 100).toFixed(2)}</td></tr>
           </tbody>
         </table>)}
     </section>
