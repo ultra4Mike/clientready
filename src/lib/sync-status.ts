@@ -48,6 +48,22 @@ export function markSynced(...ids: string[]) {
   write(read().filter((item) => !ids.includes(item)));
 }
 
+/** Ids still marked unsynced (not queued deletes). */
+export function unsyncedIds() {
+  return typeof window === "undefined" ? [] : read();
+}
+
+/**
+ * After a successful fetch+sync: drop marks that can never upload. Kept: any local (non-cloud) id that
+ * is still on this device, and anything that was just pushed (its own save clears it when it lands).
+ */
+export function clearSettledMarks(localIds: string[], cloudIds: string[], pushedIds: string[]) {
+  const here = new Set(localIds), cloud = new Set(cloudIds), pushed = new Set(pushedIds);
+  const stale = read().filter((id) => !pushed.has(id) && (!here.has(id) || cloud.has(id)));
+  if (stale.length) markSynced(...stale);
+  return stale;
+}
+
 export function clearPending() {
   write([]);
 }

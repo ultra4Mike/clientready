@@ -4,6 +4,7 @@ import { clientFromRow, readCachedClients } from "@/lib/client-rows";
 import { supabase } from "@/lib/supabase";
 import { fetchCloudDocuments, type CloudDoc } from "@/lib/cloud-docs";
 import { flushDeletes } from "@/lib/doc-tombstones";
+import { clearSettledMarks } from "@/lib/sync-status";
 
 /** Late fee settings from the profile row; before migration 120000 (no columns) keep this device's values. */
 /** Set-aside % and profit alert margin: the account value when saved there (migration 20261020090000), else this device's value. */
@@ -178,6 +179,10 @@ async function loadAccountOnce(): Promise<boolean> {
   window.localStorage.setItem(OWNER_KEY, user.id);
   const synced = await syncLocalDocs(merged, pushUp);
   window.localStorage.setItem(DOCS_KEY, JSON.stringify(synced));
+  // Help retest: "Saved on this device (n)" marks that can never upload are cleared after a good fetch:
+  // a cloud doc that was not pushed (the cloud copy is the same or newer, so nothing is left to send),
+  // or a mark for a document that is no longer on this device. Local-only docs keep their mark.
+  clearSettledMarks(synced.map((doc) => doc.id), cloud.map((doc) => doc.id), pushUp.map((doc) => doc.id));
   return true;
 }
 

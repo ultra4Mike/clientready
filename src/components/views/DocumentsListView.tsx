@@ -42,7 +42,8 @@ type SavedDocument = {
 /** Help live check: a change order shows its own total (a credit reads -$X), never a bare dash. */
 export function totalText(doc: { type?: string; data?: Record<string, unknown> }, total: number) {
   if (Math.abs(total) > 0.004) return `${total < 0 ? "-" : ""}$${Math.abs(total).toFixed(2)}`;
-  return isChangeOrder(doc) ? "$0.00" : "—";
+  // Help retest: a $0 invoice/proposal reads "$0.00" too; only emails/reports (no amount) show a dash.
+  return isChangeOrder(doc) || doc.type === "invoice" || doc.type === "proposal" || !doc.type ? "$0.00" : "—";
 }
 
 function num(value: unknown) {

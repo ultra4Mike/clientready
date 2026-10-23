@@ -43,6 +43,7 @@ const STYLES: Record<SyncState, string> = {
 export default function SyncPill() {
   const [state, setState] = useState<SyncState | null>(null);
   const [signedIn, setSignedIn] = useState(false);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -72,12 +73,14 @@ export default function SyncPill() {
   if (!signedIn || !state) return null;
   const count = pendingIds().length;
   return (
+    <span className="relative inline-flex">
     <button
       type="button"
       data-testid="sync-pill"
       data-state={state}
-      onClick={() => flushPending()}
-      title={state === "local" ? "Tap to try syncing now" : undefined}
+      onClick={() => { setOpen((v) => !v); void flushPending(); }}
+      aria-expanded={open}
+      title={state === "local" ? "Tap to see what is waiting and try syncing now" : undefined}
       aria-label={LABELS[state]}
       className={`print-hide inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 max-[899px]:h-11 max-[899px]:w-11 max-[899px]:justify-center max-[899px]:border-0 max-[899px]:bg-transparent max-[899px]:p-0 text-xs font-medium ${STYLES[state]}`}
     >
@@ -87,5 +90,28 @@ export default function SyncPill() {
         {(state === "local" || state === "offline") && count > 0 ? ` (${count})` : ""}
       </span>
     </button>
+    {open && (
+      <span role="dialog" aria-label="Waiting to sync" data-testid="sync-pending-list" className="absolute right-0 top-full z-50 mt-1 w-72 rounded-lg border border-slate-300 bg-[var(--cr-bg,white)] p-3 text-left text-xs shadow-lg dark:border-slate-600">
+        {count === 0 ? <span className="block">Nothing is waiting. Everything is in your account.</span> : (
+          <>
+            <span className="mb-1 block font-semibold">Waiting to reach your account ({count})</span>
+            <ul className="space-y-1">{pendingItems().map((item) => <li key={item.key} data-testid="sync-pending-item" data-key={item.key}>{item.label}</li>)}</ul>
+            <span className="mt-2 block text-[var(--cr-muted)]">These upload by themselves when the connection works.</span>
+          </>
+        )}
+      </span>
+    )}
+    </span>
   );
+}
+
+/** What feeds the count, by number where known (unsynced saves + queued deletes). */
+export function pendingItems() {
+  let docs: { id?: string; type?: string; title?: string; data?: { invoiceNumber?: string } }[] = [];
+  try { docs = JSON.parse(window.localStorage.getItem("clientready-documents") || "[]"); } catch { docs = []; }
+  const name = (id: string) => { const d = docs.find((x) => String(x?.id) === id); return d ? String(d.data?.invoiceNumber || d.title || "Untitled document") : ""; };
+  return pendingIds().map((key) => {
+    if (key.startsWith("delete:")) { const id = key.slice(7); return { key, label: `Delete of ${name(id) || `a removed document (${id.slice(0, 8)})`}` }; }
+    return { key, label: `${name(key) || `Document ${key.slice(0, 8)}`}: changes not uploaded yet` };
+  });
 }

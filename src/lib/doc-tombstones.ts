@@ -45,6 +45,14 @@ export function localTombstones() {
   return readMap(TOMBSTONES_KEY);
 }
 
+/** Drops queued deletes (used by the sync pill cleanup when the cloud no longer has the row). */
+export function dropPendingDeletes(ids: string[]) {
+  const next = readMap(PENDING_KEY);
+  let changed = false;
+  for (const id of ids) if (id in next) { delete next[id]; changed = true; }
+  if (changed) writeMap(PENDING_KEY, next);
+}
+
 export function pendingDeleteIds() {
   return typeof window === "undefined" ? [] : Object.keys(readMap(PENDING_KEY));
 }
@@ -67,7 +75,11 @@ export async function flushDeletes(userId: string) {
       if (markError && !tableMissing(markError)) continue;
     }
     const { error } = await supabase.from("documents").delete().eq("id", id).eq("user_id", userId);
-    if (error) continue;
+    if (error) {
+      // Help retest: a queued delete for a row the cloud no longer has is done, not "waiting" forever.
+      const { data: still, error: readError } = await supabase.from("documents").select("id").eq("id", id).eq("user_id", userId).maybeSingle();
+      if (readError || still) continue;
+    }
     const next = readMap(PENDING_KEY);
     delete next[id];
     writeMap(PENDING_KEY, next);
