@@ -32,7 +32,7 @@ function CrewPto() {
   }
   const ptoOff = rules ? rules.ptoPreset === "off" || rules.ptoPreset === "federal" : false;
   const allowNeg = Boolean(rules?.ptoAllowNegative);
-  const on = Boolean(balance) && !(ptoOff && !(balance && balance.accrued > 0));
+  const on = Boolean(balance) && !ptoOff;
   const input = "mt-1 block min-h-11 w-full rounded-lg border bg-transparent px-3";
   return (
     <section className="cr-panel mt-4 rounded-xl border p-3 text-sm" data-testid="crew-pto">
@@ -46,7 +46,7 @@ function CrewPto() {
         <label>Note<input ref={noteRef} name="ptoNote" autoComplete="off" maxLength={300} data-testid="crew-pto-note" className={input} defaultValue="" /></label>
       </div>
       <button type="button" data-testid="crew-pto-submit" className="mt-2 min-h-11 rounded-lg border px-3 disabled:opacity-50" disabled={busy} onClick={() => void submit()}>{busy ? "Sending…" : "Ask for time off"}</button>
-      </> : balance && <p className="mt-1 text-[var(--cr-muted)]" data-testid="crew-pto-off">Time-off requests are off for your account.</p>}
+      </> : ptoOff && <p className="mt-1 text-[var(--cr-muted)]" data-testid="crew-pto-off">Time-off requests are off for your account.</p>}
       {msg && <p className="mt-1" role="status" data-testid="crew-pto-message">{msg}</p>}
       {requests.length > 0 && <ul className="mt-2 space-y-1" data-testid="crew-pto-list">{requests.map((r) => <li key={r.id} data-testid="crew-pto-item" data-status={r.status}>{r.date} · {r.hours} h {r.kind === "sick" ? "sick" : "PTO"} · <span className="cr-chip2">{r.status}</span>{r.note ? <span className="block text-xs text-[var(--cr-muted)]" data-testid="crew-pto-item-note">“{r.note}”</span> : null}</li>)}</ul>}
     </section>

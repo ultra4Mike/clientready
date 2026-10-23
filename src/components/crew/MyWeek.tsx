@@ -87,7 +87,7 @@ export default function MyWeek({ email, employeeId, clock, onRows }: { email: st
             </div>
           );
         })}
-        <div role="row" className="grid grid-cols-[minmax(0,1fr)_4.75rem_4.75rem_4.75rem] border-t font-semibold" data-testid="my-week-total"><span className="py-1.5">Total</span><span className="whitespace-nowrap py-1.5 pr-1 text-right">{hm(total)}</span><span className="whitespace-nowrap py-1.5 pr-1 text-right">{hm(breaks)}</span><span /></div>
+        <div role="row" className="grid grid-cols-[minmax(0,1fr)_4.75rem_4.75rem_4.75rem] border-t font-semibold" data-testid="my-week-total"><span className="py-1.5">Total</span><span className="whitespace-nowrap py-1.5 pr-1 text-right">{hm(total)}</span><span className="whitespace-nowrap py-1.5 pr-1 text-right">{hm(breaks)}</span><span className="whitespace-nowrap py-1.5 pr-1 text-right" data-testid="my-week-total-unpaid">{hm(rows.reduce((t, r) => t + r.unpaid, 0))}</span></div>
       </div>
       <div data-testid="attest" data-state={attested[week] ? "done" : "open"} className="text-sm">
         {attested[week] ? <p data-testid="attest-done">Week confirmed {new Date(attested[week]).toLocaleString()}.</p>
