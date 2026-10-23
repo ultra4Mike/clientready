@@ -263,6 +263,8 @@ export function buildDay(input: {
   let lastJobDoc: string | undefined;
   let dayStart: string | undefined, dayEnd: string | undefined, trailingDrive: { start: string; end: string } | null = null;
   let cur: { state: DayStateName; resume: DayStateName; docId?: string } = { state: "OFF_DUTY", resume: "ON_DUTY_IDLE" };
+  // Several sessions a day: Start day after End day re-opens the day. A session with no job taps is paid on-duty time.
+  let session: { start: string; hadJob: boolean } | null = null;
   const sched = new Map(input.schedule.map((job) => [job.docId, job]));
   const closeJob = (at: string, fromSchedule = false) => {
     if (!openJob) return;
@@ -291,8 +293,9 @@ export function buildDay(input: {
     else if (event.deviceAt && Math.abs(ms(event.deviceAt) - ms(event.at)) > CLOCK_SKEW_MS) flags.add("clock_skew");
     const openBreak = breaks.length && !breaks[breaks.length - 1].end ? breaks[breaks.length - 1] : null;
     if (kind !== "break_start" && openBreak && kind !== "end_day") openBreak.end = event.at; // any tap ends an open break
-    if (kind === "start_day") { if (!dayStart) dayStart = event.at; }
+    if (kind === "start_day") { if (!dayStart) dayStart = event.at; if (!session) session = { start: event.at, hadJob: false }; }
     else if (kind === "start_job" || kind === "arrive") {
+      if (session) session.hadJob = true; else session = { start: event.at, hadJob: true };
       if (openDrive) { drives.push({ fromDocId: openDrive.from, toDocId: event.docId || openDrive.to, start: openDrive.start, end: event.at, minutes: mins(openDrive.start, event.at), paidMinutes: 0 }); openDrive = null; }
       if (openJob && openJob.docId !== event.docId) closeJob(event.at);
       if (!openJob && event.docId) openJob = { docId: event.docId, start: event.at, notAtSite: away };
@@ -308,6 +311,8 @@ export function buildDay(input: {
       closeJob(event.at);
       if (openDrive) { if (openDrive.from) trailingDrive = { start: openDrive.start, end: event.at }; openDrive = null; } // drive home: paid only with "pay last commute"
       dayEnd = event.at;
+      if (session && !session.hadJob && ms(event.at) > ms(session.start)) jobs.push({ docId: "", start: session.start, end: event.at, minutes: mins(session.start, event.at), fromSchedule: false, notAtSite: false, label: "On duty" });
+      session = null;
     }
   }
   const nowMs = input.now ? ms(input.now) : Number.POSITIVE_INFINITY;
@@ -643,7 +648,7 @@ export function dayTimeline(day: DaySheet | undefined): TimelineRow[] {
   if (!day || !day.jobs.length) return [];
   const rows: TimelineRow[] = [];
   day.jobs.forEach((job, i) => {
-    rows.push({ at: job.start, kind: "start", docId: job.docId, fromSchedule: job.fromSchedule, text: `${fmtTime(job.start)} Started ${job.label || "job"}${job.fromSchedule ? " (from schedule)" : ""}` });
+    rows.push({ at: job.start, kind: "start", docId: job.docId, fromSchedule: job.fromSchedule, text: !job.docId ? `${fmtTime(job.start)} Day started (no job)` : `${fmtTime(job.start)} Started ${job.label || "job"}${job.fromSchedule ? " (from schedule)" : ""}` });
     const leg = day.drives.find((d) => d.fromDocId === job.docId && d.start === job.end);
     if (leg && i < day.jobs.length - 1) {
       rows.push({ at: job.end, kind: "end", docId: job.docId, text: `${fmtTime(job.end)} Finished ${job.label || "job"}` });
@@ -656,8 +661,8 @@ export function dayTimeline(day: DaySheet | undefined): TimelineRow[] {
   for (const b of day.breaks || []) rows.push({ at: b.start, kind: "break", minutes: b.minutes, paid: b.paid, text: b.auto ? `Auto meal break ${hm(b.minutes)} (unpaid)` : `${fmtTime(b.start)} Break ${hm(b.minutes)} (${b.paid ? "paid, short break" : "unpaid"})` });
   for (const leg of day.drives.filter((d) => d.autoBreakMinutes)) rows.push({ at: leg.end, kind: "break", minutes: leg.autoBreakMinutes, paid: false, text: `Long drive: ${hm(leg.autoBreakMinutes || 0)} over the limit treated as an unpaid break` });
   const last = day.jobs[day.jobs.length - 1];
-  rows.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
   rows.push({ at: last.end, kind: "end", docId: last.docId, text: `${fmtTime(last.end)} Day ended${day.autoEnded ? " (auto-ended at the last stop)" : ""}` });
+  rows.sort((a, b) => Date.parse(a.at) - Date.parse(b.at) || (a.kind === "end" ? 1 : 0) - (b.kind === "end" ? 1 : 0));
   return rows;
 }
 
