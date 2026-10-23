@@ -180,11 +180,11 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
         onDragStart={(event) => event.dataTransfer.setData("text/plain", job.doc.id)}
         onClick={(event) => { event.stopPropagation(); setEditing({ docId: job.doc.id }); }}
         className={agenda ? `flex min-h-11 cursor-pointer flex-col justify-center rounded-lg border border-l-4 px-3 py-2 text-left text-sm font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc, jobDocs) ? " cr-tentative border-dashed opacity-60" : ""}` : `cr-chip2 cursor-grab min-w-0 break-words rounded-md border border-l-4 px-1.5 py-1 text-left text-xs font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc, jobDocs) ? " cr-tentative border-dashed opacity-60" : ""}`}
-        title={`${job.doc.title} · ${job.doc.clientName} · ${statusLabel(job.schedule)}${job.schedule.onMyWayAt && job.schedule.status !== "done" ? ` · ${job.schedule.onMyWayBy || "Crew"} on the way` : ""}${people ? ` · ${people}` : ""}`}
+        title={`${crossesMidnight(job.schedule.startTime, job.schedule.endTime) ? `${timeLabel(job.schedule.startTime || "")}–${timeLabel(job.schedule.endTime || "")} (next day) · ` : ""}${job.doc.title} · ${job.doc.clientName} · ${statusLabel(job.schedule)}${job.schedule.onMyWayAt && job.schedule.status !== "done" ? ` · ${job.schedule.onMyWayBy || "Crew"} on the way` : ""}${people ? ` · ${people}` : ""}`}
       >
         {agenda ? (
           <span className="flex min-w-0 items-baseline gap-2">
-            <span className="shrink-0 font-semibold tabular-nums">{job.schedule.startTime ? timeLabel(job.schedule.startTime) : "Any time"}{crossesMidnight(job.schedule.startTime, job.schedule.endTime) ? `–${timeLabel(job.schedule.endTime || "")} (next day)` : ""}</span>
+            <span className="shrink-0 font-semibold tabular-nums">{job.schedule.startTime ? timeLabel(job.schedule.startTime) : "Any time"}{crossesMidnight(job.schedule.startTime, job.schedule.endTime) ? `–${timeLabel(job.schedule.endTime || "")} (next day)` : ""}</span>{" "}
             <span className="min-w-0 truncate">{job.doc.title}{job.doc.clientName ? <span className="opacity-80"> · {job.doc.clientName}</span> : null}</span>
           </span>
         ) : (
@@ -214,7 +214,8 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
         data-testid={`${agenda ? "agenda-" : ""}job-cont-${job.doc.id}`}
         data-overnight="continued"
         onClick={(event) => { event.stopPropagation(); setEditing({ docId: job.doc.id }); }}
-        title={`${job.doc.title} · continues from the day before`}
+        title={`${crossesMidnight(job.schedule.startTime, job.schedule.endTime) ? `${timeLabel(job.schedule.startTime || "")}–${timeLabel(job.schedule.endTime || "")} (next day) · ` : ""}${job.doc.title} · continues from the day before`}
+        aria-label={`Until ${timeLabel(job.schedule.endTime || "")} · ${job.doc.clientName || job.doc.title} · continues from the night before`}
         className={`cr-chip2 cr-chip-cont cursor-pointer min-w-0 break-words rounded-md border border-dashed border-l-4 px-1.5 py-1 text-left font-medium leading-snug opacity-90 ${agenda ? "min-h-11 text-sm" : "text-xs"} ${statusClass(job.schedule)}`}
       >
         <span className="font-semibold">↳ until {timeLabel(job.schedule.endTime || "")} </span>{job.doc.clientName || job.doc.title}
@@ -271,7 +272,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
 
   return (
     <AppShell title="Calendar">
-      <PageHeader title="Calendar" subtitle={<><span className="hidden sm:inline">Drag jobs onto the week or month. Click a slot or job to edit it.</span><span className="sm:hidden">Tap a slot or job to edit it.</span></>} actions={<a href="/invoice?visit=1#schedule" data-testid="calendar-new-job" className="rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">New job</a>} />
+      <PageHeader title="Calendar" subtitle={<><span className="hidden sm:inline">Drag jobs onto the week or month. Click a slot or job to edit it.</span><span className="sm:hidden">Tap a slot or job to edit it.</span></>} actions={<a href="/invoice?visit=1&new=1#schedule" data-testid="calendar-new-job" className="rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">New job</a>} />
       <section className="py-0">
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <CalendarViewTabs current={view} onPick={setView} />

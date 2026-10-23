@@ -54,6 +54,11 @@ import { appendChangeOrderNote, changeOrderData, changeOrdersFor, mergeChangeOrd
 import ChangeOrderNotes from "@/components/ChangeOrderNotes";
 import { ApprovalBadge, ApprovalShare } from "@/components/Approval";
 import { useAutosaveDraft } from "@/hooks/useAutosaveDraft";
+import { newDocDraftStale, wantsFreshDoc } from "@/lib/draft-stale";
+
+function readDocsForDraftCheck() {
+  try { return JSON.parse(window.localStorage.getItem("clientready-documents") || "[]") as { id?: string; title?: string; data?: Record<string, unknown> }[]; } catch { return []; }
+}
 import RestoreDraftBanner from "@/components/RestoreDraftBanner";
 import FormDraft from "@/components/FormDraft";
 import ScheduleEditor from "@/components/ScheduleEditor";
@@ -415,7 +420,11 @@ export default function NewInvoicePage() {
       const isReload = (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined)?.type === "reload";
       const stashedId = window.localStorage.getItem("clientready-open-document");
       window.localStorage.removeItem("clientready-open-document");
-      const openId = urlId || (isReload ? "" : stashedId);
+      // Help retest #2: calendar "New job" (?visit=1 / ?new=1) always opens a blank document, never a left-over
+      // open-document or crew-draft handoff (that is how INV-1015 opened instead of a new form).
+      const fresh = wantsFreshDoc(window.location.search);
+      if (fresh) window.localStorage.removeItem("clientready-open-draft");
+      const openId = urlId || (isReload || fresh ? "" : stashedId);
       const raw = window.localStorage.getItem("clientready-documents");
       const wanted = window.localStorage.getItem("clientready-new-type");
       if (!openId) {
@@ -644,7 +653,7 @@ export default function NewInvoicePage() {
   const draftValue = { clientName, clientCompany, contactName, clientEmail, clientPhone, clientAddress, invoiceNumber, invoiceDate, dueDate, notes, items, taxPercent, discountType, discountValue, payments };
   const [saveToast, setSaveToast] = useState(false);
   useEffect(() => { if (!saveToast) return; const t = window.setTimeout(() => setSaveToast(false), 6000); return () => window.clearTimeout(t); }, [saveToast, saveMessage]);
-  const draft = useAutosaveDraft("doc", docId || `new-${docKind}`, draftValue, { enabled: formReady && notFound === "" });
+  const draft = useAutosaveDraft("doc", docId || `new-${docKind}`, draftValue, { enabled: formReady && notFound === "", isStale: docId ? undefined : (found) => newDocDraftStale(found.payload as { invoiceNumber?: string }, found.updatedAt, readDocsForDraftCheck()) });
   function restoreDraft() { restoreFrom(draft.accept() as Partial<typeof draftValue> | null); }
   function restoreFrom(v: Partial<typeof draftValue> | null) {
     if (!v) return;

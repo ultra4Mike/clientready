@@ -72,6 +72,8 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
   const length = jobMinutes(startTime, endTime); // cal24: 22:00-04:00 = 6 h
   const slotOpts = { ignoreTentative: skipTentative };
   const suggestion = conflicts.length || softConflicts.length ? nextOpenSlot(allDocs, docId, date, workerIds, length, startTime ? toMin(startTime) : undefined, slotOpts) || nextOpenSlot(allDocs, docId, date, workerIds, length, undefined, slotOpts) : "";
+  // Help retest #1: "Use next open time" is always offered next to the date/time fields (not only on a clash).
+  const openSlot = date ? nextOpenSlot(allDocs, docId, date, workerIds, length, startTime ? toMin(startTime) : undefined, slotOpts) || nextOpenSlot(allDocs, docId, date, workerIds, length, undefined, slotOpts) : "";
   function applySlot(slot: string) {
     const start = toMin(slot);
     setStartTime(slot);
@@ -161,6 +163,10 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
           </select>
         </label>
       </div>
+      {date && <div className="flex flex-wrap items-center gap-2" data-testid="next-open-row">
+        <button type="button" data-testid="next-open-time" data-time={openSlot} disabled={!openSlot || openSlot === startTime} onClick={() => openSlot && applySlot(openSlot)} className="cr-slot-chip inline-flex min-h-11 items-center gap-1.5 rounded-full border border-teal-500 px-4 text-sm font-semibold transition hover:bg-teal-500/10 disabled:cursor-default disabled:opacity-60">Use next open time{openSlot ? `: ${clockText(toMin(openSlot))}` : ""}</button>
+        {(!openSlot || openSlot === startTime) && <span data-testid="next-open-time-note" className="text-xs text-[var(--cr-muted)]">{openSlot ? "This start time is already open." : "No open time left on this day."}</span>}
+      </div>}
       {crossesMidnight(startTime, endTime) && <p data-testid="overnight-note" className="rounded-md border border-sky-400/50 bg-sky-500/10 px-2.5 py-1.5 text-sky-900 dark:text-sky-100">Overnight job: ends {endTime ? new Date(`2000-01-01T${endTime}`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : ""} the next day ({Math.floor(length / 60)} h{length % 60 ? ` ${length % 60} m` : ""}).</p>}
       <label className="flex flex-col gap-1">Note for crew <span className="text-xs opacity-60">(shown to assigned crew only, not the customer)</span>
         <input aria-label="Note for crew" value={crewNote} maxLength={500} onChange={(event) => setCrewNote(event.target.value)} placeholder="Gate code, parking, what to bring…" className="rounded-md border border-slate-300 bg-transparent px-2 py-1.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" />

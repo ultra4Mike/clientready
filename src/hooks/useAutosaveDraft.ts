@@ -11,7 +11,7 @@ export type DraftConflict<T> = { server: T; version: number };
  * Saves `value` debounced ~300ms (and on hide/close), offers a found draft back once, clears after Save.
  * enabled=false while the record is still loading, so a load is never drafted or overwritten.
  */
-export function useAutosaveDraft<T>(form: string, recordId: string, value: T, { enabled = true, isEmpty, delay = 300, maxAgeHours = 0 }: { enabled?: boolean; isEmpty?: (v: T) => boolean; delay?: number; maxAgeHours?: number } = {}) {
+export function useAutosaveDraft<T>(form: string, recordId: string, value: T, { enabled = true, isEmpty, delay = 300, maxAgeHours = 0, isStale }: { enabled?: boolean; isEmpty?: (v: T) => boolean; delay?: number; maxAgeHours?: number; isStale?: (draft: FoundDraft<T>) => boolean } = {}) {
   const key = `${form}::${recordId}`;
   const [restorable, setRestorable] = useState<FoundDraft<T> | null>(null);
   const [status, setStatus] = useState<DraftStatus | "">("");
@@ -42,9 +42,11 @@ export function useAutosaveDraft<T>(form: string, recordId: string, value: T, { 
       resolved.current = key;
       // Too old to matter (e.g. a time fix from yesterday): drop it instead of asking.
       if (draft && maxAgeHours > 0 && Date.now() - new Date(draft.updatedAt).getTime() > maxAgeHours * 3600000) { void clearDraft(form, recordId); return; }
+      // Help retest #3: a draft that no longer belongs here (already saved as a doc, too old for a new form) is dropped.
+      if (draft && isStale && isStale(draft)) { void clearDraft(form, recordId); return; }
       if (draft && JSON.stringify(draft.payload) !== baseline.current && !(isEmpty && isEmpty(draft.payload))) setRestorable({ payload: draft.payload, updatedAt: draft.updatedAt });
     }).catch(() => { if (live()) resolved.current = key; });
-  }, [enabled, key, value, form, recordId, isEmpty, maxAgeHours]);
+  }, [enabled, key, value, form, recordId, isEmpty, maxAgeHours, isStale]);
 
   const write = useCallback(() => {
     const { key: k, value: v, enabled: on, recordId: id } = latest.current;
