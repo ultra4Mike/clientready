@@ -36,11 +36,13 @@ export default function ChangeOrderPanel({ docs, currentId, onDeleteDraft }: { d
         <dl className="mt-3 grid gap-1 sm:max-w-md">
           {row("Original total", $(sum.originalTotal), "co-original-total")}
           {row("Paid to date", $(sum.paidToDate), "co-paid-to-date")}
-          {row("This change order", $(co.amount), "co-this-amount")}
-          {sum.changeOrders.length > 1 && row("All change orders", $(sum.changeOrdersTotal), "co-all-amount")}
+          {row(co.counted ? "This change order" : "This change order (draft, not counted)", $(co.amount), "co-this-amount")}
+          {sum.changeOrders.length > 1 && row("Change orders counted", $(sum.changeOrdersTotal), "co-all-amount")}
           {row("New contract total", $(sum.revisedTotal), "co-new-total", true)}
           {row("Remaining balance", $(sum.remaining), "co-remaining", true)}
         </dl>
+        {!co.counted && !co.isVoid && co.amount !== 0 && <p data-testid="co-pending" className="mt-2 font-semibold text-amber-800 dark:text-amber-200">Pending: +{$(co.amount)} once sent</p>}
+        <p className="mt-1 text-xs opacity-70">Totals count only change orders that are sent or later; drafts and void ones are not counted.</p>
       </section>
     );
   }
@@ -53,14 +55,15 @@ export default function ChangeOrderPanel({ docs, currentId, onDeleteDraft }: { d
           return (
             <li key={c.id} data-testid={`co-summary-item-${c.id}`} className="flex flex-wrap justify-between gap-2 py-1.5">
               <a href={`/invoice?id=${encodeURIComponent(c.id)}`} className="font-semibold underline">{c.number}</a>
-              <span>{c.empty ? <span className="font-semibold text-amber-700 dark:text-amber-300">Empty draft, add the change</span> : displayStatus(d as never, docs as never).label} · {$(c.amount)}{c.isVoid ? " (not counted)" : ""}</span>
+              <span>{c.empty ? <span className="font-semibold text-amber-700 dark:text-amber-300">Empty draft, add the change</span> : displayStatus(d as never, docs as never).label} · {$(c.amount)}{c.isVoid ? " (void, not counted)" : !c.counted ? " (draft, not counted)" : ""}</span>
             </li>
           );
         })}
       </ul>
       <dl className="mt-3 grid gap-1 border-t border-teal-500/20 pt-2 sm:max-w-md">
         {row("Original total", $(sum.originalTotal), "co-original-total")}
-        {row("Change orders", $(sum.changeOrdersTotal), "co-all-amount")}
+        {row("Change orders (sent or later)", $(sum.changeOrdersTotal), "co-all-amount")}
+        {sum.pendingTotal !== 0 && row("Pending drafts (not counted)", `+${$(sum.pendingTotal)}`, "co-pending-total")}
         {row("Revised total", $(sum.revisedTotal), "co-revised-total", true)}
         {row("Paid to date", $(sum.paidToDate), "co-paid-to-date")}
         {row("Remaining balance", $(sum.remaining), "co-remaining", true)}

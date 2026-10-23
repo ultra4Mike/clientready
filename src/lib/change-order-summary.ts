@@ -20,11 +20,11 @@ export function isEmptyDraftChangeOrder(doc: Doc) {
 
 export type ContractSummary = {
   original: Doc; originalNumber: string; originalTotal: number;
-  changeOrders: { id: string; number: string; amount: number; status: string; empty: boolean; isVoid: boolean }[];
-  changeOrdersTotal: number; revisedTotal: number; paidToDate: number; remaining: number;
+  changeOrders: { id: string; number: string; amount: number; status: string; empty: boolean; isVoid: boolean; counted: boolean }[];
+  changeOrdersTotal: number; pendingTotal: number; revisedTotal: number; paidToDate: number; remaining: number;
 };
 
-/** The original + all its change orders. Void ones are listed but not counted. */
+/** The original + all its change orders. Only sent-or-later change orders count; drafts and void are listed, not counted. */
 export function contractSummary(docs: Doc[], anyId: string): ContractSummary | null {
   const doc = docs.find((d) => d.id === anyId);
   if (!doc || doc.type !== "invoice") return null;
@@ -34,11 +34,13 @@ export function contractSummary(docs: Doc[], anyId: string): ContractSummary | n
   const cos = docs.filter((d) => d.type === "invoice" && readChangeOrderOf(d.data?.changeOrderOf)?.id === original.id)
     .sort((a, b) => String(a.data?.invoiceDate || "").localeCompare(String(b.data?.invoiceDate || "")) || numberOf(a).localeCompare(numberOf(b), undefined, { numeric: true }));
   const o = docAmounts(original);
-  const counted = [original, ...cos].filter((d) => !isVoid(d));
-  const changeOrders = cos.map((d) => ({ id: d.id, number: numberOf(d), amount: docAmounts(d).total, status: String(d.data?.status || "draft"), empty: isEmptyDraftChangeOrder(d), isVoid: isVoid(d) }));
-  const changeOrdersTotal = cents(changeOrders.filter((c) => !c.isVoid).reduce((s, c) => s + c.amount, 0));
+  const isCounted = (d: Doc) => !isVoid(d) && String(d.data?.status || "draft") !== "draft";
+  const counted = [original, ...cos.filter(isCounted)].filter((d) => !isVoid(d));
+  const changeOrders = cos.map((d) => ({ id: d.id, number: numberOf(d), amount: docAmounts(d).total, status: String(d.data?.status || "draft"), empty: isEmptyDraftChangeOrder(d), isVoid: isVoid(d), counted: isCounted(d) }));
+  const changeOrdersTotal = cents(changeOrders.filter((c) => c.counted).reduce((s, c) => s + c.amount, 0));
+  const pendingTotal = cents(changeOrders.filter((c) => !c.counted && !c.isVoid).reduce((s, c) => s + c.amount, 0));
   return {
-    original, originalNumber: numberOf(original), originalTotal: o.total, changeOrders, changeOrdersTotal,
+    original, originalNumber: numberOf(original), originalTotal: o.total, changeOrders, changeOrdersTotal, pendingTotal,
     revisedTotal: cents((isVoid(original) ? 0 : o.total) + changeOrdersTotal),
     paidToDate: cents(counted.reduce((s, d) => s + docAmounts(d).paid, 0)),
     remaining: cents(counted.reduce((s, d) => s + docAmounts(d).owed, 0)),
