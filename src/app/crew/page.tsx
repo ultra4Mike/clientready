@@ -393,6 +393,8 @@ export default function CrewPage() {
   });
   const weekClocked = hoursByDay.reduce((sum, item) => sum + item.clocked, 0);
   const weekLogged = hoursByDay.reduce((sum, item) => sum + item.logged, 0);
+  const paidRows = jobs.filter((job) => job.status === "paid" && !job.id.includes("-sched-"));
+  const confirmedPay = paidRows.reduce((sum, job) => sum + (Number(job.pay) || 0), 0);
 
   async function saveExpense(card: Card) {
     if (!spend.amount.trim()) return setMessage("Add the amount you spent.");
@@ -964,6 +966,11 @@ export default function CrewPage() {
                 <tr className="border-t border-teal-500/30 font-semibold" data-testid="hours-total"><td className="px-2 py-2">Total</td><td className="px-2 py-2 text-right tabular-nums">{fmtHours(weekClocked)}</td><td className="px-2 py-2 text-right tabular-nums">{weekLogged.toFixed(2)} h</td></tr>
               </tfoot>
             </table>
+            <div className="mt-5 rounded-xl bg-teal-500/10 p-4 text-sm">
+              <p className="text-xs text-[var(--cr-muted)]">Your confirmed pay (jobs marked paid)</p>
+              <p className="mt-1 text-2xl font-bold tabular-nums">${confirmedPay.toFixed(2)}</p>
+              <p className="text-xs text-[var(--cr-muted)]">Only you can see this. A scheduled job is not pay yet.</p>
+            </div>
           </section>
         )}
 
