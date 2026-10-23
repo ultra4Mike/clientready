@@ -1,5 +1,6 @@
 "use client";
 
+import LaborReport from "@/components/timesheet/LaborReport";
 import { shortDay } from "@/lib/followups";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -58,6 +59,7 @@ export default function ReportsPage() {
     <AppShell title="Reports">
       <PageHeader title="Reports" subtitle="Billed, collected, costs and job profit by month." />
       <div data-testid="reports" data-year={year} className="space-y-6">
+        <LaborReport docs={documents} />
         <label className="flex items-center gap-2 text-sm">
           Year
           <select data-testid="report-year" value={year} onChange={(event) => setYear(event.target.value)} className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2 text-sm">

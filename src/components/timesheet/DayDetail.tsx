@@ -26,7 +26,8 @@ export function auditText(r: AuditRow) {
     case "edit": return `Edited ${mins(o.editedMinutes ?? o.paidMinutes)} → ${mins(v.editedMinutes)}`;
     case "unapprove": return "Approval undone";
     case "attest": return `Worker confirmed the week (${mins(v.minutes)})`;
-    case "settings": return `Rules changed: ${Object.keys(v).join(", ")}`;
+    case "settings": return `Rules changed: ${Object.keys(v).map((k) => `${k} ${JSON.stringify(o[k] ?? "")} → ${JSON.stringify(v[k])}`).join("; ")}`;
+    case "worker_rules": return `Worker time settings: ${Object.keys(v).map((k) => `${k} ${JSON.stringify(o[k] ?? "")} → ${JSON.stringify(v[k])}`).join("; ")}`;
     default: return r.action;
   }
 }
@@ -35,6 +36,7 @@ const hhmm = (iso: string) => { const d = new Date(iso); return `${String(d.getH
 const atTime = (date: string, t: string) => new Date(`${date}T${t}:00`).toISOString();
 
 export default function DayDetail(props: {
+  worker?: import("@/lib/timesheet").WorkerTimeOverrides;
   workerName: string; date: string; sheet?: DaySheet; approval?: DayApproval; minutes: number; extraFlags: string[];
   settings: TimesheetSettings; schedule: ScheduledJob[]; fixes: FixRequest[];
   employeeId?: string; taps?: TapEvent[]; dayPay?: DayPay;
@@ -53,8 +55,8 @@ export default function DayDetail(props: {
   const pending = props.fixes.filter((f) => f.status === "pending");
   const approved = Boolean(props.approval?.approvedAt);
   // Same engine as the taps: edited job times become the day's "schedule" with no taps.
-  const recalc = (list: typeof spans) => buildDay({ employeeId: "x", date, events: [], settings, schedule: list.filter((s) => s.start && s.end).map((s) => ({ docId: s.docId, label: s.label, start: atTime(date, s.start), end: atTime(date, s.end) })) }).paidMinutes;
-  const scheduleMinutes = props.schedule.length ? buildDay({ employeeId: "x", date, events: [], settings, schedule: props.schedule }).paidMinutes : null;
+  const recalc = (list: typeof spans) => buildDay({ employeeId: "x", date, events: [], settings, worker: props.worker, schedule: list.filter((s) => s.start && s.end).map((s) => ({ docId: s.docId, label: s.label, start: atTime(date, s.start), end: atTime(date, s.end) })) }).paidMinutes;
+  const scheduleMinutes = props.schedule.length ? buildDay({ employeeId: "x", date, events: [], settings, worker: props.worker, schedule: props.schedule }).paidMinutes : null;
   const editedMinutes = props.approval?.editedMinutes;
   const btn = "min-h-11 rounded-lg border px-3 text-sm";
 

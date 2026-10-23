@@ -1,5 +1,6 @@
 "use client";
 
+import TimeAttentionCard from "@/components/timesheet/TimeAttentionCard";
 import { profitAlertJobs, readMinMargin } from "@/lib/profit-alerts";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { recurringDraftsReady, runDueRecurring } from "@/lib/recurring";
@@ -363,6 +364,7 @@ export default function DashboardPage() {
           <div className="min-w-0 md:order-1" data-testid="dash-cell-today"><TodayJobsBlock docs={documents as never} loaded={loaded || cacheShown} /></div>
           <section className="min-w-0 space-y-3 md:order-3" data-testid="dash-cell-attention" aria-label="Needs attention">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--cr-muted)]">Needs attention</h2>
+          <TimeAttentionCard />
           {(auto.sent.length > 0 || auto.errors.length > 0) && (
             <div className={`space-y-2 rounded-xl border px-4 py-3 text-sm ${auto.errors.length ? "border-rose-300/70" : "cr-tone-good border-emerald-300 bg-emerald-50 text-emerald-800"}`} data-testid="auto-sent" data-count={auto.sent.length}>
               {auto.sent.length > 0 && <p className="flex items-start gap-2 font-medium text-emerald-800 dark:text-emerald-200"><span aria-hidden="true">✓</span><span className="min-w-0 break-words">Sent automatically: {auto.sent.map((item) => `${item.kind === "done" ? "invoice" : "reminder"} to ${item.to}`).join("; ")}</span></p>}

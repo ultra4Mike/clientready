@@ -12,6 +12,7 @@ import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import ScheduleReconcile from "@/components/ScheduleReconcile";
 import { supabase } from "@/lib/supabase";
+import { readWorkerOverrides, timeOverridesRow, type WorkerTimeOverrides } from "@/lib/timesheet";
 import { DEFAULT_PAY, payLabel, payProblem, readPaySettings, type PaySettings } from "@/lib/pay-types";
 
 type RateChange = { rate: string; effectiveDate: string };
@@ -28,6 +29,7 @@ type Employee = {
   active: boolean;
   rateHistory: RateChange[];
   paySettings?: PaySettings;
+  timeOverrides?: WorkerTimeOverrides;
 };
 
 const emptyForm = {
@@ -39,6 +41,7 @@ const emptyForm = {
   rate: "",
   hireDate: "",
   paySettings: DEFAULT_PAY as PaySettings,
+  timeOverrides: { breakPreset: "", geofenceOptOut: false } as WorkerTimeOverrides,
 };
 
 function fromRow(row: Record<string, unknown>): Employee {
@@ -54,6 +57,7 @@ function fromRow(row: Record<string, unknown>): Employee {
     active: row.active !== false,
     rateHistory: Array.isArray(row.rate_history) ? (row.rate_history as RateChange[]) : [],
     paySettings: readPaySettings(row.pay_settings),
+    timeOverrides: readWorkerOverrides({ timeOverrides: row.time_overrides }),
   };
 }
 
@@ -70,8 +74,9 @@ function toRow(person: Employee, userId: string) {
     hire_date: person.hireDate,
     active: person.active,
     rate_history: person.rateHistory,
+    time_overrides: timeOverridesRow(person.timeOverrides || {}),
     // Only sent once the owner picked something other than the default (older databases have no column).
-    ...(person.paySettings && (person.paySettings.type !== "hourly" || person.paySettings.overtime) ? { pay_settings: person.paySettings } : {}),
+    ...(person.paySettings && (person.paySettings.type !== "hourly" || person.paySettings.overtime || person.paySettings.travelRate) ? { pay_settings: person.paySettings } : {}),
   };
 }
 
@@ -150,6 +155,14 @@ export default function EmployeesPage() {
       const next = employees.map((person) => (person.id === editingId ? nextPerson : person));
       saveLocal(next);
       await saveCloud(nextPerson);
+      // Log per-worker timesheet setting changes (travel rate, break rules, distance check, hire date) in the time history.
+      const was = { travelRate: readPaySettings(current?.paySettings).travelRate || "", ...timeOverridesRow(current?.timeOverrides || {}) } as Record<string, unknown>;
+      const now = { travelRate: nextPerson.paySettings?.travelRate || "", ...timeOverridesRow(nextPerson.timeOverrides || {}) } as Record<string, unknown>;
+      const diff = ["travelRate", "breakPreset", "geofenceOptOut"].filter((k) => was[k] !== now[k]);
+      if (diff.length || (current?.hireDate || "") !== nextPerson.hireDate) {
+        const { logAudit } = await import("@/lib/day-events");
+        void logAudit({ action: "worker_rules", employeeId: nextPerson.id, oldValue: { ...Object.fromEntries(diff.map((k) => [k, was[k] ?? ""])), ...((current?.hireDate || "") !== nextPerson.hireDate ? { hireDate: current?.hireDate || "" } : {}) }, newValue: { ...Object.fromEntries(diff.map((k) => [k, now[k] ?? ""])), ...((current?.hireDate || "") !== nextPerson.hireDate ? { hireDate: nextPerson.hireDate } : {}) } });
+      }
       setEditingId("");
       setForm(emptyForm);
       setMessage("Employee updated. Past jobs were not changed.");
@@ -179,6 +192,7 @@ export default function EmployeesPage() {
       rate: person.rate,
       hireDate: person.hireDate,
       paySettings: readPaySettings(person.paySettings),
+      timeOverrides: timeOverridesRow(person.timeOverrides || {}),
     });
     setRaiseRate("");
     setRaiseDate("");
@@ -280,6 +294,11 @@ export default function EmployeesPage() {
             </div>}
             {form.paySettings.type !== "job" && form.paySettings.type !== "salary" && <label className="block text-sm font-medium text-[var(--cr-muted)]">Drive-time rate $/hr (blank = same rate)<input name="payTravelRate" data-testid="pay-travel-rate" inputMode="decimal" placeholder="" className="mt-1.5 block min-h-11 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 text-right tabular-nums outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={form.paySettings.travelRate || ""} onChange={(event) => setForm({ ...form, paySettings: { ...form.paySettings, travelRate: event.target.value } })} /></label>}
             {form.paySettings.type === "job" && <label className="block text-sm font-medium text-[var(--cr-muted)]">Amount per job $<input name="payJobAmount" data-testid="pay-job-amount" inputMode="decimal" className="mt-1.5 block min-h-11 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 text-right tabular-nums outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={form.paySettings.jobAmount || ""} onChange={(event) => setForm({ ...form, paySettings: { ...form.paySettings, jobAmount: event.target.value } })} /></label>}
+            <div className="cr-section grid gap-2 rounded-lg border p-2" data-testid="worker-time-settings">
+              <p className="cr-section-label text-xs font-semibold">Timesheet (blank = account rules)</p>
+              <label className="block text-sm font-medium text-[var(--cr-muted)]">Break rules<select name="payBreakPreset" data-testid="worker-break-preset" className="mt-1.5 block min-h-11 w-full rounded-lg border bg-transparent px-3" value={form.timeOverrides.breakPreset || ""} onChange={(event) => setForm({ ...form, timeOverrides: { ...form.timeOverrides, breakPreset: event.target.value as WorkerTimeOverrides["breakPreset"] } })}><option value="">Account rules</option><option value="federal">Federal</option><option value="california">California</option></select></label>
+              <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" name="payGeofenceOff" data-testid="worker-geofence-off" checked={Boolean(form.timeOverrides.geofenceOptOut)} onChange={(event) => setForm({ ...form, timeOverrides: { ...form.timeOverrides, geofenceOptOut: event.target.checked } })} />Skip the job-site distance check for this worker</label>
+            </div>
             <label className="flex min-h-11 items-center gap-2"><input type="checkbox" name="payOtOn" data-testid="pay-ot-on" checked={Boolean(form.paySettings.overtime?.on)} onChange={(event) => setForm({ ...form, paySettings: { ...form.paySettings, overtime: { weekly: "40", daily: "", multiplier: "1.5", ...form.paySettings.overtime, on: event.target.checked } } })} />Pay overtime (hourly hours)</label>
             {form.paySettings.overtime?.on && <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-3">
               <label className="block text-sm font-medium text-[var(--cr-muted)]">Weekly over (h)<input name="payOtWeekly" data-testid="pay-ot-weekly" inputMode="decimal" className="mt-1.5 block min-h-11 w-full rounded-lg border border-teal-500/30 bg-transparent px-2 text-right tabular-nums outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={form.paySettings.overtime.weekly || ""} onChange={(event) => setForm({ ...form, paySettings: { ...form.paySettings, overtime: { ...form.paySettings.overtime!, weekly: event.target.value } } })} /></label>

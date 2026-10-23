@@ -6,6 +6,7 @@
  * Pay comes from the APPROVED day (from the cutover date on): approving or undoing here rewrites each job's share of
  * the day on its crew rows, so job labor/profit, Crew pay, Year packet and Reports follow. Unapproved days are estimates.
  */
+import { readWorkerOverrides } from "@/lib/timesheet";
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
@@ -77,6 +78,7 @@ export default function TimesheetPage() {
     setApprovals((list) => [...list.filter((a) => !keys.has(`${a.employeeId}|${a.date}`)), ...rows]);
     if (record && before.length) setHistory((all) => ({ ...all, [week]: [...(all[week] || []), before].slice(-20) }));
     await saveApprovals(rows);
+    try { window.dispatchEvent(new CustomEvent("clientready:timesheet-changed")); } catch { /* ssr */ }
   }
   const blank = (employeeId: string, date: string): DayApproval => ({ employeeId, date, paidMinutes: 0, driveMinutes: 0, editedMinutes: null, approvedAt: null, changedAt: null });
   const flagsOf = (id: string, date: string) => { const s = sheets.get(`${id}|${date}`); const a = approvalOf(id, date); return [...(s?.flags || []), ...(a?.editedMinutes != null ? ["edited"] : []), ...(a?.changedAt && !a?.approvedAt ? ["changed_since_approved"] : [])]; };
@@ -194,6 +196,7 @@ export default function TimesheetPage() {
             {payOf(id, d.date)?.otHours ? <span className="cr-chip2 cr-tone-warn ml-1 text-[11px]" data-testid="ts-pill-ot">OT</span> : null}
             {payOf(id, d.date)?.dtHours ? <span className="cr-chip2 cr-tone-bad ml-1 text-[11px]" data-testid="ts-pill-dt">DT</span> : null}
             {s?.flags.some((f) => f === "meal_missed" || f === "rest_missed") ? <span className="cr-chip2 cr-tone-bad ml-1 text-[11px]" data-testid="ts-pill-break">Break</span> : null}
+            {s?.flags.includes("before_hire") ? <span className="cr-chip2 cr-tone-warn ml-1 text-[11px]" data-testid="ts-pill-before-hire">Before hire</span> : null}
             {s?.driveMinutes ? <span className="block text-xs text-[var(--cr-muted)]">incl. {Math.round(s.driveMinutes)} min drive</span> : null}
           </>
         ) : <span className="text-gray-400" data-testid="ts-add">+ Add</span>}
@@ -301,7 +304,7 @@ export default function TimesheetPage() {
       {open && openWorker && (
         <DayDetail key={`${open}|${approvalOf(openWorker.id, openDate)?.editedMinutes ?? ""}`} workerName={openWorker.name} date={openDate} sheet={sheets.get(open)} approval={approvalOf(openWorker.id, openDate)}
           minutes={minutesOf(openWorker.id, openDate)} extraFlags={flagsOf(openWorker.id, openDate).filter((f) => f === "edited" || f === "changed_since_approved")}
-          settings={settings} schedule={scheduleFor(docs, openWorker.id, openDate)} employeeId={openWorker.id}
+          settings={settings} schedule={scheduleFor(docs, openWorker.id, openDate)} employeeId={openWorker.id} worker={readWorkerOverrides(openWorker)}
           taps={events.filter((e) => e.employeeId === openWorker.id && e.date === openDate)} dayPay={payOf(openWorker.id, openDate)} fixes={fixes.filter((f) => f.employeeId === openWorker.id && f.date === openDate)}
           onApprove={() => approveDay(openWorker.id, openDate)} onUnapprove={() => unapproveDay(openWorker.id, openDate)}
           onSetMinutes={(m, approve) => setMinutes(openWorker.id, openDate, m, approve)} onDecide={(f, st, note) => decide(f, st, note)} onClose={() => setOpen(null)} />
