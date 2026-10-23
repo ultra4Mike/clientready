@@ -148,8 +148,27 @@ export function isPastDue(status: unknown, dueDate: unknown, owed: number, today
 }
 
 /**
- * isPastDue for a whole invoice. With a payment plan / stages (data.stages), each installment is judged on its
- * own due date (an unpaid installment's date has passed), and the invoice due date passing with money owed also counts (R86).
+ * Overdue v2: the header due date when an invoice has a payment plan = the last dated stage (the plan's final date).
+ * Without a plan (or no dated stage) it's the invoice's own Due date. Use this wherever a due date is shown or compared.
+ */
+export function effectiveDueDate(data: Record<string, unknown> | undefined) {
+  const d = data || {};
+  const dates = readStages(d.stages).map((s) => s.dueDate.slice(0, 10)).filter((v) => /^\d{4}-\d{2}-\d{2}$/.test(v)).sort();
+  return dates.length ? dates[dates.length - 1] : String(d.dueDate || "").slice(0, 10);
+}
+
+/** Overdue v2: the date the next unpaid payment is due (a plan's first unpaid stage), else the effective due date. */
+export function nextDueDate(data: Record<string, unknown> | undefined, total: number, owed: number, today = localToday()) {
+  const d = data || {};
+  const stages = readStages(d.stages);
+  const row = stages.length ? stagePlan(total, owed, stages, today).rows.find((r) => r.state !== "paid" && r.dueDate) : null;
+  return row ? row.dueDate.slice(0, 10) : effectiveDueDate(d);
+}
+
+/**
+ * isPastDue for a whole invoice. Overdue v2: with a payment plan (data.stages) the stages decide. It is overdue only
+ * when an unpaid or partly paid stage's due date has passed (business-timezone today). The invoice-level Due date is
+ * ignored then (it's kept in sync with the last stage), so an old header date can't keep a plan invoice "Overdue".
  */
 export function invoicePastDue(data: Record<string, unknown> | undefined, total: number, owed: number, today = localToday()) {
   const d = data || {};
@@ -157,21 +176,23 @@ export function invoicePastDue(data: Record<string, unknown> | undefined, total:
   if (!stages.length) return isPastDue(d.status, d.dueDate, owed, today);
   const s = String(d.status || "draft");
   if (s === "draft" || s === "paid" || s === "void" || s === "voided" || !(owed > 0.004)) return false;
-  // R86: the invoice's own due date still counts — past it with money owed is overdue, stages or not.
-  if (isPastDue(s, d.dueDate, owed, today)) return true;
   return stagePlan(total, owed, stages, today).rows.some((row) => row.state === "overdue");
 }
 
-/**
- * Overdue fix: why invoicePastDue says overdue, in plain words (or "" when it isn't), so a stale payment-plan
- * date (e.g. an unpaid deposit) is visible instead of looking "stuck" after the invoice due date is moved.
- */
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function shortDate(ymd: string) {
+  const [, m, day] = ymd.split("-").map(Number);
+  return m && day ? `${MONTHS[m - 1]} ${day}` : ymd;
+}
+
+/** Why invoicePastDue says overdue, in plain words (or "" when it isn't). With a plan it names the stage. */
 export function overdueReason(data: Record<string, unknown> | undefined, total: number, owed: number, today = localToday()) {
   const d = data || {};
   if (!invoicePastDue(d, total, owed, today)) return "";
-  if (isPastDue(d.status, d.dueDate, owed, today)) return `Due date ${String(d.dueDate).slice(0, 10)} has passed`;
-  const row = stagePlan(total, owed, readStages(d.stages), today).rows.find((r) => r.state === "overdue");
-  return row ? `Payment plan: ${row.label || "a payment"} $${row.remaining.toFixed(2)} was due ${row.dueDate}` : "";
+  const stages = readStages(d.stages);
+  if (!stages.length) return `Due date ${String(d.dueDate).slice(0, 10)} has passed`;
+  const row = stagePlan(total, owed, stages, today).rows.find((r) => r.state === "overdue");
+  return row ? `${row.label || "A payment"} $${row.remaining.toFixed(2)} was due ${shortDate(row.dueDate)}` : "";
 }
 
 function localToday() {

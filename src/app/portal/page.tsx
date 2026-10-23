@@ -10,7 +10,7 @@ import { amountOf, documentTotals } from "@/lib/discount";
 import { portalTimeline } from "@/lib/portal-timeline";
 import { payNowAmount, readStages, stagePlan, todayYmd } from "@/lib/stages";
 import { isRevision, replacedBy, revisionOwed } from "@/lib/change-order-revision";
-import { owedAfterRefunds, paidTotal, readPayments } from "@/lib/payments";
+import { effectiveDueDate, owedAfterRefunds, paidTotal, readPayments } from "@/lib/payments";
 import { readApproval } from "@/lib/approval";
 
 const text = (value: unknown) => (typeof value === "string" ? value : "");
@@ -97,7 +97,7 @@ export default function PortalPage() {
                 <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">{doc.type === "proposal" ? "Proposal" : "Invoice"}</span>
                 <span className="block font-semibold">{text(doc.data.invoiceNumber) || doc.title}</span>
                 <span className="block text-xs text-slate-600">
-                  {text(doc.data.invoiceDate)}{text(doc.data.dueDate) ? ` · ${doc.type === "proposal" ? "valid until" : "due"} ${text(doc.data.dueDate)}` : ""}
+                  {text(doc.data.invoiceDate)}{(doc.type === "proposal" ? text(doc.data.dueDate) : effectiveDueDate(doc.data as Record<string, unknown>)) ? ` · ${doc.type === "proposal" ? "valid until" : "due"} ${doc.type === "proposal" ? text(doc.data.dueDate) : effectiveDueDate(doc.data as Record<string, unknown>)}` : ""}
                   {doc.type !== "proposal" ? "" : approval?.status === "approved" ? " · Approved" : approval ? " · Waiting for your approval" : ""}
                   {plan && <span className="block font-semibold text-teal-700" data-testid="portal-plan-next">{plan.state === "upcoming" ? "Next payment" : plan.state === "overdue" ? "Overdue" : "Due now"}: ${plan.remaining.toFixed(2)}{plan.dueDate ? ` on ${plan.dueDate}` : plan.kind === "final" && !String(plan.label || "").toLowerCase().includes("when the job is done") ? " when the job is done" : ""} ({plan.label || "payment"})</span>}
                 </span>

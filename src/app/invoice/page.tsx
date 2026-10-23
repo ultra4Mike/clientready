@@ -74,6 +74,7 @@ import { confirmRemoval, jobDonePhotos, crewForWorkers, followSchedule, jobSched
 import { createClientFromInvoice } from "@/lib/client-create";
 import { defaultInvoiceTerms } from "@/lib/terms";
 import { followDueDate } from "@/lib/stages";
+import { effectiveDueDate } from "@/lib/payments";
 import OverlapBadge from "@/components/OverlapBadge";
 import { bookingConflicts, clockText, readOverrides, type Conflict, type Override } from "@/lib/conflicts";
 import { approvalBadgeApplies, readApproval, refreshApproval, type Approval } from "@/lib/approval";
@@ -244,6 +245,20 @@ export default function NewInvoicePage() {
   const [invoiceNumber, setInvoiceNumber] = useState("INV-1001");
   const [invoiceDate, setInvoiceDate] = useState("");
   const [dueDate, setDueDate] = useState("");
+  // Overdue v2: "Change due date" jumps to and focuses the Due date field (also via /invoice?id=...#due-date).
+  const focusDueDate = () => {
+    const el = document.getElementById("doc-due-date") as HTMLInputElement | null;
+    if (!el) return false;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    el.focus({ preventScroll: true });
+    return true;
+  };
+  useEffect(() => {
+    if (typeof window === "undefined" || window.location.hash !== "#due-date") return;
+    let tries = 0;
+    const timer = window.setInterval(() => { tries += 1; if (focusDueDate() || tries > 40) window.clearInterval(timer); }, 100);
+    return () => window.clearInterval(timer);
+  }, []);
   const [jobStart, setJobStart] = useState("");
   const [jobMiles, setJobMiles] = useState("");
   const [jobRate, setJobRate] = useState(""); const [taskType, setTaskType] = useState("");
@@ -563,7 +578,8 @@ export default function NewInvoicePage() {
       setClientAddress(data.clientAddress || "");
       setInvoiceNumber(data.invoiceNumber || (kind === "proposal" ? "PROP-1001" : "INV-1001"));
       setInvoiceDate(data.invoiceDate || ymd(new Date()));
-      setDueDate(data.dueDate || plusDays(14));
+      // Overdue v2: with a payment plan the header Due date is the last stage date (kept in sync).
+      setDueDate(effectiveDueDate(data as Record<string, unknown>) || data.dueDate || plusDays(14));
       setJobStart(data.jobStart || "");
       setJobMiles(String((data as Record<string, unknown>).jobMiles ?? ""));
       setJobRate(String((data as Record<string, unknown>).jobRate ?? "")); setTaskType(String((data as Record<string, unknown>).taskType ?? ""));
@@ -1313,7 +1329,7 @@ export default function NewInvoicePage() {
           <p className="text-xs font-semibold uppercase tracking-wider text-teal-600 dark:text-teal-300">{isProposal ? "Proposal" : "Invoice"}</p>
           <div className="mt-1 flex flex-wrap items-center gap-3">
             <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{invoiceNumber || (isProposal ? "New proposal" : "New invoice")}</h2>
-            <span className="rounded-full border border-teal-500/40 bg-teal-500/10 px-3 py-0.5 text-xs font-semibold" data-testid="doc-header-status">{displayStatus({ id: docId, type: isProposal ? "proposal" : "invoice", data: { status, approval, schedule, payments, items, taxPercent, discountType, discountValue, dueDate, stages } }, docsForStage()).label}</span>
+            {(() => { const shown = displayStatus({ id: docId, type: isProposal ? "proposal" : "invoice", data: { status, approval, schedule, payments, items, taxPercent, discountType, discountValue, dueDate, stages } }, docsForStage()); const why = "why" in shown && shown.why ? String(shown.why) : ""; return <><span className="rounded-full border border-teal-500/40 bg-teal-500/10 px-3 py-0.5 text-xs font-semibold" data-testid="doc-header-status">{shown.label}</span>{why ? <span className="text-xs text-red-700 dark:text-red-300" data-testid="doc-overdue-why">{why} · <button type="button" data-testid="change-due-date" className="font-semibold underline" onClick={focusDueDate}>Change due date</button></span> : null}</>; })()}
           </div>
           <p className="mt-1 text-sm text-[var(--cr-muted)]">{clientName || "No client yet"} · Total ${totals.total.toFixed(2)}</p>
         </div>
@@ -1386,7 +1402,7 @@ export default function NewInvoicePage() {
             </select>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="text-sm text-slate-600">{isProposal ? "Proposal date" : "Invoice date"}<input type="date" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} /></label>
-              <label className="text-sm text-slate-600">{isProposal ? "Valid until" : "Due date"}<input type="date" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={dueDate} onChange={(event) => { const next = event.target.value; const prev = dueDate; setDueDate(next); /* Overdue fix: the remaining-balance stage follows the invoice due date it was set from. */ if (prev && next) setStages((list) => followDueDate(list, prev, next)); }} /></label>
+              <label className="text-sm text-slate-600">{isProposal ? "Valid until" : "Due date"}<input id="doc-due-date" data-testid="doc-due-date" type="date" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={dueDate} onChange={(event) => { const next = event.target.value; const prev = dueDate; setDueDate(next); /* Overdue fix: the remaining-balance stage follows the invoice due date it was set from. */ if (prev && next) setStages((list) => followDueDate(list, prev, next)); }} /></label>
 {!isProposal && <label className="text-sm text-slate-600">Job rate ($/h, prevailing wage)<input name="jobRate" data-testid="job-rate" inputMode="decimal" placeholder="worker's own rate" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500" value={jobRate} onChange={(event) => setJobRate(event.target.value)} /><span className="mt-1 block text-xs text-slate-500">Replaces each hourly worker&apos;s rate on this job. Pay already approved stays as it is.</span></label>}
 {!isProposal && <label className="text-sm text-slate-600">Task type<input name="taskType" data-testid="job-task-type" placeholder="e.g. Prevailing wage" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500" value={taskType} onChange={(event) => setTaskType(event.target.value)} /><span className="mt-1 block text-xs text-slate-500">Uses the task rate from Team › Timesheet rules.</span></label>}
 {!isProposal && <label className="text-sm text-slate-600">Miles driven for this job<input name="jobMiles" data-testid="job-miles" inputMode="decimal" placeholder="0" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500" value={jobMiles} onChange={(event) => setJobMiles(event.target.value)} /><span className="mt-1 block text-xs text-slate-500">Added to your Mileage log as one trip.</span></label>}
@@ -1500,7 +1516,7 @@ export default function NewInvoicePage() {
                 <p className="text-right"><span className="block text-sm font-medium text-slate-600">{isProposal && totals.paid > 0 ? "Balance after deposit" : balanceLabel(totals.paid, totals.balance)}</span><span data-testid="still-owed" className={`text-2xl font-bold tabular-nums ${totals.balance <= 0.004 && totals.paid > 0 ? "text-emerald-700 dark:text-emerald-300" : ""}`}>${totals.balance.toFixed(2)}</span></p>
               </div>
             </Section>
-            {!isProposal && <StageEditor stages={stages} onChange={setStages} total={totals.total} balance={totals.balance} dueDate={dueDate} />}
+            {!isProposal && <StageEditor stages={stages} onChange={(next) => { setStages(next); /* Overdue v2: header Due date follows the last stage date. */ const last = effectiveDueDate({ stages: next }); if (next.length && last) setDueDate(last); }} total={totals.total} balance={totals.balance} dueDate={dueDate} />}
             </Section>
             <p className="cr-group-heading">Payments</p>
             <Section id="pay-photos" label="Payment, photos and notes" className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">

@@ -9,7 +9,7 @@ import PageHeader from "@/components/PageHeader";
 import StuckPayments from "@/components/StuckPayments";
 import { saveCloudDocument } from "@/lib/cloud-docs";
 import { amountOf, documentTotals } from "@/lib/discount";
-import { balanceDue, invoicePastDue, methodLabel, isOpenBalance, isVoidStatus, paidTotal, paymentFields, paymentMethods, readPayments } from "@/lib/payments";
+import { balanceDue, effectiveDueDate, nextDueDate, invoicePastDue, methodLabel, isOpenBalance, isVoidStatus, paidTotal, paymentFields, paymentMethods, readPayments } from "@/lib/payments";
 import { uniqueDocs } from "@/lib/change-orders";
 import { effectiveAmounts } from "@/lib/change-order-revision";
 import { isPendingRecurringDraft } from "@/lib/recurring";
@@ -255,7 +255,7 @@ export default function CollectPage() {
                 <p className="truncate text-base font-semibold">{doc.title}</p>
                 <p className="text-sm text-[var(--cr-muted)]">
                   {doc.clientName || "No client"} · {doc.data?.status || "draft"}
-                  {doc.data?.dueDate ? ` · due ${doc.data.dueDate}` : ""}
+                  {effectiveDueDate(doc.data as Record<string, unknown>) ? ` · due ${effectiveDueDate(doc.data as Record<string, unknown>)}` : ""}
                   {isOverdue(doc) ? " · overdue" : ""}
                 </p>
               </div>
@@ -292,7 +292,7 @@ export default function CollectPage() {
                   clientCompany: String(doc.data?.clientCompany || ""),
                   invoiceNumber: String(doc.data?.invoiceNumber || doc.title || ""),
                   owed: balance(doc),
-                  dueDate: String(doc.data?.dueDate || ""),
+                  dueDate: nextDueDate(doc.data as Record<string, unknown>, invoiceTotal(doc), balance(doc)),
                   payUrl: payUrlFor(doc.data?.payLink, profile.paymentLink),
                   businessName: profile.businessName || "",
                   ownerName: profile.ownerName || "",
