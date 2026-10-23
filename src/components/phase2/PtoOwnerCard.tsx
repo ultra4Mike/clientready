@@ -11,7 +11,7 @@ export default function PtoOwnerCard({ workers, settings, today }: { workers: W[
   const [requests, setRequests] = useState<PtoRequest[]>([]);
   const [worked, setWorked] = useState<Map<string, number>>(new Map());
   const [add, setAdd] = useState({ employeeId: "", date: "", hours: "8", kind: "pto" as PtoKind });
-  const [msg, setMsg] = useState("");
+  const [msg, setMsg] = useState(""); const [over, setOver] = useState("");
   useEffect(() => { void loadPtoRequests(year).then(setRequests); void loadYearWorkedHours(year).then(setWorked); }, [year]);
   const rows = useMemo(() => workers.filter((w) => ptoOn(settings, w.pto) || requests.some((r) => r.employeeId === w.id)).map((w) => ({ w, b: ptoBalance({ policy: settings, worker: w.pto, workedHours: worked.get(w.id) || 0, requests, employeeId: w.id, year, hireDate: w.hireDate, today }) })), [workers, settings, worked, requests, year, today]);
   const publishKey = rows.map((r) => `${r.w.id}:${r.b.accrued}:${r.b.taken}:${r.b.available}`).join("|");
@@ -26,6 +26,11 @@ export default function PtoOwnerCard({ workers, settings, today }: { workers: W[
   async function addOff() {
     const hours = Number(add.hours);
     if (!add.employeeId || !/^\d{4}-\d{2}-\d{2}$/.test(add.date) || !(hours > 0 && hours <= 24)) { setMsg("Pick a worker, a day and 0–24 hours."); return; }
+    const bal = rows.find((r) => r.w.id === add.employeeId)?.b;
+    const left = bal ? bal.available : 0;
+    const key = `${add.employeeId}|${add.date}|${hours}`;
+    if (hours > left + 1e-9 && over !== key) { setOver(key); setMsg(`Only ${left} h available for ${name(add.employeeId)}. Press “Add anyway” to go over.`); return; }
+    setOver("");
     const req = newPtoRequest({ employeeId: add.employeeId, date: add.date, hours, kind: add.kind, status: "approved" });
     req.decidedAt = req.createdAt;
     const err = await savePtoRequest(req); setRequests((all) => [...all, req]); setMsg(err ? `Saved here only: ${err}` : "Time off added.");
@@ -46,7 +51,7 @@ export default function PtoOwnerCard({ workers, settings, today }: { workers: W[
         <input type="date" name="ptoAddDate" aria-label="Day" className={input} data-testid="pto-add-date" value={add.date} onChange={(e) => setAdd({ ...add, date: e.target.value })} />
         <input name="ptoAddHours" aria-label="Hours" inputMode="decimal" className={`${input} w-20`} data-testid="pto-add-hours" value={add.hours} onChange={(e) => setAdd({ ...add, hours: e.target.value })} />
         <select name="ptoAddKind" aria-label="Type" className={input} data-testid="pto-add-kind" value={add.kind} onChange={(e) => setAdd({ ...add, kind: e.target.value as PtoKind })}><option value="pto">PTO</option><option value="sick">Sick</option></select>
-        <button type="button" className="min-h-11 rounded-lg border px-3" data-testid="pto-add-save" onClick={() => void addOff()}>Add time off</button>
+        <button type="button" className="min-h-11 rounded-lg border px-3" data-testid="pto-add-save" onClick={() => void addOff()}>{over && over === `${add.employeeId}|${add.date}|${Number(add.hours)}` ? "Add anyway" : "Add time off"}</button>
       </div>
       {msg && <p className="mt-1" role="status" data-testid="pto-message">{msg}</p>}
     </section>

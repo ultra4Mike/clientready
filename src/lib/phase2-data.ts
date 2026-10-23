@@ -66,9 +66,21 @@ export async function loadLeadTeam(date: string) {
   return { people, events };
 }
 /** Lead clocks a crew member in/out; acted_by is recorded by the server. */
+/** The lead's phone location for a lead tap (null when denied, unavailable or slow). */
+function leadLocation(): Promise<{ lat: number; lng: number } | null> {
+  if (typeof navigator === "undefined" || !navigator.geolocation) return Promise.resolve(null);
+  return new Promise((res) => {
+    const t = setTimeout(() => res(null), 5000);
+    navigator.geolocation.getCurrentPosition((p) => { clearTimeout(t); res({ lat: p.coords.latitude, lng: p.coords.longitude }); }, () => { clearTimeout(t); res(null); }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 });
+  });
+}
 export async function leadTap(employeeId: string, kind: "start_day" | "end_day" | "break_start" | "break_end"): Promise<string> {
-  const at = new Date();
-  const { error } = await supabase.rpc("crew_lead_tap", { p_id: newId(), p_employee_id: employeeId, p_kind: kind, p_at: at.toISOString(), p_work_date: ymdTz(at) });
+  const at = new Date(); const id = newId();
+  const loc = await leadLocation();
+  const base = { p_id: id, p_employee_id: employeeId, p_kind: kind, p_at: at.toISOString(), p_work_date: ymdTz(at) };
+  let { error } = await supabase.rpc("crew_lead_tap", { ...base, p_lat: loc?.lat ?? null, p_lng: loc?.lng ?? null });
+  // Before deploy11.sql the 7-argument version doesn't exist yet: same tap without the location.
+  if (error && /function|schema cache|PGRST202/i.test(`${error.message} ${error.code}`)) ({ error } = await supabase.rpc("crew_lead_tap", base));
   return error ? error.message : "";
 }
 
@@ -81,4 +93,15 @@ export async function loadYearWorkedHours(year: string): Promise<Map<string, num
     out.set(r.employee_id, (out.get(r.employee_id) || 0) + (r.edited_minutes ?? r.paid_minutes ?? 0) / 60);
   }
   return out;
+}
+
+/** Owner: recompute every worker's PTO balance (account rules + per-worker blanks) and publish it (hours only). */
+export async function refreshPtoBalances(today = ymdTz(new Date())) {
+  const [{ readWorkers }, { readLocalTimesheetSettings }, { ptoBalance, ptoOn }, { readWorkerOverrides }] = await Promise.all([import("@/lib/schedule"), import("@/lib/day-events"), import("@/lib/pay-phase2"), import("@/lib/timesheet")]);
+  const settings = readLocalTimesheetSettings(); const year = today.slice(0, 4);
+  const [requests, worked] = await Promise.all([loadPtoRequests(year), loadYearWorkedHours(year)]);
+  const rows = readWorkers().map((w) => ({ w, pto: readWorkerOverrides(w) })).filter(({ w, pto }) => ptoOn(settings, pto) || requests.some((r) => r.employeeId === w.id))
+    .map(({ w, pto }) => { const b = ptoBalance({ policy: settings, worker: pto, workedHours: worked.get(w.id) || 0, requests, employeeId: w.id, year, hireDate: w.hireDate, today }); return { employeeId: w.id, accrued: b.accrued, taken: b.taken, available: b.available }; });
+  await savePtoBalances(year, rows);
+  return rows;
 }

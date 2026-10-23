@@ -109,9 +109,9 @@ export type TimesheetSettings = {
   /** Task rates (prevailing wage / job rates): task name -> hourly rate that replaces the base wage on jobs of that task. */
   taskRates: Record<string, number>;
   /** Paid time off / sick: accrual of 1 hour per `ptoPerHours` hours worked (0 = off); caps in hours (0 = no cap). */
-  ptoPreset: PtoPreset; ptoPerHours: number; ptoCapHours: number; ptoUseCapHours: number; ptoWaitDays: number;
+  ptoPreset: PtoPreset; ptoAllowNegative: boolean; ptoPerHours: number; ptoCapHours: number; ptoUseCapHours: number; ptoWaitDays: number;
 };
-export type PtoPreset = "off" | "california" | "custom";
+export type PtoPreset = "off" | "federal" | "california" | "custom";
 /** California paid sick leave: 1 h per 30 h worked, accrual cap 80 h, use cap 40 h (5 days) a year, usable after 90 days. */
 export const CA_SICK = { ptoPerHours: 30, ptoCapHours: 80, ptoUseCapHours: 40, ptoWaitDays: 90 };
 export const MIN_WAGE_PRESETS: { id: string; label: string; rate: number }[] = [
@@ -125,12 +125,12 @@ export const DEFAULT_TIMESHEET_SETTINGS: TimesheetSettings = {
   roundingMinutes: 0, geofenceMeters: 200, jobGeofence: {},
   otPreset: "worker", weeklyOtHours: 40, dailyOtHours: 0, dailyDtHours: 0, seventhDayRule: false, bonusInRegularRate: true,
   payPeriod: "weekly", payPeriodAnchor: "", remindMissedStartMinutes: 15, remindMissedEndMinutes: 60,
-  minWage: 0, flsaNonHourly: false, taskRates: {}, ptoPreset: "off", ptoPerHours: 0, ptoCapHours: 0, ptoUseCapHours: 0, ptoWaitDays: 0,
+  minWage: 0, flsaNonHourly: false, taskRates: {}, ptoPreset: "off", ptoAllowNegative: false, ptoPerHours: 0, ptoCapHours: 0, ptoUseCapHours: 0, ptoWaitDays: 0,
 };
 /** California preset values (applied by the Rules screen when the owner picks California). */
 export const CALIFORNIA_RULES: Partial<TimesheetSettings> = { breakPreset: "california", shortBreakPaidMinutes: 20, otPreset: "california", weeklyOtHours: 40, dailyOtHours: 8, dailyDtHours: 12, seventhDayRule: true };
 
-export type JobSpan = { docId: string; start: string; end: string; minutes: number; fromSchedule: boolean; notAtSite: boolean; label?: string };
+export type JobSpan = { docId: string; start: string; end: string; minutes: number; fromSchedule: boolean; notAtSite: boolean; label?: string; scheduledStart?: string; scheduledEnd?: string };
 export type DriveLeg = { fromDocId?: string; toDocId?: string; start: string; end: string; minutes: number; paidMinutes: number; expectedMinutes?: number; longDrive?: boolean; commute?: "first" | "last"; autoBreakMinutes?: number };
 export type BreakSpan = { start: string; end: string; minutes: number; paid: boolean; auto?: boolean; unpaidMinutes: number };
 export type DaySheet = {
@@ -190,7 +190,7 @@ export function readTimesheetSettings(raw: unknown): TimesheetSettings {
     payPeriodAnchor: typeof v.payPeriodAnchor === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v.payPeriodAnchor) ? v.payPeriodAnchor : "",
     remindMissedStartMinutes: nonneg(v.remindMissedStartMinutes, d.remindMissedStartMinutes), remindMissedEndMinutes: nonneg(v.remindMissedEndMinutes, d.remindMissedEndMinutes),
     minWage: nonneg(v.minWage, 0), flsaNonHourly: bool(v.flsaNonHourly, false), taskRates,
-    ptoPreset: (["off", "california", "custom"].includes(String(v.ptoPreset)) ? v.ptoPreset : "off") as PtoPreset,
+    ptoPreset: (["off", "federal", "california", "custom"].includes(String(v.ptoPreset)) ? v.ptoPreset : "off") as PtoPreset, ptoAllowNegative: v.ptoAllowNegative === true,
     ...(v.ptoPreset === "california" ? CA_SICK : { ptoPerHours: v.ptoPreset === "custom" ? nonneg(v.ptoPerHours, 0) : 0, ptoCapHours: nonneg(v.ptoCapHours, 0), ptoUseCapHours: nonneg(v.ptoUseCapHours, 0), ptoWaitDays: nonneg(v.ptoWaitDays, 0) }),
   };
 }
@@ -340,7 +340,12 @@ export function buildDay(input: {
   for (const job of input.schedule) {
     if (tapped.has(job.docId) || !job.start || !job.end || ms(job.end) <= ms(job.start)) continue;
     if (Number.isFinite(nowMs) && ms(job.start) > nowMs) continue; // not happened yet
-    jobs.push({ docId: job.docId, start: job.start, end: job.end, minutes: mins(job.start, job.end), fromSchedule: true, notAtSite: false, label: job.label });
+    // Real Start day / End day taps win: the scheduled fill-in is clipped to the day the worker actually tapped.
+    const start = dayStart && ms(dayStart) > ms(job.start) ? dayStart : job.start;
+    const end = dayEnd && ms(dayEnd) < ms(job.end) ? dayEnd : job.end;
+    if (ms(end) <= ms(start)) continue;
+    const clipped = start !== job.start || end !== job.end;
+    jobs.push({ docId: job.docId, start, end, minutes: mins(start, end), fromSchedule: true, notAtSite: false, label: job.label, ...(clipped ? { scheduledStart: job.start, scheduledEnd: job.end } : {}) });
     flags.add("from_schedule");
   }
   jobs.sort((a, b) => ms(a.start) - ms(b.start));
@@ -355,8 +360,10 @@ export function buildDay(input: {
     const excess = leg.paidMinutes - settings.longDriveBreakMinutes;
     leg.autoBreakMinutes = round2(excess); leg.paidMinutes -= excess; autoBreak += excess; flags.add("long_drive_break");
   };
+  let reach = jobs[0];
   for (let i = 1; i < jobs.length; i++) {
-    const prev = jobs[i - 1], next = jobs[i];
+    const prev = reach, next = jobs[i];
+    if (ms(next.end) > ms(reach.end)) reach = next;
     const gap = mins(prev.end, next.start);
     if (gap <= 0) continue;
     const logged = drives.filter((d) => ms(d.start) >= ms(prev.end) - 60000 && ms(d.end) <= ms(next.start) + 60000);
@@ -647,21 +654,23 @@ export type TimelineRow = { at: string; kind: "start" | "end" | "gap" | "break";
 export function dayTimeline(day: DaySheet | undefined): TimelineRow[] {
   if (!day || !day.jobs.length) return [];
   const rows: TimelineRow[] = [];
-  day.jobs.forEach((job, i) => {
+  // The day ends at the latest end (overlapping schedule fill-ins can end before an earlier-started job).
+  const last = day.jobs.reduce((a, b) => (ms(b.end) >= ms(a.end) ? b : a));
+  day.jobs.forEach((job) => {
     rows.push({ at: job.start, kind: "start", docId: job.docId, fromSchedule: job.fromSchedule, text: !job.docId ? `${fmtTime(job.start)} Day started (no job)` : `${fmtTime(job.start)} Started ${job.label || "job"}${job.fromSchedule ? " (from schedule)" : ""}` });
     const leg = day.drives.find((d) => d.fromDocId === job.docId && d.start === job.end);
-    if (leg && i < day.jobs.length - 1) {
+    if (leg && job !== last) {
       rows.push({ at: job.end, kind: "end", docId: job.docId, text: `${fmtTime(job.end)} Finished ${job.label || "job"}` });
       const unpaid = leg.minutes - leg.paidMinutes;
       rows.push({ at: leg.start, kind: "gap", minutes: leg.minutes, paid: unpaid < 0.5,
         text: unpaid < 0.5 ? `Drive ${hm(leg.paidMinutes)} (paid)` : leg.paidMinutes > 0 ? `Gap ${hm(leg.minutes)}: drive ${hm(leg.paidMinutes)} paid, ${hm(unpaid)} unpaid` : `Gap ${hm(leg.minutes)} (unpaid)` });
-    } else if (i < day.jobs.length - 1) rows.push({ at: job.end, kind: "end", docId: job.docId, text: `${fmtTime(job.end)} Finished ${job.label || "job"}` });
+    } else if (job !== last) rows.push({ at: job.end, kind: "end", docId: job.docId, text: `${fmtTime(job.end)} Finished ${job.label || "job"}` });
   });
   for (const leg of day.drives.filter((d) => d.commute)) rows.push({ at: leg.start, kind: "gap", minutes: leg.minutes, paid: true, text: `${fmtTime(leg.start)} ${leg.commute === "first" ? "Travel to first job" : "Drive home"} ${hm(leg.paidMinutes)} (paid${leg.minutes - leg.paidMinutes >= 0.5 ? `, ${hm(leg.minutes - leg.paidMinutes)} not paid` : ""})` });
   for (const b of day.breaks || []) rows.push({ at: b.start, kind: "break", minutes: b.minutes, paid: b.paid, text: b.auto ? `Auto meal break ${hm(b.minutes)} (unpaid)` : `${fmtTime(b.start)} Break ${hm(b.minutes)} (${b.paid ? "paid, short break" : "unpaid"})` });
   for (const leg of day.drives.filter((d) => d.autoBreakMinutes)) rows.push({ at: leg.end, kind: "break", minutes: leg.autoBreakMinutes, paid: false, text: `Long drive: ${hm(leg.autoBreakMinutes || 0)} over the limit treated as an unpaid break` });
-  const last = day.jobs[day.jobs.length - 1];
   rows.push({ at: last.end, kind: "end", docId: last.docId, text: `${fmtTime(last.end)} Day ended${day.autoEnded ? " (auto-ended at the last stop)" : ""}` });
+  for (const job of day.jobs) if (job.fromSchedule && job.scheduledStart) rows.push({ at: job.start, kind: "gap", paid: true, fromSchedule: true, docId: job.docId, text: `Scheduled ${fmtTime(job.scheduledStart)}–${fmtTime(job.scheduledEnd || job.end)}; counted only ${fmtTime(job.start)}–${fmtTime(job.end)} (inside the real Start day / End day taps)` });
   rows.sort((a, b) => Date.parse(a.at) - Date.parse(b.at) || (a.kind === "end" ? 1 : 0) - (b.kind === "end" ? 1 : 0));
   return rows;
 }

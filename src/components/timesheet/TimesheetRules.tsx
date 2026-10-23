@@ -184,8 +184,8 @@ export default function TimesheetRules() {
       <section className={card} data-testid="ts-rules-pto" aria-labelledby="ts-h-pto">
         <h3 id="ts-h-pto" className="cr-section-label font-semibold">Paid time off / sick</h3>
         <label className="mt-2 block text-sm"><span className="font-medium">Rules</span>
-          <select name="ts-pto-preset" data-testid="ts-pto-preset" className={field} value={settings.ptoPreset} onChange={(e) => { const v = e.target.value as TimesheetSettings["ptoPreset"]; set(v === "california" ? { ptoPreset: v, ...CA_SICK } : v === "off" ? { ptoPreset: v, ptoPerHours: 0 } : { ptoPreset: v }); }}>
-            <option value="off">Off</option><option value="california">California sick leave (1 h per 30 h, cap 80, use 40, after 90 days)</option><option value="custom">Custom</option>
+          <select name="ts-pto-preset" data-testid="ts-pto-preset" className={field} value={settings.ptoPreset} onChange={(e) => { const v = e.target.value as TimesheetSettings["ptoPreset"]; set(v === "california" ? { ptoPreset: v, ...CA_SICK } : v === "off" || v === "federal" ? { ptoPreset: v, ptoPerHours: 0 } : { ptoPreset: v }); }}>
+            <option value="off">Off</option><option value="federal">Federal (no paid leave required)</option><option value="california">California sick leave (1 h per 30 h, cap 80, use 40, after 90 days)</option><option value="custom">Custom</option>
           </select></label>
         {settings.ptoPreset === "custom" && <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {num("ptoPerHours", "1 h earned per … h worked", "ts-pto-per")}
@@ -193,6 +193,8 @@ export default function TimesheetRules() {
           {num("ptoUseCapHours", "Most hours usable per year (0 = no cap)", "ts-pto-use-cap")}
           {num("ptoWaitDays", "Usable after … days from hire", "ts-pto-wait")}
         </div>}
+        {settings.ptoPreset !== "off" && settings.ptoPreset !== "federal" && <div className="mt-2">{tog("ptoAllowNegative", "Let workers ask for more than they have (negative balance)", "ts-pto-negative")}</div>}
+        <p className="mt-1 text-xs text-[var(--cr-muted)]" data-testid="ts-pto-worker-note">Each worker uses these rules. On a worker&apos;s page, leave the PTO fields blank to keep them, or set their own rate / starting hours / off.</p>
         <p className="cr-preview mt-2 text-sm text-[var(--cr-muted)]" data-testid="ts-preview-pto">{settings.ptoPreset === "off" || !(settings.ptoPerHours > 0) ? "No paid time off is earned." : `1 h earned per ${settings.ptoPerHours} h worked${settings.ptoCapHours ? `, up to ${settings.ptoCapHours} h` : ""}${settings.ptoUseCapHours ? `, ${settings.ptoUseCapHours} h usable a year` : ""}${settings.ptoWaitDays ? `, after ${settings.ptoWaitDays} days` : ""}.`}</p>
       </section>
 

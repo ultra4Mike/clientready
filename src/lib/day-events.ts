@@ -300,6 +300,8 @@ export async function saveApprovals(rows: DayApproval[], note = ""): Promise<str
   const uid = data.user.id;
   const { error } = await supabase.from("crew_day_approvals").upsert(rows.map((r) => ({ owner_id: uid, employee_id: r.employeeId, work_date: r.date, paid_minutes: r.paidMinutes, drive_minutes: r.driveMinutes, edited_minutes: r.editedMinutes ?? null, approved_at: r.approvedAt ?? null, changed_at: r.changedAt ?? null, updated_at: new Date().toISOString() })));
   await queuePayRefresh(rows.map((r) => r.date), "approvals");
+  // Approved hours change PTO accrual: re-publish the crew balances (not only when Timesheet is opened).
+  if (!error) void import("./phase2-data").then((m) => m.refreshPtoBalances()).catch(() => undefined);
   return error && !missing(error) ? error.message : "";
 }
 
