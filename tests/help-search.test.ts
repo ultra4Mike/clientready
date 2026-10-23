@@ -67,3 +67,16 @@ test("24-hour calendar help: night and overnight jobs article", () => {
   for (const a of HELP_ARTICLES) for (const r of a.related || []) assert.ok(ids.has(r), `${a.id} → ${r}`);
   assert.ok(hay("overnight").includes("night-overnight-jobs"));
 });
+test("Deploy 8 help: overtime settings, FLSA premium formula, CO signature published", async () => {
+  const { UPCOMING_HELP_ARTICLES } = await import("@/lib/help/upcoming");
+  const by = Object.fromEntries(HELP_ARTICLES.map((a) => [a.id, [a.question, a.summary || "", ...a.steps, ...(a.tips || [])].join(" ")]));
+  assert.ok(by["co-needs-signature"]); assert.ok(!UPCOMING_HELP_ARTICLES.some((a) => a.id === "co-needs-signature"));
+  for (const id of ["co-needs-signature", "tt-owner-overtime", "tt-owner-flsa-nonhourly", "change-orders"]) assert.doesNotMatch(by[id], /\[TODO|\[TBD/);
+  assert.match(by["tt-owner-overtime"], /Count paid time off toward overtime hours/);
+  assert.match(by["tt-owner-overtime"], /Use account overtime rules/);
+  assert.match(by["tt-owner-flsa-nonhourly"], /\(multiplier − 1\) × regular rate/);
+  assert.match(by["change-orders"], /per-day dates/);
+  assert.ok(hay("time and a half").includes("tt-owner-overtime"));
+  const ids = new Set(HELP_ARTICLES.map((a) => a.id));
+  for (const a of HELP_ARTICLES) for (const r of a.related || []) assert.ok(ids.has(r), `${a.id} → ${r}`);
+});
