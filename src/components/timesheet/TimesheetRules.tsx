@@ -8,10 +8,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { loadOwnerTimesheet, readLocalTimesheetSettings, saveTimesheetSettings } from "@/lib/day-events";
-import { CALIFORNIA_RULES, CA_SICK, DEFAULT_TIMESHEET_SETTINGS, type TimesheetSettings } from "@/lib/timesheet";
+import { CALIFORNIA_RULES, DEFAULT_TIMESHEET_SETTINGS, type TimesheetSettings } from "@/lib/timesheet";
 import { syncTimesheetCutover, addDays, readDocs } from "@/lib/timesheet-sync";
 import { weekOf } from "@/lib/pay-types";
 import TimeAuditLog from "@/components/timesheet/TimeAuditLog";
+import PtoRulesFields from "@/components/timesheet/PtoRulesFields";
 
 const field = "mt-1 block min-h-11 w-full rounded-lg border bg-transparent px-2 tabular-nums";
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
@@ -183,19 +184,8 @@ export default function TimesheetRules() {
 
       <section className={card} data-testid="ts-rules-pto" aria-labelledby="ts-h-pto">
         <h3 id="ts-h-pto" className="cr-section-label font-semibold">Paid time off / sick</h3>
-        <label className="mt-2 block text-sm"><span className="font-medium">Rules</span>
-          <select name="ts-pto-preset" data-testid="ts-pto-preset" className={field} value={settings.ptoPreset} onChange={(e) => { const v = e.target.value as TimesheetSettings["ptoPreset"]; set(v === "california" ? { ptoPreset: v, ...CA_SICK } : v === "off" || v === "federal" ? { ptoPreset: v, ptoPerHours: 0 } : { ptoPreset: v }); }}>
-            <option value="off">Off</option><option value="federal">Federal (no paid leave required)</option><option value="california">California sick leave (1 h per 30 h, cap 80, use 40, after 90 days)</option><option value="custom">Custom</option>
-          </select></label>
-        {settings.ptoPreset === "custom" && <div className="mt-2 grid gap-2 sm:grid-cols-2">
-          {num("ptoPerHours", "1 h earned per … h worked", "ts-pto-per")}
-          {num("ptoCapHours", "Most hours that can build up (0 = no cap)", "ts-pto-cap")}
-          {num("ptoUseCapHours", "Most hours usable per year (0 = no cap)", "ts-pto-use-cap")}
-          {num("ptoWaitDays", "Usable after … days from hire", "ts-pto-wait")}
-        </div>}
-        {settings.ptoPreset !== "off" && settings.ptoPreset !== "federal" && <div className="mt-2">{tog("ptoAllowNegative", "Let workers ask for more than they have (negative balance)", "ts-pto-negative")}</div>}
-        <p className="mt-1 text-xs text-[var(--cr-muted)]" data-testid="ts-pto-worker-note">Each worker uses these rules. On a worker&apos;s page, leave the PTO fields blank to keep them, or set their own rate / starting hours / off.</p>
-        <p className="cr-preview mt-2 text-sm text-[var(--cr-muted)]" data-testid="ts-preview-pto">{settings.ptoPreset === "off" || !(settings.ptoPerHours > 0) ? "No paid time off is earned." : `1 h earned per ${settings.ptoPerHours} h worked${settings.ptoCapHours ? `, up to ${settings.ptoCapHours} h` : ""}${settings.ptoUseCapHours ? `, ${settings.ptoUseCapHours} h usable a year` : ""}${settings.ptoWaitDays ? `, after ${settings.ptoWaitDays} days` : ""}.`}</p>
+        <PtoRulesFields settings={settings} set={set} />
+        <p className="mt-1 text-xs"><Link href="/profile#time-off" className="underline" data-testid="ts-pto-settings-link">More time-off settings</Link></p>
       </section>
 
       <div className="mt-3 flex flex-wrap items-center gap-3">

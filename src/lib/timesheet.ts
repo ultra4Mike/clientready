@@ -110,6 +110,8 @@ export type TimesheetSettings = {
   taskRates: Record<string, number>;
   /** Paid time off / sick: accrual of 1 hour per `ptoPerHours` hours worked (0 = off); caps in hours (0 = no cap). */
   ptoPreset: PtoPreset; ptoAllowNegative: boolean; ptoPerHours: number; ptoCapHours: number; ptoUseCapHours: number; ptoWaitDays: number;
+  /** Account-wide time-off settings (Settings > Time off): hours in one day off (prefills requests), and whether workers may ask in the crew app. */
+  ptoDayHours: number; ptoRequestsOn: boolean;
 };
 export type PtoPreset = "off" | "federal" | "california" | "custom";
 /** California paid sick leave: 1 h per 30 h worked, accrual cap 80 h, use cap 40 h (5 days) a year, usable after 90 days. */
@@ -126,6 +128,7 @@ export const DEFAULT_TIMESHEET_SETTINGS: TimesheetSettings = {
   otPreset: "worker", weeklyOtHours: 40, dailyOtHours: 0, dailyDtHours: 0, seventhDayRule: false, bonusInRegularRate: true,
   payPeriod: "weekly", payPeriodAnchor: "", remindMissedStartMinutes: 15, remindMissedEndMinutes: 60,
   minWage: 0, flsaNonHourly: false, taskRates: {}, ptoPreset: "off", ptoAllowNegative: false, ptoPerHours: 0, ptoCapHours: 0, ptoUseCapHours: 0, ptoWaitDays: 0,
+  ptoDayHours: 8, ptoRequestsOn: true,
 };
 /** California preset values (applied by the Rules screen when the owner picks California). */
 export const CALIFORNIA_RULES: Partial<TimesheetSettings> = { breakPreset: "california", shortBreakPaidMinutes: 20, otPreset: "california", weeklyOtHours: 40, dailyOtHours: 8, dailyDtHours: 12, seventhDayRule: true };
@@ -191,6 +194,7 @@ export function readTimesheetSettings(raw: unknown): TimesheetSettings {
     remindMissedStartMinutes: nonneg(v.remindMissedStartMinutes, d.remindMissedStartMinutes), remindMissedEndMinutes: nonneg(v.remindMissedEndMinutes, d.remindMissedEndMinutes),
     minWage: nonneg(v.minWage, 0), flsaNonHourly: bool(v.flsaNonHourly, false), taskRates,
     ptoPreset: (["off", "federal", "california", "custom"].includes(String(v.ptoPreset)) ? v.ptoPreset : "off") as PtoPreset, ptoAllowNegative: v.ptoAllowNegative === true,
+    ptoDayHours: Number(v.ptoDayHours) > 0 && Number(v.ptoDayHours) <= 24 ? Number(v.ptoDayHours) : 8, ptoRequestsOn: v.ptoRequestsOn !== false,
     ...(v.ptoPreset === "california" ? CA_SICK : { ptoPerHours: v.ptoPreset === "custom" ? nonneg(v.ptoPerHours, 0) : 0, ptoCapHours: nonneg(v.ptoCapHours, 0), ptoUseCapHours: nonneg(v.ptoUseCapHours, 0), ptoWaitDays: nonneg(v.ptoWaitDays, 0) }),
   };
 }
@@ -543,12 +547,14 @@ export function dedupeTaps(events: TapEvent[]): TapEvent[] {
 /** Apply approved fix requests to the events (pending/denied leave them alone). History is kept by the caller. */
 export function applyFixes(events: TapEvent[], fixes: FixRequest[]): TapEvent[] {
   let out = [...events];
-  for (const fix of fixes.filter((f) => f.status === "approved")) {
+  // Oldest decision first, so the newest approved fix wins; the "(was …)" time is always the worker's original tap.
+  const approved = fixes.filter((f) => f.status === "approved").sort((a, b) => (a.decidedAt || a.createdAt || "").localeCompare(b.decidedAt || b.createdAt || ""));
+  for (const fix of approved) {
     // A start/end-of-day fix without an event id replaces that day's own start/end tap (one per day), never adds a second.
     const target = fix.eventId ? out.find((e) => e.id === fix.eventId)
       : (fix.kind === "start_day" || fix.kind === "end_day") ? out.find((e) => e.kind === fix.kind && e.date === fix.date && (!e.employeeId || !fix.employeeId || e.employeeId === fix.employeeId) && !e.fixed) : undefined;
     // A fixed tap is the owner-approved time: no phone time (no clock_skew) and never "out of order".
-    if (target) out = out.map((e) => (e.id === target.id ? { ...e, at: fix.at, deviceAt: undefined, outOfOrder: false, fixed: true, wasAt: e.at } : e));
+    if (target) out = out.map((e) => (e.id === target.id ? { ...e, at: fix.at, deviceAt: undefined, outOfOrder: false, fixed: true, wasAt: e.wasAt ?? e.at } : e));
     else out.push({ id: `fix-${fix.id}`, employeeId: fix.employeeId, date: fix.date, kind: fix.kind, at: fix.at, docId: fix.docId, fixed: true });
   }
   return out;
@@ -653,27 +659,41 @@ export function crewFlagReasons(day: DaySheet | undefined, extra: string[] = [],
 
 /** Timeline rows for a day: job starts/ends, drives and gaps (paid or unpaid), in time order. */
 export type TimelineRow = { at: string; kind: "start" | "end" | "gap" | "break"; text: string; paid?: boolean; minutes?: number; docId?: string; fromSchedule?: boolean };
-export function dayTimeline(day: DaySheet | undefined): TimelineRow[] {
+export function dayTimeline(day: DaySheet | undefined, taps: TapEvent[] = []): TimelineRow[] {
   if (!day || !day.jobs.length) return [];
   const rows: TimelineRow[] = [];
+  // Re-opened day (End day, then Start day again): the time between is off duty, shown as its own rows in order.
+  const sorted = [...taps].sort((a, b) => ms(a.at) - ms(b.at));
+  const reopens: { end: string; start: string }[] = [];
+  sorted.forEach((e, i) => {
+    if (normalizeKind(e.kind) !== "end_day") return;
+    const again = sorted.slice(i + 1).find((x) => normalizeKind(x.kind) === "start_day" || normalizeKind(x.kind) === "start_job" || normalizeKind(x.kind) === "arrive");
+    if (again) reopens.push({ end: e.at, start: again.at });
+  });
+  const shown = new Set<{ end: string; start: string }>();
+  const offDuty = (a: string, b: string) => { const r = reopens.find((x) => ms(x.end) >= ms(a) - 60000 && ms(x.start) <= ms(b) + 60000); if (r) shown.add(r); return r; };
   // The day ends at the latest end (overlapping schedule fill-ins can end before an earlier-started job).
   const last = day.jobs.reduce((a, b) => (ms(b.end) >= ms(a.end) ? b : a));
   day.jobs.forEach((job) => {
     rows.push({ at: job.start, kind: "start", docId: job.docId, fromSchedule: job.fromSchedule, text: !job.docId ? `${fmtTime(job.start)} Day started (no job)` : `${fmtTime(job.start)} Started ${job.label || "job"}${job.fromSchedule ? " (from schedule)" : ""}` });
     const leg = day.drives.find((d) => d.fromDocId === job.docId && d.start === job.end);
     if (leg && job !== last) {
-      rows.push({ at: job.end, kind: "end", docId: job.docId, text: `${fmtTime(job.end)} Finished ${job.label || "job"}` });
+      rows.push({ at: job.end, kind: "end", docId: job.docId, text: `${fmtTime(job.end)} ${!job.docId ? "Session ended" : `Finished ${job.label || "job"}`}` });
       const unpaid = leg.minutes - leg.paidMinutes;
+      const off = offDuty(leg.start, leg.end);
       rows.push({ at: leg.start, kind: "gap", minutes: leg.minutes, paid: unpaid < 0.5,
-        text: unpaid < 0.5 ? `Drive ${hm(leg.paidMinutes)} (paid)` : leg.paidMinutes > 0 ? `Gap ${hm(leg.minutes)}: drive ${hm(leg.paidMinutes)} paid, ${hm(unpaid)} unpaid` : `Gap ${hm(leg.minutes)} (unpaid)` });
-    } else if (job !== last) rows.push({ at: job.end, kind: "end", docId: job.docId, text: `${fmtTime(job.end)} Finished ${job.label || "job"}` });
+        text: off ? `Off duty ${hm(leg.minutes)} (day ended, then re-opened at ${fmtTime(off.start)})` : unpaid < 0.5 ? `Drive ${hm(leg.paidMinutes)} (paid)` : leg.paidMinutes > 0 ? `Gap ${hm(leg.minutes)}: drive ${hm(leg.paidMinutes)} paid, ${hm(unpaid)} unpaid` : `Gap ${hm(leg.minutes)} (unpaid)` });
+    } else if (job !== last) rows.push({ at: job.end, kind: "end", docId: job.docId, text: `${fmtTime(job.end)} ${!job.docId ? "Session ended" : `Finished ${job.label || "job"}`}` });
   });
   for (const leg of day.drives.filter((d) => d.commute)) rows.push({ at: leg.start, kind: "gap", minutes: leg.minutes, paid: true, text: `${fmtTime(leg.start)} ${leg.commute === "first" ? "Travel to first job" : "Drive home"} ${hm(leg.paidMinutes)} (paid${leg.minutes - leg.paidMinutes >= 0.5 ? `, ${hm(leg.minutes - leg.paidMinutes)} not paid` : ""})` });
   for (const b of day.breaks || []) rows.push({ at: b.start, kind: "break", minutes: b.minutes, paid: b.paid, text: b.auto ? `Auto meal break ${hm(b.minutes)} (unpaid)` : `${fmtTime(b.start)} Break ${hm(b.minutes)} (${b.paid ? "paid, short break" : "unpaid"})` });
   for (const leg of day.drives.filter((d) => d.autoBreakMinutes)) rows.push({ at: leg.end, kind: "break", minutes: leg.autoBreakMinutes, paid: false, text: `Long drive: ${hm(leg.autoBreakMinutes || 0)} over the limit treated as an unpaid break` });
   rows.push({ at: last.end, kind: "end", docId: last.docId, text: `${fmtTime(last.end)} Day ended${day.autoEnded ? " (auto-ended at the last stop)" : ""}` });
   for (const job of day.jobs) if (job.fromSchedule && job.scheduledStart) rows.push({ at: job.start, kind: "gap", paid: true, fromSchedule: true, docId: job.docId, text: `Scheduled ${fmtTime(job.scheduledStart)}–${fmtTime(job.scheduledEnd || job.end)}; counted only ${fmtTime(job.start)}–${fmtTime(job.end)} (inside the real Start day / End day taps)` });
-  rows.sort((a, b) => Date.parse(a.at) - Date.parse(b.at) || (a.kind === "end" ? 1 : 0) - (b.kind === "end" ? 1 : 0));
+  for (const r of reopens) if (!shown.has(r)) rows.push({ at: r.end, kind: "gap", paid: false, text: `${fmtTime(r.end)} Day ended · re-opened at ${fmtTime(r.start)} (off duty, unpaid)` });
+  // Same-minute ties keep the real order: a job/session finishes, then the gap or break, then the next start; "Day ended" is last.
+  const rank = (r: TimelineRow) => (r.kind === "end" ? (r.text.includes("Day ended") ? 3 : 0) : r.kind === "start" ? 2 : 1);
+  rows.sort((a, b) => Date.parse(a.at) - Date.parse(b.at) || rank(a) - rank(b));
   return rows;
 }
 

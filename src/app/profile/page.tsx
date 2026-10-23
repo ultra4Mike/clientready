@@ -2,6 +2,7 @@
 
 import { lateFeeRulesFromRow, lateFeeRulesToRow } from "@/lib/late-fees";
 import PlanSection from "@/components/PlanSection";
+import PtoSettingsCard from "@/components/timesheet/PtoSettingsCard";
 import PushSettings from "@/components/PushSettings";
 import PaymentMethodsSettings from "@/components/PaymentMethodsSettings";
 import TimezoneCombobox from "@/components/TimezoneCombobox";
@@ -349,6 +350,8 @@ export default function ProfilePage() {
       <PaymentMethodsSettings />
 
       <PlanSection />
+
+      <PtoSettingsCard />
 
       <form id="password" onSubmit={changePassword} className="scroll-mt-24 mt-6 space-y-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none sm:p-6">
         <h2 className="text-lg font-bold tracking-tight">Login password</h2>

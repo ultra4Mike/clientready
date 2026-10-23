@@ -921,6 +921,9 @@ html.dark :is([data-testid="crew-pto"],[data-testid="crew-pto-card"],[data-testi
 [data-testid="my-week-table"] tfoot td { border-top: 2px solid rgba(148,163,184,.35); font-weight: 700; font-size: .9375rem; }
 html.dark [data-testid="my-week-table"] thead th, [data-testid="my-week-table"] thead th { color: #94a3b8 !important; opacity: 1; }
 html.dark [data-testid="my-week-table"] :is(th,td)[data-testid^="my-week-h-"] { color: #94a3b8 !important; opacity: 1; }
+/* My hours is now a CSS grid (header div + button rows): the old flex row rule above pulled the cells out of their columns at phone width. */
+[data-testid="my-week-table"] button[data-testid^="my-week-day-"] { display: grid; justify-content: stretch; align-items: start; gap: 0 .25rem; padding: 0; border-bottom: 1px solid rgba(148,163,184,.18); }
+[data-testid="my-week-table"] div[data-testid="my-week-total"] { display: grid; font-size: .9375rem; font-weight: 700; }
 
 /* Crew tabs contrast */
 html.dark nav[role="tablist"] .crew-tab.crew-tab-active { background-color: #14b8a6 !important; color: #042f2e !important; font-weight: 700; }

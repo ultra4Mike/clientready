@@ -30,7 +30,7 @@ function CrewPto() {
     setMsg(err ? `Not sent: ${err}` : "Sent to your boss for approval.");
     if (!err) { setDate(""); if (noteRef.current) noteRef.current.value = ""; void reload(); }
   }
-  const ptoOff = rules ? rules.ptoPreset === "off" || rules.ptoPreset === "federal" : false;
+  const ptoOff = rules ? rules.ptoPreset === "off" || rules.ptoPreset === "federal" || rules.ptoRequestsOn === false : false;
   const allowNeg = Boolean(rules?.ptoAllowNegative);
   const on = Boolean(balance) && !ptoOff;
   const input = "mt-1 block min-h-11 w-full rounded-lg border bg-transparent px-3";
@@ -41,7 +41,7 @@ function CrewPto() {
       {on ? <>
       <div className="mt-2 grid grid-cols-2 gap-2">
         <label>Day<input type="date" name="ptoDate" data-testid="crew-pto-date" className={input} value={date} onChange={(e) => setDate(e.target.value)} /></label>
-        <label>Hours<input ref={hoursRef} name="ptoHours" inputMode="decimal" autoComplete="off" data-testid="crew-pto-hours" className={input} defaultValue="8" /></label>
+        <label>Hours<input ref={hoursRef} name="ptoHours" inputMode="decimal" autoComplete="off" data-testid="crew-pto-hours" className={input} defaultValue={String(rules?.ptoDayHours || 8)} key={`h${rules?.ptoDayHours || 8}`} /></label>
         <label>Type<select name="ptoKind" data-testid="crew-pto-kind" className={input} value={kind} onChange={(e) => setKind(e.target.value as PtoKind)}><option value="pto">Paid time off</option><option value="sick">Sick</option></select></label>
         <label>Note<input ref={noteRef} name="ptoNote" autoComplete="off" maxLength={300} data-testid="crew-pto-note" className={input} defaultValue="" /></label>
       </div>

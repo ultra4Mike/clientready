@@ -6,7 +6,7 @@
  */
 import { addDays } from "@/lib/timesheet-sync";
 import { useEffect, useState } from "react";
-import { buildDay, fmtTime, hhmmTz, wallToIso, dayTimeline, daySummary, flagReasons, hm, type DaySheet, type FixRequest, type ScheduledJob, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
+import { applyFixes, buildDay, fmtTime, hhmmTz, wallToIso, dayTimeline, daySummary, flagReasons, hm, type DaySheet, type FixRequest, type ScheduledJob, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
 import { loadAudit, type AuditRow, type DayApproval } from "@/lib/day-events";
 import type { DayPay } from "@/lib/timesheet-pay";
 import { KIND_LABEL } from "@/components/crew/MyDay";
@@ -73,7 +73,7 @@ export default function DayDetail(props: {
     return first ? [{ docId: "day", label: "Day", start: hhmm(first), end: last && last !== first ? hhmm(last) : "" }] : [];
   });
   const [hours, setHours] = useState(() => (props.minutes / 60).toFixed(2));
-  const timeline = dayTimeline(sheet);
+  const timeline = dayTimeline(sheet, props.taps);
   const reasons = flagReasons(sheet, props.extraFlags, settings);
   const docLinks = docLinkMap([...(sheet?.jobs || []), ...props.schedule]);
   const pending = props.fixes.filter((f) => f.status === "pending");
@@ -129,8 +129,8 @@ export default function DayDetail(props: {
           <details className="cr-collapse mb-3" data-testid="ts-dd-taps">
             <summary>Taps ({props.taps.length})</summary>
             <ul className="mt-1 space-y-1">
-              {[...props.taps].sort((a, b) => a.at.localeCompare(b.at)).map((e) => (
-                <li key={e.id} data-testid="ts-dd-tap" data-kind={e.kind}>{hhmm(e.at)} · {KIND_LABEL[e.kind]}{e.outOfOrder ? " · out of order" : ""}{e.notAtSite ? " · not at site" : ""}
+              {applyFixes(props.taps, props.fixes).sort((a, b) => a.at.localeCompare(b.at)).map((e) => (
+                <li key={e.id} data-testid="ts-dd-tap" data-kind={e.kind}>{fmtTime(e.at)}{e.wasAt && e.wasAt !== e.at && <span data-testid="ts-dd-tap-was" className="ml-1 text-xs text-[var(--cr-muted)]">(was <s>{fmtTime(e.wasAt)}</s>)</span>} · {KIND_LABEL[e.kind]}{e.outOfOrder ? " · out of order" : ""}{e.notAtSite ? " · not at site" : ""}
                   {e.lat != null && e.lng != null && <> · <span data-testid={`ts-dd-pin-${e.id}`}><a className="underline" target="_blank" rel="noopener noreferrer" data-testid="ts-dd-map" href={`https://www.google.com/maps/search/?api=1&query=${e.lat},${e.lng}`}>Map</a></span></>}</li>
               ))}
             </ul>
