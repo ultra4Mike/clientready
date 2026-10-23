@@ -205,6 +205,7 @@ export async function refreshEmployeesCache(userId?: string): Promise<boolean> {
         active: row.active !== false,
         rateHistory: row.rate_history || [],
         paySettings: row.pay_settings || {},
+        timeOverrides: row.time_overrides || {},
       }))
     )
   );
