@@ -1,4 +1,5 @@
 import { readStages, stagePlan } from "./stages";
+import { bizToday } from "./biz-today";
 /** tip: extra the client gave on top of the bill; never counts toward the balance. */
 export type Payment = { id: string; amount: string; method: string; date: string; ref: string; tip?: string; note?: string };
 
@@ -138,7 +139,8 @@ export function keepStripePayments(local: Record<string, unknown>, cloud: Record
  */
 export function isPastDue(status: unknown, dueDate: unknown, owed: number, today = localToday()) {
   const s = String(status || "draft");
-  if (s === "draft" || s === "paid" || !(owed > 0.004)) return false;
+  // Overdue fix: void never goes overdue (it owes nothing), same as draft and paid.
+  if (s === "draft" || s === "paid" || s === "void" || s === "voided" || !(owed > 0.004)) return false;
   const due = String(dueDate || "").slice(0, 10);
   const hasDue = /^\d{4}-\d{2}-\d{2}$/.test(due);
   // Only a passed due date counts; a manual "overdue" with no or a future due date does not.
@@ -154,15 +156,26 @@ export function invoicePastDue(data: Record<string, unknown> | undefined, total:
   const stages = readStages(d.stages);
   if (!stages.length) return isPastDue(d.status, d.dueDate, owed, today);
   const s = String(d.status || "draft");
-  if (s === "draft" || s === "paid" || !(owed > 0.004)) return false;
+  if (s === "draft" || s === "paid" || s === "void" || s === "voided" || !(owed > 0.004)) return false;
   // R86: the invoice's own due date still counts — past it with money owed is overdue, stages or not.
   if (isPastDue(s, d.dueDate, owed, today)) return true;
   return stagePlan(total, owed, stages, today).rows.some((row) => row.state === "overdue");
 }
 
+/**
+ * Overdue fix: why invoicePastDue says overdue, in plain words (or "" when it isn't), so a stale payment-plan
+ * date (e.g. an unpaid deposit) is visible instead of looking "stuck" after the invoice due date is moved.
+ */
+export function overdueReason(data: Record<string, unknown> | undefined, total: number, owed: number, today = localToday()) {
+  const d = data || {};
+  if (!invoicePastDue(d, total, owed, today)) return "";
+  if (isPastDue(d.status, d.dueDate, owed, today)) return `Due date ${String(d.dueDate).slice(0, 10)} has passed`;
+  const row = stagePlan(total, owed, readStages(d.stages), today).rows.find((r) => r.state === "overdue");
+  return row ? `Payment plan: ${row.label || "a payment"} $${row.remaining.toFixed(2)} was due ${row.dueDate}` : "";
+}
+
 function localToday() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return bizToday();
 }
 
 export function isOpenBalance(status: unknown, owed: number) {

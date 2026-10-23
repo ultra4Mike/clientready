@@ -3,7 +3,7 @@
  * It is the pipeline stage (lib/doc-stage), plus "Overdue" for an invoice past due (R86 rule).
  */
 import { docAmounts, documentStage, STAGE_LABEL } from "@/lib/doc-stage";
-import { invoicePastDue, readPayments, refundState, refundWording } from "@/lib/payments";
+import { invoicePastDue, overdueReason, readPayments, refundState, refundWording } from "@/lib/payments";
 
 type Doc = Parameters<typeof documentStage>[0];
 
@@ -19,7 +19,7 @@ export function displayStatus(doc: Doc, allDocs: Doc[] = [], today?: string) {
   if (refund) return { key: refund, label: wording || (refund === "refunded" ? "Refunded" : "Partially refunded") };
   // A refund before the invoice was paid in full (e.g. the deposit given back) shows next to the status.
   const note = wording ? ` · ${wording}` : "";
-  if (doc.type === "invoice" && stage !== "paid" && stage !== "draft" && invoicePastDue(doc.data as Record<string, unknown>, total, owed, today)) return { key: "overdue", label: `Overdue${note}` };
+  if (doc.type === "invoice" && stage !== "paid" && stage !== "draft" && invoicePastDue(doc.data as Record<string, unknown>, total, owed, today)) return { key: "overdue", label: `Overdue${note}`, why: overdueReason(doc.data as Record<string, unknown>, total, owed, today) };
   // R80: an invoice with some money in but not all reads "Partially paid".
   if (doc.type === "invoice" && stage !== "paid" && stage !== "draft" && owed > 0.004 && total - owed > 0.004) return { key: "partial", label: `Partially paid${note}` };
   // Help retest: a refunded-but-owing invoice uses the same word as the client page ("Due · Refunded $X"), not the pipeline stage.

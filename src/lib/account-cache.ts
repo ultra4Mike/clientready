@@ -134,6 +134,8 @@ async function loadAccountOnce(): Promise<boolean> {
         logo: profile.logo || "",
         logoAt: String(profile.updated_at || ""),
         paymentLink: profile.payment_link || "",
+        // Overdue fix: the business zone decides "today" for due dates.
+        ...(profile.timezone ? { timezone: String(profile.timezone) } : {}),
         ...lateFeeFields(profile),
         ...moneySettings(profile),
         // Backlog 13 (migration 20261021130000): the account's automation switches; before it, this device's.

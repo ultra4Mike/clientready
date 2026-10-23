@@ -1,3 +1,4 @@
+import { bizToday } from "./biz-today";
 /**
  * Progress billing: optional payment stages on one invoice (data.stages). Stages only split the
  * invoice total into a schedule; they never change items, totals or payments. Payments recorded
@@ -103,9 +104,16 @@ export function payNowAmount(total: number, balance: number, stages: Stage[], to
   return current ? round(Math.min(current.remaining, balance)) : balance;
 }
 
+/** Overdue fix: when the invoice due date moves, final stages that were on the old due date (or blank) move with it. */
+export function followDueDate(stages: Stage[], prev: string, next: string): Stage[] {
+  if (!prev || !next || prev === next) return stages;
+  let changed = false;
+  const out = stages.map((stage) => (stage.kind === "final" && stage.dueDate === prev ? ((changed = true), { ...stage, dueDate: next }) : stage));
+  return changed ? out : stages;
+}
+
 export function todayYmd() {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  return bizToday();
 }
 
 export type PlanEvery = "week" | "2weeks" | "month";
