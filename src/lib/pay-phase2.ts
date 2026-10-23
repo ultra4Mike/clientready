@@ -156,3 +156,9 @@ export function jobLaborSplit(crew: (PayRow & { employeeId?: string; name?: stri
   const rows = [...by.entries()].map(([employeeId, v]) => ({ employeeId, ...v }));
   return { rows, totalCents: rows.reduce((s, r) => s + r.cents, 0) };
 }
+
+/** Server requests win by id; this device's requests not yet on the server are kept (offline / not synced). */
+export function mergePtoRequests(cloud: PtoRequest[], local: PtoRequest[]): PtoRequest[] {
+  const ids = new Set(cloud.map((r) => r.id));
+  return [...cloud, ...local.filter((r) => !ids.has(r.id))];
+}

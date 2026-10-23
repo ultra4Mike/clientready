@@ -4,6 +4,8 @@
  * cost through the usual path (jobCosts.labor = sum of crew row pay) and the crew pay rows (crew_jobs).
  * Works without migration 20261026110000: approvals/taps come from localStorage then.
  */
+import { loadPtoForRange, readLocalPtoRequests } from "@/lib/phase2-data";
+import type { PtoRequest } from "@/lib/pay-phase2";
 import { DOCS_KEY } from "@/lib/doc-sync";
 import { readOwnerClock } from "@/lib/clock";
 import { readHoursApprovals } from "@/lib/hours-approval";
@@ -104,7 +106,7 @@ export function weekSheets(input: { workers: Worker[]; docs: Doc[]; events: TapE
 }
 
 /** Per worker: the week's day pay and job shares from sheets + approvals. */
-export function weekShares(input: { workers: Worker[]; docs: Doc[]; days: string[]; sheets: Map<string, DaySheet>; approvals: DayApproval[]; settings?: Partial<TimesheetSettings> }) {
+export function weekShares(input: { workers: Worker[]; docs: Doc[]; days: string[]; sheets: Map<string, DaySheet>; approvals: DayApproval[]; settings?: Partial<TimesheetSettings>; pto?: PtoRequest[] }) {
   const pays = new Map<string, DayPay[]>();
   const shares = new Map<string, JobShare>(); // employeeId|date|docId
   for (const w of input.workers) {
@@ -128,7 +130,11 @@ export function weekShares(input: { workers: Worker[]; docs: Doc[]; days: string
       const e = rowExtraPay(r.payType === "commission" && !r.commissionBase ? { ...r, commissionBase: String(jobPrice(doc as never)) } : r);
       if (e > 0) weekExtra.set(wk, (weekExtra.get(wk) || 0) + e);
     }
-    const week = allocateWeek(list, w.paySettings, w.rate || "", { halfDayHours: input.settings?.halfDayHours, settings: input.settings, weekBonus, weekExtra, jobRates: jobRates(input.docs as never, input.settings) });
+    // Approved PTO / sick hours this week (only counted toward OT when the owner turned that on).
+    const off = { pto: 0, sick: 0 };
+    for (const r of input.pto || readLocalPtoRequests()) if (r.employeeId === w.id && r.status === "approved" && input.days.includes(r.date)) off[r.kind === "sick" ? "sick" : "pto"] += Number(r.hours) || 0;
+    const weekOff = new Map([[wk, off]]);
+    const week = allocateWeek(list, w.paySettings, w.rate || "", { halfDayHours: input.settings?.halfDayHours, settings: input.settings, weekBonus, weekExtra, weekOff, jobRates: jobRates(input.docs as never, input.settings) });
     // Unallocated salary only for weeks from the pay cutover / his pay start up to this week (same rule as Year packet).
     if (week.some((d) => d.unallocated)) {
       const owed = unallocatedSalaryWeeks({ workers: [w], docs: [], cutover: readCutover() || timesheetCutover(), today: localYmd(new Date().toISOString()) }).some((u) => u.week === weekOf(input.days[0]));
@@ -199,12 +205,12 @@ export async function refreshTimesheetPay(date: string, opts: { approvals?: DayA
   try { return await refreshWeek(date, week, opts); } finally { if (queued) fireTimesheetChanged(queued.source, [week]); }
 }
 async function refreshWeek(date: string, week: string, opts: { approvals?: DayApproval[]; now?: string }) {
-  const [data, cutover] = await Promise.all([loadOwnerTimesheet(week, addDays(week, 6)), syncTimesheetCutover()]);
+  const [data, cutover, pto] = await Promise.all([loadOwnerTimesheet(week, addDays(week, 6)), syncTimesheetCutover(), loadPtoForRange(week, addDays(week, 6))]);
   const workers = readWorkers();
   const docs = readDocs();
   const approvals = opts.approvals || data.approvals;
   const { days, sheets } = weekSheets({ workers, docs, events: data.events, fixes: data.fixes, settings: data.settings, week, now: opts.now || new Date().toISOString() });
-  const { pays, shares } = weekShares({ workers, docs, days, sheets, approvals, settings: data.settings });
+  const { pays, shares } = weekShares({ workers, docs, days, sheets, approvals, settings: data.settings, pto });
   const applied = applyWeekToDocs(docs, shares, cutover);
   void pushChangedDocs(applied.changed);
   return { ...applied, pays, sheets, approvals };

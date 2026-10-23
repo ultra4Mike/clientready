@@ -97,6 +97,10 @@ export type TimesheetSettings = {
   geofenceMeters: number; jobGeofence: Record<string, number>;
   // Overtime ("worker" = each worker's own overtime setting, today's behaviour)
   otPreset: OtPreset; weeklyOtHours: number; dailyOtHours: number; dailyDtHours: number; seventhDayRule: boolean; bonusInRegularRate: boolean;
+  /** Custom overtime multiplier (1.5 = time and a half) and double-time multiplier (2). Federal / California use 1.5 and 2. */
+  otMultiplier: number; dtMultiplier: number;
+  /** Count approved PTO / sick hours toward the weekly overtime threshold (off = US federal: only hours worked). Never paid at the OT rate. */
+  otCountPto: boolean; otCountSick: boolean;
   // Pay period (for export / period pickers). anchor = a period start date (YYYY-MM-DD) for biweekly.
   payPeriod: PayPeriod; payPeriodAnchor: string;
   // Reminders (foreground only)
@@ -125,13 +129,14 @@ export const DEFAULT_TIMESHEET_SETTINGS: TimesheetSettings = {
   shortBreakPaidMinutes: 20, autoMealOn: false, autoMealAfterHours: 6, autoMealMinutes: 30, breakPreset: "federal", caPremiumPay: false, idleGapPaid: true,
   payFirstCommute: false, payLastCommute: false, startAtShop: false, commuteDeductMinutes: 0, longDriveBreakMinutes: 0,
   roundingMinutes: 0, geofenceMeters: 200, jobGeofence: {},
-  otPreset: "worker", weeklyOtHours: 40, dailyOtHours: 0, dailyDtHours: 0, seventhDayRule: false, bonusInRegularRate: true,
+  // New accounts: overtime ON (US standard, 1.5x over 40 h a week). Saved rules without otPreset stay "worker" (see readTimesheetSettings).
+  otPreset: "federal", weeklyOtHours: 40, dailyOtHours: 0, dailyDtHours: 0, seventhDayRule: false, bonusInRegularRate: true, otMultiplier: 1.5, dtMultiplier: 2, otCountPto: false, otCountSick: false,
   payPeriod: "weekly", payPeriodAnchor: "", remindMissedStartMinutes: 15, remindMissedEndMinutes: 60,
   minWage: 0, flsaNonHourly: false, taskRates: {}, ptoPreset: "off", ptoAllowNegative: false, ptoPerHours: 0, ptoCapHours: 0, ptoUseCapHours: 0, ptoWaitDays: 0,
   ptoDayHours: 8, ptoRequestsOn: true,
 };
 /** California preset values (applied by the Rules screen when the owner picks California). */
-export const CALIFORNIA_RULES: Partial<TimesheetSettings> = { breakPreset: "california", shortBreakPaidMinutes: 20, otPreset: "california", weeklyOtHours: 40, dailyOtHours: 8, dailyDtHours: 12, seventhDayRule: true };
+export const CALIFORNIA_RULES: Partial<TimesheetSettings> = { breakPreset: "california", shortBreakPaidMinutes: 20, otPreset: "california", weeklyOtHours: 40, dailyOtHours: 8, dailyDtHours: 12, seventhDayRule: true, otMultiplier: 1.5, dtMultiplier: 2 };
 
 export type JobSpan = { docId: string; start: string; end: string; minutes: number; fromSchedule: boolean; notAtSite: boolean; label?: string; scheduledStart?: string; scheduledEnd?: string };
 export type DriveLeg = { fromDocId?: string; toDocId?: string; start: string; end: string; minutes: number; paidMinutes: number; expectedMinutes?: number; longDrive?: boolean; commute?: "first" | "last"; autoBreakMinutes?: number };
@@ -170,6 +175,7 @@ export function readTimesheetSettings(raw: unknown): TimesheetSettings {
   const pos = (value: unknown, fallback: number) => { const n = Number(value); return Number.isFinite(n) && n > 0 ? n : fallback; };
   const nonneg = (value: unknown, fallback: number) => { const n = Number(value); return value !== undefined && value !== null && value !== "" && Number.isFinite(n) && n >= 0 ? n : fallback; };
   const bool = (value: unknown, fallback: boolean) => (typeof value === "boolean" ? value : fallback);
+  const mult = (value: unknown, fallback: number) => { const n = Number(value); return Number.isFinite(n) && n > 0 && n <= 10 ? Math.round(n * 100) / 100 : fallback; };
   const rounding = Number(v.roundingMinutes);
   const jobGeofence: Record<string, number> = {};
   if (v.jobGeofence && typeof v.jobGeofence === "object") for (const [k, m] of Object.entries(v.jobGeofence as Record<string, unknown>)) { const n = Number(m); if (Number.isFinite(n) && n > 0) jobGeofence[k] = n; }
@@ -186,7 +192,9 @@ export function readTimesheetSettings(raw: unknown): TimesheetSettings {
     commuteDeductMinutes: nonneg(v.commuteDeductMinutes, d.commuteDeductMinutes), longDriveBreakMinutes: nonneg(v.longDriveBreakMinutes, d.longDriveBreakMinutes),
     roundingMinutes: (rounding === 7 ? 15 : [0, 5, 6, 15].includes(rounding) ? rounding : 0) as TimesheetSettings["roundingMinutes"],
     geofenceMeters: pos(v.geofenceMeters, d.geofenceMeters), jobGeofence,
-    otPreset: (["worker", "federal", "california", "custom"].includes(String(v.otPreset)) ? v.otPreset : "worker") as OtPreset,
+    // Missing otPreset: brand-new (nothing saved) = default (overtime on); saved rules from before = "worker" so nobody's pay changes.
+    otPreset: (["worker", "federal", "california", "custom"].includes(String(v.otPreset)) ? v.otPreset : Object.keys(v).length ? "worker" : d.otPreset) as OtPreset,
+    otMultiplier: mult(v.otMultiplier, d.otMultiplier), dtMultiplier: mult(v.dtMultiplier, d.dtMultiplier), otCountPto: v.otCountPto === true, otCountSick: v.otCountSick === true,
     weeklyOtHours: nonneg(v.weeklyOtHours, d.weeklyOtHours), dailyOtHours: nonneg(v.dailyOtHours, d.dailyOtHours), dailyDtHours: nonneg(v.dailyDtHours, d.dailyDtHours),
     seventhDayRule: bool(v.seventhDayRule, d.seventhDayRule), bonusInRegularRate: bool(v.bonusInRegularRate, d.bonusInRegularRate),
     payPeriod: (["weekly", "biweekly", "semimonthly"].includes(String(v.payPeriod)) ? v.payPeriod : "weekly") as PayPeriod,

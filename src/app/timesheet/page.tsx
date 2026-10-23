@@ -15,8 +15,8 @@ import { weekOf } from "@/lib/pay-types";
 import Link from "next/link";
 import DayDetail from "@/components/timesheet/DayDetail";
 import PtoOwnerCard from "@/components/phase2/PtoOwnerCard";
-import { loadPtoRequests } from "@/lib/phase2-data";
-import { ptoDays } from "@/lib/pay-phase2";
+import { loadPtoForRange, loadPtoRequests } from "@/lib/phase2-data";
+import { ptoDays, type PtoRequest } from "@/lib/pay-phase2";
 import { loadBusinessTz, loadAttestations, decideFix, loadOwnerTimesheet, readLocalTimesheetSettings, saveApprovals, type DayApproval } from "@/lib/day-events";
 import { dayState, DEFAULT_TIMESHEET_SETTINGS, reviewDayInfo, weekStatus, type DayStateName, type DaySheet, type FixRequest, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
 import { addDays, applyWeekToDocs, pushChangedDocs, readDocs, syncTimesheetCutover, scheduleFor, weekShares, weekSheets } from "@/lib/timesheet-sync";
@@ -34,6 +34,7 @@ export default function TimesheetPage() {
   const [fixes, setFixes] = useState<FixRequest[]>([]);
   const [approvals, setApprovals] = useState<DayApproval[]>([]);
   const [settings, setSettings] = useState<TimesheetSettings>(DEFAULT_TIMESHEET_SETTINGS);
+  const [weekPto, setWeekPto] = useState<PtoRequest[] | undefined>(undefined);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [periodPick, setPeriod] = useState<"" | "weekly" | "biweekly" | "semimonthly">("");
   const [attest, setAttest] = useState<Record<string, string>>({});
@@ -67,10 +68,11 @@ export default function TimesheetPage() {
   useEffect(() => {
     if (!week) return;
     void loadOwnerTimesheet(week, addDays(week, 6)).then((data) => { setCloud(data.cloud); setCloudError(data.cloudError || ""); setEvents(data.events); setFixes(data.fixes); setApprovals(data.approvals); setSettings(data.settings); });
+    void loadPtoForRange(week, addDays(week, 6)).then(setWeekPto).catch(() => {});
     void loadAttestations(week).then(setAttest);
   }, [week]);
   const { days, sheets } = useMemo(() => (week && now ? weekSheets({ workers, docs, events, fixes, settings, week, now }) : { days: [] as string[], sheets: new Map<string, DaySheet>() }), [workers, docs, events, fixes, settings, week, now]);
-  const { pays, shares } = useMemo(() => weekShares({ workers, docs, days, sheets, approvals, settings }), [workers, docs, days, sheets, approvals, settings]);
+  const { pays, shares } = useMemo(() => weekShares({ workers, docs, days, sheets, approvals, settings, pto: weekPto }), [workers, docs, days, sheets, approvals, settings, weekPto]);
   // Keep the jobs in step with the week (estimates for unapproved days, the approved day's split otherwise).
   useEffect(() => {
     if (!week || !now || !cutover || !shares.size || !cloud) return; // never push estimates built from a failed/empty cloud read
@@ -195,7 +197,7 @@ export default function TimesheetPage() {
     for (let wk = weekOf(from); wk <= to; wk = addDays(wk, 7)) {
       const data = await loadOwnerTimesheet(wk, addDays(wk, 6));
       const ws = weekSheets({ workers, docs, events: data.events, fixes: data.fixes, settings: data.settings, week: wk, now: new Date().toISOString() });
-      const sh = weekShares({ workers, docs, days: ws.days, sheets: ws.sheets, approvals: data.approvals, settings: data.settings });
+      const sh = weekShares({ workers, docs, days: ws.days, sheets: ws.sheets, approvals: data.approvals, settings: data.settings, pto: await loadPtoForRange(wk, addDays(wk, 6)) });
       for (const w of workers) for (const date of ws.days) {
         if (date < from || date > to) continue;
         const s = ws.sheets.get(`${w.id}|${date}`); const a = data.approvals.find((x) => x.employeeId === w.id && x.date === date);

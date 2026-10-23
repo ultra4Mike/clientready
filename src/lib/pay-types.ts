@@ -26,7 +26,10 @@ export type PaySettings = {
   dayHours?: string;
   dayRate?: string;
   jobAmount?: string;
-  overtime?: { on: boolean; weekly?: string; daily?: string; multiplier?: string };
+  /** override: true = this worker's own overtime rule; false = the account's Timesheet rules; missing = as before (see usesAccountOvertime). */
+  overtime?: { on: boolean; weekly?: string; daily?: string; multiplier?: string; override?: boolean;
+    /** Optional second tier (e.g. 2x after 12 h a day) and counting PTO / sick toward the weekly threshold. */
+    dtDaily?: string; dtMultiplier?: string; countPto?: boolean; countSick?: boolean };
   /** piece / hybrid: pay per unit (e.g. per window, per lawn, per task) logged on the job. */
   pieceRate?: string;
   /** piece / hybrid: what one unit is called ("unit", "window", "lawn"). */
@@ -61,7 +64,7 @@ export function readPaySettings(raw: unknown): PaySettings {
     ...(value.pieceRate ? { pieceRate: String(value.pieceRate) } : {}),
     ...(value.pieceUnit ? { pieceUnit: String(value.pieceUnit).slice(0, 30) } : {}),
     ...(value.commissionPct ? { commissionPct: String(value.commissionPct) } : {}),
-    ...(ot ? { overtime: { on: Boolean(ot.on), weekly: String(ot.weekly ?? "40"), daily: String(ot.daily ?? ""), multiplier: String(ot.multiplier ?? "1.5") } } : {}),
+    ...(ot ? { overtime: { on: Boolean(ot.on), weekly: String(ot.weekly ?? "40"), daily: String(ot.daily ?? ""), multiplier: String(ot.multiplier ?? "1.5"), ...(typeof ot.override === "boolean" ? { override: ot.override } : {}), ...(ot.dtDaily ? { dtDaily: String(ot.dtDaily) } : {}), ...(ot.dtMultiplier ? { dtMultiplier: String(ot.dtMultiplier) } : {}), ...(ot.countPto ? { countPto: true } : {}), ...(ot.countSick ? { countSick: true } : {}) } } : {}),
   };
 }
 

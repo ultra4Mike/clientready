@@ -1,6 +1,10 @@
 // Owner-only timesheet CSV from crew clock entries. Hours only (no pay), one row per entry plus a total per worker.
 import { entryHours, type ClockEntry } from "@/lib/clock";
-import { overtimePremium, readPaySettings } from "@/lib/pay-types";
+import { readPaySettings } from "@/lib/pay-types";
+import { ptoWeekOff, resolvedOvertime } from "@/lib/timesheet-pay";
+import { otRules, usesAccountOvertime } from "@/lib/overtime-rules";
+import type { TimesheetSettings } from "@/lib/timesheet";
+import type { PtoRequest } from "@/lib/pay-phase2";
 import { hhmmTz, ymdTz } from "@/lib/timesheet";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -25,7 +29,7 @@ export function csvCell(value: string | number) {
 type Job = { title: string; client: string };
 
 /** `pay`: employee id -> pay settings. An "Overtime" column appears only when someone has overtime switched on. */
-export function timesheetCsv(entries: ClockEntry[], from: string, to: string, names: Record<string, string>, jobs: Record<string, Job>, pay: Record<string, unknown> = {}) {
+export function timesheetCsv(entries: ClockEntry[], from: string, to: string, names: Record<string, string>, jobs: Record<string, Job>, pay: Record<string, unknown> = {}, opts: { settings?: TimesheetSettings; pto?: PtoRequest[] } = {}) {
   const rows = entries
     .filter((e) => {
       const d = localYmd(new Date(e.started_at));
@@ -39,7 +43,10 @@ export function timesheetCsv(entries: ClockEntry[], from: string, to: string, na
       return { id: e.employee_id, worker, date: localYmd(start), start, end, job, hours: end ? entryHours(e) : null, edited: e.edited_reason || "" };
     })
     .sort((a, b) => a.worker.localeCompare(b.worker) || a.start.getTime() - b.start.getTime());
-  const otOn = rows.some((r) => readPaySettings(pay[r.id]).overtime?.on);
+  // Same resolved rules as the timesheet: account overtime unless the worker overrides.
+  const s = opts.settings;
+  const otActive = (id: string) => { const p = readPaySettings(pay[id]); return usesAccountOvertime(p, s?.otPreset) ? Boolean(s && otRules(s)) : Boolean(p.overtime?.on); };
+  const otOn = rows.some((r) => otActive(r.id));
   const lines = [["Worker", "Date", "Job", "Client", "Clock in", "Clock out", "Hours", "Edited", ...(otOn ? ["Overtime"] : [])].join(",")];
   const perWorker = new Map<string, { id: string; date: string; hours: number }[]>();
   const totals = new Map<string, number>();
@@ -50,7 +57,8 @@ export function timesheetCsv(entries: ClockEntry[], from: string, to: string, na
   }
   for (const [worker, h] of totals) {
     const list = perWorker.get(worker) || [];
-    const ot = otOn ? overtimePremium(list.map((x) => ({ date: x.date, hours: x.hours, rate: 0 })), readPaySettings(pay[list[0]?.id])).hours : 0;
+    const id = list[0]?.id;
+    const ot = otOn && id ? resolvedOvertime(list.map((x) => ({ date: x.date, hours: x.hours, rate: 0 })), pay[id], { settings: s, weekOff: ptoWeekOff(opts.pto || [], id) }).hours : 0;
     lines.push([worker, "", "Total", "", "", "", h.toFixed(2), "", ...(otOn ? [ot.toFixed(2)] : [])].map(csvCell).join(","));
   }
   return { csv: lines.join("\r\n") + "\r\n", count: rows.length };

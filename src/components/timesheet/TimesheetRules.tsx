@@ -13,6 +13,8 @@ import { syncTimesheetCutover, addDays, readDocs } from "@/lib/timesheet-sync";
 import { weekOf } from "@/lib/pay-types";
 import TimeAuditLog from "@/components/timesheet/TimeAuditLog";
 import PtoRulesFields from "@/components/timesheet/PtoRulesFields";
+import OvertimeRulesFields from "@/components/timesheet/OvertimeRulesFields";
+import { otSummary } from "@/lib/overtime-rules";
 
 const field = "mt-1 block min-h-11 w-full rounded-lg border bg-transparent px-2 tabular-nums";
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
@@ -27,7 +29,7 @@ export function rulePreviews(s: TimesheetSettings) {
     s.longDriveBreakMinutes ? `Drive time past ${s.longDriveBreakMinutes} min is held back as unpaid until you approve it.` : "",
   ].filter(Boolean).join(" ");
   const breaks = `${s.breakPreset === "california" ? "California: 30-min meal before the 5th hour, 10-min rest per 4 hours." : "Federal: no required breaks."} Breaks under ${s.shortBreakPaidMinutes} min are paid, longer ones are unpaid.${s.autoMealOn ? ` A ${s.autoMealMinutes}-min meal is taken off days over ${s.autoMealAfterHours} h with no break logged.` : ""}${s.breakPreset === "california" && s.caPremiumPay ? " A missed meal or rest adds 1 hour of premium pay." : ""}`;
-  const ot = s.otPreset === "worker" ? "Each worker's own overtime setting is used." : s.otPreset === "federal" ? "Overtime 1.5× after 40 h a week." : s.otPreset === "california" ? "1.5× after 8 h a day or 40 h a week, 2× after 12 h a day, 7th day in a row: 1.5× first 8 h then 2×." : `Custom: 1.5× after ${s.weeklyOtHours || "—"} h a week${s.dailyOtHours ? ` or ${s.dailyOtHours} h a day` : ""}${s.dailyDtHours ? `, 2× after ${s.dailyDtHours} h a day` : ""}${s.seventhDayRule ? ", 7th-day rule on" : ""}.`;
+  const ot = otSummary(s);
   const rounding = Number(s.roundingMinutes) === 15 ? "Quarter hour (7-minute rule): 1–7 min rounds down, 8–14 rounds up. Rounds both ways, so it evens out." : s.roundingMinutes ? `Each start and end is rounded to the nearest ${s.roundingMinutes} min (rounds both ways).` : "Exact: paid to the minute, no rounding.";
   const loc = `A tap more than ${s.geofenceMeters} m from the job is flagged (never blocked).${Object.keys(s.jobGeofence).length ? ` ${Object.keys(s.jobGeofence).length} job(s) have their own distance.` : ""}`;
   const period = `${s.payPeriod === "weekly" ? "Paid weekly" : s.payPeriod === "biweekly" ? `Paid every 2 weeks${s.payPeriodAnchor ? ` from ${s.payPeriodAnchor}` : ""}` : "Paid twice a month (1st–15th, 16th–end)"}. Reminders: ${s.remindMissedStartMinutes ? `${s.remindMissedStartMinutes} min after a missed start` : "no missed-start reminder"}, ${s.remindMissedEndMinutes ? `${s.remindMissedEndMinutes} min after a missed end` : "no missed-end reminder"}.`;
@@ -112,18 +114,7 @@ export default function TimesheetRules() {
 
       <section className={card} data-testid="ts-rules-ot" aria-labelledby="ts-h-ot">
         <h3 id="ts-h-ot" className="cr-section-label font-semibold">Overtime / double time</h3>
-        <label className="mt-2 block text-sm"><span className="font-medium">Rules</span>
-          <select name="ts-ot-preset" data-testid="ts-ot-preset" className={field} value={settings.otPreset} onChange={(e) => set({ otPreset: e.target.value as TimesheetSettings["otPreset"] })}>
-            <option value="worker">Each worker&apos;s own setting (Team)</option><option value="federal">Federal (40 h week)</option><option value="california">California (daily, double time, 7th day)</option><option value="custom">Custom</option>
-          </select></label>
-        {settings.otPreset === "custom" && <div className="mt-2 grid gap-2 sm:grid-cols-3">
-          {num("weeklyOtHours", "Weekly OT after (h)", "ts-ot-weekly")}
-          {num("dailyOtHours", "Daily OT after (h, 0 = off)", "ts-ot-daily")}
-          {num("dailyDtHours", "Double time after (h/day, 0 = off)", "ts-dt-daily")}
-          {tog("seventhDayRule", "7th day in a row rule", "ts-seventh-day")}
-        </div>}
-        {settings.otPreset !== "worker" && tog("bonusInRegularRate", "Include job bonuses in the overtime rate (FLSA)", "ts-bonus-regular")}
-        {preview(p.ot, "ts-preview-ot")}
+        <OvertimeRulesFields settings={settings} set={set} />
       </section>
 
       <section className={card} data-testid="ts-rules-rounding" aria-labelledby="ts-h-round">

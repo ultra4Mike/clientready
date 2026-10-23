@@ -1,6 +1,6 @@
 "use client";
 import { unallocatedSalary } from "@/lib/timesheet-sync";
-import { isTimesheetRow, overtimePremium, readPaySettings, rowHours, rowPayMoney, weekOf, type PayType } from "@/lib/pay-types";
+import { isTimesheetRow, readPaySettings, rowHours, rowPayMoney, weekOf, type PayType } from "@/lib/pay-types";
 import { readSetAside } from "@/lib/profit-alerts";
 import { buildReport } from "@/lib/reports";
 
@@ -14,7 +14,9 @@ import { readPayments } from "@/lib/payments";
 import { lineSplit } from "@/lib/line-split";
 import { isPendingRecurringDraft } from "@/lib/recurring";
 import { supabase } from "@/lib/supabase";
-import { loadPtoRequests } from "@/lib/phase2-data";
+import { loadPtoRequests, mergePtoRequests, readLocalPtoRequests } from "@/lib/phase2-data";
+import { ptoWeekOff, resolvedOvertime } from "@/lib/timesheet-pay";
+import { readLocalTimesheetSettings } from "@/lib/day-events";
 import { ptoDays, type PtoRequest } from "@/lib/pay-phase2";
 import { searchWithNumbers } from "@/lib/doc-number";
 
@@ -322,9 +324,12 @@ export default function YearPage() {
       list.push({ id: `salary-${id}-${week}`, docId: "", docType: "invoice", kind: "pay", date: week, client: "", number: "", category: "Labor", amount: cents / 100, method: "", ref: "", note: `Salary week of ${week}, no jobs (unallocated labor, counted once)`, hours: "", rate: "", worker: name, workerKind: kindFor(name, id) });
     }
     // Overtime premium (only for people whose owner switched overtime on; off by default).
+    // Same resolved rules as the timesheet (account overtime unless the worker overrides; PTO counted only when switched on).
+    const otSettings = readLocalTimesheetSettings();
+    const otPto = mergePtoRequests(ptoReqs, readLocalPtoRequests());
     for (const [id, entries] of hourly) {
       const person = employees.find((item) => item.id === id || item.name === id);
-      const { hours, premium } = overtimePremium(entries, readPaySettings(person?.paySettings));
+      const { hours, premium } = resolvedOvertime(entries, person?.paySettings, { settings: otSettings, weekOff: ptoWeekOff(otPto, person?.id || id) });
       if (!premium) continue;
       const name = entries[0].name;
       list.push({ id: `ot-${id}`, docId: "", docType: "invoice", kind: "pay", date: `${year}-12-31`, client: "", number: "", category: "Labor", amount: premium, method: "", ref: "", note: `Overtime premium (${hours.toFixed(2)} h)`, hours: String(hours), rate: "", worker: name, workerKind: kindFor(name, id) });

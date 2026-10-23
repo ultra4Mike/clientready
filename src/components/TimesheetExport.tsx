@@ -7,6 +7,8 @@ import { periodRange, type PeriodRange } from "@/lib/period";
 import { entryHours, type ClockEntry } from "@/lib/clock";
 import { readOwnerClock, refreshOwnerClock } from "@/lib/clock";
 import { localYmd, timesheetCsv, weekRange } from "@/lib/timesheet-csv";
+import { loadOwnerTimesheet } from "@/lib/day-events";
+import { loadPtoForRange } from "@/lib/phase2-data";
 
 const field = "mt-1 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2 text-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30";
 
@@ -72,7 +74,10 @@ export default function TimesheetExport({ names }: { names: Record<string, strin
     } catch {
       // no cached team
     }
-    const { csv, count } = period === "all" ? timesheetCsv(entries, "0000-01-01", "9999-12-31", names, jobs, pay) : timesheetCsv(entries, range.from, range.to, names, jobs, pay);
+    const [from, to] = period === "all" ? ["0000-01-01", "9999-12-31"] : [range.from, range.to];
+    // Account overtime rules + approved PTO / sick (server merged with this device), same as the timesheet.
+    const [ts, pto] = await Promise.all([loadOwnerTimesheet(range.from, range.to).catch(() => null), loadPtoForRange(period === "all" ? "2000-01-01" : from, period === "all" ? "2100-12-31" : to).catch(() => [])]);
+    const { csv, count } = timesheetCsv(entries, from, to, names, jobs, pay, { settings: ts?.settings, pto });
     if (!count) return setNote("No clock entries in those dates.");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
