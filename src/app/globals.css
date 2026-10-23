@@ -678,3 +678,95 @@ html.dark [data-testid="card-pay"] > p.text-xs { color: #c7e5e1 !important; }
 /* Small print on the signature/disclaimer. */
 [data-testid="signature-pad"] p.text-xs, [data-testid="approve-panel"] p.text-xs { font-size: 0.8125rem; }
 html.dark [data-testid="signature-pad"] p.text-xs, html.dark [data-testid="approve-panel"] p.text-xs { color: #b6cfcc !important; }
+
+/* ===== Time tracking phase 1 — visual only (keyed to testids / data-state) ===== */
+/* Crew: My day */
+[data-testid="my-day"] { max-width: 40rem; margin-inline: auto; }
+[data-testid="my-day"] .cr-btn, [data-testid="my-week"] .cr-btn, [data-testid="fix-form"] .cr-btn { min-height: 2.75rem; }
+[data-testid="step-tracker"] { display: flex; gap: 0.375rem; list-style: none; padding: 0; margin: 0; }
+[data-testid="step-tracker"] > li { min-height: 2.75rem; display: flex; align-items: center; justify-content: center; border-radius: 0.625rem; border: 1px solid rgba(100,116,139,.35); font-size: .75rem; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; padding: 0 .25rem; overflow-wrap: anywhere; }
+html [data-testid="step-tracker"] > li[data-step-state="done"] { background-color: rgba(20,184,166,.15) !important; border-color: rgba(20,184,166,.55) !important; color: #0f766e !important; }
+html [data-testid="step-tracker"] > li[data-step-state="current"] { background-color: #14b8a6 !important; border-color: #14b8a6 !important; color: #042f2e !important; box-shadow: 0 0 0 3px rgba(20,184,166,.25); }
+html [data-testid="step-tracker"] > li[data-step-state="locked"] { background-color: transparent !important; border-style: dashed !important; color: var(--cr-muted) !important; opacity: .65; }
+html.dark [data-testid="step-tracker"] > li[data-step-state="done"] { color: #99f6e4 !important; }
+[data-testid="tap-primary"] { width: 100%; min-height: 3.5rem !important; font-size: 1.0625rem !important; border-radius: .875rem !important; }
+[data-testid="tap-break"] { min-height: 3.5rem !important; }
+[data-testid="tap-break"][data-state="on"] { border-color: #f59e0b !important; }
+[data-testid="break-timer"] { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 1.125rem; }
+[data-testid="tap-end-day"] { min-height: 3rem !important; }
+[data-testid="my-day-totals"], [data-testid="my-day-hours"], [data-testid="my-day-breaks"], [data-testid="my-day-unpaid"], [data-testid="my-day-total"], [data-testid="my-day-drive"], [data-testid="my-day-rounding"] { font-variant-numeric: tabular-nums; }
+[data-testid="my-day-totals"] { display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); gap: .5rem; }
+[data-testid="my-day-state"] { font-weight: 700; }
+[data-testid="geo-sheet"], [data-testid="confirm-tap"], [data-testid="confirm-end"], [data-testid="still-driving"] { border-radius: 1rem; padding: 1rem; border: 1px solid rgba(20,184,166,.35); background-color: var(--cr-card); color: var(--cr-text); box-shadow: 0 -8px 24px rgba(0,0,0,.18); }
+@media (max-width: 640px) {
+  [data-testid="geo-sheet"] { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; border-radius: 1rem 1rem 0 0; padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom)); }
+}
+[data-testid="geo-sheet-yes"], [data-testid="geo-sheet-no"], [data-testid="confirm-tap-yes"], [data-testid="confirm-tap-no"], [data-testid="confirm-end-yes"], [data-testid="confirm-end-no"], [data-testid="forgot-end-fix"], [data-testid="fix-send"], [data-testid="fix-cancel"] { min-height: 3.5rem !important; width: 100%; }
+html.dark [data-testid="forgot-end"] [data-testid="forgot-end-fix"], html.dark [data-testid="forgot-end"] button { background-color: #14b8a6 !important; color: #042f2e !important; border-color: #14b8a6 !important; }
+html.dark [data-testid="tap-end-day"].cr-tone-bad { background-color: rgba(127,29,29,.45) !important; }
+[data-testid="location-denied"], [data-testid="forgot-end"] { line-height: 1.5; }
+[data-testid="pending-sync"] { display: inline-flex; align-items: center; gap: .375rem; border-radius: 999px; padding: .125rem .625rem; font-size: .75rem; font-weight: 700; border: 1px solid rgba(245,158,11,.6); color: #92400e; background: rgba(245,158,11,.12); }
+html.dark [data-testid="pending-sync"] { color: #fde68a !important; }
+[data-testid="pending-count"] { font-variant-numeric: tabular-nums; }
+[data-testid="fix-form"] label { display: block; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin-bottom: .25rem; color: var(--cr-muted); }
+[data-testid="fix-form"] input, [data-testid="fix-form"] select, [data-testid="fix-form"] textarea { min-height: 2.75rem; width: 100%; }
+[data-testid="fix-history"] { list-style: none; padding: 0; display: grid; gap: .375rem; }
+[data-testid="fix-status"] { padding: .625rem .75rem; border-radius: .75rem; border: 1px solid rgba(100,116,139,.3); font-size: .875rem; font-variant-numeric: tabular-nums; line-height: 1.5; }
+/* Crew: My week (hours only) */
+[data-testid="my-week"] { max-width: 40rem; margin-inline: auto; font-variant-numeric: tabular-nums; }
+[data-testid^="my-week-day-"] { display: flex; justify-content: space-between; align-items: center; gap: .75rem; min-height: 2.75rem; padding: .5rem .75rem; border-bottom: 1px solid rgba(100,116,139,.2); }
+[data-testid="my-week-total"] { font-size: 1.25rem; font-weight: 800; }
+[data-testid="my-day-week-link"] { min-height: 2.75rem; display: inline-flex; align-items: center; }
+
+/* Owner: on the clock strip */
+[data-testid="ts-on-clock"] { display: flex; gap: .5rem; overflow-x: auto; padding-bottom: .25rem; scrollbar-width: thin; }
+[data-testid^="ts-on-clock-"]:not([data-testid="ts-on-clock-empty"]) { flex: 0 0 auto; border-radius: 999px; padding: .375rem .75rem; border: 1px solid rgba(20,184,166,.45); background: rgba(20,184,166,.1); font-size: .8125rem; font-weight: 600; white-space: nowrap; }
+[data-testid="ts-on-clock-empty"], [data-testid="ts-empty"], [data-testid="ts-audit-empty"], [data-testid="ts-dd-history-empty"], [data-testid="labor-empty"] { padding: 1.25rem; text-align: center; border: 1px dashed rgba(100,116,139,.4); border-radius: .75rem; color: var(--cr-muted); font-size: .875rem; }
+/* Timesheet grid */
+[data-testid="ts-table"] { font-variant-numeric: tabular-nums; border-collapse: separate; border-spacing: 0; width: 100%; }
+[data-testid="ts-table"] th { font-size: .6875rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; color: var(--cr-muted); padding: .5rem; position: sticky; top: 0; background: var(--cr-panel); z-index: 1; }
+[data-testid="ts-table"] td { padding: .5rem; border-top: 1px solid rgba(100,116,139,.2); vertical-align: top; }
+[data-testid^="ts-row-"]:hover td { background-color: rgba(20,184,166,.06); }
+[data-testid^="ts-cell-"] { min-width: 4.5rem; text-align: center; cursor: pointer; border-radius: .5rem; }
+[data-testid^="ts-week-"], [data-testid^="ts-week-pay-"] { font-weight: 700; text-align: right; }
+[data-testid="ts-cards"] { display: grid; gap: .75rem; font-variant-numeric: tabular-nums; }
+[data-testid="ts-cards"] [data-testid^="ts-row-"] { border-radius: .75rem; border: 1px solid rgba(100,116,139,.3); padding: .875rem; background: var(--cr-card); }
+[data-testid^="ts-card-toggle-"], [data-testid^="ts-select-"] { min-height: 2.75rem; min-width: 2.75rem; }
+/* Pills */
+[data-testid^="ts-pill-"], [data-testid^="ts-dd-pill-"], [data-testid="ts-edited"], [data-testid="ts-fix-badge"] { display: inline-flex; align-items: center; border-radius: 999px; padding: 0 .4rem; font-size: .625rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; line-height: 1.25rem; border: 1px solid transparent; }
+html [data-testid="ts-pill-ot"], html [data-testid="ts-dd-pill-ot"] { background: rgba(245,158,11,.15) !important; color: #92400e !important; border-color: rgba(245,158,11,.5) !important; }
+html [data-testid="ts-pill-dt"], html [data-testid="ts-dd-pill-dt"], html [data-testid="ts-dd-pill-premium"] { background: rgba(244,63,94,.12) !important; color: #9f1239 !important; border-color: rgba(244,63,94,.5) !important; }
+html [data-testid="ts-pill-break"], html [data-testid="ts-dd-pill-break"] { background: rgba(99,102,241,.12) !important; color: #3730a3 !important; border-color: rgba(99,102,241,.45) !important; }
+html [data-testid="ts-edited"], html [data-testid="ts-dd-pill-edited"], html [data-testid="ts-pill-attested"], html [data-testid="ts-pill-before-hire"] { background: rgba(100,116,139,.12) !important; color: #334155 !important; border-color: rgba(100,116,139,.45) !important; }
+html [data-testid="ts-fix-badge"] { background: #14b8a6 !important; color: #042f2e !important; }
+html.dark [data-testid="ts-pill-ot"], html.dark [data-testid="ts-dd-pill-ot"] { color: #fde68a !important; }
+html.dark [data-testid="ts-pill-dt"], html.dark [data-testid="ts-dd-pill-dt"], html.dark [data-testid="ts-dd-pill-premium"] { color: #fecdd3 !important; }
+html.dark [data-testid="ts-pill-break"], html.dark [data-testid="ts-dd-pill-break"] { color: #c7d2fe !important; }
+html.dark [data-testid="ts-edited"], html.dark [data-testid="ts-dd-pill-edited"], html.dark [data-testid="ts-pill-attested"], html.dark [data-testid="ts-pill-before-hire"] { color: #cbd5e1 !important; }
+/* Approve / locked / toolbar */
+[data-testid="ts-approve-selected"], [data-testid="ts-approve-all"], [data-testid="ts-export-csv"], [data-testid="ts-prev"], [data-testid="ts-next"], [data-testid="ts-filter-all"], [data-testid="ts-filter-review"], [data-testid="ts-add"], [data-testid="ts-audit-export"], [data-testid="labor-export"] { min-height: 2.75rem; }
+[data-testid="ts-period"], [data-testid="ts-pay-period"] { font-variant-numeric: tabular-nums; font-weight: 700; }
+[data-state="locked"][data-testid], [data-testid="ts-dd-locked"] { opacity: .8; }
+[data-testid="ts-dd-locked"], [data-testid="ts-approved"], [data-testid="ts-dd-approved"] { display: inline-flex; align-items: center; gap: .25rem; border-radius: 999px; padding: .125rem .625rem; font-size: .75rem; font-weight: 700; border: 1px solid rgba(16,185,129,.5); background: rgba(16,185,129,.1); }
+/* Day detail */
+[data-testid="ts-daydetail"] { font-variant-numeric: tabular-nums; border-radius: 1rem; }
+[data-testid="ts-dd-timeline"], [data-testid="ts-dd-history"], [data-testid="ts-audit-list"] { list-style: none; padding: 0 0 0 1rem; margin: 0; border-left: 2px solid rgba(20,184,166,.35); display: grid; gap: .5rem; }
+[data-testid="ts-dd-timeline"] > li, [data-testid="ts-dd-history-row"], [data-testid="ts-audit-row"] { position: relative; font-size: .875rem; line-height: 1.45; }
+[data-testid="ts-dd-timeline"] > li::before, [data-testid="ts-dd-history-row"]::before, [data-testid="ts-audit-row"]::before { content: ""; position: absolute; left: -1.375rem; top: .4rem; width: .625rem; height: .625rem; border-radius: 999px; background: #14b8a6; box-shadow: 0 0 0 3px var(--cr-card); }
+[data-testid="ts-dd-breaks"], [data-testid="ts-dd-rounding"], [data-testid="ts-dd-summary"] { font-size: .875rem; }
+[data-testid="ts-dd-map"] { border-radius: .75rem; overflow: hidden; min-height: 10rem; border: 1px solid rgba(100,116,139,.3); }
+[data-testid="ts-dd-approve"], [data-testid="ts-dd-unapprove"], [data-testid="ts-dd-edit"], [data-testid="ts-dd-close"], [data-testid="ts-dd-fix-approve"], [data-testid="ts-dd-fix-deny"], [data-testid="ts-fix-approve"], [data-testid="ts-fix-deny"] { min-height: 2.75rem; }
+/* Audit log */
+[data-testid^="ts-audit-chip-"] { min-height: 2.25rem; border-radius: 999px; padding: 0 .75rem; font-size: .75rem; font-weight: 600; }
+[data-testid="ts-audit-row"] { font-variant-numeric: tabular-nums; }
+/* Settings cards */
+[data-testid="ts-settings"] { display: grid; gap: 1rem; }
+@media (min-width: 768px) { [data-testid="ts-settings"] { grid-template-columns: repeat(2, minmax(0, 1fr)); } [data-testid="ts-settings"] > [data-testid="ts-settings-save"], [data-testid="ts-settings"] > [data-testid="ts-settings-message"] { grid-column: 1 / -1; } }
+[data-testid^="ts-rules-"]:not([data-testid="ts-rules-help"]) { border-radius: .75rem; border: 1px solid rgba(100,116,139,.3); background: var(--cr-card); padding: 1rem 1.25rem; }
+[data-testid^="ts-rules-"] label { display: block; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--cr-muted); margin-bottom: .25rem; }
+[data-testid^="ts-rules-"] input:not([type="checkbox"]):not([type="radio"]), [data-testid^="ts-rules-"] select { min-height: 2.75rem; font-variant-numeric: tabular-nums; }
+[data-testid="ts-settings-save"], [data-testid="ts-settings-reset"], [data-testid="ts-preset-federal"], [data-testid="ts-preset-california"], [data-testid="ts-geo-job-add"] { min-height: 2.75rem; }
+[data-testid="ts-rules-help"] { font-size: .8125rem; color: var(--cr-muted); line-height: 1.5; border-left: 3px solid rgba(20,184,166,.5); padding-left: .75rem; }
+/* Labor report */
+[data-testid="labor-table"] { font-variant-numeric: tabular-nums; width: 100%; }
+@media (max-width: 400px) { [data-testid="step-tracker"] > li { font-size: .625rem; } [data-testid="ts-settings"] { gap: .75rem; } }
