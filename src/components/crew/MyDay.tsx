@@ -66,8 +66,16 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [worker, setWorker] = useState<WorkerTimeOverrides>({});
   const [fixOpen, setFixOpen] = useState<{ eventId?: string; kind: TapKind; at: string; reason: string; docId?: string; date: string } | null>(null);
-  const today = localDate(new Date(now));
+  const calToday = localDate(new Date(now));
   const yesterday = localDate(new Date(new Date(now).getTime() - 86400000));
+  // Overnight shift: a day started yesterday and still open (last tap < 16 h ago) stays ONE work day, dated the Start day
+  // (business zone). Taps after midnight go to that day, so OT, breaks and pay count there and My day stays continuous.
+  const overnight = useMemo(() => {
+    const y = events.filter((e) => e.date === yesterday).sort((a, b) => a.at.localeCompare(b.at));
+    if (!y.length || events.some((e) => e.date === calToday) || dayState(y).state === "OFF_DUTY") return false;
+    return new Date(now).getTime() - new Date(y[y.length - 1].at).getTime() < 16 * 3600000;
+  }, [events, yesterday, calToday, now]);
+  const today = overnight ? yesterday : calToday;
 
   useEffect(() => {
     if (!email) return;
@@ -95,7 +103,7 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
   const schedule: ScheduledJob[] = plan.map((j) => ({ docId: j.docId, start: toIso(j.date, j.startTime), end: toIso(j.date, j.endTime), label: j.label })).filter((j) => j.start && j.end);
   const sheet = buildDay({ employeeId: employeeId || "me", date: today, events: todays.map((e) => ({ ...e, employeeId: employeeId || "me" })), schedule, now, settings: rules, worker });
   const askStillDriving = stillDrivingDue(todays, now, rules);
-  const forgotYesterday = yesterdays.length > 0 && dayState(yesterdays).state !== "OFF_DUTY" && !fixes.some((f) => f.date === yesterday && (f.kind === "end_day" || f.kind === "end_shift"));
+  const forgotYesterday = !overnight && yesterdays.length > 0 && dayState(yesterdays).state !== "OFF_DUTY" && !fixes.some((f) => f.date === yesterday && (f.kind === "end_day" || f.kind === "end_shift"));
   // Break clock: server time of the break start vs. this phone's clock corrected by the last live tap's offset. Never < 0.
   const lastLive = [...todays].reverse().find((e) => e.deviceAt && !e.offline && !e.pending && !e.fixed);
   const skewMs = lastLive ? new Date(lastLive.at).getTime() - new Date(lastLive.deviceAt!).getTime() : 0;
