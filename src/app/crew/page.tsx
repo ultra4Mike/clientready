@@ -841,7 +841,7 @@ export default function CrewPage() {
                 {card.client_address && <p className="mt-1 text-sm">{card.client_address}</p>}
                 {running
                   ? <button type="button" disabled={busy !== ""} data-testid="crew-detail-clock-out" onClick={() => clockTap("clock-out", card.doc_id)} className="cr-btn mt-3 w-full bg-amber-500 py-4 text-lg text-slate-950!" style={{ minHeight: "3.75rem" }}>Clock out</button>
-                  : <a href="/crew?tab=today" data-testid="crew-detail-start" className="cr-btn cr-btn-primary mt-3 flex min-h-14 w-full items-center justify-center text-lg">Tap your time in My day</a>}
+                  : <a href="/crew?tab=today" data-testid="crew-detail-start" className="cr-btn cr-btn-primary mt-3 flex min-h-14 w-full items-center justify-center text-lg" style={{ minHeight: "3.75rem" }}>Tap your time in My day</a>}
                 {otherOpen && !running && <p className="mt-1 text-xs text-[var(--cr-muted)]" data-testid="crew-detail-other-open">An old clock-in is still open on another job. Clock out there.</p>}
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   {mapUrl ? <a href={mapUrl} target="_blank" rel="noreferrer" data-testid="crew-detail-map" className="cr-btn cr-btn-secondary">Map</a> : <span className="cr-btn cr-btn-secondary opacity-50" aria-disabled="true">Map</span>}
