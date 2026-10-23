@@ -10,7 +10,7 @@ import CrewDaysOff from "@/components/CrewDaysOff";
 import { CREW_KINDS, EXTRA_PREFIX, crewKindLabel, legacySummary, type CostLine, type CrewKind } from "@/lib/cost-categories";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import MyDay from "@/components/crew/MyDay";
-import MyWeek from "@/components/crew/MyWeek";
+import MyWeek, { type WeekRow } from "@/components/crew/MyWeek";
 import LeadPanel from "@/components/phase2/LeadPanel";
 import CrewPto from "@/components/phase2/CrewPto";
 import { ymdTz } from "@/lib/timesheet";
@@ -176,6 +176,7 @@ function buildCards(jobs: Job[]): Card[] {
 export default function CrewPage() {
   const [userId, setUserId] = useState("");
   const [email, setEmail] = useState("");
+  const [myWeekRows, setMyWeekRows] = useState<WeekRow[]>([]);
   const [offline, setOffline] = useState(false);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -394,8 +395,11 @@ export default function CrewPage() {
   const later = cards.filter((card) => card.job_date && weekDays.length > 0 && card.job_date > weekDays[6]).sort((a, b) => a.job_date.localeCompare(b.job_date));
 
   const hoursByDay = weekDays.map((day) => {
-    const clocked = clock.filter((entry) => ymdTz(new Date(entry.started_at)) === day).reduce((sum, entry) => sum + entryHours(entry, now), 0);
-    const logged = jobs.filter((job) => !job.id.includes("-sched-") && job.job_date === day).reduce((sum, job) => sum + (Number(job.hours) || 0), 0);
+    // Same paid source as My week: My day taps (owner-approved minutes when approved) + the old per-job clock.
+    const mw = myWeekRows.find((r) => r.date === day);
+    const clocked = mw ? (mw.paid + mw.oldClock) / 60 : clock.filter((entry) => ymdTz(new Date(entry.started_at)) === day).reduce((sum, entry) => sum + entryHours(entry, now), 0);
+    const typed = jobs.filter((job) => !job.id.includes("-sched-") && job.job_date === day).reduce((sum, job) => sum + (Number(job.hours) || 0), 0);
+    const logged = typed || (mw?.approved ? mw.paid / 60 : 0);
     return { day, clocked, logged };
   });
   const weekClocked = hoursByDay.reduce((sum, item) => sum + item.clocked, 0);
@@ -567,7 +571,7 @@ export default function CrewPage() {
   function jobCard(card: Card) { return jobCardView(card, false); }
   function jobCardView(card: Card, detail: boolean) {
     const status = (card.schedule_status || "scheduled") as JobStatus;
-    const mine = clock.filter((entry) => entry.doc_id === card.doc_id);
+    const mine = clock.filter((entry) => entry.doc_id === card.doc_id && (!entry.ended_at || Date.parse(entry.ended_at) - Date.parse(entry.started_at) >= 60000)); // zero-length mis-taps hidden
     const running = mine.find((entry) => !entry.ended_at);
     const total = mine.reduce((sum, entry) => sum + entryHours(entry, now), 0);
     const jobSpend = expenses.filter((item) => item.doc_id === card.doc_id);
@@ -955,7 +959,7 @@ export default function CrewPage() {
           </section>
         )}
 
-        {!detailId && tab === "hours" && email && <MyWeek email={email} employeeId={employeeId} clock={clock} />}
+        {!detailId && tab === "hours" && email && <MyWeek email={email} employeeId={employeeId} clock={clock} onRows={setMyWeekRows} />}
         {!detailId && tab === "hours" && email && <CrewPto />}
         {!detailId && tab === "hours" && (
           <section className={cardClass} data-testid="my-hours">
