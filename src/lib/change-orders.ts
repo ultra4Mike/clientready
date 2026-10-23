@@ -39,6 +39,25 @@ export function changeOrderData(original: Doc, newNumber: string, today: string,
   };
 }
 
+/**
+ * Option A: a revised-version change order. Copies every line plus client, tax, discount, notes and style
+ * from the latest version of the chain (the original or the newest sent revision). Lines remember where
+ * they came from (fromVersion) so the editor can say "From INV-x" vs "Added". Never copied (R87):
+ * payments, crew, schedule, photos, signatures, approval, stages.
+ */
+export function revisionData(root: Doc, latest: Doc, newNumber: string, today: string, due: string, latestTotal: number) {
+  const base = changeOrderData(latest, newNumber, today, due) as Record<string, unknown>;
+  const latestNumber = String(latest.data?.invoiceNumber || latest.title);
+  const items = (Array.isArray(latest.data?.items) ? latest.data.items : []) as Record<string, unknown>[];
+  return {
+    ...base,
+    items: items.map((item) => ({ ...item, fromVersion: String(item.fromVersion || latestNumber) })),
+    coMode: "revision",
+    revises: { id: latest.id, number: latestNumber, total: latestTotal },
+    changeOrderOf: { id: root.id, number: String(root.data?.invoiceNumber || root.title) },
+  };
+}
+
 export type ChangeOrderNote = { id: string; number: string; createdAt: string };
 
 export function readChangeOrderNotes(value: unknown): ChangeOrderNote[] {

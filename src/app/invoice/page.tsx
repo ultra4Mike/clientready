@@ -51,7 +51,8 @@ import { ownerRating, starsText, type Rating } from "@/lib/ratings";
 import { applyPackage, deletePackage, readPackages, savePackage, syncPackages, type JobPackage } from "@/lib/packages";
 import ReminderPanel from "@/components/ReminderPanel";
 import { normalizeCategory, type LineCategory } from "@/lib/line-split";
-import { appendChangeOrderNote, changeOrderData, changeOrdersFor, mergeChangeOrderNotes, readChangeOrderNotes, readChangeOrderOf, type ChangeOrderNote, type ChangeOrderOf } from "@/lib/change-orders";
+import { chainCredits, latestVersion, revisionOwed } from "@/lib/change-order-revision";
+import { appendChangeOrderNote, changeOrdersFor, revisionData, mergeChangeOrderNotes, readChangeOrderNotes, readChangeOrderOf, type ChangeOrderNote, type ChangeOrderOf } from "@/lib/change-orders";
 import ChangeOrderNotes from "@/components/ChangeOrderNotes";
 import { ApprovalBadge, ApprovalShare } from "@/components/Approval";
 import { useAutosaveDraft } from "@/hooks/useAutosaveDraft";
@@ -85,6 +86,7 @@ import SignaturePad, { SignatureBlock } from "@/components/SignaturePad";
 import { readSignature, type Signature } from "@/lib/signature";
 import { amountOf, documentTotals, discountLabel, normalizeDiscountType, type DiscountType } from "@/lib/discount";
 import DocTrail from "@/components/DocTrail";
+import RevisionPanel from "@/components/RevisionPanel";
 import ChangeOrderPanel from "@/components/ChangeOrderPanel";
 import { isEmptyDraftChangeOrder } from "@/lib/change-order-summary";
 
@@ -585,6 +587,10 @@ export default function NewInvoicePage() {
       setShowPhotos(data.showPhotos === true);
       setStages(readStages((data as Record<string, unknown>).stages));
       setChangeOrderOf(kind === "invoice" ? readChangeOrderOf(data.changeOrderOf) : null);
+      {
+        const raw = data as Record<string, unknown>;
+        setRevision(kind === "invoice" && raw.coMode === "revision" ? { coMode: "revision", revises: (raw.revises || {}) as Record<string, unknown> } : null);
+      }
       setFromProposal(kind === "invoice" && data.fromProposal?.id ? { id: String(data.fromProposal.id), number: String(data.fromProposal.number || "proposal") } : null);
       // Invoices already made from this proposal (the proposal itself is never changed).
       setMadeInvoices(kind === "proposal" ? (docs as unknown as { id: string; type: string; title: string; data?: { invoiceNumber?: string; fromProposal?: { id?: string } } }[])
@@ -651,13 +657,19 @@ export default function NewInvoicePage() {
     return `${client.name} ${client.company} ${client.email}`.toLowerCase().includes(clientSearch.toLowerCase());
   });
   
+  // Option A: a revised-version change order (coMode "revision") owes its total minus all chain payments.
+  const [revision, setRevision] = useState<{ coMode: string; revises: Record<string, unknown> } | null>(null);
   const totals = useMemo(() => {
     const subtotal = items.reduce((sum, item) => sum + amountOf(item.qty) * amountOf(item.rate), 0);
     const base = documentTotals(subtotal, taxPercent, discountType, discountValue);
     const paid = paidTotal(payments);
     // R126: a refund on a paid-in-full invoice doesn't reopen a balance unless the owner re-bills it.
-    return { ...base, paid, balance: isProposal ? balanceDue(base.total, paid, status) : owedAfterRefunds(base.total, payments, status, rebillRefund) };
-  }, [items, taxPercent, discountType, discountValue, payments, status, rebillRefund, isProposal]);
+    const own = isProposal ? balanceDue(base.total, paid, status) : owedAfterRefunds(base.total, payments, status, rebillRefund);
+    if (isProposal || !revision || !docId) return { ...base, paid, balance: own, credits: [] as { id: string; number: string; paid: number }[] };
+    const live = { id: docId, type: "invoice", title: invoiceNumber, data: { invoiceNumber, items, taxPercent, discountType, discountValue, payments, status, rebillRefund, ...revision, ...(changeOrderOf ? { changeOrderOf } : {}) } };
+    const all = [...docsForStage().filter((d) => d.id !== docId), live];
+    return { ...base, paid, balance: revisionOwed(all as never, live as never), credits: chainCredits(all as never, live as never) };
+  }, [items, taxPercent, discountType, discountValue, payments, status, rebillRefund, isProposal, revision, docId, invoiceNumber, changeOrderOf]);
   const refund = isProposal ? "" : refundState(totals.total, payments);
 
   // Never lose typed work: the editor's fields are kept as a draft until Save (schedule has its own autosave).
@@ -991,7 +1003,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, ...(linkedClientId ? { clientId: linkedClientId } : {}), clientCompany, ...(contactName.trim() ? { contactName: contactName.trim() } : {}), ...(stockUsed.length ? { stockUsed } : {}), ...(isProposal && Number(depositPercent) > 0 ? { depositPercent: String(Math.min(Number(depositPercent), 100)) } : {}), clientEmail, clientPhone, clientAddress, invoiceNumber: fixedNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Number(jobRate) > 0 && !isProposal ? { jobRate: String(Number(jobRate)) } : {}), ...(taskType.trim() && !isProposal ? { taskType: taskType.trim().slice(0, 40) } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), ...(rebillRefund ? { rebillRefund: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(storedSchedule && (stored?.data?.schedule || !isProposal) ? { schedule: storedSchedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.autoSent ? { autoSent: (stored?.data as Record<string, unknown>).autoSent } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviewAskedAt ? { reviewAskedAt: (stored?.data as Record<string, unknown>).reviewAskedAt } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew: savedCrew, ...(crewReport ? { crewReport } : {}), ...(Object.keys(crewKindFix).length ? { crewKindFix } : {}), ...(crewUndo.length ? { crewUndo } : {}) },
+      data: { clientName, ...(linkedClientId ? { clientId: linkedClientId } : {}), clientCompany, ...(contactName.trim() ? { contactName: contactName.trim() } : {}), ...(stockUsed.length ? { stockUsed } : {}), ...(isProposal && Number(depositPercent) > 0 ? { depositPercent: String(Math.min(Number(depositPercent), 100)) } : {}), clientEmail, clientPhone, clientAddress, invoiceNumber: fixedNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Number(jobRate) > 0 && !isProposal ? { jobRate: String(Number(jobRate)) } : {}), ...(taskType.trim() && !isProposal ? { taskType: taskType.trim().slice(0, 40) } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), ...(rebillRefund ? { rebillRefund: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(revision && !isProposal ? revision : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(storedSchedule && (stored?.data?.schedule || !isProposal) ? { schedule: storedSchedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.autoSent ? { autoSent: (stored?.data as Record<string, unknown>).autoSent } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviewAskedAt ? { reviewAskedAt: (stored?.data as Record<string, unknown>).reviewAskedAt } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew: savedCrew, ...(crewReport ? { crewReport } : {}), ...(Object.keys(crewKindFix).length ? { crewKindFix } : {}), ...(crewUndo.length ? { crewUndo } : {}) },
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -1122,8 +1134,12 @@ export default function NewInvoicePage() {
     }
     const raw = window.localStorage.getItem("clientready-documents");
     const docs = raw ? (JSON.parse(raw) as SavedDocument[]) : [];
-    const original = docs.find((doc) => doc.id === docId && doc.type === "invoice");
-    if (!original) { setSaveMessage("Save this invoice first, then create a change order."); return false; }
+    const opened = docs.find((doc) => doc.id === docId && doc.type === "invoice");
+    if (!opened) { setSaveMessage("Save this invoice first, then create a change order."); return false; }
+    // Option A: a change order is a revised version of the job's invoice, linked to the original (root).
+    const rootId = readChangeOrderOf(opened.data?.changeOrderOf)?.id || opened.id;
+    const original = docs.find((doc) => doc.id === rootId && doc.type === "invoice") || opened;
+    const version = (latestVersion(docs as never, original as never) as SavedDocument | null) || original;
     const originalNumber = String(original.data?.invoiceNumber || original.title);
     const count = changeOrdersFor(docs, original.id).length + 1;
     const number = nextNumber("invoice");
@@ -1134,7 +1150,11 @@ export default function NewInvoicePage() {
       clientName: original.clientName,
       createdAt: new Date().toLocaleDateString(),
       // Crew "Extra item": the owner's tap pre-fills one line (still a Draft change order they review and send).
-      data: line ? { ...changeOrderData(original, number, ymd(new Date()), plusDays(14)), items: [{ description: line.description, qty: "1", rate: line.amount.toFixed(2), category: "" }] } : changeOrderData(original, number, ymd(new Date()), plusDays(14)),
+      // It copies every line of the latest version (original or newest sent change order); never crew/schedule/photos/signatures/payments.
+      data: (() => {
+        const base = revisionData(original, version, number, ymd(new Date()), plusDays(14), docAmounts(version as never).total);
+        return line ? { ...base, items: [...base.items, { description: line.description, qty: "1", rate: line.amount.toFixed(2), category: "" }] } : base;
+      })(),
     };
     const cloudId = await saveCloudDocument(nextDoc);
     nextDoc.id = cloudId;
@@ -1284,6 +1304,8 @@ export default function NewInvoicePage() {
       <RestoreDraftBanner draft={draft.restorable} onRestore={restoreDraft} onDiscard={draft.discard} status={draft.status} conflict={Boolean(draft.conflict)} onResolve={(choice) => { void draft.resolve(choice).then((theirs) => { if (theirs) restoreFrom(theirs as never); }); }} />
       <FormDraft form="job-message" id={docId} enabled={formReady && Boolean(docId)} value={jobMsg || { kind: "", text: "" }} blank={{ kind: "", text: "" }} onRestore={(v) => setJobMsg(v.kind ? v : null)} what="message to the client" />
       <DocTrail docs={docsForStage() as never} currentId={docId} />
+      {!isProposal && docId && <RevisionPanel docs={docsForStage() as never} currentId={docId} liveTotal={totals.total} balance={totals.balance} credits={totals.credits} status={status}
+        empty={!!revision && status === "draft" && totals.paid === 0 && Math.abs(totals.total - Number(revision.revises.total || 0)) < 0.005 && !items.some((item) => !(item as { fromVersion?: string }).fromVersion && amountOf(item.rate) !== 0)} onDeleteDraft={deleteEmptyDraft} />}
       {!isProposal && <ChangeOrderPanel docs={docsForStage() as never} currentId={docId} onDeleteDraft={deleteEmptyDraft} />}
       <div className="print-hide mb-6 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -1411,6 +1433,7 @@ export default function NewInvoicePage() {
               <div className="hidden gap-2 border-b border-slate-200 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:grid sm:grid-cols-[minmax(0,1fr)_4.5rem_6rem_8.5rem]"><span>Description</span><span>Qty</span><span>Rate</span><span>Type</span></div>
               {items.map((item, index) => (
                 <div key={index} className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-2 sm:grid-cols-[minmax(0,1fr)_4.5rem_6rem_8.5rem] sm:border-0 sm:p-0">
+                  {revision && <span data-testid="line-version-chip" className="col-span-full -mb-1 text-xs font-semibold text-amber-700 dark:text-amber-300">{(item as { fromVersion?: string }).fromVersion ? `From ${(item as { fromVersion?: string }).fromVersion}` : "Added"}</span>}
                   <input className="col-span-2 sm:col-span-1 rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Description" value={item.description} onChange={(event) => updateItem(index, "description", event.target.value)} />
                   <input className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Qty" value={item.qty} onChange={(event) => updateItem(index, "qty", event.target.value)} />
                   <input className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Rate" value={item.rate} onChange={(event) => updateItem(index, "rate", event.target.value)} />
@@ -1843,7 +1866,8 @@ export default function NewInvoicePage() {
               <div className="sm:shrink-0 sm:text-right">
                 {approval && approvalBadgeApplies({ type: isProposal ? "proposal" : "invoice", data: { status, ...(changeOrderOf ? { changeOrderOf } : {}) } }, approval) && <div className="mb-1"><ApprovalBadge approval={approval} /></div>}
                 {recurringFrom && !isProposal && <p className="change-order-badge mb-1 mr-1 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide" data-testid="recurring-badge">Recurring</p>}
-                {changeOrderOf && !isProposal && <p className="change-order-badge mb-1 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide" data-testid="change-order-badge">Change order</p>}
+                {changeOrderOf && !isProposal && <p className="change-order-badge mb-1 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide" data-testid="change-order-badge">{revision ? "Change order" : "Add-on change order"}</p>}
+                {revision && !isProposal && <p className="mb-1 text-xs" data-testid="preview-revises">Updated version of {String(revision.revises.number || "")}: was ${Number(revision.revises.total || 0).toFixed(2)} → now ${totals.total.toFixed(2)} ({totals.total - Number(revision.revises.total || 0) < 0 ? "−" : "+"}${Math.abs(totals.total - Number(revision.revises.total || 0)).toFixed(2)})</p>}
                 <p className={`text-xs uppercase tracking-wide ${labelClass}`}>{isProposal ? "Proposal" : "Invoice"}</p>
                 <h2 className="text-xl font-semibold leading-tight">{invoiceNumber || (isProposal ? "PROP-0000" : "INV-0000")}</h2>
                 <div className={`text-sm ${mutedClass}`}>
@@ -1864,7 +1888,7 @@ export default function NewInvoicePage() {
             <div className="mt-4 border-t border-slate-500 pt-1">
               {items.map((item, index) => {
                 const amount = amountOf(item.qty) * amountOf(item.rate);
-                return <div key={index} className="flex justify-between gap-4 py-1 text-sm"><span>{item.description || "Item"}</span><span>${amount.toFixed(2)}</span></div>;
+                return <div key={index} className="flex justify-between gap-4 py-1 text-sm"><span>{item.description || "Item"}{revision && <span data-testid="preview-line-version" className="ml-2 text-xs opacity-70">{(item as { fromVersion?: string }).fromVersion ? `From ${(item as { fromVersion?: string }).fromVersion}` : "Added"}</span>}</span><span>${amount.toFixed(2)}</span></div>;
               })}
             </div>
             <div className="mt-2 grid grid-cols-2 gap-6 border-t border-slate-500 pt-2 text-sm tabular-nums">
@@ -1883,6 +1907,7 @@ export default function NewInvoicePage() {
                 <div className="flex justify-between font-semibold"><span>Total</span><span>${totals.total.toFixed(2)}</span></div>
                 {isProposal && Number(depositPercent) > 0 && <div className="flex justify-between" data-testid="preview-deposit-request"><span>Deposit requested ({depositPercent}%)</span><span>${(totals.total * Number(depositPercent) / 100).toFixed(2)}</span></div>}
                 {totals.paid > 0 && <div className="flex justify-between text-emerald-700"><span>{isProposal ? "Deposit paid ✓" : "Paid"}</span><span>-${totals.paid.toFixed(2)}</span></div>}
+                {totals.credits.map((c) => <div key={c.id} className="flex justify-between text-emerald-700" data-testid="preview-chain-credit"><span>Paid on {c.number}</span><span>-${c.paid.toFixed(2)}</span></div>)}
                 {tipTotal(payments) > 0 && <div className="flex justify-between" data-testid="tip-line"><span>Tip received, thank you</span><span>${tipTotal(payments).toFixed(2)}</span></div>}
                 {(!isProposal || totals.paid > 0) && <div className="mt-1 flex justify-between border-t border-slate-500 pt-1 text-lg font-bold"><span data-testid="preview-balance-label">{isProposal ? "Balance after deposit" : balanceLabel(totals.paid, totals.balance)}</span><span data-testid="preview-still-owed">${totals.balance.toFixed(2)}</span></div>}
               </div>

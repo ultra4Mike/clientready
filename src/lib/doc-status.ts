@@ -3,6 +3,7 @@
  * It is the pipeline stage (lib/doc-stage), plus "Overdue" for an invoice past due (R86 rule).
  */
 import { docAmounts, documentStage, STAGE_LABEL } from "@/lib/doc-stage";
+import { effectiveAmounts, isRevision, replacedBy } from "@/lib/change-order-revision";
 import { invoicePastDue, overdueReason, readPayments, refundState, refundWording } from "@/lib/payments";
 
 type Doc = Parameters<typeof documentStage>[0];
@@ -11,7 +12,11 @@ export function displayStatus(doc: Doc, allDocs: Doc[] = [], today?: string) {
   // Help retest: a voided document reads "Void" everywhere (never "Paid" just because nothing is owed).
   if (["void", "voided"].includes(String((doc.data as Record<string, unknown> | undefined)?.status || ""))) return { key: "void", label: "Void" };
   const { stage } = documentStage(doc, allDocs);
-  const { total, owed } = docAmounts(doc);
+  // Option A: replaced by a sent revision change order → never overdue/owed; a revision owes net of chain payments.
+  const by = doc.type === "invoice" ? replacedBy(allDocs as never, doc as never) : null;
+  if (by) return { key: "replaced", label: `Replaced by ${String((by.data as Record<string, unknown> | undefined)?.invoiceNumber || by.title || "a change order")}` };
+  const { total, owed } = doc.type === "invoice" ? effectiveAmounts(allDocs as never, doc as never) : docAmounts(doc);
+  if (isRevision(doc as never) && stage !== "draft" && total > 0 && owed <= 0.004) return { key: "paid", label: "Paid" };
   // R126: a paid invoice later refunded reads Refunded / Partially refunded (no silent owed balance) unless re-billed.
   const data = (doc.data || {}) as Record<string, unknown>;
   const refund = doc.type === "invoice" && !data.rebillRefund && !["void", "voided"].includes(String(data.status || "")) ? refundState(total, readPayments(data)) : "";

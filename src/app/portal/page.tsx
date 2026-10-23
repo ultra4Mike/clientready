@@ -9,21 +9,26 @@ import { fetchPortal, portalDocUrl, type PortalBusiness, type PortalDoc } from "
 import { amountOf, documentTotals } from "@/lib/discount";
 import { portalTimeline } from "@/lib/portal-timeline";
 import { payNowAmount, readStages, stagePlan, todayYmd } from "@/lib/stages";
+import { isRevision, replacedBy, revisionOwed } from "@/lib/change-order-revision";
 import { owedAfterRefunds, paidTotal, readPayments } from "@/lib/payments";
 import { readApproval } from "@/lib/approval";
 
 const text = (value: unknown) => (typeof value === "string" ? value : "");
 
-function figures(doc: PortalDoc) {
+function figures(doc: PortalDoc, all: PortalDoc[] = []) {
   const items = Array.isArray(doc.data.items) ? (doc.data.items as { qty?: string; rate?: string }[]) : [];
   const subtotal = items.reduce((sum, item) => sum + amountOf(item.qty) * amountOf(item.rate), 0);
   const total = documentTotals(subtotal, text(doc.data.taxPercent), text(doc.data.discountType), text(doc.data.discountValue)).total;
   const paid = paidTotal(readPayments(doc.data));
-  const owed = doc.type === "invoice" ? owedAfterRefunds(total, readPayments(doc.data), doc.data.status, doc.data.rebillRefund) : 0; // R128: refund-aware
+  // Option A: a version replaced by a sent revision owes nothing; a revision owes net of earlier versions' payments.
+  const by = doc.type === "invoice" ? replacedBy(all as never, doc as never) : null;
+  const ownOwed = doc.type === "invoice" ? owedAfterRefunds(total, readPayments(doc.data), doc.data.status, doc.data.rebillRefund) : 0; // R128: refund-aware
+  const owed = by ? 0 : doc.type === "invoice" && isRevision(doc as never) ? revisionOwed(all as never, doc as never) : ownOwed;
+  const replacedNumber = by ? String((by.data as Record<string, unknown>).invoiceNumber || by.title || "") : "";
   // Payment plan / stages: only the current payment is due now.
   const stages = readStages(doc.data.stages);
   const dueNow = owed > 0 && stages.length ? payNowAmount(total, owed, stages, todayYmd()) : owed;
-  return { total, paid, owed, dueNow, plan: stages.length > 0 && owed > 0 ? stagePlan(total, owed, stages, todayYmd()).current : null };
+  return { total, paid: by ? paid : Math.max(paid, Math.round((total - owed) * 100) / 100), owed, dueNow, replacedNumber, plan: stages.length > 0 && owed > 0 ? stagePlan(total, owed, stages, todayYmd()).current : null };
 }
 
 /** Public, no-login client portal: every sent invoice/proposal for one client of one business. */
@@ -64,7 +69,7 @@ export default function PortalPage() {
     );
   }
 
-  const rows = portal.documents.map((doc) => ({ doc, ...figures(doc), approval: readApproval(doc.data.approval) }));
+  const rows = portal.documents.map((doc) => ({ doc, ...figures(doc, portal.documents), approval: readApproval(doc.data.approval) }));
   const owed = rows.reduce((sum, row) => sum + row.owed, 0);
   const timeline = portalTimeline(rows.map((row) => ({ ...row.doc, total: row.total, owed: row.owed })));
   const dueNow = Math.round(rows.reduce((sum, row) => sum + row.dueNow, 0) * 100) / 100;
@@ -86,7 +91,7 @@ export default function PortalPage() {
         </div>
         <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white shadow-sm" data-testid="portal-list">
           {rows.length === 0 && <p className="p-5 text-sm text-slate-600">Nothing has been shared yet.</p>}
-          {rows.map(({ doc, total, paid, owed: rowOwed, approval, plan }) => (
+          {rows.map(({ doc, total, paid, owed: rowOwed, approval, plan, replacedNumber }) => (
             <a key={doc.id} href={portalDocUrl(token, doc.id)} data-testid="portal-doc" className="flex min-h-16 items-center justify-between gap-3 p-4 transition hover:bg-slate-50 sm:px-5">
               <span className="min-w-0">
                 <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">{doc.type === "proposal" ? "Proposal" : "Invoice"}</span>
@@ -99,7 +104,8 @@ export default function PortalPage() {
               </span>
               <span className="shrink-0 text-right text-sm">
                 <span className="block font-semibold tabular-nums">${total.toFixed(2)}</span>
-                {doc.type === "invoice" && <span className={`mt-0.5 inline-block text-xs font-semibold ${rowOwed > 0 ? "text-amber-700 cr-text-warn" : "text-emerald-700 cr-text-good"}`}>{rowOwed > 0 ? (paid > 0.004 ? <span data-testid="portal-remaining">${paid.toFixed(2)} paid · ${rowOwed.toFixed(2)} remaining</span> : `$${rowOwed.toFixed(2)} owed`) : total > 0 ? <span data-testid="portal-paid">Paid</span> : ""}</span>}
+                {doc.type === "invoice" && replacedNumber && <span className="mt-0.5 inline-block text-xs font-semibold text-slate-500" data-testid="portal-replaced">Replaced by {replacedNumber}</span>}
+                {doc.type === "invoice" && !replacedNumber && <span className={`mt-0.5 inline-block text-xs font-semibold ${rowOwed > 0 ? "text-amber-700 cr-text-warn" : "text-emerald-700 cr-text-good"}`}>{rowOwed > 0 ? (paid > 0.004 ? <span data-testid="portal-remaining">${paid.toFixed(2)} paid · ${rowOwed.toFixed(2)} remaining</span> : `$${rowOwed.toFixed(2)} owed`) : total > 0 ? <span data-testid="portal-paid">Paid</span> : ""}</span>}
               </span>
               <span aria-hidden="true" className="shrink-0 text-xl text-slate-400">›</span>
             </a>

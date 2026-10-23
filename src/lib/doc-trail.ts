@@ -3,6 +3,7 @@
  * from it, every change order (oldest → newest), then recurring copies. Links only; nothing is merged and a
  * change order never replaces the original. Built on jobChain (fromProposal / changeOrderOf).
  */
+import { isRevision, replacedBy } from "@/lib/change-order-revision";
 import { jobChain } from "@/lib/job-chain";
 import { readChangeOrderOf } from "@/lib/change-orders";
 import { readRecurringFrom } from "@/lib/recurring";
@@ -25,7 +26,7 @@ export function docTrail<T extends Doc>(allDocs: T[], id: string): TrailItem<T>[
   const add = (doc: T | null | undefined, role: TrailRole) => {
     if (!doc || out.some((i) => i.doc.id === doc.id)) return;
     const number = numberOf(doc);
-    const kind = role === "proposal" || (role === "recurring-parent" && doc.type === "proposal") ? "Proposal" : role === "change-order" ? "Change order" : "Invoice";
+    const kind = role === "proposal" || (role === "recurring-parent" && doc.type === "proposal") ? "Proposal" : role === "change-order" ? (isRevision(doc as never) ? "Change order" : "Add-on change order") : "Invoice";
     out.push({ doc, role, number, label: `${kind} ${number}`.trim(), latest: false });
   };
   const parent = chain.invoice ? byId.get(readRecurringFrom(chain.invoice.data?.recurringFrom)?.id || "") : undefined;
@@ -34,7 +35,8 @@ export function docTrail<T extends Doc>(allDocs: T[], id: string): TrailItem<T>[
   add(chain.invoice, "invoice");
   [...chain.changeOrders].sort(byDate).forEach((co) => add(co, "change-order"));
   // LATEST = newest real document: an empty $0 draft change order never wins.
-  const main = out.filter((i) => i.role !== "recurring-parent" && !(i.role === "change-order" && isEmptyDraftChangeOrder(i.doc)));
+  // Option A: a version replaced by a sent revision is never LATEST either.
+  const main = out.filter((i) => i.role !== "recurring-parent" && !(i.role === "change-order" && isEmptyDraftChangeOrder(i.doc)) && !replacedBy(docs as never, i.doc as never));
   if (main.length) main[main.length - 1].latest = true;
   if (chain.invoice) docs.filter((d) => d.type === "invoice" && readRecurringFrom(d.data?.recurringFrom)?.id === chain.invoice!.id).sort(byDate).forEach((c) => add(c, "recurring-copy"));
   return out;

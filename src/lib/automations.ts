@@ -28,7 +28,7 @@ export function planAutomations(docs: AutoDoc[], settings: Automations, ctx: { b
   const out: AutoPlan[] = [];
   for (const doc of docs) {
     const client = clientFor(ctx.clients || [], doc.data || {}, String(doc.clientName || doc.data?.clientName || ""));
-    const item = planOne(doc, settings, { business: ctx.business, reviewLink: ctx.reviewLink, origin: ctx.origin, today: ctx.today || localToday(), reviewOptOut: Boolean(client?.reviewOptOut), autoOptOut: Boolean(client?.autoEmailOptOut) });
+    const item = planOne(doc, settings, { business: ctx.business, reviewLink: ctx.reviewLink, origin: ctx.origin, today: ctx.today || localToday(), reviewOptOut: Boolean(client?.reviewOptOut), autoOptOut: Boolean(client?.autoEmailOptOut), chain: docs });
     if (item) out.push(item);
   }
   return out;

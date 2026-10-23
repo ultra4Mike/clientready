@@ -7,6 +7,7 @@
 import { docAmounts } from "./doc-stage";
 import { readPayments, isRefundRow } from "./payments";
 import { dedupeCopies } from "./doc-dedupe";
+import { effectiveAmounts } from "./change-order-revision";
 
 type Doc = { id: string; type: string; title?: string; createdAt?: string; data?: Record<string, unknown> };
 export type CashEntry = { docId: string; date: string; amount: number };
@@ -65,11 +66,15 @@ export function cashCollected(docs: Doc[], from = "", to = "") {
  */
 export function billedOutstanding(allDocs: Doc[], from = "", to = "") {
   let count = 0, billed = 0, outstanding = 0;
-  for (const doc of dedupeCopies(allDocs)) {
+  const docs = dedupeCopies(allDocs);
+  for (const doc of docs) {
     if (doc.type !== "invoice" || voided(doc) || String(doc.data?.status || "draft") === "draft") continue;
     const date = ymd(doc.data?.invoiceDate) || ymd(doc.createdAt);
     if ((from && date < from) || (to && date > to)) continue;
-    const { total, owed } = docAmounts(doc);
+    // Option A (owner-approved): a version replaced by a SENT revision change order is not billed or owed
+    // (its payments still count in cashCollected); a revision owes its total minus all chain payments.
+    const { total, owed, replaced } = effectiveAmounts(docs as never, doc as never);
+    if (replaced) continue;
     count += 1; billed += total; outstanding += owed;
   }
   const r = (n: number) => Math.round(n * 100) / 100;

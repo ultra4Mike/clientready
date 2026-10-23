@@ -54,9 +54,14 @@ export async function POST(request: Request) {
     const client = ((clientResponse?.ok ? await clientResponse.json().catch(() => []) : []) as Record<string, unknown>[])[0] || {};
     const today = /^\d{4}-\d{2}-\d{2}$/.test(String(body?.today || "")) ? String(body?.today) : new Date().toISOString().slice(0, 10);
     const doc: AutoDoc = { id: row.id, type: row.type, title: row.title, clientName: row.client_name, data: row.data || {} };
+    // Option A: the change-order chain (original + its change orders), so replaced versions and revision owed match the app.
+    const rootId = String((row.data?.changeOrderOf as { id?: unknown } | undefined)?.id || row.id);
+    const chainResponse = UUID.test(rootId) ? await rest(`documents?select=id,type,title,client_name,data&user_id=eq.${user.id}&or=(id.eq.${rootId},data->changeOrderOf->>id.eq.${rootId})`) : null;
+    const chainRows = chainResponse?.ok ? ((await chainResponse.json().catch(() => [])) as typeof rows) : [];
+    const chain: AutoDoc[] = [doc, ...(Array.isArray(chainRows) ? chainRows : []).filter((r) => r.id !== row.id).map((r) => ({ id: r.id, type: r.type, title: r.title, clientName: r.client_name, data: r.data || {} }))];
     const plan = planOne(doc, readAutomations(profile.automations), {
       business: String(profile.business_name || ""), reviewLink: String(profile.review_link || ""), origin: new URL(request.url).origin, today,
-      reviewOptOut: client.review_opt_out === true, autoOptOut: client.auto_email_opt_out === true,
+      reviewOptOut: client.review_opt_out === true, autoOptOut: client.auto_email_opt_out === true, chain,
     });
     if (!plan || plan.kind !== auto.kind || plan.period !== auto.period) return fail(409, "Nothing to send for this invoice (already sent, turned off, a draft, or not due).");
     ({ to, subject, text } = plan);

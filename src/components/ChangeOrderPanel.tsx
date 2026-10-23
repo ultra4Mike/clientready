@@ -1,5 +1,6 @@
 "use client";
 
+import { isRevision } from "@/lib/change-order-revision";
 import { contractSummary } from "@/lib/change-order-summary";
 import { displayStatus } from "@/lib/doc-status";
 import { readSchedule, readWorkers } from "@/lib/schedule";
@@ -9,9 +10,12 @@ const $ = (n: number) => `$${n.toFixed(2)}`;
 
 /** Change order money at a glance (display only). On a change order: the original contract; on the original: its change orders. */
 export default function ChangeOrderPanel({ docs, currentId, onDeleteDraft }: { docs: Doc[]; currentId: string; onDeleteDraft?: () => void }) {
+  const current = docs.find((d) => d.id === currentId);
+  if (current && isRevision(current as never)) return null; // Option A versions use RevisionPanel
   const sum = currentId ? contractSummary(docs, currentId) : null;
   if (!sum || !sum.changeOrders.length) return null;
   const isCo = sum.original.id !== currentId;
+  if (isCo && !sum.changeOrders.some((c) => c.id === currentId)) return null;
   const row = (label: string, value: string, testid: string, strong = false) => (
     <div className="flex justify-between gap-3"><dt className="opacity-75">{label}</dt><dd data-testid={testid} className={strong ? "font-bold" : "font-semibold"}>{value}</dd></div>
   );
@@ -29,6 +33,7 @@ export default function ChangeOrderPanel({ docs, currentId, onDeleteDraft }: { d
             {onDeleteDraft && <button type="button" data-testid="co-delete-draft" className="cr-btn cr-btn-secondary" onClick={onDeleteDraft}>Delete draft</button>}
           </div>
         )}
+        <p data-testid="co-addon-label" className="mb-2 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold">Add-on change order</p>
         <p className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">Original contract</p>
         <p className="mt-1">Change order to <a className="font-semibold underline" href={`/invoice?id=${encodeURIComponent(sum.original.id)}`} data-testid="co-original-number">{sum.originalNumber}</a>
           {" · "}{String(o.clientName || sum.original.clientName || "")}{o.clientAddress ? ` · ${String(o.clientAddress)}` : ""}</p>
@@ -54,7 +59,7 @@ export default function ChangeOrderPanel({ docs, currentId, onDeleteDraft }: { d
           const d = docs.find((x) => x.id === c.id)!;
           return (
             <li key={c.id} data-testid={`co-summary-item-${c.id}`} className="flex flex-wrap justify-between gap-2 py-1.5">
-              <a href={`/invoice?id=${encodeURIComponent(c.id)}`} className="font-semibold underline">{c.number}</a>
+              <a href={`/invoice?id=${encodeURIComponent(c.id)}`} className="font-semibold underline">{c.number}</a><span className="text-xs opacity-70" data-testid="co-addon-label">Add-on change order</span>
               <span>{c.empty ? <span className="font-semibold text-amber-700 dark:text-amber-300">Empty draft, add the change</span> : displayStatus(d as never, docs as never).label} · {$(c.amount)}{c.isVoid ? " (void, not counted)" : !c.counted ? " (draft, not counted)" : ""}</span>
             </li>
           );

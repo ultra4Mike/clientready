@@ -12,6 +12,7 @@ import { loadAccountIntoCache } from "@/lib/account-cache";
 import { amountOf, documentTotals } from "@/lib/discount";
 import { documentStage, STAGE_LABEL } from "@/lib/doc-stage";
 import { billedOutstanding, cashCollected } from "@/lib/money";
+import { effectiveAmounts } from "@/lib/change-order-revision";
 import { isOpenBalance, invoicePastDue, owedAfterRefunds, paidTotal, readPayments } from "@/lib/payments";
 import { uniqueDocs } from "@/lib/change-orders";
 import FollowUps from "@/components/FollowUps";
@@ -70,7 +71,10 @@ function crewNames(doc: SavedDocument) {
   return ids.map((id) => names.get(String(id)) || "").filter(Boolean);
 }
 
+// Option A: all documents on screen (set each render) so a replaced version owes 0 and a revision owes net of chain payments.
+let chainDocs: SavedDocument[] = [];
 function balance(doc: SavedDocument) {
+  if (chainDocs.length) return effectiveAmounts(chainDocs as never, doc as never).owed;
   // R126: refund-aware and 0 for void (same rule as billedOutstanding).
   return owedAfterRefunds(invoiceTotal(doc), readPayments(doc.data), doc.data?.status, (doc.data as Record<string, unknown> | undefined)?.rebillRefund);
 }
@@ -142,6 +146,7 @@ export default function DashboardPage() {
     load();
   }, []);
 
+  chainDocs = documents;
   const invoices = documents.filter((doc) => doc.type === "invoice");
   const hour = now ? now.getHours() : -1;
   const hello = hour < 0 ? "Hello" :

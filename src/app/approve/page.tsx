@@ -64,6 +64,8 @@ export default function ApprovePage() {
   // R128: after Stripe sends the client back: confirming, then a receipt with a number.
   const [receiptState, setReceiptState] = useState<"" | "confirming" | "done" | "slow">("");
   const [receiptId, setReceiptId] = useState("");
+  // Option A: replaced by a sent revision change order (no pay, link forward) or a revision's chain credits.
+  const [chain, setChain] = useState<{ replaced?: { id: string; number: string; token: string }; revision?: { owed: number; credits: { number: string; paid: number }[]; wasNumber: string; wasTotal: number } } | null>(null);
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
@@ -91,6 +93,8 @@ export default function ApprovePage() {
         if (viaPortal) fetchPortal(viaPortal.p).then((all) => setPortalDocs(linkByNumber(all?.documents || []))).catch(() => setPortalDocs([]));
         if (!found) return setState("missing");
         setDoc(found);
+        if (found.type === "invoice") fetch("/api/doc-chain", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(viaPortal ? { portal: viaPortal.p, docId: viaPortal.d } : { token: t }) })
+          .then((r) => (r.ok ? r.json() : {})).then((info: { replaced?: unknown; revision?: unknown }) => setChain(info && (info.replaced || info.revision) ? (info as never) : null)).catch(() => setChain(null));
         setApproval(readApproval(found.data?.approval));
         setApprovalSignature(readSignature((found.data?.approval as { signature?: unknown } | null)?.signature));
         setState("ready");
@@ -125,13 +129,22 @@ export default function ApprovePage() {
   const data = useMemo(() => doc?.data || {}, [doc]);
   const items = useMemo(() => (Array.isArray(data.items) ? (data.items as LineItem[]) : []), [data]);
   const payments = useMemo(() => readPayments(data), [data]);
-  const totals = useMemo(() => {
+  const rawTotals = useMemo(() => {
     const subtotal = items.reduce((sum, item) => sum + amountOf(item.qty) * amountOf(item.rate), 0);
     const base = documentTotals(subtotal, text(data.taxPercent), text(data.discountType), text(data.discountValue));
     const paid = paidTotal(payments);
     // R128: refund-aware (a refund never reopens a balance or asks the client to pay it again).
     return { ...base, paid, gross: grossPaid(payments), refunded: refundedTotal(payments), balance: owedAfterRefunds(base.total, payments, data.status, data.rebillRefund) };
   }, [items, payments, data]);
+  // Option A: a revision owes its total minus everything paid on earlier versions; a replaced version owes nothing here.
+  const credit = chain?.revision ? chain.revision.credits.reduce((sum, c) => sum + c.paid, 0) : 0;
+  const totals = useMemo(() => {
+    if (chain?.replaced) return { ...rawTotals, balance: 0 };
+    if (chain?.revision) return { ...rawTotals, balance: chain.revision.owed, paid: rawTotals.paid + credit, gross: rawTotals.gross + credit };
+    return rawTotals;
+  }, [rawTotals, chain, credit]);
+  const replaced = chain?.replaced || null;
+  const replacedHref = replaced ? (portal ? portalDocUrl(portal.p, replaced.id) : replaced.token ? `/approve?t=${encodeURIComponent(replaced.token)}` : "") : "";
 
   async function payByCard(full = false, target?: Record<string, string>) {
     setPaying(true);
@@ -247,7 +260,7 @@ export default function ApprovePage() {
   const receipt = receiptId ? payments.find((payment) => payment.id === receiptId) || null : null;
   const receiptNumber = (id: string) => `R-${number.replace(/[^A-Za-z0-9]/g, "")}-${(id.replace(/[^A-Za-z0-9]/g, "").slice(-6) || "1").toUpperCase()}`;
   const refundText = isProposal ? "" : refundWording(totals.total, payments);
-  const baseLabel = !isProposal && paidInFull ? "Paid" : approved ? "Approved" : needsApproval && approval ? "Awaiting approval" : isProposal ? "" : totals.paid > 0.004 ? "Partially paid" : "Due";
+  const baseLabel = !isProposal && chain?.replaced ? `Replaced by ${chain.replaced.number}` : !isProposal && paidInFull ? "Paid" : approved ? "Approved" : needsApproval && approval ? "Awaiting approval" : isProposal ? "" : totals.paid > 0.004 ? "Partially paid" : "Due";
   // Same refund words as the owner's Documents list (lib/payments refundWording).
   const statusLabel = refundText ? (paidInFull ? refundText : `${baseLabel} · ${refundText}`) : baseLabel;
   // The rating comes after the work: once the invoice is paid or the visit is done.
@@ -331,13 +344,24 @@ export default function ApprovePage() {
                   <span className="shrink-0 text-right font-medium tabular-nums">-${amountOf(payment.amount).toFixed(2)}</span>
                 </div>
               ))}
+              {chain?.revision?.credits.map((c) => (
+                <div key={c.number} className="flex items-start justify-between gap-3 py-0.5 text-emerald-700" data-testid="approve-chain-credit">
+                  <span className="min-w-0">Paid on {c.number}</span>
+                  <span className="shrink-0 text-right font-medium tabular-nums">-${c.paid.toFixed(2)}</span>
+                </div>
+              ))}
               {refundRows.map((payment) => (
                 <div key={payment.id} className="flex items-start justify-between gap-3 py-0.5 text-slate-700" data-testid="approve-refund">
                   <span className="min-w-0">Refunded to you{payment.date ? ` ${niceDate(payment.date)}` : ""}</span>
                   <span className="shrink-0 text-right font-medium tabular-nums">+${Math.abs(Number(String(payment.amount).replace(/[^0-9.-]/g, "")) || 0).toFixed(2)}</span>
                 </div>
               ))}
-              {!isProposal && (
+              {!isProposal && replaced && (
+                <div className="mt-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900" data-testid="approve-replaced">
+                  Replaced by {replaced.number}, no longer valid. {replacedHref ? <a href={replacedHref} className="underline" data-testid="approve-replaced-link">View {replaced.number}</a> : "Please use the newer invoice."}
+                </div>
+              )}
+              {!isProposal && !replaced && (
                 <div className="mt-2 flex items-baseline justify-between gap-3 cr-tone-teal rounded-xl border border-teal-500/30 bg-teal-50 px-4 py-3 text-xl font-bold tabular-nums text-teal-900 print:bg-transparent print:px-0" data-testid="approve-owed">
                   <span>{paidInFull ? "Paid in full" : totals.paid > 0.004 ? "Remaining balance" : "Amount due"}</span><span>${totals.balance.toFixed(2)}</span>
                 </div>
@@ -345,7 +369,7 @@ export default function ApprovePage() {
             </div>
           </div>
 
-          {!isProposal && !paidInFull && totals.balance > 0.004 && (cardEnabled || payMessage) && (
+          {!isProposal && !replaced && !paidInFull && totals.balance > 0.004 && (cardEnabled || payMessage) && (
             <div className="print-hide mt-4 cr-tone-teal rounded-xl border border-teal-500/30 bg-teal-50 p-4 text-sm text-slate-800" data-testid="card-pay">
               {cardEnabled && totals.balance >= 0.5 && (
                 <button type="button" data-testid="pay-card" disabled={paying} onClick={() => payByCard(false)} className="min-h-14 w-full rounded-xl bg-teal-600 px-6 py-3 text-lg font-semibold text-white! shadow-md transition hover:bg-teal-500 disabled:opacity-60">
@@ -361,7 +385,7 @@ export default function ApprovePage() {
               {cardEnabled && totals.balance >= 0.5 && <p className="mt-2 text-xs text-slate-500">Secure checkout by Stripe. {payNow < totals.balance ? "You pay the amount due now; the rest follows the payment schedule." : "You pay what is still owed."}</p>}
             </div>
           )}
-          {!isProposal && !paidInFull && text(data.status) !== "paid" && totals.balance > 0.004 && <PayOptions config={payMethods} amount={payNow} reference={number} publicCopy dueNote={stages.length && payNow < totals.balance - 0.004 ? `Payment plan: $${payNow.toFixed(2)} now (of $${totals.balance.toFixed(2)} still owed)` : ""} />}
+          {!isProposal && !replaced && !paidInFull && text(data.status) !== "paid" && totals.balance > 0.004 && <PayOptions config={payMethods} amount={payNow} reference={number} publicCopy dueNote={stages.length && payNow < totals.balance - 0.004 ? `Payment plan: $${payNow.toFixed(2)} now (of $${totals.balance.toFixed(2)} still owed)` : ""} />}
           {!isProposal && <StageSchedule stages={stages} total={totals.total} balance={totals.balance} awaitingApproval={awaitingApproval} jobDone={jobDone} />}
           {text(data.notes) && <p className="mt-3 text-sm text-slate-600">{text(data.notes)}</p>}
           {data.showPhotos === true && <JobPhotoStrip photos={readPhotos(data.photos)} />}

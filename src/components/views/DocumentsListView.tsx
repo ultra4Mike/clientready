@@ -1,5 +1,6 @@
 "use client";
 
+import { effectiveAmounts } from "@/lib/change-order-revision";
 import { writeBases } from "@/lib/three-way";
 import { csvText, downloadCsv } from "@/lib/csv";
 import EmptyState from "@/components/EmptyState";
@@ -186,7 +187,11 @@ export default function DocumentsPage({ initialView = "all" }: { initialView?: "
     setBulkMessage(`Deleted ${remove.length}.${keep.length ? ` Kept ${keep.length} with payments.` : ""}`);
   }
 
-  const factsById = useMemo(() => new Map(documents.map((doc) => [doc.id, facts(doc)])), [documents]);
+  // Option A: a version replaced by a sent revision owes 0 (never overdue); a revision owes net of chain payments.
+  const factsById = useMemo(() => new Map(documents.map((doc) => {
+    const info = facts(doc);
+    return [doc.id, doc.type === "invoice" ? { ...info, owed: effectiveAmounts(documents as never, doc as never).owed } : info];
+  })), [documents]);
 
   const visibleDocs = useMemo(() => {
     // Words must all match; a number like "450" or "$450.00" also matches the document total.

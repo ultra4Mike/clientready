@@ -2,6 +2,7 @@
  * Change order contract summary (display only). Uses docAmounts — the same money math as everywhere — and never
  * writes anything: payments, billedOutstanding and cashCollected stay exactly as recorded.
  */
+import { isRevision, revisesOf } from "@/lib/change-order-revision";
 import { docAmounts } from "@/lib/doc-stage";
 import { readChangeOrderOf } from "@/lib/change-orders";
 
@@ -15,7 +16,13 @@ const cents = (n: number) => Math.round(n * 100) / 100;
 export function isEmptyDraftChangeOrder(doc: Doc) {
   if (!readChangeOrderOf(doc.data?.changeOrderOf) && !(doc.data?.changeOrderOf as { number?: string } | undefined)?.number) return false;
   const { total, paid } = docAmounts(doc);
-  return String(doc.data?.status || "draft") === "draft" && total === 0 && paid === 0;
+  if (String(doc.data?.status || "draft") !== "draft" || paid !== 0) return false;
+  // Option A: a revised-version draft is "empty" until something is added or the total changes.
+  if (isRevision(doc as never)) {
+    const items = (Array.isArray(doc.data?.items) ? doc.data.items : []) as { fromVersion?: unknown; rate?: unknown }[];
+    return !items.some((item) => !item.fromVersion && Number(item.rate || 0) !== 0) && Math.abs(total - revisesOf(doc as never).total) < 0.005;
+  }
+  return total === 0;
 }
 
 export type ContractSummary = {
@@ -31,7 +38,8 @@ export function contractSummary(docs: Doc[], anyId: string): ContractSummary | n
   const originalId = readChangeOrderOf(doc.data?.changeOrderOf)?.id || doc.id;
   const original = docs.find((d) => d.id === originalId);
   if (!original) return null;
-  const cos = docs.filter((d) => d.type === "invoice" && readChangeOrderOf(d.data?.changeOrderOf)?.id === original.id)
+  // Add-on change orders only; revised versions (Option A) have their own panel and replace, not add.
+  const cos = docs.filter((d) => d.type === "invoice" && !isRevision(d as never) && readChangeOrderOf(d.data?.changeOrderOf)?.id === original.id)
     .sort((a, b) => String(a.data?.invoiceDate || "").localeCompare(String(b.data?.invoiceDate || "")) || numberOf(a).localeCompare(numberOf(b), undefined, { numeric: true }));
   const o = docAmounts(original);
   const isCounted = (d: Doc) => !isVoid(d) && String(d.data?.status || "draft") !== "draft";

@@ -11,6 +11,7 @@ import { saveCloudDocument } from "@/lib/cloud-docs";
 import { amountOf, documentTotals } from "@/lib/discount";
 import { balanceDue, invoicePastDue, methodLabel, isOpenBalance, isVoidStatus, paidTotal, paymentFields, paymentMethods, readPayments } from "@/lib/payments";
 import { uniqueDocs } from "@/lib/change-orders";
+import { effectiveAmounts } from "@/lib/change-order-revision";
 import { isPendingRecurringDraft } from "@/lib/recurring";
 import ReminderPanel from "@/components/ReminderPanel";
 import { payUrlFor } from "@/lib/pay-link";
@@ -56,10 +57,19 @@ function amountPaid(doc: SavedDocument) {
   return paidTotal(readPayments(doc.data));
 }
 
+// Option A: every document on screen, so balance() can apply the change-order chain (set each render).
+let chainDocs: SavedDocument[] = [];
 function balance(doc: SavedDocument) {
+  if (chainDocs.length) return chainBalance(doc, chainDocs);
   if (isVoidStatus(doc.data?.status) || (doc.data as { deleted?: unknown } | undefined)?.deleted) return 0; // void never counts as owed
   // R128: the shared refund-aware owed amount (same as dashboard, Documents, portal): a refund never reopens a balance.
   return docAmounts(doc as never).owed;
+}
+
+/** Option A: replaced versions owe nothing here; a revision owes net of all chain payments. */
+function chainBalance(doc: SavedDocument, all: SavedDocument[]) {
+  if (isVoidStatus(doc.data?.status) || (doc.data as { deleted?: unknown } | undefined)?.deleted) return 0;
+  return effectiveAmounts(all as never, doc as never).owed;
 }
 
 /** Same rule as the dashboard and Documents (drafts excluded, balance > 0, per installment on payment plans). */
@@ -178,6 +188,7 @@ export default function CollectPage() {
     window.location.href = `/invoice?id=${encodeURIComponent(id)}`;
   }
 
+  chainDocs = documents;
   const invoices = documents.filter((doc) => doc.type === "invoice");
   // Recurring drafts nobody has reviewed yet are not money to collect: keep them out of the
   // list and totals, and point to them below so they aren't lost.

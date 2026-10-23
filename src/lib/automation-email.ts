@@ -5,6 +5,7 @@ import { greetingName } from "@/lib/reminders";
  * invoice's client. Each email has a (kind, period) key the server claims once.
  */
 import { docAmounts } from "@/lib/doc-stage";
+import { effectiveAmounts } from "@/lib/change-order-revision";
 import { invoicePastDue } from "@/lib/payments";
 import { readStages, stagePlan } from "@/lib/stages";
 
@@ -22,7 +23,7 @@ export function readAutomations(value: unknown): Automations {
 export type AutoDoc = { id: string; type: string; title?: string; clientName?: string; data?: Record<string, unknown> };
 export type AutoKind = "done" | "late";
 export type AutoPlan = { docId: string; kind: AutoKind; period: string; to: string; subject: string; text: string };
-export type AutoCtx = { business: string; reviewLink: string; origin: string; today: string; reviewOptOut: boolean; autoOptOut: boolean };
+export type AutoCtx = { business: string; reviewLink: string; origin: string; today: string; reviewOptOut: boolean; autoOptOut: boolean; chain?: AutoDoc[] };
 
 const EMAIL = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -49,7 +50,10 @@ export function planOne(doc: AutoDoc, settings: Automations, ctx: AutoCtx): Auto
   const data = doc.data || {};
   const to = String(data.clientEmail || "").trim();
   if (!EMAIL.test(to) || !isSendable(data)) return null;
-  const { total, owed } = docAmounts(doc as never);
+  // Option A: a version replaced by a sent revision change order gets no emails; a revision owes net of chain payments.
+  const eff = ctx.chain ? effectiveAmounts(ctx.chain as never, doc as never) : { ...docAmounts(doc as never), replaced: false };
+  if (eff.replaced) return null;
+  const { total, owed } = eff;
   if (!(owed > 0.004)) return null;
   const sent = sentKeys(data);
   const number = String(data.invoiceNumber || doc.title || "your invoice");
