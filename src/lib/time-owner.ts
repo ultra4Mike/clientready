@@ -58,7 +58,7 @@ export function timeAttention(w: TimeWeek, now = new Date().toISOString()): Time
 }
 
 /** Labor rows (worker × day × job) for reports: hours and cost from the same approved-timesheet day pay. */
-export type LaborRow = { employeeId: string; name: string; date: string; week: string; docId: string; minutes: number; cents: number; otHours: number; dtHours: number; premiumCents: number; approved: boolean; topUpCents?: number; prevailingTopUpCents?: number; ptoHours?: number };
+export type LaborRow = { employeeId: string; name: string; date: string; week: string; docId: string; minutes: number; cents: number; otHours: number; dtHours: number; premiumCents: number; approved: boolean; topUpCents?: number; prevailingTopUpCents?: number; ptoHours?: number; holidayHours?: number };
 export function laborRows(w: TimeWeek): LaborRow[] {
   const out: LaborRow[] = [];
   for (const worker of w.workers) for (const day of w.pays.get(worker.id) || []) {

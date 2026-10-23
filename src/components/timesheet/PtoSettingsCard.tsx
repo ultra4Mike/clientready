@@ -9,7 +9,7 @@ import PtoRulesFields, { PTO_KEYS, mergePto } from "@/components/timesheet/PtoRu
 
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
-/** Settings > Time off: account-wide PTO / sick rules (same rules as Employees > Timesheet rules). Owner-only page. */
+/** Settings > Time off: account-wide PTO / sick rules (same rules as Team > Timesheet rules). Owner-only page. */
 export default function PtoSettingsCard() {
   const [settings, setSettings] = useState<TimesheetSettings>(() => readLocalTimesheetSettings());
   const [saved, setSaved] = useState<TimesheetSettings>(settings);
@@ -32,7 +32,7 @@ export default function PtoSettingsCard() {
   return (
     <section id="time-off" className="scroll-mt-24 mt-6 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 text-sm shadow-sm max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none sm:p-6" data-testid="settings-pto">
       <h2 className="text-lg font-bold tracking-tight">Time off (PTO / sick)</h2>
-      <p className="mt-1 text-[var(--cr-muted)]">For your whole account. Workers see only their own hours.</p>
+      <p className="mt-1 text-[var(--cr-muted)]" data-testid="set-pto-where">For your whole account (same rules as Team &gt; Timesheet rules). Workers see only their own hours.</p>
       <PtoRulesFields settings={settings} set={set} p="set" account />
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button type="button" className="cr-btn cr-btn-primary" data-testid="set-pto-save" disabled={busy || !dirty} onClick={() => void save()}>{busy ? "Saving…" : "Save time off"}</button>

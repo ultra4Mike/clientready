@@ -2,10 +2,11 @@
 
 import { type TimesheetSettings } from "@/lib/timesheet";
 import { multWords, otRules, otSummary } from "@/lib/overtime-rules";
+import { useState } from "react";
 
 const field = "mt-1 block min-h-11 w-full rounded-lg border bg-transparent px-2 tabular-nums";
 
-export const OT_KEYS = ["otPreset", "weeklyOtHours", "dailyOtHours", "dailyDtHours", "seventhDayRule", "bonusInRegularRate", "otMultiplier", "dtMultiplier", "otCountPto", "otCountSick"] as const;
+export const OT_KEYS = ["otPreset", "weeklyOtHours", "dailyOtHours", "dailyDtHours", "seventhDayRule", "bonusInRegularRate", "otMultiplier", "dtMultiplier", "otCountPto", "otCountSick", "otCountHoliday"] as const;
 /** Only the overtime keys from `ot` go on top of the latest full rules (Settings card never overwrites other rules). */
 export function mergeOt(latest: TimesheetSettings, ot: TimesheetSettings): TimesheetSettings {
   const out = { ...latest } as Record<string, unknown>;
@@ -29,14 +30,16 @@ export function otEdit(s: TimesheetSettings, patch: Partial<TimesheetSettings>):
 
 /** Multiplier picker: Time and a half / Double time / Custom (any positive decimal, e.g. 1.25 or 1.75). */
 export function MultiplierPicker({ value, onChange, id, label }: { value: number; onChange: (n: number) => void; id: string; label: string }) {
-  const preset = value === 1.5 ? "1.5" : value === 2 ? "2" : "custom";
+  // Once the owner picks Custom or types a multiplier, the picker stays on Custom (even at 1.5 or 2) instead of snapping back to a preset name.
+  const [edited, setEdited] = useState(false);
+  const preset = edited ? "custom" : value === 1.5 ? "1.5" : value === 2 ? "2" : "custom";
   return (
     <div className="block text-sm">
       <label htmlFor={id} className="cr-field-label font-medium">{label}</label>
-      <select id={id} name={id} data-testid={id} className={field} value={preset} onChange={(e) => onChange(e.target.value === "custom" ? (value === 1.5 || value === 2 ? 1.25 : value) : Number(e.target.value))}>
+      <select id={id} name={id} data-testid={id} className={field} value={preset} onChange={(e) => { const custom = e.target.value === "custom"; setEdited(custom); onChange(custom ? (value === 1.5 || value === 2 ? 1.25 : value) : Number(e.target.value)); }}>
         <option value="1.5">Time and a half (1.5x)</option><option value="2">Double time (2x)</option><option value="custom">Custom…</option>
       </select>
-      {preset === "custom" && <input aria-label={`${label} (custom)`} data-testid={`${id}-custom`} className={field} inputMode="decimal" defaultValue={String(value)} onChange={(e) => { const n = Number(e.target.value); if (Number.isFinite(n) && n > 0) onChange(n); }} />}
+      {preset === "custom" && <input aria-label={`${label} (custom)`} data-testid={`${id}-custom`} className={field} inputMode="decimal" defaultValue={String(value)} onChange={(e) => { setEdited(true); const n = Number(e.target.value); if (Number.isFinite(n) && n > 0) onChange(n); }} />}
       <span className="text-xs text-[var(--cr-muted)]" data-testid={`${id}-words`}>{multWords(value)}</span>
     </div>
   );
@@ -62,6 +65,7 @@ export default function OvertimeRulesFields({ settings, set, p = "ts" }: { setti
         <div className="mt-1 flex flex-wrap gap-2" role="group" aria-label="Overtime shortcuts">
           <button type="button" className="cr-btn cr-btn-secondary" data-testid={`${p}-ot-us`} aria-pressed={settings.otPreset === "federal"} onClick={() => set(OT_PRESETS.us as Partial<TimesheetSettings>)}>US standard</button>
           <button type="button" className="cr-btn cr-btn-secondary" data-testid={`${p}-ot-california`} aria-pressed={settings.otPreset === "california"} onClick={() => set(OT_PRESETS.california as Partial<TimesheetSettings>)}>California</button>
+          {settings.otPreset === "custom" && <span className="inline-flex min-h-11 items-center rounded-lg border border-teal-500 bg-teal-500/10 px-3 text-sm font-medium" data-testid={`${p}-ot-custom-tag`} aria-current="true">Custom</span>}
         </div>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {numIn("Overtime starts after (hours per week)", `${p}-ot-weekly`, r?.weekly || 0, (n) => edit({ weeklyOtHours: n }), "Any number, e.g. 40, 38 or 44.")}
@@ -76,13 +80,14 @@ export default function OvertimeRulesFields({ settings, set, p = "ts" }: { setti
           <div className="flex flex-wrap gap-x-4">
             {chk("PTO", `${p}-ot-count-pto`, settings.otCountPto, (v) => set({ otCountPto: v }))}
             {chk("Sick", `${p}-ot-count-sick`, settings.otCountSick, (v) => set({ otCountSick: v }))}
+            {chk("Holiday", `${p}-ot-count-holiday`, settings.otCountHoliday, (v) => set({ otCountHoliday: v }))}
           </div>
           <p className="text-xs text-[var(--cr-muted)]">Off matches US federal law, where only hours worked count. When on, those hours count toward the weekly threshold but are paid at the normal rate, never the overtime rate.</p>
         </fieldset>
         {chk("Include job bonuses in the overtime rate (FLSA)", `${p}-bonus-regular`, settings.bonusInRegularRate, (v) => set({ bonusInRegularRate: v }))}
       </>}
-      <p className="mt-1 text-xs text-[var(--cr-muted)]" data-testid={`${p}-ot-worker-note`}>Every worker uses these rules unless you turn on Override on their page. Day-rate and piece-rate overtime is a separate switch (off by default).</p>
-      <p className="cr-preview mt-2 text-sm text-[var(--cr-muted)]" data-testid={`${p}-preview-ot`}>{otSummary(settings)}{on && (settings.otCountPto || settings.otCountSick) ? ` ${[settings.otCountPto && "PTO", settings.otCountSick && "sick"].filter(Boolean).join(" and ")} hours count toward the weekly threshold.` : ""}</p>
+      <p className="mt-1 text-xs text-[var(--cr-muted)]" data-testid={`${p}-ot-worker-note`}>Every worker uses these rules unless you untick Use account overtime rules on their page. Day-rate and piece-rate overtime is a separate switch (off by default).</p>
+      <p className="cr-preview mt-2 text-sm text-[var(--cr-muted)]" data-testid={`${p}-preview-ot`}>{otSummary(settings)}{on && (settings.otCountPto || settings.otCountSick || settings.otCountHoliday) ? ` ${[settings.otCountPto && "PTO", settings.otCountSick && "sick", settings.otCountHoliday && "holiday"].filter(Boolean).join(" and ")} hours count toward the weekly threshold.` : ""}</p>
     </>
   );
 }

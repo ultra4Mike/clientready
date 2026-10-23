@@ -9,7 +9,7 @@ import OvertimeRulesFields, { OT_KEYS, mergeOt } from "@/components/timesheet/Ov
 
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
-/** Settings > Overtime: account-wide overtime rules (same rules as Employees > Timesheet rules). Owner-only page. */
+/** Settings > Overtime: account-wide overtime rules (same rules as Team > Timesheet rules). Owner-only page. */
 export default function OvertimeSettingsCard() {
   const [settings, setSettings] = useState<TimesheetSettings>(() => readLocalTimesheetSettings());
   const [saved, setSaved] = useState<TimesheetSettings>(settings);

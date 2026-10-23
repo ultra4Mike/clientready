@@ -149,7 +149,7 @@ export function weekOvertime(days: { date: string; hours: number; straight: numb
     const ownPay: PaySettings = accountOt ? { ...pay, overtime: undefined } : pay;
     const own = accountOt ? null : workerOtRules(pay.overtime);
     // PTO / sick counted toward the weekly threshold (account switch, or the worker's own when overriding). Off = federal.
-    const counted = countedOffHours(defaults.weekOff?.get(weekKey), accountOt ? { pto: defaults.settings?.otCountPto, sick: defaults.settings?.otCountSick } : { pto: pay.overtime?.countPto, sick: pay.overtime?.countSick });
+    const counted = countedOffHours(defaults.weekOff?.get(weekKey), accountOt ? { pto: defaults.settings?.otCountPto, sick: defaults.settings?.otCountSick, holiday: defaults.settings?.otCountHoliday } : { pto: pay.overtime?.countPto, sick: pay.overtime?.countSick });
     // Worker override that needs tiers (second tier or counted PTO); plain old overrides keep overtimePremium exactly as before.
     const ownTiers = own && (own.double > 0 || counted > 0) ? own : null;
     const tierRules = rules || ownTiers;
@@ -184,12 +184,12 @@ export function weekOvertime(days: { date: string; hours: number; straight: numb
   return { premium, ot };
 }
 
-/** Approved PTO / sick hours per week (Monday) for one worker, for counting toward OT. */
+/** Approved PTO / sick / holiday hours per week (Monday) for one worker, for counting toward OT. */
 export function ptoWeekOff(reqs: { employeeId: string; date: string; hours: number | string; kind: string; status: string }[], employeeId: string) {
-  const m = new Map<string, { pto: number; sick: number }>();
+  const m = new Map<string, { pto: number; sick: number; holiday: number }>();
   for (const r of reqs) {
     if (r.employeeId !== employeeId || r.status !== "approved") continue;
-    const o = m.get(weekOf(r.date)) || { pto: 0, sick: 0 }; o[r.kind === "sick" ? "sick" : "pto"] += Number(r.hours) || 0; m.set(weekOf(r.date), o);
+    const o = m.get(weekOf(r.date)) || { pto: 0, sick: 0, holiday: 0 }; o[r.kind === "sick" ? "sick" : r.kind === "holiday" ? "holiday" : "pto"] += Number(r.hours) || 0; m.set(weekOf(r.date), o);
   }
   return m;
 }

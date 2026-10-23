@@ -9,6 +9,7 @@ import PageHeader from "@/components/PageHeader";
 import ScheduleEditor from "@/components/ScheduleEditor";
 import { uniqueDocs } from "@/lib/change-orders";
 import { scheduledJobs } from "@/lib/scheduled-jobs";
+import { expandJobDays, dragPayload, readDragPayload } from "@/lib/job-days";
 import { allConflicts, bookingConflicts, clockText, nextOpenSlot, readOverrides, splitConflicts } from "@/lib/conflicts";
 import { ignoresTentative, isTentative, PRESETS, readCalendarFilter, saveCalendarFilter, visibleOnCalendar, type CalendarFilter } from "@/lib/calendar-filter";
 import { belongsInUnscheduled, isDueInvoice } from "@/lib/doc-status";
@@ -23,7 +24,7 @@ type SavedDocument = {
   createdAt: string;
   data: Record<string, unknown>;
 };
-type Job = { doc: SavedDocument; schedule: Schedule };
+type Job = { doc: SavedDocument; schedule: Schedule; day?: { index: number; count: number; offset: number } };
 type View = "week" | "month" | "worker";
 type Editing = { docId: string; date?: string; startTime?: string } | null;
 
@@ -82,7 +83,8 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
   const workerName = useMemo(() => new Map(workers.map((person) => [person.id, person.name])), [workers]);
 
   const jobDocs = docs.filter((doc) => doc.type === "invoice" || doc.type === "proposal");
-  const jobs: Job[] = scheduledJobs(jobDocs).filter((job) => visibleOnCalendar(job.doc, filter, jobDocs));
+  // Multi-day jobs show on each of their days ("Day 2 of 3"); day 1 keeps the job-<id> chip.
+  const jobs: Job[] = expandJobDays(scheduledJobs(jobDocs).filter((job) => visibleOnCalendar(job.doc, filter, jobDocs)));
   const skipTentative = ignoresTentative(filter);
   const clashList = allConflicts(jobDocs);
   const clashing = new Set(clashList.filter((c) => !c.tentative).flatMap((c) => [c.docId, c.otherDocId]));
@@ -119,10 +121,12 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
 
   const toMin = (time: string) => { const [h, m] = time.split(":").map(Number); return h * 60 + m; };
 
-  function dropOn(date: string, startTime?: string) {
+  function dropOn(dropDate: string, startTime?: string) {
     return async (event: React.DragEvent) => {
       event.preventDefault();
-      const docId = event.dataTransfer.getData("text/plain");
+      // A later day's chip carries its offset: dropping day 2 on a date puts day 1 that many days earlier.
+      const { docId, offset } = readDragPayload(event.dataTransfer.getData("text/plain"));
+      const date = offset ? addDays(dropDate, -offset) : dropDate;
       const doc = docs.find((item) => item.id === docId);
       if (!doc) return;
       const existing = readSchedule(doc.data);
@@ -168,16 +172,18 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
   function chip(job: Job, compact = false, agenda = false) {
     const tid = agenda ? "agenda-" : "";
     const people = job.schedule.workerIds.map((id) => workerName.get(id)).filter(Boolean).join(", ");
+    const later = job.day && job.day.index > 1;
     return (
       <div
-        key={job.doc.id}
+        key={`${job.doc.id}-${job.day?.index || 1}`}
         draggable
-        data-testid={`${tid}job-${job.doc.id}`}
+        data-testid={later ? `${tid}job-day-${job.doc.id}-${job.day!.index}` : `${tid}job-${job.doc.id}`}
+        data-day={job.day ? `${job.day.index}/${job.day.count}` : undefined}
         data-status={job.schedule.status}
         data-tentative={isTentative(job.doc, jobDocs) || undefined}
         data-state={clashing.has(job.doc.id) ? "blocked" : undefined}
         data-done={doneState(job.schedule) || undefined}
-        onDragStart={(event) => event.dataTransfer.setData("text/plain", job.doc.id)}
+        onDragStart={(event) => event.dataTransfer.setData("text/plain", dragPayload(job.doc.id, job.day?.offset || 0))}
         onClick={(event) => { event.stopPropagation(); setEditing({ docId: job.doc.id }); }}
         className={agenda ? `flex min-h-11 cursor-pointer flex-col justify-center rounded-lg border border-l-4 px-3 py-2 text-left text-sm font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc, jobDocs) ? " cr-tentative border-dashed opacity-60" : ""}` : `cr-chip2 cursor-grab min-w-0 break-words rounded-md border border-l-4 px-1.5 py-1 text-left text-xs font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc, jobDocs) ? " cr-tentative border-dashed opacity-60" : ""}`}
         title={`${crossesMidnight(job.schedule.startTime, job.schedule.endTime) ? `${timeLabel(job.schedule.startTime || "")}–${timeLabel(job.schedule.endTime || "")} (next day) · ` : ""}${job.doc.title} · ${job.doc.clientName} · ${statusLabel(job.schedule)}${job.schedule.onMyWayAt && job.schedule.status !== "done" ? ` · ${job.schedule.onMyWayBy || "Crew"} on the way` : ""}${people ? ` · ${people}` : ""}`}
@@ -190,9 +196,11 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
         ) : (
           <>
             {job.schedule.startTime && <span className="font-semibold">{timeLabel(job.schedule.startTime)}{crossesMidnight(job.schedule.startTime, job.schedule.endTime) ? `–${timeLabel(job.schedule.endTime || "")} ☾` : ""} </span>}
+            {job.day && <span data-testid={`${tid}day-label`} className="mr-1 inline-block rounded bg-black/10 px-1 text-[10px] font-semibold uppercase tracking-wide dark:bg-white/10">Day {job.day.index} of {job.day.count}</span>}
             {job.doc.clientName || job.doc.title}
           </>
         )}
+        {agenda && job.day && <span data-testid={`${tid}day-label`} className="mt-0.5 block w-fit rounded bg-black/10 px-1 text-[10px] font-semibold uppercase tracking-wide dark:bg-white/10">Day {job.day.index} of {job.day.count}</span>}
         {isTentative(job.doc, jobDocs) && <span data-testid="not-approved-tag" className="mt-0.5 inline-block rounded border border-dashed border-current px-1 text-[10px] font-semibold uppercase tracking-wide">Not approved</span>}
         {!compact && people && <span className="block truncate opacity-80">{people}</span>}
         {compact && softClashing.has(job.doc.id) && <span data-testid="overlap-dot" data-soft="true" title="A job that isn't approved yet holds this time" className="block text-amber-700/80 dark:text-amber-300/80">Pending overlap</span>}

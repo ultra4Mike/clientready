@@ -70,6 +70,8 @@ import RestoreDraftBanner from "@/components/RestoreDraftBanner";
 import FormDraft from "@/components/FormDraft";
 import ScheduleEditor from "@/components/ScheduleEditor";
 import { entryHours, fmtHours, hoursByWorker, ownerEditClock, fixTimeProblem, crewFixReason, refreshOwnerClock, type ClockEntry } from "@/lib/clock";
+import MultiDayEditor from "@/components/MultiDayEditor";
+import { allDayWorkerIds, jobDays } from "@/lib/job-days";
 import { confirmRemoval, jobDonePhotos, crewForWorkers, followSchedule, jobScheduleFromForm, crewIds, workLogged, clockHoursFor, dedupeWorkerIds, readSchedule, readWorkers, saveAssignment, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
 import { createClientFromInvoice } from "@/lib/client-create";
 import { defaultInvoiceTerms } from "@/lib/terms";
@@ -984,6 +986,12 @@ export default function NewInvoicePage() {
       setSaveMessage("Trial ended. Old documents stay viewable; saving new work needs a plan. Plan details coming soon (see Plans).");
       return;
     }
+    // Help: a never-saved doc with no client, line item or payment is never written, so it never uses up an INV/PROP number
+    // (calendar "New job" opened and left, or Save pressed on a blank form).
+    if (!currentDocId(docId) && !over && !docHasContent({ clientName, clientCompany, contactName, clientEmail, clientPhone, clientAddress, clientId: docClientId, items, payments })) {
+      setSaveMessage(HOLD_NOTE);
+      return;
+    }
     // R116: a new client typed here is saved to Clients and linked to this document.
     let linkedClientId = docClientId;
     if (!linkedClientId && clientName.trim()) {
@@ -1011,7 +1019,12 @@ export default function NewInvoicePage() {
     // One source of truth: crew rows take the schedule's date/times (rows paid to the worker keep theirs).
     // Scheduling has one source of truth (data.schedule). A changed Job start/end or crew work date
     // here moves the schedule; a job with a start time and no schedule yet gets one (on the calendar).
-    const storedSchedule = isProposal ? (stored?.data?.schedule ? readSchedule(stored.data) : null) : jobScheduleFromForm(stored?.data?.schedule ? readSchedule(stored.data) : null, { jobStart, jobEnd, invoiceDate, crew });
+    let storedSchedule = isProposal ? (stored?.data?.schedule ? readSchedule(stored.data) : null) : jobScheduleFromForm(stored?.data?.schedule ? readSchedule(stored.data) : null, { jobStart, jobEnd, invoiceDate, crew });
+    // Multi-day: people on a later day are on the job's crew list too (else a schedule save would drop their rows).
+    if (storedSchedule && !isProposal) {
+      const ids = allDayWorkerIds(storedSchedule, crew);
+      if (ids.length !== storedSchedule.workerIds.length) storedSchedule = { ...storedSchedule, workerIds: ids, updatedAt: new Date().toISOString() };
+    }
     const savedCrew = crew.map((row) => followSchedule(row, storedSchedule, crew));
     const keptNotes = mergeChangeOrderNotes(readChangeOrderNotes(stored?.data?.changeOrderNotes), changeOrderNotes);
     const recurring = isProposal ? null : scheduleFromForm(readRecurring(stored?.data?.recurring), { frequency: recFreq, intervalDays: recInterval, nextRunDate: recNext, loadedNextRunDate: recLoadedNext, today: ymd(new Date()) });
@@ -1426,11 +1439,12 @@ export default function NewInvoicePage() {
             <Section id="schedule" label="Schedule" className="print-hide space-y-3 rounded-xl border border-slate-200 p-4 text-sm sm:p-5" testId="schedule-section">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-semibold">Schedule</p>
-                {schedule && <span className="text-xs" data-testid="schedule-summary">{schedule.date}{schedule.startTime ? ` ${schedule.startTime}` : ""}{schedule.endTime ? `–${schedule.endTime}` : ""} · {STATUS_LABEL[schedule.status]}</span>}
+                {schedule && <span className="text-xs" data-testid="schedule-summary">{schedule.date}{schedule.startTime ? ` ${schedule.startTime}` : ""}{schedule.endTime ? `–${schedule.endTime}` : ""}{jobDays(schedule, crew).length > 1 ? ` · ${jobDays(schedule, crew).length} days` : ""} · {STATUS_LABEL[schedule.status]}</span>}
               </div>
               {!locked
                 ? <ScheduleEditor key={scheduleKey} autoSave holdNote={!docId && !docHasContent({ clientName, clientCompany, contactName, clientEmail, clientPhone, clientAddress, clientId: docClientId, items, payments }) ? HOLD_NOTE : ""} docId={docId} value={schedule} workers={workers} onSave={saveJobSchedule} confirmRemove={(ids) => confirmRemoval(workLogged(crew, ids, clockHoursFor(docId)))} />
                 : <p className="text-xs text-slate-600">Save the document first, then schedule the job here or on the Calendar.</p>}
+              {!locked && !isProposal && schedule && <MultiDayEditor schedule={schedule} crew={crew} workers={workers} onChange={setCrew} />}
               {!isProposal && <VisitNotes notes={visitNotes} onChange={setVisitNotes} today={ymd(new Date())} disabled={locked} />}
               {docId && <OwnerVisitNotes docId={docId} />}
               {docId && <JobDonePanel docId={docId} schedule={schedule} onConfirmed={(next) => { setSchedule(next); setScheduleKey((key) => key + 1); }} />}

@@ -22,7 +22,7 @@ export function ptoPresetPatch(v: TimesheetSettings["ptoPreset"]): Partial<Times
   return v === "california" ? { ptoPreset: v, ...CA_SICK } : v === "off" || v === "federal" ? { ptoPreset: v, ptoPerHours: 0 } : { ptoPreset: v };
 }
 
-/** Account-wide PTO / sick rules. Shared by Employees > Timesheet rules and Settings > Time off. `p` prefixes test ids. */
+/** Account-wide PTO / sick rules. Shared by Team > Timesheet rules and Settings > Time off. `p` prefixes test ids. */
 export default function PtoRulesFields({ settings, set, p = "ts", account = false }: { settings: TimesheetSettings; set: (patch: Partial<TimesheetSettings>) => void; p?: string; account?: boolean }) {
   const num = (k: keyof TimesheetSettings, label: string, id: string) => (
     <label className="block text-sm"><span className="cr-field-label font-medium">{label}</span>

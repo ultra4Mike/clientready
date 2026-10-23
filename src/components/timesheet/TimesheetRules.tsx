@@ -14,7 +14,7 @@ import { weekOf } from "@/lib/pay-types";
 import TimeAuditLog from "@/components/timesheet/TimeAuditLog";
 import PtoRulesFields from "@/components/timesheet/PtoRulesFields";
 import OvertimeRulesFields from "@/components/timesheet/OvertimeRulesFields";
-import { otSummary } from "@/lib/overtime-rules";
+import { flsaWords, otSummary } from "@/lib/overtime-rules";
 
 const field = "mt-1 block min-h-11 w-full rounded-lg border bg-transparent px-2 tabular-nums";
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
@@ -159,7 +159,7 @@ export default function TimesheetRules() {
         <h3 id="ts-h-pay" className="cr-section-label font-semibold">Pay rules (piece rate, commission, day/salary)</h3>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {num("minWage", "Minimum wage ($/h, 0 = off)", "ts-min-wage", "Piece, commission and day pay are topped up to this for every hour worked.")}
-          {tog("flsaNonHourly", "Overtime for non-hourly pay (FLSA: ½ × week pay ÷ hours, over 40 h)", "ts-flsa-nonhourly")}
+          {tog("flsaNonHourly", flsaWords(settings).label, "ts-flsa-nonhourly")}
         </div>
         <p className="mt-3 text-sm font-medium">Job / task rates ($/h, override a worker&apos;s hourly rate on that task)</p>
         <ul className="mt-1 space-y-1" data-testid="ts-task-rates">{Object.entries(settings.taskRates).map(([k, v]) => (
@@ -170,7 +170,7 @@ export default function TimesheetRules() {
           <input name="ts-task-rate" aria-label="Rate per hour" placeholder="$/h" inputMode="decimal" data-testid="ts-task-rate" className={`${field} w-24`} value={taskRate} onChange={(e) => setTaskRate(e.target.value)} />
           <button type="button" className="cr-btn cr-btn-secondary" data-testid="ts-task-add" onClick={() => { const r = Number(taskRate); if (taskName.trim() && r > 0) { set({ taskRates: { ...settings.taskRates, [taskName.trim().slice(0, 40)]: r } }); setTaskName(""); setTaskRate(""); } }}>Add rate</button>
         </div>
-        <p className="cr-preview mt-2 text-sm text-[var(--cr-muted)]" data-testid="ts-preview-pay">{settings.minWage > 0 ? `Non-hourly pay is topped up to $${settings.minWage.toFixed(2)}/h.` : "No minimum-wage top-up."} {settings.flsaNonHourly ? "Non-hourly workers get FLSA overtime over 40 h." : ""}</p>
+        <p className="cr-preview mt-2 text-sm text-[var(--cr-muted)]" data-testid="ts-preview-pay">{settings.minWage > 0 ? `Non-hourly pay is topped up to $${settings.minWage.toFixed(2)}/h.` : "No minimum-wage top-up."} {settings.flsaNonHourly ? flsaWords(settings).preview : ""}</p>
       </section>
 
       <section className={card} data-testid="ts-rules-pto" aria-labelledby="ts-h-pto">

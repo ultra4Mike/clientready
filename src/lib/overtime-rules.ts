@@ -89,6 +89,17 @@ export function workerOtRules(o: { on?: boolean; weekly?: string; daily?: string
 }
 
 /** Paid-off hours that count toward the weekly overtime threshold (default none: US federal counts only hours worked). */
-export function countedOffHours(off: { pto?: number; sick?: number } | undefined, c: { pto?: boolean; sick?: boolean } | undefined) {
-  return (c?.pto ? off?.pto || 0 : 0) + (c?.sick ? off?.sick || 0 : 0);
+export function countedOffHours(off: { pto?: number; sick?: number; holiday?: number } | undefined, c: { pto?: boolean; sick?: boolean; holiday?: boolean } | undefined) {
+  return (c?.pto ? off?.pto || 0 : 0) + (c?.sick ? off?.sick || 0 : 0) + (c?.holiday ? off?.holiday || 0 : 0);
+}
+
+/** FLSA non-hourly overtime in words, from the same threshold and multiplier the engine uses (default 40 h, 1.5x). */
+export function flsaWords(s: OtSettings): { label: string; preview: string } {
+  const r = otRules(s);
+  const week = r?.weekly && r.weekly > 0 ? r.weekly : 40;
+  const mult = Math.max(1, Math.round((r?.mult ?? 1.5) * 100) / 100);
+  return {
+    label: `Overtime for non-hourly pay (FLSA: (${mult} - 1) x regular rate for hours over ${week} h)`,
+    preview: `Non-hourly workers get FLSA overtime: (${mult} - 1) x regular rate for hours over ${week} h.`,
+  };
 }

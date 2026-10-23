@@ -36,7 +36,7 @@ export default function WorkerOvertimeFields({ overtime, account, onChange }: { 
               <label className="flex min-h-11 items-center gap-2"><input type="checkbox" data-testid="pay-ot-count-pto" checked={Boolean(o.countPto)} onChange={(e) => set({ countPto: e.target.checked })} />PTO</label>
               <label className="flex min-h-11 items-center gap-2"><input type="checkbox" data-testid="pay-ot-count-sick" checked={Boolean(o.countSick)} onChange={(e) => set({ countSick: e.target.checked })} />Sick</label>
             </div>
-            <p className="text-xs text-[var(--cr-muted)]">Off matches US federal law, where only hours worked count.</p></fieldset>
+            <p className="text-xs text-[var(--cr-muted)]" data-testid="pay-ot-count-help">Off matches US federal law, where only hours worked count. When on, those hours count toward the threshold but are paid at the normal rate, not the overtime rate.</p></fieldset>
         </div>}
       </div>}
     </div>

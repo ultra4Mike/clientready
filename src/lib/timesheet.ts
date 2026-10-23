@@ -100,7 +100,7 @@ export type TimesheetSettings = {
   /** Custom overtime multiplier (1.5 = time and a half) and double-time multiplier (2). Federal / California use 1.5 and 2. */
   otMultiplier: number; dtMultiplier: number;
   /** Count approved PTO / sick hours toward the weekly overtime threshold (off = US federal: only hours worked). Never paid at the OT rate. */
-  otCountPto: boolean; otCountSick: boolean;
+  otCountPto: boolean; otCountSick: boolean; otCountHoliday: boolean;
   // Pay period (for export / period pickers). anchor = a period start date (YYYY-MM-DD) for biweekly.
   payPeriod: PayPeriod; payPeriodAnchor: string;
   // Reminders (foreground only)
@@ -130,7 +130,7 @@ export const DEFAULT_TIMESHEET_SETTINGS: TimesheetSettings = {
   payFirstCommute: false, payLastCommute: false, startAtShop: false, commuteDeductMinutes: 0, longDriveBreakMinutes: 0,
   roundingMinutes: 0, geofenceMeters: 200, jobGeofence: {},
   // New accounts: overtime ON (US standard, 1.5x over 40 h a week). Saved rules without otPreset stay "worker" (see readTimesheetSettings).
-  otPreset: "federal", weeklyOtHours: 40, dailyOtHours: 0, dailyDtHours: 0, seventhDayRule: false, bonusInRegularRate: true, otMultiplier: 1.5, dtMultiplier: 2, otCountPto: false, otCountSick: false,
+  otPreset: "federal", weeklyOtHours: 40, dailyOtHours: 0, dailyDtHours: 0, seventhDayRule: false, bonusInRegularRate: true, otMultiplier: 1.5, dtMultiplier: 2, otCountPto: false, otCountSick: false, otCountHoliday: false,
   payPeriod: "weekly", payPeriodAnchor: "", remindMissedStartMinutes: 15, remindMissedEndMinutes: 60,
   minWage: 0, flsaNonHourly: false, taskRates: {}, ptoPreset: "off", ptoAllowNegative: false, ptoPerHours: 0, ptoCapHours: 0, ptoUseCapHours: 0, ptoWaitDays: 0,
   ptoDayHours: 8, ptoRequestsOn: true,
@@ -194,7 +194,7 @@ export function readTimesheetSettings(raw: unknown): TimesheetSettings {
     geofenceMeters: pos(v.geofenceMeters, d.geofenceMeters), jobGeofence,
     // Missing otPreset: brand-new (nothing saved) = default (overtime on); saved rules from before = "worker" so nobody's pay changes.
     otPreset: (["worker", "federal", "california", "custom"].includes(String(v.otPreset)) ? v.otPreset : Object.keys(v).length ? "worker" : d.otPreset) as OtPreset,
-    otMultiplier: mult(v.otMultiplier, d.otMultiplier), dtMultiplier: mult(v.dtMultiplier, d.dtMultiplier), otCountPto: v.otCountPto === true, otCountSick: v.otCountSick === true,
+    otMultiplier: mult(v.otMultiplier, d.otMultiplier), dtMultiplier: mult(v.dtMultiplier, d.dtMultiplier), otCountPto: v.otCountPto === true, otCountSick: v.otCountSick === true, otCountHoliday: v.otCountHoliday === true,
     weeklyOtHours: nonneg(v.weeklyOtHours, d.weeklyOtHours), dailyOtHours: nonneg(v.dailyOtHours, d.dailyOtHours), dailyDtHours: nonneg(v.dailyDtHours, d.dailyDtHours),
     seventhDayRule: bool(v.seventhDayRule, d.seventhDayRule), bonusInRegularRate: bool(v.bonusInRegularRate, d.bonusInRegularRate),
     payPeriod: (["weekly", "biweekly", "semimonthly"].includes(String(v.payPeriod)) ? v.payPeriod : "weekly") as PayPeriod,

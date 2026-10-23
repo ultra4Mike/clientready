@@ -190,7 +190,7 @@ export default function TimesheetPage() {
   async function exportCsv() {
     // Pay period: weekly = this week; biweekly = this + next week; semi-monthly = 1st–15th or 16th–end of the month of this week.
     const { from, to } = payPeriodOf(week, period, period === settings.payPeriod ? settings.payPeriodAnchor : "");
-    const lines = ["Worker,Date,Paid hours,Drive min,Unpaid break min,Rounding min,OT hours,DT hours,Break premium hours,Units,Commission,Min-wage top-up,Prevailing-wage top-up,PTO hours,PTO pay,Approved,Flags"];
+    const lines = ["Worker,Date,Paid hours,Drive min,Unpaid break min,Rounding min,OT hours,DT hours,Break premium hours,Units,Commission,Min-wage top-up,Prevailing-wage top-up,PTO hours,Holiday hours,PTO pay,Approved,Flags"];
     const ptoReqs = (await Promise.all([...new Set([from.slice(0, 4), to.slice(0, 4)])].map((y) => loadPtoRequests(y).catch(() => [])))).flat();
     const pto = ptoDays(ptoReqs, workers as never, from, to);
     const crewOn = (id: string, date: string) => docs.flatMap((d) => ((d.data as { crew?: { employeeId?: string; workDate?: string; units?: string; commissionPct?: string; commissionBase?: string }[] } | undefined)?.crew || []).filter((c) => c.employeeId === id && c.workDate === date));
@@ -208,7 +208,7 @@ export default function TimesheetPage() {
         const cr = crewOn(w.id, date);
         const units = cr.reduce((t, c) => t + (Number(c.units) || 0), 0);
         const comm = cr.reduce((t, c) => t + ((Number(c.commissionPct) || 0) / 100) * (Number(c.commissionBase) || 0), 0);
-        lines.push([`"${w.name.replace(/"/g, '""')}"`, date, (mins / 60).toFixed(2), Math.round(s?.driveMinutes || 0), s?.breakMinutes || 0, s?.roundingMinutes || 0, (p?.otHours || 0).toFixed(2), (p?.dtHours || 0).toFixed(2), s?.premiumHours || 0, units || "", comm ? comm.toFixed(2) : "", p?.topUpCents ? (p.topUpCents / 100).toFixed(2) : "", p?.prevailingTopUpCents ? (p.prevailingTopUpCents / 100).toFixed(2) : "", off ? off.hours.toFixed(2) : "", off ? (off.cents / 100).toFixed(2) : "", a?.approvedAt ? "yes" : "no", `"${(s?.flags || []).join(" ")}"`].join(","));
+        lines.push([`"${w.name.replace(/"/g, '""')}"`, date, (mins / 60).toFixed(2), Math.round(s?.driveMinutes || 0), s?.breakMinutes || 0, s?.roundingMinutes || 0, (p?.otHours || 0).toFixed(2), (p?.dtHours || 0).toFixed(2), s?.premiumHours || 0, units || "", comm ? comm.toFixed(2) : "", p?.topUpCents ? (p.topUpCents / 100).toFixed(2) : "", p?.prevailingTopUpCents ? (p.prevailingTopUpCents / 100).toFixed(2) : "", off ? (off.hours - off.holidayHours).toFixed(2) : "", off ? off.holidayHours.toFixed(2) : "", off ? (off.cents / 100).toFixed(2) : "", a?.approvedAt ? "yes" : "no", `"${(s?.flags || []).join(" ")}"`].join(","));
       }
     }
     const url = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" }));

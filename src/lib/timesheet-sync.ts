@@ -131,8 +131,8 @@ export function weekShares(input: { workers: Worker[]; docs: Doc[]; days: string
       if (e > 0) weekExtra.set(wk, (weekExtra.get(wk) || 0) + e);
     }
     // Approved PTO / sick hours this week (only counted toward OT when the owner turned that on).
-    const off = { pto: 0, sick: 0 };
-    for (const r of input.pto || readLocalPtoRequests()) if (r.employeeId === w.id && r.status === "approved" && input.days.includes(r.date)) off[r.kind === "sick" ? "sick" : "pto"] += Number(r.hours) || 0;
+    const off = { pto: 0, sick: 0, holiday: 0 };
+    for (const r of input.pto || readLocalPtoRequests()) if (r.employeeId === w.id && r.status === "approved" && input.days.includes(r.date)) off[r.kind === "sick" ? "sick" : r.kind === "holiday" ? "holiday" : "pto"] += Number(r.hours) || 0;
     const weekOff = new Map([[wk, off]]);
     const week = allocateWeek(list, w.paySettings, w.rate || "", { halfDayHours: input.settings?.halfDayHours, settings: input.settings, weekBonus, weekExtra, weekOff, jobRates: jobRates(input.docs as never, input.settings) });
     // Unallocated salary only for weeks from the pay cutover / his pay start up to this week (same rule as Year packet).

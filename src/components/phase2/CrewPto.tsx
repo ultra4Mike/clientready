@@ -2,7 +2,7 @@
 // Crew: own PTO/sick balance (hours only) and requests. Never shows pay.
 import { memo, useEffect, useRef, useState } from "react";
 import { loadMyPto, requestMyPto } from "@/lib/phase2-data";
-import { ptoRequestProblem, type PtoKind, type PtoRequest } from "@/lib/pay-phase2";
+import { ptoKindLabel, ptoRequestProblem, type PtoKind, type PtoRequest } from "@/lib/pay-phase2";
 import { ymdTz, type TimesheetSettings } from "@/lib/timesheet";
 import { loadMyTimeRules } from "@/lib/day-events";
 
@@ -48,7 +48,7 @@ function CrewPto() {
       <button type="button" data-testid="crew-pto-submit" className="mt-2 min-h-11 rounded-lg border px-3 disabled:opacity-50" disabled={busy} onClick={() => void submit()}>{busy ? "Sending…" : "Ask for time off"}</button>
       </> : ptoOff && <p className="mt-1 text-[var(--cr-muted)]" data-testid="crew-pto-off">Time-off requests are off for your account.</p>}
       {msg && <p className="mt-1" role="status" data-testid="crew-pto-message">{msg}</p>}
-      {requests.length > 0 && <ul className="mt-2 space-y-1" data-testid="crew-pto-list">{requests.map((r) => <li key={r.id} data-testid="crew-pto-item" data-status={r.status}>{r.date} · {r.hours} h {r.kind === "sick" ? "sick" : "PTO"} · <span className="cr-chip2">{r.status}</span>{r.note ? <span className="block text-xs text-[var(--cr-muted)]" data-testid="crew-pto-item-note">“{r.note}”</span> : null}</li>)}</ul>}
+      {requests.length > 0 && <ul className="mt-2 space-y-1" data-testid="crew-pto-list">{requests.map((r) => <li key={r.id} data-testid="crew-pto-item" data-status={r.status}>{r.date} · {r.hours} h {ptoKindLabel(r.kind, true)} · <span className="cr-chip2">{r.status}</span>{r.note ? <span className="block text-xs text-[var(--cr-muted)]" data-testid="crew-pto-item-note">“{r.note}”</span> : null}</li>)}</ul>}
     </section>
   );
 }

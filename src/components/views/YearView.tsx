@@ -17,7 +17,7 @@ import { supabase } from "@/lib/supabase";
 import { loadPtoRequests, mergePtoRequests, readLocalPtoRequests } from "@/lib/phase2-data";
 import { ptoWeekOff, resolvedOvertime } from "@/lib/timesheet-pay";
 import { readLocalTimesheetSettings } from "@/lib/day-events";
-import { ptoDays, type PtoRequest } from "@/lib/pay-phase2";
+import { ptoDays, ptoKindLabel, type PtoRequest } from "@/lib/pay-phase2";
 import { searchWithNumbers } from "@/lib/doc-number";
 
 type CrewExpense = { id: string; doc_id: string; worker_name?: string; kind?: string; amount?: string; note?: string; created_at?: string; receipt?: string };
@@ -337,7 +337,7 @@ export default function YearPage() {
     // Approved PTO / sick (paid time off, no job). Minimum-wage top-up is already inside each day's crew pay.
     for (const [k, v] of ptoDays(ptoReqs, employees as never, `${year}-01-01`, `${year}-12-31`)) {
       const [id, date] = k.split("|"); const name = employees.find((p) => p.id === id)?.name || "Worker";
-      if (v.cents) list.push({ id: `pto-${id}-${date}`, docId: "", docType: "invoice", kind: "pay", date, client: "", number: "", category: "Labor", amount: v.cents / 100, method: "", ref: "", note: `${v.kind === "sick" ? "Sick" : "PTO"} ${v.hours.toFixed(2)} h`, hours: String(v.hours), rate: "", worker: name, workerKind: kindFor(name, id) });
+      if (v.cents) list.push({ id: `pto-${id}-${date}`, docId: "", docType: "invoice", kind: "pay", date, client: "", number: "", category: "Labor", amount: v.cents / 100, method: "", ref: "", note: `${v.holidayHours >= v.hours ? "Holiday" : v.holidayHours > 0 ? "PTO / holiday" : ptoKindLabel(v.kind)} ${v.hours.toFixed(2)} h`, hours: String(v.hours), rate: "", worker: name, workerKind: kindFor(name, id) });
     }
     return list;
   }, [documents, employees, year, ptoReqs]);

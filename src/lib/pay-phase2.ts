@@ -63,7 +63,9 @@ export function spreadCents(cents: number, weights: number[]) {
 }
 
 // ---------- PTO / sick ----------
-export type PtoKind = "pto" | "sick";
+export type PtoKind = "pto" | "sick" | "holiday";
+/** Words for a time-off kind. Holiday = paid holiday the owner adds (never takes from the PTO balance). */
+export function ptoKindLabel(kind: string, lower = false) { const w = kind === "sick" ? "Sick" : kind === "holiday" ? "Holiday" : "PTO"; return lower && w !== "PTO" ? w.toLowerCase() : w; }
 export type PtoRequest = { id: string; employeeId: string; date: string; hours: number; kind: PtoKind; note?: string; status: "pending" | "approved" | "denied"; createdAt: string; decidedAt?: string | null };
 export type PtoPolicy = Pick<TimesheetSettings, "ptoPreset" | "ptoPerHours" | "ptoCapHours" | "ptoUseCapHours" | "ptoWaitDays">;
 /** Worker override: own accrual (hours per hour of PTO), a starting balance carried in, or off. */
@@ -79,8 +81,8 @@ export function ptoBalance(input: { policy: PtoPolicy; worker?: PtoOverride; wor
   const per = num(input.worker?.ptoPerHours) > 0 ? num(input.worker!.ptoPerHours) : input.policy.ptoPerHours;
   const on = ptoOn(input.policy, input.worker);
   const mine = input.requests.filter((r) => r.employeeId === input.employeeId && r.date.startsWith(input.year));
-  const taken = r2(mine.filter((r) => r.status === "approved").reduce((s, r) => s + r.hours, 0));
-  const pending = r2(mine.filter((r) => r.status === "pending").reduce((s, r) => s + r.hours, 0));
+  const taken = r2(mine.filter((r) => r.status === "approved" && r.kind !== "holiday").reduce((s, r) => s + r.hours, 0));
+  const pending = r2(mine.filter((r) => r.status === "pending" && r.kind !== "holiday").reduce((s, r) => s + r.hours, 0));
   let accrued = on && per > 0 ? input.workedHours / per : 0;
   accrued += num(input.worker?.ptoStartHours);
   if (input.policy.ptoCapHours > 0) accrued = Math.min(accrued, input.policy.ptoCapHours);
@@ -113,12 +115,12 @@ export function ptoPayCents(hours: number, rate: string, paySettings?: unknown) 
 
 /** Approved PTO for a set of days: employeeId|date -> { hours, cents }. Only approved, never pending. */
 export function ptoDays(requests: PtoRequest[], workers: { id: string; rate?: string; paySettings?: unknown }[], from: string, to: string) {
-  const out = new Map<string, { hours: number; cents: number; kind: PtoKind }>();
+  const out = new Map<string, { hours: number; cents: number; kind: PtoKind; holidayHours: number }>();
   for (const r of requests) {
     if (r.status !== "approved" || r.date < from || r.date > to) continue;
     const w = workers.find((x) => x.id === r.employeeId); if (!w) continue;
     const k = `${r.employeeId}|${r.date}`; const prev = out.get(k);
-    out.set(k, { hours: r2((prev?.hours || 0) + r.hours), cents: (prev?.cents || 0) + ptoPayCents(r.hours, w.rate || "", w.paySettings), kind: r.kind });
+    out.set(k, { hours: r2((prev?.hours || 0) + r.hours), cents: (prev?.cents || 0) + ptoPayCents(r.hours, w.rate || "", w.paySettings), kind: r.kind, holidayHours: r2((prev?.holidayHours || 0) + (r.kind === "holiday" ? r.hours : 0)) });
   }
   return out;
 }
