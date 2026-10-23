@@ -52,3 +52,12 @@ test("R128 help: refunds, approval and hours articles match the shipped wording"
   const ids = new Set(HELP_ARTICLES.map((a) => a.id));
   for (const a of HELP_ARTICLES) for (const r of a.related || []) assert.ok(ids.has(r), `${a.id} → ${r}`);
 });
+test("Phase 2 help: PTO and crew lead articles published with shipped labels", async () => {
+  const { UPCOMING_HELP_ARTICLES } = await import("@/lib/help/upcoming");
+  const by = Object.fromEntries(HELP_ARTICLES.map((a) => [a.id, [a.question, a.summary || "", ...a.steps, ...(a.tips || [])].join(" ")]));
+  for (const id of ["tt-owner-pto", "tt-owner-crew-lead", "tt-owner-team-clock", "tt-crew-time-off", "tt-crew-what-lead-can-do"]) { assert.ok(by[id], id); assert.ok(!UPCOMING_HELP_ARTICLES.some((a) => a.id === id), id); assert.doesNotMatch(by[id], /\[TODO\]/); }
+  assert.match(by["tt-owner-pto"], /1 h per … h worked/);
+  assert.match(by["tt-crew-time-off"], /Ask for time off/);
+  assert.match(by["tt-owner-crew-lead"], /Can clock the crew in and out/);
+  assert.doesNotMatch(by["tt-crew-my-hours"], /day total/);
+});
