@@ -770,3 +770,22 @@ html.dark [data-testid="ts-edited"], html.dark [data-testid="ts-dd-pill-edited"]
 /* Labor report */
 [data-testid="labor-table"] { font-variant-numeric: tabular-nums; width: 100%; }
 @media (max-width: 400px) { [data-testid="step-tracker"] > li { font-size: .625rem; } [data-testid="ts-settings"] { gap: .75rem; } }
+
+/* Time tracking phase 1: newer testids (visual only) */
+[data-testid^="ts-preview-line-"] { display: block; margin-top: .375rem; padding: .25rem 0 .25rem .625rem; border-left: 3px solid var(--cr-teal, #14b8a6); font-size: .8125rem; line-height: 1.35; color: var(--cr-muted, #94a3b8); font-variant-numeric: tabular-nums; }
+[data-testid^="ts-dd-pin-"] { display: inline-flex; align-items: center; gap: .25rem; }
+[data-testid^="ts-dd-pin-"] a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 .375rem; color: var(--cr-teal, #14b8a6); }
+[data-testid^="ts-dd-pin-"] a::before { content: ""; width: .5rem; height: .5rem; border-radius: 9999px; background: var(--cr-teal, #14b8a6); margin-right: .375rem; }
+[data-testid="ts-select-all"] { width: 1.25rem; height: 1.25rem; accent-color: var(--cr-teal, #14b8a6); }
+label:has(> [data-testid="ts-select-all"]) { min-height: 44px; min-width: 44px; cursor: pointer; }
+[data-testid="break-timer-wrap"] { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.15; text-align: center; }
+[data-testid="tap-break-label"] { font-size: .8125rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #fbbf24; }
+[data-testid="break-timer-wrap"] [data-testid="break-timer"] { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+[data-testid="tap-break"][data-state="on"] { border-width: 2px; border-left-width: 4px; background: rgba(245,158,11,.08); }
+[data-testid="dash-time"] { border-color: var(--cr-border, #334155); }
+[data-testid="dash-time"][data-state="attention"] { border-left: 4px solid #f59e0b; }
+[data-testid="dash-time"][data-state="ok"] { border-left: 4px solid var(--cr-teal, #14b8a6); }
+[data-testid="dash-time-alerts"] a, [data-testid="dash-time-open"] { display: inline-flex; align-items: center; min-height: 44px; }
+[data-testid="dash-time-alert"] { font-size: .875rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+[data-testid^="clock-use-myday-"] { min-height: 60px !important; display: inline-flex; align-items: center; justify-content: center; }
+[data-testid="ts-gap"], [data-testid="ts-halfday"], [data-testid="ts-timeout"] { min-height: 44px; font-variant-numeric: tabular-nums; max-width: 100%; }
