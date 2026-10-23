@@ -194,7 +194,7 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
       )}
       {(allowed.includes("break_start") || state === "ON_BREAK") && (
         <button data-testid="tap-break" data-state={state === "ON_BREAK" ? "on" : "off"} disabled={busy} className="cr-btn cr-btn-secondary w-full" onClick={() => tap(state === "ON_BREAK" ? "break_end" : "break_start")}>
-          {state === "ON_BREAK" ? <>On break <span data-testid="break-timer" className="tabular-nums">{Math.floor(breakMs / 60000)}:{String(Math.floor((breakMs % 60000) / 1000)).padStart(2, "0")}</span>{breakMs / 60000 < rules.shortBreakPaidMinutes ? ` · paid under ${rules.shortBreakPaidMinutes} min` : " · unpaid"}</> : "Start break"}
+          {state === "ON_BREAK" ? <span data-testid="break-timer-wrap"><span data-testid="tap-break-label">On break</span> <span data-testid="break-timer" className="tabular-nums">{Math.floor(breakMs / 60000)}:{String(Math.floor((breakMs % 60000) / 1000)).padStart(2, "0")}</span>{breakMs / 60000 < rules.shortBreakPaidMinutes ? ` · paid under ${rules.shortBreakPaidMinutes} min` : " · unpaid"}</span> : <span data-testid="tap-break-label">Start break</span>}
         </button>
       )}
       {note && <p data-testid="my-day-note" role="status" className="text-sm">{note}</p>}

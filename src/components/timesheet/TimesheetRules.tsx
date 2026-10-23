@@ -58,7 +58,7 @@ export default function TimesheetRules() {
     <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" name={id} data-testid={id} checked={Boolean(settings[k])} onChange={(e) => set({ [k]: e.target.checked } as Partial<TimesheetSettings>)} />{label}</label>
   );
   const p = rulePreviews(settings);
-  const preview = (text: string, id: string) => <p className="cr-preview mt-2 text-sm text-[var(--cr-muted)]" data-testid={id}>{text}</p>;
+  const preview = (text: string, id: string) => <p className="cr-preview mt-2 text-sm text-[var(--cr-muted)]" data-testid={id}><span data-testid={`ts-preview-line-${id.replace("ts-preview-", "")}`}>{text}</span></p>;
   const dirty = JSON.stringify(settings) !== JSON.stringify(saved);
   async function save() {
     setBusy(true);

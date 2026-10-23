@@ -101,7 +101,7 @@ export default function DayDetail(props: {
             <ul className="mt-1 space-y-1">
               {[...props.taps].sort((a, b) => a.at.localeCompare(b.at)).map((e) => (
                 <li key={e.id} data-testid="ts-dd-tap" data-kind={e.kind}>{hhmm(e.at)} · {KIND_LABEL[e.kind]}{e.outOfOrder ? " · out of order" : ""}{e.notAtSite ? " · not at site" : ""}
-                  {e.lat != null && e.lng != null && <> · <a className="underline" target="_blank" rel="noopener noreferrer" data-testid="ts-dd-map" href={`https://www.google.com/maps/search/?api=1&query=${e.lat},${e.lng}`}>Map</a></>}</li>
+                  {e.lat != null && e.lng != null && <> · <span data-testid={`ts-dd-pin-${e.id}`}><a className="underline" target="_blank" rel="noopener noreferrer" data-testid="ts-dd-map" href={`https://www.google.com/maps/search/?api=1&query=${e.lat},${e.lng}`}>Map</a></span></>}</li>
               ))}
             </ul>
           </details>

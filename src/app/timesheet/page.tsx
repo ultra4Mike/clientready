@@ -277,7 +277,7 @@ export default function TimesheetPage() {
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] text-sm" data-testid="ts-table">
-            <thead><tr><th className="p-2 text-left">Worker</th>{days.map((d) => <th key={d} className="p-2 text-left">{dayLabel(d)}</th>)}<th className="p-2 text-right">Week</th></tr></thead>
+            <thead><tr><th className="p-2 text-left"><label className="flex items-center gap-2"><input type="checkbox" name="ts-select-all" aria-label="Select all workers" data-testid="ts-select-all" checked={shown.length > 0 && shown.every((r) => selected.has(r.w.id))} onChange={(e) => setSelected(e.target.checked ? new Set(shown.map((r) => r.w.id)) : new Set())} />Worker</label></th>{days.map((d) => <th key={d} className="p-2 text-left">{dayLabel(d)}</th>)}<th className="p-2 text-right">Week</th></tr></thead>
             <tbody>
               {shown.map((r) => (
                 <tr key={r.w.id} className="border-t align-top" data-testid={`ts-row-${r.w.id}`}>
