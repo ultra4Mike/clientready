@@ -15,6 +15,7 @@ import { weekOf } from "@/lib/pay-types";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { refreshEmployeesCache } from "@/lib/account-cache";
+import { splitAlerts, scheduleAlertLabel, type OwnerAlert } from "@/lib/timesheet-alerts";
 import { timesheetEmptyKind, type CrewLoad } from "@/lib/timesheet-crew-state";
 import DayDetail from "@/components/timesheet/DayDetail";
 import PtoOwnerCard from "@/components/phase2/PtoOwnerCard";
@@ -198,12 +199,13 @@ export default function TimesheetPage() {
     for (const w of workers) for (const d of days) { const j = scheduleFor(docs, w.id, d); if (j.length) schedule.set(`${w.id}|${d}`, j); }
     return timeAlerts({ sheets, fixes: [], events, today: localYmd(now), schedule, now }).filter((a) => a.kind === "late_start" || a.kind === "no_show");
   }, [workers, days, docs, sheets, events, now]);
-  const alerts = [
-    ...lateAlerts.map((a) => ({ key: `${a.kind}-${a.employeeId}-${a.date}`, kind: a.kind, text: `${workers.find((w) => w.id === a.employeeId)?.name || "Worker"} · ${a.date}: ${a.kind === "no_show" ? "No-show" : "Late start"}`, open: `${a.employeeId}|${a.date}` })),
-    ...pendingFixes.map((f) => ({ key: `fix-${f.id}`, text: `${workers.find((w) => w.id === f.employeeId)?.name || "Worker"} asked to fix ${f.date}`, open: `${f.employeeId}|${f.date}` })),
+  const allAlerts: OwnerAlert[] = [
+    ...lateAlerts.map((a) => ({ key: `${a.kind}-${a.employeeId}-${a.date}`, kind: a.kind, employeeId: a.employeeId, date: a.date, text: `${workers.find((w) => w.id === a.employeeId)?.name || "Worker"} · ${a.date}: ${scheduleAlertLabel(a.kind, minutesOf(a.employeeId, a.date))}`, open: `${a.employeeId}|${a.date}` })),
+    ...pendingFixes.map((f) => ({ key: `fix-${f.id}`, sticky: true, text: `${workers.find((w) => w.id === f.employeeId)?.name || "Worker"} asked to fix ${f.date}`, open: `${f.employeeId}|${f.date}` })),
     ...rows.flatMap((r) => r.info.filter((d) => d.flagged && !d.approved && d.hasHours).map((d) => ({ key: `flag-${r.w.id}-${d.date}`, text: `${r.w.name} · ${d.date} needs review`, open: `${r.w.id}|${d.date}` }))),
-    ...events.filter((e) => e.outOfOrder || (e.deviceAt && Math.abs(new Date(e.deviceAt).getTime() - new Date(e.at).getTime()) > 300000)).map((e) => ({ key: `tap-${e.id}`, text: `${workers.find((w) => w.id === e.employeeId)?.name || "Worker"} · ${e.date}: ${e.outOfOrder ? "tap out of order" : "phone clock was off"}`, open: `${e.employeeId}|${e.date}` })),
+    ...events.filter((e) => e.outOfOrder || (e.deviceAt && Math.abs(new Date(e.deviceAt).getTime() - new Date(e.at).getTime()) > 300000)).map((e) => ({ key: `tap-${e.id}`, employeeId: e.employeeId, date: e.date, text: `${workers.find((w) => w.id === e.employeeId)?.name || "Worker"} · ${e.date}: ${e.outOfOrder ? "tap out of order" : "phone clock was off"}`, open: `${e.employeeId}|${e.date}` })),
   ];
+  const { open: alerts, resolved: resolvedAlerts } = splitAlerts(allAlerts, (id, date) => Boolean(approvalOf(id, date)?.approvedAt));
   async function exportCsv() {
     // Pay period: weekly = this week; biweekly = this + next week; semi-monthly = 1st–15th or 16th–end of the month of this week.
     const { from, to } = payPeriodOf(week, period, period === settings.payPeriod ? settings.payPeriodAnchor : "");
@@ -305,8 +307,12 @@ export default function TimesheetPage() {
       {alerts.length > 0 && (
         <details className="cr-collapse mb-3" data-testid="ts-alerts" open>
           <summary>Alerts ({alerts.length})</summary>
-          <ul className="mt-1 space-y-1 text-sm">{alerts.slice(0, 30).map((a) => <li key={a.key} data-testid="ts-alert" data-kind={"kind" in a ? a.kind : undefined}><button className="cr-btn-text" onClick={() => setOpen(a.open)}>{a.text}</button></li>)}</ul>
+          <ul className="mt-1 space-y-1 text-sm">{alerts.slice(0, 30).map((a) => <li key={a.key} data-testid="ts-alert" data-kind={a.kind}><button className="cr-btn-text" onClick={() => setOpen(a.open)}>{a.text}</button></li>)}</ul>
+          {resolvedAlerts.length > 0 && <details className="mt-2 text-sm text-[var(--cr-muted)]" data-testid="ts-alerts-resolved"><summary>Resolved ({resolvedAlerts.length})</summary><ul className="mt-1 space-y-1">{resolvedAlerts.slice(0, 30).map((a) => <li key={a.key} data-testid="ts-alert-resolved" data-kind={a.kind}><button className="cr-btn-text" onClick={() => setOpen(a.open)}>{a.text} · ✓ Approved</button></li>)}</ul></details>}
         </details>
+      )}
+      {alerts.length === 0 && resolvedAlerts.length > 0 && (
+        <details className="cr-collapse mb-3 text-sm text-[var(--cr-muted)]" data-testid="ts-alerts-resolved"><summary>Resolved alerts ({resolvedAlerts.length})</summary><ul className="mt-1 space-y-1">{resolvedAlerts.slice(0, 30).map((a) => <li key={a.key} data-testid="ts-alert-resolved" data-kind={a.kind}><button className="cr-btn-text" onClick={() => setOpen(a.open)}>{a.text} · ✓ Approved</button></li>)}</ul></details>
       )}
       {phone ? (
         <div className="space-y-2" data-testid="ts-cards">
