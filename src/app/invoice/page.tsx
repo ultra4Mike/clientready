@@ -2,15 +2,13 @@
 
 import { CONTACT_METHODS, contactMethodLabel, readContactMethod } from "@/lib/contact-method";
 import Link from "next/link";
-import PortalShare from "@/components/PortalShare";
+import dynamic from "next/dynamic";
 import Section, { SectionDefaults, useOpenedExisting } from "@/components/Section";
-import EmailComposer from "@/components/EmailComposer";
 import StageBar from "@/components/StageBar";
 import { applyCrewAmount, applyFeeAmount, customCostLineNames, customFeeEstimates, isCostKey, isFeeKind, type CostKey, CREW_KINDS, CREW_TYPE_CHOICES, crewApplySnapshot, crewTypeLabel, crewTypeMismatch, estimateByKind, extraName, isExtraItem, isCrewKind, readCostLines, readCrewUndo, undoCrewApply, type CostFields, type CostLine, type CrewApplyUndo, type CrewKind } from "@/lib/cost-categories";
 import { docAmounts, NEXT_LABEL, STAGE_LABEL, STAGES } from "@/lib/doc-stage";
 import { readEmailLog, type EmailLogEntry } from "@/lib/email";
 import { clientIdFor } from "@/lib/portal";
-import JobDonePanel from "@/components/JobDonePanel";
 import { StageEditor, StageSchedule } from "@/components/StageSchedule";
 import { balanceLabel, readStages, type Stage } from "@/lib/stages";
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
@@ -51,7 +49,6 @@ import { completeMessage, mailHref, scheduledMessage } from "@/lib/job-messages"
 import { clientFromRow, readCachedClients } from "@/lib/client-rows";
 import { ownerRating, starsText, type Rating } from "@/lib/ratings";
 import { applyPackage, deletePackage, readPackages, savePackage, syncPackages, type JobPackage } from "@/lib/packages";
-import ReminderPanel from "@/components/ReminderPanel";
 import { normalizeCategory, type LineCategory } from "@/lib/line-split";
 import { chainCredits, childRevision, creditLabel, newestDescendant, parentOf, revisionOwed } from "@/lib/change-order-revision";
 import { appendChangeOrderNote, changeOrdersFor, crewHandoff, revisionData, mergeChangeOrderNotes, readChangeOrderNotes, readChangeOrderOf, type ChangeOrderNote, type ChangeOrderOf } from "@/lib/change-orders";
@@ -73,7 +70,6 @@ import RestoreDraftBanner from "@/components/RestoreDraftBanner";
 import FormDraft from "@/components/FormDraft";
 import ScheduleEditor from "@/components/ScheduleEditor";
 import { entryHours, fmtHours, hoursByWorker, ownerEditClock, fixTimeProblem, crewFixReason, refreshOwnerClock, type ClockEntry } from "@/lib/clock";
-import MultiDayEditor from "@/components/MultiDayEditor";
 import { allDayWorkerIds, jobDays } from "@/lib/job-days";
 import { confirmRemoval, jobDonePhotos, crewForWorkers, followSchedule, jobScheduleFromForm, crewIds, workLogged, clockHoursFor, dedupeWorkerIds, readSchedule, readScheduleDays, readWorkers, shiftScheduleDays, saveAssignment, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
 import { createClientFromInvoice } from "@/lib/client-create";
@@ -93,9 +89,16 @@ import SignaturePad, { SignatureBlock } from "@/components/SignaturePad";
 import { readSignature, type Signature } from "@/lib/signature";
 import { amountOf, documentTotals, discountLabel, normalizeDiscountType, type DiscountType } from "@/lib/discount";
 import DocTrail from "@/components/DocTrail";
-import RevisionPanel from "@/components/RevisionPanel";
-import ChangeOrderPanel from "@/components/ChangeOrderPanel";
 import { isEmptyDraftChangeOrder } from "@/lib/change-order-summary";
+
+// R64: heavy, rarely opened panels load on demand (same props, same testids; they render once their chunk arrives).
+const EmailComposer = dynamic(() => import("@/components/EmailComposer"));
+const PortalShare = dynamic(() => import("@/components/PortalShare"));
+const ReminderPanel = dynamic(() => import("@/components/ReminderPanel"));
+const RevisionPanel = dynamic(() => import("@/components/RevisionPanel"));
+const ChangeOrderPanel = dynamic(() => import("@/components/ChangeOrderPanel"));
+const MultiDayEditor = dynamic(() => import("@/components/MultiDayEditor"));
+const JobDonePanel = dynamic(() => import("@/components/JobDonePanel"));
 
 type LineItem = { description: string; qty: string; rate: string; category?: LineCategory };
 type SavedClient = { id: string; name: string; company: string; email: string; phone: string; address: string; preferences?: string; contactMethod?: string };
