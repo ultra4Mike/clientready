@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { loadAccountIntoCache } from "@/lib/account-cache";
 import { afterAuthPath, pendingPlan, usePlanFromUrl } from "@/lib/pending-plan";
 import BrandMark from "@/components/BrandMark";
+import { passkeysSupported, signInWithPasskey } from "@/lib/passkeys";
 import { keepDefault, loginReasonMessage, markSignedIn, ROLE_KEY } from "@/lib/session-policy";
 
 export default function LoginPage() {
@@ -30,6 +31,14 @@ export default function LoginPage() {
     setReasonNote(loginReasonMessage(new URLSearchParams(window.location.search).get("reason")));
   }, []);
   const [busy, setBusy] = useState(false);
+  const [canPasskey, setCanPasskey] = useState(false);
+  useEffect(() => { setCanPasskey(passkeysSupported(window)); }, []);
+  async function passkeyLogin() {
+    setBusy(true); setMessage("");
+    const r = await signInWithPasskey();
+    if (!r.ok) { setBusy(false); setMessage(r.message); return; }
+    await finishSignIn();
+  }
   const [resetMode, setResetMode] = useState(false);
   // ?plan= (or a plan picked before an email-confirmation round trip): checkout opens after logging in.
   const plan = usePlanFromUrl();
@@ -62,6 +71,11 @@ export default function LoginPage() {
       setMessage(friendlyError(error.message));
       return;
     }
+    await finishSignIn();
+  }
+
+  /** Shared by password and passkey sign-in: crew vs owner routing + the keep/idle policy. */
+  async function finishSignIn() {
     const { data: session } = await supabase.auth.getUser();
     const signedIn = session.user;
     if (signedIn) {
@@ -100,6 +114,11 @@ export default function LoginPage() {
           {busy ? "Working" : resetMode ? "Send reset link" : "Log in"}
         </button>
       </form>
+      {canPasskey && !resetMode && (
+        <button type="button" data-testid="login-passkey" disabled={busy} onClick={passkeyLogin} className="mt-3 min-h-11 w-full rounded-lg border border-teal-500/40 px-4 py-2.5 text-sm font-semibold transition hover:bg-teal-500/10 disabled:opacity-60">
+          Sign in with fingerprint or face
+        </button>
+      )}
       {unconfirmed && (
         <div role="status" className="mt-4 space-y-2 rounded-lg border border-amber-400/50 bg-amber-400/10 px-3 py-3 text-sm" data-testid="login-unconfirmed">
           <p>Almost there: confirm your email first. Tap the link we sent to <strong>{unconfirmed}</strong>.</p>

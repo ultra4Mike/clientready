@@ -1,6 +1,7 @@
 "use client";
 
 import SecuritySettings from "@/components/SecuritySettings";
+import PasskeySettings from "@/components/PasskeySettings";
 import BookingSettings from "@/components/BookingSettings";
 import { lateFeeRulesFromRow, lateFeeRulesToRow } from "@/lib/late-fees";
 import PlanSection from "@/components/PlanSection";
@@ -369,7 +370,7 @@ export default function ProfilePage() {
         {passwordMessage && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-[var(--cr-muted)]">{passwordMessage}</p>}
       </form>
 
-      <SecuritySettings />
+      <SecuritySettings><PasskeySettings /></SecuritySettings>
 
       <BookingSettings />
       <PushSettings />
