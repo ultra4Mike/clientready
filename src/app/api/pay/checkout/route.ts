@@ -2,7 +2,7 @@ import { toCents } from "@/lib/stripe-money";
 import { tipCents } from "@/lib/tip";
 import { isRevision, replacedBy, revisionOwed } from "@/lib/change-order-revision";
 import { loadChain } from "@/lib/chain-server";
-import { amountToCharge, serviceClient, stripeConfig } from "@/lib/stripe-server";
+import { amountToCharge, docOwnerId, serviceClient, stripeConfig, stripeConfigFor } from "@/lib/stripe-server";
 
 import { clientIp, rateLimitedShared, tooMany } from "@/lib/rate-limit";
 
@@ -15,8 +15,8 @@ export const dynamic = "force-dynamic";
  * The amount is always computed here from the saved invoice, never taken from the browser.
  */
 export async function POST(request: Request) {
-  const config = stripeConfig();
-  if (!config.checkoutEnabled) return Response.json({ error: "Card payment is not set up." }, { status: 503 });
+  const baseConfig = stripeConfig();
+  if (!baseConfig.checkoutEnabled && !process.env.STRIPE_TEST_SECRET_KEY) return Response.json({ error: "Card payment is not set up." }, { status: 503 });
   if (await rateLimitedShared(`pay:${clientIp(request)}`, 15, 60_000)) return tooMany();
   let token = "";
   let portal = "";
@@ -43,6 +43,10 @@ export async function POST(request: Request) {
   if (error || !doc) return Response.json({ error: "Link not found." }, { status: 404 });
   if (doc.type !== "invoice") return Response.json({ error: doc.type === "proposal" ? "Approve the proposal first; the deposit is paid on its invoice." : "Only invoices can be paid online.", needsApproval: doc.type === "proposal" }, { status: doc.type === "proposal" ? 409 : 400 });
   const data = (doc.data || {}) as Record<string, unknown>;
+  // Owner first: sandbox (test) owners are charged with the Stripe TEST key, everyone else with the normal key.
+  const ownerId = await docOwnerId(String(doc.id));
+  const config = stripeConfigFor(ownerId);
+  if (!config.checkoutEnabled) return Response.json({ error: "Card payment is not set up." }, { status: 503 });
   // R128: plain invoices are payable right away; proposals are never charged here (their deposit is paid on
   // the invoice made automatically at approval, see /api/approve/convert).
   if (["void", "voided", "deleted"].includes(String(data.status || "")) || data.deleted) return Response.json({ error: "This invoice is void." }, { status: 400 });
@@ -90,8 +94,6 @@ export async function POST(request: Request) {
 
   // Claim the invoice before calling Stripe. With migration 20261015140000 a unique index allows one
   // open row per invoice, so a near-simultaneous second request fails here (23505) and is refused.
-  const { data: ownerRow } = await serviceClient().from("documents").select("user_id").eq("id", String(doc.id)).maybeSingle();
-  const ownerId = (ownerRow as { user_id?: string } | null)?.user_id || null;
   const claimId = `claim_${crypto.randomUUID()}`;
   let claimed = false;
   if (!openError) {

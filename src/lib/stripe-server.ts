@@ -19,6 +19,31 @@ export function stripeConfig() {
   };
 }
 
+/**
+ * Sandbox owners (test accounts): when STRIPE_TEST_SECRET_KEY (sk_test_ only) is set and the invoice's owner id is
+ * listed in STRIPE_TEST_OWNER_IDS (comma separated), that owner's client checkouts use the TEST key, so tips and
+ * payments can be tried on production without a real charge. Every other owner keeps STRIPE_SECRET_KEY unchanged.
+ */
+export function sandboxOwner(ownerId: string | null | undefined) {
+  const key = process.env.STRIPE_TEST_SECRET_KEY || "";
+  if (!ownerId || !key.startsWith("sk_test_")) return false;
+  return (process.env.STRIPE_TEST_OWNER_IDS || "").split(",").map((v) => v.trim()).filter(Boolean).includes(ownerId);
+}
+export function stripeConfigFor(ownerId: string | null | undefined) {
+  const base = stripeConfig();
+  if (!sandboxOwner(ownerId)) return base;
+  const secretKey = process.env.STRIPE_TEST_SECRET_KEY || "";
+  return { ...base, secretKey, checkoutEnabled: Boolean(secretKey && base.serviceKey && base.supabaseUrl) };
+}
+/** Test-mode webhook signing secret (STRIPE_TEST_WEBHOOK_SECRET), used only for livemode:false events. */
+export function testWebhookSecret() {
+  return (process.env.STRIPE_TEST_SECRET_KEY || "").startsWith("sk_test_") ? process.env.STRIPE_TEST_WEBHOOK_SECRET || "" : "";
+}
+export async function docOwnerId(docId: string) {
+  const { data } = await serviceClient().from("documents").select("user_id").eq("id", docId).maybeSingle();
+  return (data as { user_id?: string } | null)?.user_id || null;
+}
+
 /** Service-role client: only used for the two Stripe functions, which only the service role may call. */
 export function serviceClient() {
   const { supabaseUrl, serviceKey } = stripeConfig();

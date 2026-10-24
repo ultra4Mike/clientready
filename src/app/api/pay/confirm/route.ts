@@ -1,4 +1,4 @@
-import { serviceClient, stripeConfig } from "@/lib/stripe-server";
+import { docOwnerId, serviceClient, stripeConfig, stripeConfigFor } from "@/lib/stripe-server";
 import { currencyOk, fromMinor } from "@/lib/stripe-money";
 import { clientIp, rateLimitedShared, tooMany } from "@/lib/rate-limit";
 
@@ -13,8 +13,7 @@ export const dynamic = "force-dynamic";
  * the page can show the receipt.
  */
 export async function POST(request: Request) {
-  const config = stripeConfig();
-  if (!config.checkoutEnabled) return Response.json({ error: "Card payment is not set up." }, { status: 503 });
+  if (!stripeConfig().checkoutEnabled && !process.env.STRIPE_TEST_SECRET_KEY) return Response.json({ error: "Card payment is not set up." }, { status: 503 });
   if (await rateLimitedShared(`confirm:${clientIp(request)}`, 30, 60_000)) return tooMany();
   let token = "", portal = "", docId = "", cs = "";
   try {
@@ -30,6 +29,7 @@ export async function POST(request: Request) {
     : await client.rpc("stripe_invoice_for_token", { p_token: token });
   const doc = (Array.isArray(rows) ? rows[0] : rows) as { id: string; type: string } | null;
   if (!doc || doc.type !== "invoice") return Response.json({ error: "Link not found." }, { status: 404 });
+  const config = stripeConfigFor(await docOwnerId(String(doc.id)));
   const session = await fetch(`${config.apiBase}/v1/checkout/sessions/${encodeURIComponent(cs)}`, { headers: { Authorization: `Bearer ${config.secretKey}` } })
     .then((r) => (r.ok ? r.json() : null)).catch(() => null) as { id?: string; payment_status?: string; amount_total?: number; currency?: string; created?: number; payment_intent?: string | null; metadata?: { doc_id?: string; tip_cents?: string } } | null;
   if (!session || session.metadata?.doc_id !== String(doc.id)) return Response.json({ error: "Unknown payment." }, { status: 404 });

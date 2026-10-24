@@ -1,5 +1,5 @@
 import { handleSubscriptionEvent, SUBSCRIPTION_EVENTS } from "@/lib/stripe-subscription-events";
-import { serviceClient, stripeConfig, verifyStripeSignature } from "@/lib/stripe-server";
+import { sandboxOwner, serviceClient, stripeConfig, testWebhookSecret, verifyStripeSignature } from "@/lib/stripe-server";
 import { currencyOk, fromMinor } from "@/lib/stripe-money";
 
 export const runtime = "nodejs";
@@ -28,7 +28,11 @@ export async function POST(request: Request) {
   const config = stripeConfig();
   if (!config.webhookEnabled) return Response.json({ error: "Webhook is not set up." }, { status: 503 });
   const payload = await request.text();
-  if (!verifyStripeSignature(payload, request.headers.get("stripe-signature") || "", config.webhookSecret)) {
+  const signature = request.headers.get("stripe-signature") || "";
+  const liveOk = verifyStripeSignature(payload, signature, config.webhookSecret);
+  const testSecret = testWebhookSecret();
+  const testOk = !liveOk && Boolean(testSecret) && verifyStripeSignature(payload, signature, testSecret);
+  if (!liveOk && !testOk) {
     return Response.json({ error: "Bad signature." }, { status: 400 });
   }
   let event: { id?: string; type?: string; created?: number; data?: { object?: Session } };
@@ -37,6 +41,9 @@ export async function POST(request: Request) {
   } catch {
     return Response.json({ error: "Bad payload." }, { status: 400 });
   }
+  // Test-mode: only one-off invoice checkouts are handled (no plans, refunds); the rest is acknowledged.
+  if (testOk && !(event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") ) return Response.json({ received: true, ignored: "test event" });
+  if (testOk && event.data?.object?.mode === "subscription") return Response.json({ received: true, ignored: "test event" });
   const isPlanCheckout = event.type === "checkout.session.completed" && event.data?.object?.mode === "subscription";
   if (isPlanCheckout || (event.type && event.type !== "checkout.session.completed" && SUBSCRIPTION_EVENTS.includes(event.type))) {
     const result = await handleSubscriptionEvent(event as Parameters<typeof handleSubscriptionEvent>[0]);
@@ -53,6 +60,8 @@ export async function POST(request: Request) {
     return Response.json({ received: true });
   }
   const session = event.data?.object || {};
+  // Test-mode events (signed with the test secret) only count for sandbox owners; never for real accounts.
+  if (testOk && !sandboxOwner(String(session.metadata?.owner_id || ""))) return Response.json({ received: true, recorded: false, ignored: "test event for a non-sandbox owner" });
   const docId = session.metadata?.doc_id || session.client_reference_id || "";
   if (session.payment_status !== "paid" || !session.id || !session.amount_total) {
     return Response.json({ received: true, recorded: false });
