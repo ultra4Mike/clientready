@@ -1,5 +1,6 @@
 "use client";
 
+import SecuritySettings from "@/components/SecuritySettings";
 import BookingSettings from "@/components/BookingSettings";
 import { lateFeeRulesFromRow, lateFeeRulesToRow } from "@/lib/late-fees";
 import PlanSection from "@/components/PlanSection";
@@ -367,6 +368,8 @@ export default function ProfilePage() {
         <button type="submit" className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50 w-full sm:w-auto">Update password</button>
         {passwordMessage && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-[var(--cr-muted)]">{passwordMessage}</p>}
       </form>
+
+      <SecuritySettings />
 
       <BookingSettings />
       <PushSettings />

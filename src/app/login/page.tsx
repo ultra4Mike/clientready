@@ -4,11 +4,12 @@ import { friendlyError } from "@/lib/net-error";
 import { linkOrigin } from "@/lib/site";
 import Link from "next/link";
 import LegalLinks from "@/components/LegalLinks";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { loadAccountIntoCache } from "@/lib/account-cache";
 import { afterAuthPath, pendingPlan, usePlanFromUrl } from "@/lib/pending-plan";
 import BrandMark from "@/components/BrandMark";
+import { keepDefault, loginReasonMessage, markSignedIn, ROLE_KEY } from "@/lib/session-policy";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -20,6 +21,14 @@ export default function LoginPage() {
     setResent(error ? `Could not resend: ${friendlyError(error.message)}` : `Sent a new link to ${unconfirmed}. Check inbox and spam.`);
   }
   const [message, setMessage] = useState("");
+  // Part 3: "Keep me signed in" (unchecked for owners, checked for crew who logged in here before).
+  const [keep, setKeep] = useState(false);
+  const [reasonNote, setReasonNote] = useState("");
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
+    setKeep(keepDefault(window.localStorage.getItem(ROLE_KEY)));
+    setReasonNote(loginReasonMessage(new URLSearchParams(window.location.search).get("reason")));
+  }, []);
   const [busy, setBusy] = useState(false);
   const [resetMode, setResetMode] = useState(false);
   // ?plan= (or a plan picked before an email-confirmation round trip): checkout opens after logging in.
@@ -59,10 +68,12 @@ export default function LoginPage() {
       const { data: person } = await supabase.rpc("is_crew_email");
       const row = Array.isArray(person) ? person[0] : person;
       if (row && row.user_id && row.user_id !== signedIn.id) {
+        markSignedIn(keep, "crew");
         window.location.href = "/crew";
         return;
       }
     }
+    markSignedIn(keep, "owner");
     await loadAccountIntoCache();
     window.location.href = afterAuthPath(plan || pendingPlan());
   }
@@ -73,10 +84,17 @@ export default function LoginPage() {
       <Link href="/" className="mb-6 inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[var(--cr-muted)] transition hover:text-teal-600"><BrandMark className="h-7 w-7" />Back to ClientReady</Link>
       <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-6 shadow-xl shadow-teal-950/10 sm:p-8">
       <h1 className="text-2xl font-bold tracking-tight">{resetMode ? "Reset password" : "Log in"}</h1>
+      {reasonNote && <p role="status" data-testid="login-reason" className="mt-4 rounded-lg border border-teal-500/30 bg-teal-500/10 px-3 py-2 text-sm">{reasonNote}</p>}
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <input type="email" required placeholder="Email" className="w-full min-h-11 rounded-lg border border-slate-300 bg-transparent px-3 py-2.5 text-base shadow-sm sm:text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={email} onChange={(event) => setEmail(event.target.value)} />
         {!resetMode && (
           <input type="password" required placeholder="Password" className="w-full min-h-11 rounded-lg border border-slate-300 bg-transparent px-3 py-2.5 text-base shadow-sm sm:text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={password} onChange={(event) => setPassword(event.target.value)} />
+        )}
+        {!resetMode && (
+          <label className="flex min-h-11 items-center gap-2.5 text-sm" data-testid="login-keep">
+            <input type="checkbox" checked={keep} onChange={(event) => setKeep(event.target.checked)} className="h-5 w-5 accent-teal-500" />
+            <span>Keep me signed in on this device <span className="block text-xs text-[var(--cr-muted)]">Leave unticked on shared or public computers.</span></span>
+          </label>
         )}
         <button type="submit" disabled={busy} className="min-h-11 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-60">
           {busy ? "Working" : resetMode ? "Send reset link" : "Log in"}

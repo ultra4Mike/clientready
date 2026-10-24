@@ -5,6 +5,8 @@ import TrialBanner from "@/components/TrialBanner";
 import { ReactNode, useEffect, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import IdleGuard from "@/components/IdleGuard";
+import { PENDING_KEY } from "@/lib/session-policy";
 import { clearLocalBusiness } from "@/lib/account-cache";
 import { disablePush } from "@/lib/push";
 import { isCrewUser } from "@/lib/crew";
@@ -57,6 +59,16 @@ export default function AppShell({
   }, [pathname]);
   // The theme is whatever class the layout's inline script put on <html> (read before paint; the server renders "dark").
   const theme = useSyncExternalStore(subscribeTheme, readTheme, () => "dark");
+  // Part 3 (no-flash): page content mounts only after the session check. A session dropped at startup
+  // (browser closed without "Keep me signed in", or idle) clears this device's business copy first.
+  const [gate, setGate] = useState<"checking" | "ok">("checking");
+  useEffect(() => {
+    const reason = window.localStorage.getItem(PENDING_KEY);
+    if (!reason) { setGate("ok"); return; }
+    clearLocalBusiness();
+    window.localStorage.removeItem(PENDING_KEY);
+    void supabase.auth.signOut({ scope: "local" }).catch(() => undefined).finally(() => window.location.replace(`/login?reason=${encodeURIComponent(reason)}`));
+  }, []);
   useEffect(() => {
     isCrewUser().then((crew) => {
       if (crew) window.location.href = "/crew";
@@ -160,12 +172,13 @@ export default function AppShell({
             </div>
           </header>
           <div className="app-main p-4 pb-[calc(11.5rem+env(safe-area-inset-bottom))] min-[900px]:p-6 print:pb-4">
-            <div className="mx-auto w-full max-w-6xl"><TrialBanner />{embeddedTabs}{children}</div>
+            <div className="mx-auto w-full max-w-6xl">{gate === "ok" ? <><TrialBanner />{embeddedTabs}{children}</> : <p className="py-16 text-center text-sm text-[var(--cr-muted)]" data-testid="session-checking">Loading…</p>}</div>
           </div>
         </div>
       </div>
       <MobileNav onLogOut={logOut} />
       <ConflictToast />
+      <IdleGuard />
     </div>
   );
 }
