@@ -1345,6 +1345,24 @@ export default function NewInvoicePage() {
   function updateItem(index: number, field: keyof LineItem, value: string) {
     setItems((current) => current.map((item, itemIndex) => itemIndex === index && item[field] !== value ? { ...item, [field]: value } : item));
   }
+  // Help retest (INV-1039): a scripted fill can set a box's value with native events React's value tracker
+  // swallows, so the header total and Still owed stayed on the old rate. Native listeners (capture, whole page)
+  // copy any line-item box into state on input/change/focusout/paste, so the total always recomputes from the lines.
+  useEffect(() => {
+    const sync = (event: Event) => {
+      const el = event.target as HTMLInputElement | null;
+      if (!el || !el.dataset || !el.dataset.itemField || el.dataset.itemIndex === undefined) return;
+      const field = el.dataset.itemField as ItemTextField;
+      if (!["description", "qty", "rate"].includes(field)) return;
+      const index = Number(el.dataset.itemIndex);
+      const apply = () => setItems((current) => liveItems(current, [{ value: el.value, dataset: { itemField: field, itemIndex: String(index) } }]));
+      apply();
+      if (event.type === "paste") window.setTimeout(apply, 0);
+    };
+    const types = ["input", "change", "focusout", "paste"];
+    types.forEach((t) => document.addEventListener(t, sync, true));
+    return () => types.forEach((t) => document.removeEventListener(t, sync, true));
+  }, []);
   /** Line-item text fields commit on input, change, paste and blur (a fill() or paste then an instant blur + Save never leaves $0). */
   function commitHandlers(index: number, field: ItemTextField) {
     const commit = (event: { currentTarget: HTMLInputElement }) => updateItem(index, field, event.currentTarget.value);
@@ -1365,7 +1383,7 @@ export default function NewInvoicePage() {
     const setAside = leftOver > 0 ? leftOver * ((Number(setAsidePercent) || 0) / 100) : 0;
     return { jobCost, breakdown, leftOver, setAside, yours: leftOver - setAside };
   }, [costs, otherFees, totals.total, setAsidePercent, crew, payments, jobMiles, invoiceDate, schedule]);
-  const jobAlerts = isProposal ? [] : profitAlerts({ total: totals.total, jobCost: jobMath.jobCost, crewTotal: crewReportTotal(crewReport), minMargin });
+  const jobAlerts = isProposal ? [] : profitAlerts({ total: totals.total, jobCost: jobMath.jobCost, crewTotal: crewReportTotal(crewReport), minMargin, breakdown: jobMath.breakdown });
 
   const payUrl = payUrlFor(docPayLink, paymentLink);
   const qrUrl = invoiceQrUrl(approval?.token, printOrigin(), docPayLink, paymentLink);
