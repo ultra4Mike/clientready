@@ -1,7 +1,7 @@
 import { readStages, stagePlan } from "./stages";
 import { bizToday } from "./biz-today";
 /** tip: extra the client gave on top of the bill; never counts toward the balance. */
-export type Payment = { id: string; amount: string; method: string; date: string; ref: string; tip?: string; note?: string };
+export type Payment = { id: string; amount: string; method: string; date: string; ref: string; tip?: string; note?: string; of?: string };
 
 export const paymentMethods = ["Cash", "Check", "Venmo", "Cash App", "Zelle", "PayPal", "Bank", "Card", "Card (Stripe)", "Other"];
 
@@ -36,6 +36,7 @@ export function readPayments(data?: PaymentData | null): Payment[] {
         ref: String(item.ref || ""),
         ...(num(item.tip) > 0 ? { tip: String(item.tip) } : {}),
         ...(item.note ? { note: String(item.note).slice(0, 300) } : {}),
+        ...(item.of ? { of: String(item.of) } : {}),
       };
     });
   }
@@ -120,7 +121,8 @@ export function paymentFields(payments: Payment[]) {
  */
 export function keepStripePayments(local: Record<string, unknown>, cloud: Record<string, unknown> | null | undefined) {
   if (!cloud) return local;
-  const remote = readPayments(cloud).filter((payment) => payment.id.startsWith("stripe_"));
+  // R2: server-recorded refunds ("refund_...") are kept too, so a stale device save can't drop a refund.
+  const remote = readPayments(cloud).filter((payment) => payment.id.startsWith("stripe_") || isRefundRow(payment));
   if (!remote.length) return local;
   const mine = readPayments(local);
   const missing = remote.filter((payment) => !mine.some((item) => item.id === payment.id));
@@ -223,3 +225,18 @@ export function paymentRequirement(status: unknown, payments: Payment[], legacyP
   if (String(status) === "paid" && !legacyPaid && !withAmount.length) return "To mark this invoice Paid, add a payment with the amount and how it was paid, or use Mark paid.";
   return "";
 }
+
+/**
+ * R2: how much of one payment can still be refunded: its amount minus refunds linked to it ("of"), or, for a
+ * card payment, Stripe refunds recorded against the same PaymentIntent (ref). Never more than the net paid.
+ */
+export function refundableFor(payments: Payment[], paymentId: string) {
+  const row = payments.find((payment) => payment.id === paymentId && !isRefundRow(payment));
+  if (!row || num(row.amount) <= 0) return 0;
+  const linked = payments.filter((payment) => isRefundRow(payment) && (payment.of === paymentId || (!payment.of && row.ref.startsWith("pi_") && payment.ref === row.ref)));
+  const left = num(row.amount) + linked.reduce((sum, payment) => sum + Math.min(num(payment.amount), 0), 0);
+  const net = payments.reduce((sum, payment) => sum + num(payment.amount), 0);
+  return round(Math.max(Math.min(left, net), 0));
+}
+/** R2: a card payment taken through Stripe (refund goes back to the card through Stripe). */
+export const isStripeCardPayment = (payment: Payment) => payment.id.startsWith("stripe_") && payment.ref.startsWith("pi_");

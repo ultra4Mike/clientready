@@ -36,6 +36,7 @@ import { readLateFeeSettings, suggestedLateFee, type LateFeeSettings } from "@/l
 import { saveCrewJobs } from "@/lib/crew";
 import { depositInvoice, missingDeposits } from "@/lib/proposal-deposit";
 import { docTotal } from "@/lib/review";
+import { RefundPayment } from "@/components/RefundPayment";
 import { balanceDue, owedAfterRefunds, refundState, refundedTotal, paidTotal, tipTotal, paymentFields, methodLabel, paymentMethods, paymentRequirement, readPayments, type Payment } from "@/lib/payments";
 import { JobPhotosEditor, JobPhotoStrip } from "@/components/JobPhotos";
 import { currentDocId } from "@/lib/doc-sync";
@@ -1633,6 +1634,7 @@ export default function NewInvoicePage() {
                   <label className="text-sm font-medium text-slate-600 sm:col-span-2">Reference / note<input className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Check number, confirmation, last 4" value={payment.ref} onChange={(event) => updatePayment(payment.id, { ref: event.target.value })} /></label>
                   <label className="text-sm font-medium text-slate-600">Tip (optional, not part of the bill)<input name="paymentTip" data-testid="payment-tip" className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 text-right tabular-nums" inputMode="decimal" placeholder="0.00" value={payment.tip || ""} onChange={(event) => updatePayment(payment.id, { tip: event.target.value })} /></label>
                   <button type="button" className="min-h-11 justify-self-start rounded-lg px-3 text-sm font-medium text-rose-700 transition hover:bg-rose-500/10 dark:text-rose-300 sm:col-span-2" onClick={() => setPayments((current) => current.filter((item) => item.id !== payment.id))}>Remove payment</button>
+                  {!isProposal && !payment.id.startsWith("refund_") && <RefundPayment docId={docId} payment={payment} payments={payments} onDone={(next, message) => { setPayments(next); setSaveMessage(message); }} />}
                 </div>
               ))}
               <div className="flex items-end justify-between border-t border-slate-200 pt-3">
