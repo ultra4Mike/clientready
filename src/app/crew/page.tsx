@@ -21,6 +21,7 @@ import { crewMarkDone, crewCheckItem, crewOnMyWay, omwTime, crewSetJobStatus, on
 import { compressPhoto } from "@/lib/photos";
 import CrewVisitNote from "@/components/CrewVisitNote";
 import { compressImage, crewClockIn, crewClockOut, crewEditClock, fixTimeProblem, entryHours, withQueuedClock, fmtHours, fmtTimer, type ClockEntry } from "@/lib/clock";
+import BrandMark from "@/components/BrandMark";
 
 type Client = { id: string; name: string; phone: string; address: string };
 type Job = {
@@ -779,7 +780,7 @@ export default function CrewPage() {
       <header className="app-topbar sticky top-0 z-10 border-b border-teal-500/20 bg-[var(--cr-bg)] px-4 py-3 shadow-sm print:hidden">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-500 font-bold text-slate-950! shadow-sm">C</span>
+            <BrandMark className="h-9 w-9" />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold leading-tight" data-testid="crew-name">{name || "Your jobs"}</p>
               <p className="text-xs text-[var(--cr-muted)]" data-testid="crew-role-badge">{isLeadUser ? "Crew lead" : "Crew"}</p>

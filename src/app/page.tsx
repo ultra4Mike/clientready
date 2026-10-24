@@ -6,6 +6,7 @@ import NativeLoginOnly from "@/components/NativeLoginOnly";
 import { isNativeApp } from "@/lib/native";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
+import BrandMark from "@/components/BrandMark";
 
 /**
  * Starts plan checkout for a signed-in owner (their session links the subscription to their account).
@@ -59,9 +60,11 @@ export default function HomePage() {
       {deleted && <p role="status" data-testid="account-deleted" className="flex items-center justify-center gap-2 bg-emerald-600 px-4 py-3 text-center text-sm font-medium text-white!"><span aria-hidden="true">✓</span>Your account was deleted.</p>}
       <header className="sticky top-0 z-20 border-b border-teal-500/20 bg-[var(--cr-panel)] pt-[env(safe-area-inset-top)] print:hidden">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3 sm:py-4">
-          <Link href="/" className="flex items-center gap-2 font-semibold">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-teal-500 text-sm font-bold text-slate-950!">C</span>
-            ClientReady
+          <Link href="/" className="flex items-center gap-2.5 font-semibold">
+            <BrandMark className="h-9 w-9" />
+            <span className="flex flex-col leading-none">
+              <span className="text-[17px] font-bold tracking-tight">ClientReady</span>
+            </span>
           </Link>
           <div className="flex items-center gap-2 text-sm sm:gap-4">
             <button type="button" onClick={toggleTheme} className="hidden font-medium transition hover:text-teal-500 sm:inline">{theme === "dark" ? "Light" : "Dark"}</button>
@@ -72,6 +75,13 @@ export default function HomePage() {
       </header>
 
       <section className="mx-auto max-w-6xl px-4 py-12 sm:py-20 lg:text-center">
+        <div className="mb-8 flex items-center gap-4 lg:justify-center">
+          <BrandMark className="h-14 w-14 sm:h-16 sm:w-16" />
+          <div className="text-left">
+            <p className="text-2xl font-extrabold tracking-tight sm:text-3xl">ClientReady</p>
+            <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-teal-600 dark:text-teal-300 sm:text-xs">INVOICING • SCHEDULING • CLIENT READY</p>
+          </div>
+        </div>
         <p className="inline-flex rounded-full border border-teal-500/30 bg-teal-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-teal-600 dark:text-teal-300">For small businesses</p>
         <h1 className="mt-4 max-w-3xl text-4xl lg:mx-auto font-bold leading-tight tracking-tight md:text-6xl">Get paid. Stay client-ready.</h1>
         <p className="mt-5 max-w-2xl text-lg lg:mx-auto leading-8 text-[var(--cr-muted)]">

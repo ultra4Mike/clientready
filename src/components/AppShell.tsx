@@ -13,15 +13,14 @@ import { CalendarViewTabs, DocumentsViewTabs } from "@/components/ViewTabs";
 import { calendarView, documentsView } from "@/lib/view-routes";
 import SyncPill from "@/components/SyncPill";
 import { flushClientContactQueue } from "@/lib/client-sync";
+import BrandMark from "@/components/BrandMark";
 import MobileNav, { BOTTOM_LINKS, NAV_GROUPS } from "@/components/MobileNav";
 
 function Logo() {
   return (
     <a href="/dashboard" className="flex items-center gap-2 font-semibold">
-      <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-teal-500 text-sm font-bold text-slate-950!">
-        C
-      </span>
-      <span>ClientReady</span>
+      <BrandMark className="h-8 w-8" />
+      <span className="text-[17px] font-bold tracking-tight">ClientReady</span>
     </a>
   );
 }

@@ -8,6 +8,7 @@ import { localYmd, niceYmd, scheduledJobs, timeLabel, type ScheduledJob } from "
 import { doneState, statusLabel } from "@/lib/schedule";
 import PageHeader from "@/components/PageHeader";
 import MobileNav from "@/components/MobileNav";
+import BrandMark from "@/components/BrandMark";
 
 type Client = {
   id: string;
@@ -82,7 +83,7 @@ export default function SchedulePage() {
     <main className="min-h-screen bg-[var(--cr-bg)] pb-[calc(10rem+env(safe-area-inset-bottom))] text-[var(--cr-text)] min-[900px]:pb-0 print:pb-0">
       <header className="app-topbar sticky top-0 z-20 border-b border-teal-500/20 bg-[var(--cr-panel)] print:hidden">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
-          <a href="/dashboard" className="flex items-center gap-2 text-sm font-medium transition hover:text-teal-500"><span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-teal-500 text-sm font-bold text-slate-950!">C</span>
+          <a href="/dashboard" className="flex items-center gap-2 text-sm font-medium transition hover:text-teal-500"><BrandMark className="h-8 w-8" />
             Back to dashboard
           </a>
           <a href="/calendar" className="inline-flex min-h-11 items-center rounded-lg border border-teal-500/30 px-4 text-sm font-medium transition hover:border-teal-400">

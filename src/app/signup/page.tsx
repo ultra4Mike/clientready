@@ -9,6 +9,7 @@ import { loadAccountIntoCache } from "@/lib/account-cache";
 import { afterAuthPath, asPlan, usePlanFromUrl, rememberPlan } from "@/lib/pending-plan";
 import { PLANS } from "@/lib/plans";
 import { linkOrigin } from "@/lib/site";
+import BrandMark from "@/components/BrandMark";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -60,7 +61,7 @@ export default function SignupPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[var(--cr-bg)] px-4 py-10">
       <div className="w-full max-w-md">
-      <Link href="/" className="mb-6 inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[var(--cr-muted)] transition hover:text-teal-600"><span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-teal-500 text-xs font-bold text-slate-950!">C</span>Back to ClientReady</Link>
+      <Link href="/" className="mb-6 inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[var(--cr-muted)] transition hover:text-teal-600"><BrandMark className="h-7 w-7" />Back to ClientReady</Link>
       {confirm ? (
       <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-6 text-center shadow-xl shadow-teal-950/10 sm:p-8" data-testid="signup-check-email">
         <h1 className="text-2xl font-bold tracking-tight">Check your email to confirm</h1>
