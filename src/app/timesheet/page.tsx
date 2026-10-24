@@ -13,6 +13,9 @@ import PageHeader from "@/components/PageHeader";
 import { readWorkers, type Worker } from "@/lib/schedule";
 import { weekOf } from "@/lib/pay-types";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
+import { refreshEmployeesCache } from "@/lib/account-cache";
+import { timesheetEmptyKind, type CrewLoad } from "@/lib/timesheet-crew-state";
 import DayDetail from "@/components/timesheet/DayDetail";
 import PtoOwnerCard from "@/components/phase2/PtoOwnerCard";
 import { loadPtoForRange, loadPtoRequests } from "@/lib/phase2-data";
@@ -52,6 +55,7 @@ export default function TimesheetPage() {
   const [message, setMessage] = useState("");
   const [now, setNow] = useState("");
   const [cutover, setCutover] = useState("");
+  const [crewLoad, setCrewLoad] = useState<CrewLoad>("loading");
   // Browser-only data, loaded once after the owner's shared pay cutover is synced (async, so no setState during the effect).
   useEffect(() => {
     let live = true;
@@ -63,6 +67,15 @@ export default function TimesheetPage() {
       setWeek(weekOf(q && /^\d{4}-\d{2}-\d{2}$/.test(q) ? q : localYmd(new Date().toISOString())));
       setWorkers(readWorkers()); setDocs(readDocs()); setSettings(readLocalTimesheetSettings()); setNow(new Date().toISOString());
     });
+    // The crew list is a browser cache filled by Team; a fresh browser/sign-in has none, so read it from the server here too.
+    void supabase.auth.getUser().then(async ({ data }) => {
+      if (!live) return;
+      if (!data.user) { setCrewLoad("signed_out"); return; }
+      const ok = await refreshEmployeesCache(data.user.id).catch(() => false);
+      if (!live) return;
+      if (ok) setWorkers(readWorkers());
+      setCrewLoad(ok ? "ready" : "error");
+    }).catch(() => { if (live) setCrewLoad("error"); });
     return () => { live = false; };
   }, []);
   useEffect(() => {
@@ -326,7 +339,7 @@ export default function TimesheetPage() {
       )}
       {!cloud && <p className="cr-panel cr-tone-warn mt-2 text-sm" data-testid="ts-cloud-offline" role="status">Couldn&apos;t read the saved timesheet (signed out or offline). Showing this device&apos;s copy; nothing was deleted. Sign in again or refresh.{cloudError ? <span className="block text-xs" data-testid="ts-cloud-error">Details: {cloudError}</span> : null}</p>}
       {orphans.length > 0 && <p className="cr-panel cr-tone-warn mt-2 text-sm" data-testid="ts-orphan-hours" role="status">Hours saved for {orphans.length} crew record{orphans.length === 1 ? "" : "s"} not on your Team list this week ({orphans.join(", ")}). They are kept, not deleted. Check Team for a removed or re-added person.</p>}
-      {!shown.length && <p className="mt-2 text-sm text-[var(--cr-muted)]" data-testid="ts-empty">{filter === "review" ? "Nothing needs review this week." : <>No crew yet. Add your crew on <Link href="/employees" className="underline">Team</Link>; their taps on My day show up here.</>}</p>}
+      {!shown.length && (() => { const k = timesheetEmptyKind(crewLoad, workers.length, filter); return k === "none" ? null : <p className="mt-2 text-sm text-[var(--cr-muted)]" data-testid="ts-empty" data-kind={k} role={k === "signed_out" || k === "error" ? "status" : undefined}>{k === "review_clear" ? "Nothing needs review this week." : k === "loading" ? "Loading your crew…" : k === "signed_out" ? <>You&apos;re signed out, so your crew can&apos;t load. <Link href="/login" className="underline">Sign in</Link> to see their hours.</> : k === "error" ? "Couldn't load your crew from the server. Check your connection and refresh." : <>No crew yet. Add your crew on <Link href="/employees" className="underline">Team</Link>; their taps on My day show up here.</>}</p>; })()}
       {pendingFixes.length > 0 && (
         <section className="cr-section mt-4 space-y-2" data-testid="ts-fixes">
           <h2 className="font-bold">Fix-my-time requests <span className="cr-chip2 cr-tone-warn" data-testid="ts-fix-badge">{pendingFixes.length}</span></h2>
@@ -340,7 +353,7 @@ export default function TimesheetPage() {
           ))}
         </section>
       )}
-      <p className="mt-4 text-xs text-[var(--cr-muted)]" data-testid="ts-footer-hint">Rules (gap, “Still driving?”, half day) are on <Link href="/employees" className="underline">Team</Link> under Timesheet rules.</p>
+      <p className="mt-4 text-xs text-[var(--cr-muted)]" data-testid="ts-footer-hint">Overtime and time off rules are in <Link href="/profile#overtime" className="underline" data-testid="ts-footer-settings">Settings</Link>. Day rules (gap, “Still driving?”, half day) are on <Link href="/employees" className="underline">Team</Link> under Timesheet rules. <Link href="/help?a=timesheet-how-counted" className="underline" data-testid="ts-footer-how">How hours are counted</Link></p>
       {open && openWorker && (
         <DayDetail key={`${open}|${approvalOf(openWorker.id, openDate)?.editedMinutes ?? ""}`} workerName={openWorker.name} date={openDate} sheet={sheets.get(open)} approval={approvalOf(openWorker.id, openDate)}
           minutes={minutesOf(openWorker.id, openDate)} extraFlags={flagsOf(openWorker.id, openDate).filter((f) => f === "edited" || f === "changed_since_approved")}
