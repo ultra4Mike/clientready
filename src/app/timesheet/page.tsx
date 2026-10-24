@@ -7,7 +7,7 @@
  * the day on its crew rows, so job labor/profit, Crew pay, Year packet and Reports follow. Unapproved days are estimates.
  */
 import { fmtTime, ymdTz, readWorkerOverrides, timeAlerts, payPeriodOf, type ScheduledJob } from "@/lib/timesheet";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { readWorkers, type Worker } from "@/lib/schedule";
@@ -15,13 +15,13 @@ import { weekOf } from "@/lib/pay-types";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { refreshEmployeesCache } from "@/lib/account-cache";
-import { splitAlerts, scheduleAlertLabel, type OwnerAlert } from "@/lib/timesheet-alerts";
+import { splitAlerts, mergeApprovals, resolvedInPeriod, scheduleAlertLabel, pendingSurfaces, statusChip, LOADING_LABEL, type OwnerAlert } from "@/lib/timesheet-alerts";
 import { timesheetEmptyKind, type CrewLoad } from "@/lib/timesheet-crew-state";
 import DayDetail from "@/components/timesheet/DayDetail";
 import PtoOwnerCard from "@/components/phase2/PtoOwnerCard";
 import { loadPtoForRange, loadPtoRequests } from "@/lib/phase2-data";
 import { ptoDays, ptoKindLabel, type PtoRequest } from "@/lib/pay-phase2";
-import { loadBusinessTz, loadAttestations, decideFix, loadOwnerTimesheet, readLocalTimesheetSettings, saveApprovals, type DayApproval } from "@/lib/day-events";
+import { loadBusinessTz, loadAttestations, decideFix, loadOwnerTimesheet, readLocalTimesheetSettings, readLocalApprovals, saveApprovals, type DayApproval } from "@/lib/day-events";
 import { dayState, DEFAULT_TIMESHEET_SETTINGS, reviewDayInfo, weekStatus, type DayStateName, type DaySheet, type FixRequest, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
 import { addDays, applyWeekToDocs, pushChangedDocs, readDocs, syncTimesheetCutover, scheduleFor, weekShares, weekSheets } from "@/lib/timesheet-sync";
 import type { DayPay } from "@/lib/timesheet-pay";
@@ -82,8 +82,8 @@ export default function TimesheetPage() {
   }, []);
   useEffect(() => {
     if (!week) return;
-    let live = true; setWeekLoading(true);
-    void loadOwnerTimesheet(week, addDays(week, 6)).then((data) => { if (!live) return; setWeekLoading(false); setCloud(data.cloud); setCloudError(data.cloudError || ""); setEvents(data.events); setFixes(data.fixes); setApprovals(data.approvals); setSettings(data.settings); }).catch(() => { if (live) { setWeekLoading(false); setCloud(false); } });
+    let live = true; setWeekLoading(true); setApprovals(mergeApprovals(readLocalApprovals(week, addDays(week, 6)), [...savedApprovals.current.values()].filter((a) => a.date >= week && a.date <= addDays(week, 6))));
+    void loadOwnerTimesheet(week, addDays(week, 6)).then((data) => { if (!live) return; setWeekLoading(false); setCloud(data.cloud); setCloudError(data.cloudError || ""); setEvents(data.events); setFixes(data.fixes); setApprovals(mergeApprovals(data.approvals, [...savedApprovals.current.values()].filter((a) => a.date >= week && a.date <= addDays(week, 6)))); setSettings(data.settings); }).catch(() => { if (live) { setWeekLoading(false); setCloud(false); } });
     void loadPtoForRange(week, addDays(week, 6)).then((r) => { if (live) setWeekPto(r); }).catch(() => {});
     void loadAttestations(week).then((r) => { if (live) setAttest(r); });
     return () => { live = false; };
@@ -100,6 +100,7 @@ export default function TimesheetPage() {
   const approvalOf = (id: string, date: string) => approvals.find((a) => a.employeeId === id && a.date === date);
   const minutesOf = (id: string, date: string) => { const a = approvalOf(id, date); const s = sheets.get(`${id}|${date}`); return a?.editedMinutes != null ? a.editedMinutes : a?.approvedAt ? a.paidMinutes : s?.paidMinutes || 0; };
 
+  const savedApprovals = useRef(new Map<string, DayApproval>()); // saved this session; a slower in-flight load can't undo them
   async function commit(rows: DayApproval[], before: DayApproval[], record = true, note = "") {
     const keys = new Set(rows.map((r) => `${r.employeeId}|${r.date}`));
     rows = rows.map((r) => (r.approvedAt ? { ...r, changedAt: null } : r)); // approved is never "changed since approved"
@@ -112,6 +113,7 @@ export default function TimesheetPage() {
       setMessage(`Not saved: ${error}`);
       return false;
     }
+    for (const r of rows) savedApprovals.current.set(`${r.employeeId}|${r.date}`, r);
     return true;
   }
   const blank = (employeeId: string, date: string): DayApproval => ({ employeeId, date, paidMinutes: 0, driveMinutes: 0, editedMinutes: null, approvedAt: null, changedAt: null });
@@ -177,10 +179,9 @@ export default function TimesheetPage() {
   });
   // Saved taps/approvals whose worker id is not on the Team list: never hidden silently.
   const known = new Set(workers.map((w) => w.id));
-  const orphans = [...new Set([...events.map((e) => e.employeeId), ...approvals.filter((a) => a.approvedAt || a.editedMinutes != null).map((a) => a.employeeId)].filter((id) => id && !known.has(id)))];
+  const orphansAll = [...new Set([...events.map((e) => e.employeeId), ...approvals.filter((a) => a.approvedAt || a.editedMinutes != null).map((a) => a.employeeId)].filter((id) => id && !known.has(id)))];
   const shown = rows.filter((r) => filter === "all" || r.status.kind === "review");
-  const readyCount = rows.reduce((n, r) => n + r.status.ready, 0);
-  const reviewCount = rows.reduce((n, r) => n + r.status.review, 0);
+
   const openWorker = open ? workers.find((w) => w.id === open.split("|")[0]) : undefined;
   const openDate = open?.split("|")[1] || "";
   const badgeClass = (k: string) => k === "review" ? "bg-amber-500/20 text-amber-800" : k === "ready" ? "bg-teal-500/15 text-teal-800" : k === "approved" ? "bg-emerald-500/15 text-emerald-700" : "bg-gray-500/10 text-[var(--cr-muted)]";
@@ -202,10 +203,20 @@ export default function TimesheetPage() {
   const allAlerts: OwnerAlert[] = [
     ...lateAlerts.map((a) => ({ key: `${a.kind}-${a.employeeId}-${a.date}`, kind: a.kind, employeeId: a.employeeId, date: a.date, text: `${workers.find((w) => w.id === a.employeeId)?.name || "Worker"} · ${a.date}: ${scheduleAlertLabel(a.kind, minutesOf(a.employeeId, a.date))}`, open: `${a.employeeId}|${a.date}` })),
     ...pendingFixes.map((f) => ({ key: `fix-${f.id}`, sticky: true, text: `${workers.find((w) => w.id === f.employeeId)?.name || "Worker"} asked to fix ${f.date}`, open: `${f.employeeId}|${f.date}` })),
-    ...rows.flatMap((r) => r.info.filter((d) => d.flagged && !d.approved && d.hasHours).map((d) => ({ key: `flag-${r.w.id}-${d.date}`, text: `${r.w.name} · ${d.date} needs review`, open: `${r.w.id}|${d.date}` }))),
+    ...rows.flatMap((r) => r.info.filter((d) => d.flagged && d.hasHours).map((d) => ({ key: `flag-${r.w.id}-${d.date}`, employeeId: r.w.id, date: d.date, text: `${r.w.name} · ${d.date} needs review`, open: `${r.w.id}|${d.date}` }))),
     ...events.filter((e) => e.outOfOrder || (e.deviceAt && Math.abs(new Date(e.deviceAt).getTime() - new Date(e.at).getTime()) > 300000)).map((e) => ({ key: `tap-${e.id}`, employeeId: e.employeeId, date: e.date, text: `${workers.find((w) => w.id === e.employeeId)?.name || "Worker"} · ${e.date}: ${e.outOfOrder ? "tap out of order" : "phone clock was off"}`, open: `${e.employeeId}|${e.date}` })),
   ];
-  const { open: alerts, resolved: resolvedAlerts } = splitAlerts(allAlerts, (id, date) => Boolean(approvalOf(id, date)?.approvedAt));
+  const split = splitAlerts(allAlerts, (id, date) => Boolean(approvalOf(id, date)?.approvedAt));
+  // Until this week's approvals are read, an approved day would look open: show no alerts yet (the loading line shows).
+  // pt437u: one gate for every pending surface; cached approvals are already applied (setApprovals above).
+  const gate = pendingSurfaces(weekLoading || !now, {
+    alerts: split.open,
+    resolved: now ? resolvedInPeriod(split.resolved, payPeriodOf(localYmd(now), settings.payPeriod, settings.payPeriodAnchor || "")) : [],
+    reviewCount: rows.reduce((n, r) => n + r.status.review, 0),
+    readyCount: rows.reduce((n, r) => n + r.status.ready, 0),
+    orphans: orphansAll,
+  });
+  const { alerts, resolved: resolvedAlerts, reviewCount, readyCount, orphans } = gate;
   async function exportCsv() {
     // Pay period: weekly = this week; biweekly = this + next week; semi-monthly = 1st–15th or 16th–end of the month of this week.
     const { from, to } = payPeriodOf(week, period, period === settings.payPeriod ? settings.payPeriodAnchor : "");
@@ -245,7 +256,7 @@ export default function TimesheetPage() {
           <>
             <b className={`tabular-nums ${wide ? "text-base" : ""}`}>{h(d.mins)} h</b>
             {d.approved && <span className="ml-1 text-emerald-600" title="Approved" data-testid="ts-approved">✓</span>}
-            {d.flagged && !d.approved && <span className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-xs font-bold text-white" title="Needs review" data-testid="ts-flag-alert">!</span>}
+            {!gate.loading && d.flagged && !d.approved && <span className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-xs font-bold text-white" title="Needs review" data-testid="ts-flag-alert">!</span>}
             {edited && <span className="cr-chip2 ml-1 text-[11px]" data-testid="ts-edited">edited</span>}
             {payOf(id, d.date)?.otHours ? <span className="cr-chip2 cr-tone-warn ml-1 text-[11px]" data-testid="ts-pill-ot">OT</span> : null}
             {payOf(id, d.date)?.dtHours ? <span className="cr-chip2 cr-tone-bad ml-1 text-[11px]" data-testid="ts-pill-dt">DT</span> : null}
@@ -264,9 +275,9 @@ export default function TimesheetPage() {
       <div className="font-semibold tabular-nums">{h(r.total)} h</div>
       <div className="text-xs tabular-nums" data-testid={`ts-week-pay-${r.w.id}`}>${(r.cents / 100).toFixed(2)}{r.estimated ? " estimated" : ""}</div>
       {r.unallocated && <div className="text-xs" data-testid={`ts-unallocated-${r.w.id}`}>Salary, no jobs this week (unallocated labor)</div>}
-      <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${badgeClass(r.status.kind)}`} data-testid={`ts-status-${r.w.id}`}>{r.status.label}</span>
+      <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${badgeClass(statusChip(gate.loading, r.status).kind)}`} data-testid={`ts-status-${r.w.id}`} data-loading={gate.loading || undefined}>{statusChip(gate.loading, r.status).label}</span>
       <div>
-        {r.status.kind === "approved"
+        {gate.loading ? null : r.status.kind === "approved"
           ? <button className="min-h-9 rounded border px-2 text-xs" data-testid={`ts-unapprove-week-${r.w.id}`} onClick={() => unapproveWeek(r.w.id)}>Unapprove</button>
           : r.status.kind !== "none" && <button className="min-h-9 rounded bg-teal-600 px-2 text-xs font-semibold text-white" data-testid={`ts-approve-week-${r.w.id}`} onClick={() => approveDays([r.w.id], false)}>Approve week</button>}
       </div>
@@ -286,7 +297,7 @@ export default function TimesheetPage() {
           <button className={`min-h-11 px-3 ${filter === "all" ? "bg-teal-600 text-white" : ""}`} data-testid="ts-filter-all" aria-pressed={filter === "all"} onClick={() => setFilter("all")}>All</button>
           <button className={`min-h-11 px-3 ${filter === "review" ? "bg-teal-600 text-white" : ""}`} data-testid="ts-filter-review" aria-pressed={filter === "review"} onClick={() => setFilter("review")}>Needs review only{reviewCount ? ` (${reviewCount})` : ""}</button>
         </div>
-        <button className="min-h-11 rounded-lg bg-teal-600 px-4 font-semibold text-white" data-testid="ts-approve-all" onClick={() => approveDays(workers.map((w) => w.id), true)}>Approve all ready ({readyCount})</button>
+        <button className="min-h-11 rounded-lg bg-teal-600 px-4 font-semibold text-white" data-testid="ts-approve-all" disabled={gate.loading} onClick={() => approveDays(workers.map((w) => w.id), true)}>Approve all ready ({gate.loading ? LOADING_LABEL : readyCount})</button>
         {undoSteps.length > 0 && <button className="min-h-11 rounded-lg border px-3" data-testid="ts-undo" onClick={undoLast}>Undo ({undoSteps.length})</button>}
         {selected.size > 0 && <button className="cr-btn cr-btn-primary" data-testid="ts-approve-selected" onClick={() => { void approveDays([...selected], false); setSelected(new Set()); }}>Approve selected ({selected.size})</button>}
         <label className="flex items-center gap-1 text-sm"><span className="cr-section-label">Pay period</span>
@@ -308,11 +319,11 @@ export default function TimesheetPage() {
         <details className="cr-collapse mb-3" data-testid="ts-alerts" open>
           <summary>Alerts ({alerts.length})</summary>
           <ul className="mt-1 space-y-1 text-sm">{alerts.slice(0, 30).map((a) => <li key={a.key} data-testid="ts-alert" data-kind={a.kind}><button className="cr-btn-text" onClick={() => setOpen(a.open)}>{a.text}</button></li>)}</ul>
-          {resolvedAlerts.length > 0 && <details className="mt-2 text-sm text-[var(--cr-muted)]" data-testid="ts-alerts-resolved"><summary>Resolved ({resolvedAlerts.length})</summary><ul className="mt-1 space-y-1">{resolvedAlerts.slice(0, 30).map((a) => <li key={a.key} data-testid="ts-alert-resolved" data-kind={a.kind}><button className="cr-btn-text" onClick={() => setOpen(a.open)}>{a.text} · ✓ Approved</button></li>)}</ul></details>}
+          {resolvedAlerts.length > 0 && <details className="mt-2 text-sm text-[var(--cr-muted)]" data-testid="ts-alerts-resolved"><summary>Resolved ({resolvedAlerts.length})</summary><p className="mt-1 text-xs" data-testid="ts-resolved-note">Alerts for days you&apos;ve approved. They clear at the end of the pay period.</p><ul className="mt-1 space-y-1">{resolvedAlerts.slice(0, 30).map((a) => <li key={a.key} data-testid="ts-alert-resolved" data-kind={a.kind}><button className="cr-btn-text" onClick={() => setOpen(a.open)}>{a.text} · ✓ Approved</button></li>)}</ul></details>}
         </details>
       )}
       {alerts.length === 0 && resolvedAlerts.length > 0 && (
-        <details className="cr-collapse mb-3 text-sm text-[var(--cr-muted)]" data-testid="ts-alerts-resolved"><summary>Resolved alerts ({resolvedAlerts.length})</summary><ul className="mt-1 space-y-1">{resolvedAlerts.slice(0, 30).map((a) => <li key={a.key} data-testid="ts-alert-resolved" data-kind={a.kind}><button className="cr-btn-text" onClick={() => setOpen(a.open)}>{a.text} · ✓ Approved</button></li>)}</ul></details>
+        <details className="cr-collapse mb-3 text-sm text-[var(--cr-muted)]" data-testid="ts-alerts-resolved"><summary>Resolved ({resolvedAlerts.length})</summary><p className="mt-1 text-xs" data-testid="ts-resolved-note">Alerts for days you&apos;ve approved. They clear at the end of the pay period.</p><ul className="mt-1 space-y-1">{resolvedAlerts.slice(0, 30).map((a) => <li key={a.key} data-testid="ts-alert-resolved" data-kind={a.kind}><button className="cr-btn-text" onClick={() => setOpen(a.open)}>{a.text} · ✓ Approved</button></li>)}</ul></details>
       )}
       {phone ? (
         <div className="space-y-2" data-testid="ts-cards">
@@ -349,7 +360,7 @@ export default function TimesheetPage() {
       )}
       {!cloud && <p className="cr-panel cr-tone-warn mt-2 text-sm" data-testid="ts-cloud-offline" role="status">Couldn&apos;t read the saved timesheet (signed out or offline). Showing this device&apos;s copy; nothing was deleted. Sign in again or refresh.{cloudError ? <span className="block text-xs" data-testid="ts-cloud-error">Details: {cloudError}</span> : null}</p>}
       {orphans.length > 0 && <p className="cr-panel cr-tone-warn mt-2 text-sm" data-testid="ts-orphan-hours" role="status">Hours saved for {orphans.length} crew record{orphans.length === 1 ? "" : "s"} not on your Team list this week ({orphans.join(", ")}). They are kept, not deleted. Check Team for a removed or re-added person.</p>}
-      {!shown.length && (() => { const k = timesheetEmptyKind(crewLoad, workers.length, filter); return k === "none" ? null : <p className="mt-2 text-sm text-[var(--cr-muted)]" data-testid="ts-empty" data-kind={k} role={k === "signed_out" || k === "error" ? "status" : undefined}>{k === "review_clear" ? "Nothing needs review this week." : k === "loading" ? "Loading your crew…" : k === "signed_out" ? <>You&apos;re signed out, so your crew can&apos;t load. <Link href="/login" className="underline">Sign in</Link> to see their hours.</> : k === "error" ? "Couldn't load your crew from the server. Check your connection and refresh." : <>No crew yet. Add your crew on <Link href="/employees" className="underline">Team</Link>; their taps on My day show up here.</>}</p>; })()}
+      {!shown.length && !(gate.loading && filter === "review") && (() => { const k = timesheetEmptyKind(crewLoad, workers.length, filter); return k === "none" ? null : <p className="mt-2 text-sm text-[var(--cr-muted)]" data-testid="ts-empty" data-kind={k} role={k === "signed_out" || k === "error" ? "status" : undefined}>{k === "review_clear" ? "Nothing needs review this week." : k === "loading" ? "Loading your crew…" : k === "signed_out" ? <>You&apos;re signed out, so your crew can&apos;t load. <Link href="/login" className="underline">Sign in</Link> to see their hours.</> : k === "error" ? "Couldn't load your crew from the server. Check your connection and refresh." : <>No crew yet. Add your crew on <Link href="/employees" className="underline">Team</Link>; their taps on My day show up here.</>}</p>; })()}
       {pendingFixes.length > 0 && (
         <section className="cr-section mt-4 space-y-2" data-testid="ts-fixes">
           <h2 className="font-bold">Fix-my-time requests <span className="cr-chip2 cr-tone-warn" data-testid="ts-fix-badge">{pendingFixes.length}</span></h2>

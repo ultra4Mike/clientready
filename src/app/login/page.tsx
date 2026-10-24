@@ -1,5 +1,6 @@
 "use client";
 
+import { friendlyError } from "@/lib/net-error";
 import { linkOrigin } from "@/lib/site";
 import Link from "next/link";
 import LegalLinks from "@/components/LegalLinks";
@@ -16,7 +17,7 @@ export default function LoginPage() {
   const [resent, setResent] = useState("");
   async function resendConfirmation() {
     const { error } = await supabase.auth.resend({ type: "signup", email: unconfirmed, options: { emailRedirectTo: `${linkOrigin()}/auth/callback` } });
-    setResent(error ? `Could not resend: ${error.message}` : `Sent a new link to ${unconfirmed}. Check inbox and spam.`);
+    setResent(error ? `Could not resend: ${friendlyError(error.message)}` : `Sent a new link to ${unconfirmed}. Check inbox and spam.`);
   }
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -34,7 +35,7 @@ export default function LoginPage() {
         redirectTo: `${linkOrigin()}/reset-password`,
       });
       setBusy(false);
-      setMessage(error ? error.message : "Reset link sent. Check inbox and spam.");
+      setMessage(error ? friendlyError(error.message) : "Reset link sent. Check inbox and spam.");
       return;
     }
     const { error } = await supabase.auth.signInWithPassword({
@@ -49,7 +50,7 @@ export default function LoginPage() {
         setMessage("");
         return;
       }
-      setMessage(error.message);
+      setMessage(friendlyError(error.message));
       return;
     }
     const { data: session } = await supabase.auth.getUser();

@@ -1,3 +1,4 @@
+import { friendlyError, OFFLINE_MESSAGE } from "./net-error";
 /**
  * Storage for the day timesheet: tap events, fix requests, day approvals, settings.
  * Supabase first (migration 20261026110000_crew_timesheets); when the tables/functions are not there yet,
@@ -152,6 +153,9 @@ export type DayApproval = { employeeId: string; date: string; paidMinutes: numbe
 export type OwnerTimesheet = { events: TapEvent[]; fixes: FixRequest[]; approvals: DayApproval[]; settings: TimesheetSettings; cloud: boolean; cloudError?: string };
 
 /** Owner: everything for the days [from, to] (YYYY-MM-DD). */
+/** This device's saved approvals for [from, to], shown right away while the server read runs. */
+export function readLocalApprovals(from: string, to: string) { return readLocal<DayApproval[]>(KEY_APPROVALS, []).filter((a) => a.date >= from && a.date <= to); }
+
 export async function loadOwnerTimesheet(from: string, to: string): Promise<OwnerTimesheet> {
   const localApprovals = readLocal<DayApproval[]>(KEY_APPROVALS, []);
   const localSettings = readTimesheetSettings(readLocal(KEY_SETTINGS, {}));
@@ -270,7 +274,7 @@ export async function attestWeek(week: string, minutes: number, email: string) {
   const at = new Date().toISOString();
   writeLocal(key, { ...readLocal<Record<string, string>>(key, {}), [week]: at });
   const { error } = await supabase.rpc("crew_attest_week", { p_week: week, p_minutes: Math.round(minutes) });
-  return error && !missing(error) ? error.message : "";
+  return error && !missing(error) ? friendlyError(error.message) : "";
 }
 export function readMyAttestations(email: string) { return readLocal<Record<string, string>>(`clientready-attest:${email.toLowerCase()}`, {}); }
 export async function loadAttestations(week: string): Promise<Record<string, string>> {
@@ -296,9 +300,16 @@ export async function saveApprovals(rows: DayApproval[], note = ""): Promise<str
     const action = edited ? (row.approvedAt ? "edit_approve" : "edit") : row.approvedAt ? (old?.approvedAt ? "" : "approve") : old?.approvedAt ? "unapprove" : "";
     if (action) void logAudit({ action, employeeId: row.employeeId, date: row.date, oldValue: old ? { paidMinutes: old.paidMinutes, editedMinutes: old.editedMinutes ?? null, approved: Boolean(old.approvedAt) } : null, newValue: { paidMinutes: row.paidMinutes, editedMinutes: row.editedMinutes ?? null, approved: Boolean(row.approvedAt), ...(note ? { note } : {}) } });
   }
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) { await queuePayRefresh(rows.map((r) => r.date), "approvals"); return ""; }
-  const uid = data.user.id;
+  // Session first (no network): a failed getUser() fetch used to look like "signed out" and the
+  // approval silently stayed on this device only, so the next load showed the server's old row again.
+  const session = (await supabase.auth.getSession().catch(() => null))?.data.session;
+  let uid = session?.user.id || "";
+  if (!uid) {
+    const { data, error: authError } = await supabase.auth.getUser();
+    if (authError && !data.user && /fetch|network|load failed/i.test(authError.message || "")) return OFFLINE_MESSAGE;
+    if (!data.user) { await queuePayRefresh(rows.map((r) => r.date), "approvals"); return ""; }
+    uid = data.user.id;
+  }
   const { error } = await supabase.from("crew_day_approvals").upsert(rows.map((r) => ({ owner_id: uid, employee_id: r.employeeId, work_date: r.date, paid_minutes: r.paidMinutes, drive_minutes: r.driveMinutes, edited_minutes: r.editedMinutes ?? null, approved_at: r.approvedAt ?? null, changed_at: r.changedAt ?? null, updated_at: new Date().toISOString() })));
   await queuePayRefresh(rows.map((r) => r.date), "approvals");
   // Approved hours change PTO accrual: re-publish the crew balances (not only when Timesheet is opened).
