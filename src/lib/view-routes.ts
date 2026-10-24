@@ -13,6 +13,9 @@ export const OLD_ROUTE_REDIRECTS = [
   { source: "/schedule", destination: "/calendar?view=schedule" },
   { source: "/drafts", destination: "/documents?view=crew-drafts" },
   { source: "/history", destination: "/documents?view=history" },
+  // Crew "My day" lives on the crew home page (/crew); guessed URLs land there.
+  { source: "/myday", destination: "/crew" },
+  { source: "/my-day", destination: "/crew" },
 ];
 
 /** /reports tabs: Overview, Taxes (the year packet), Accountant. Deep link: /reports?tab=taxes&year=YYYY. */
