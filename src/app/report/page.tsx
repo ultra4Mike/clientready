@@ -1,4 +1,5 @@
 "use client";
+import { printPage } from "@/lib/print-page";
 
 import { useEffect, useState } from "react";
 import { saveCloudDocument } from "@/lib/cloud-docs";
@@ -277,7 +278,7 @@ async function saveDocument() {
         <div className="lg:sticky lg:top-20 lg:self-start">
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={() => printPage()}
             className="print-hide mb-4 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400"
           >
             Print / Save PDF

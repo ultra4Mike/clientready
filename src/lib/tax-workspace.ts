@@ -4,6 +4,7 @@
  * No new money math: only sums, splits by date and labels. Not tax advice; nothing is filed.
  */
 import { cashEntries } from "@/lib/money";
+import { cashIncome } from "@/lib/ledger";
 import { irsMileageRate } from "@/lib/job-profit";
 import { countedTrips, milesOf, type Trip } from "@/lib/mileage";
 import { readPaySettings } from "@/lib/pay-types";
@@ -27,7 +28,9 @@ export function incomeSplit(docs: Doc[], year: string) {
     else payments += e.amount;
   }
   const gross = payments + deposits;
-  return { payments: r2(payments), deposits: r2(deposits), refunds: r2(refunds), gross: r2(gross), net: r2(gross - refunds) };
+  // QA3: sales tax collected is owed to the state, not income (and not in the set-aside base).
+  const salesTax = cashIncome(docs as never, `${year}-01-01`, `${year}-12-31`).salesTax;
+  return { payments: r2(payments), deposits: r2(deposits), refunds: r2(refunds), gross: r2(gross), salesTax, net: r2(gross - refunds - salesTax) };
 }
 
 /** Standard-rate mileage deduction: each counted trip × the IRS rate for its day (same rate as job profit). */

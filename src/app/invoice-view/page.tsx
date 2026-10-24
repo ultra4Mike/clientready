@@ -1,4 +1,5 @@
 "use client";
+import { printPage } from "@/lib/print-page";
 
 import PayOptions from "@/components/PayOptions";
 import { readLocalPaymentMethods, type PaymentMethodsConfig } from "@/lib/payments/providers";
@@ -9,7 +10,7 @@ import { viewStatusLabel } from "@/lib/portal-chain";
 import { chainCredits, creditLabel, isRevision, replacedBy, revisionOwed } from "@/lib/change-order-revision";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
-import { owedAfterRefunds, paidTotal, readPayments, tipTotal, type Payment } from "@/lib/payments";
+import { owedAfterRefunds, paidTotal, refundState, refundWording, readPayments, tipTotal, type Payment } from "@/lib/payments";
 import { JobPhotoStrip } from "@/components/JobPhotos";
 import { readPhotos, type JobPhoto } from "@/lib/photos";
 import LineSplit from "@/components/LineSplit";
@@ -235,7 +236,7 @@ export default function InvoiceViewPage() {
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={() => printPage()}
             className="min-h-11 rounded-xl border border-teal-500/30 px-4 py-2 text-sm font-medium text-teal-700 transition dark:text-teal-200 hover:border-teal-400/60 hover:bg-teal-500/10"
           >
             Print / Save PDF
@@ -361,6 +362,11 @@ export default function InvoiceViewPage() {
               {replaced ? (
                 <div data-testid="view-replaced-balance" className="mt-2 flex items-baseline justify-between rounded-lg border border-slate-400 px-3 py-2 text-lg font-bold">
                   <span>Replaced by {replaced.number}</span><span>$0.00</span>
+                </div>
+              ) : refundState(totals.total, payments) ? (
+                <div data-testid="view-refunded" className="mt-2 flex items-baseline justify-between rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-lg font-bold text-amber-900 print:bg-transparent print:px-0">
+                  <span>{refundWording(totals.total, payments)}</span>
+                  <span>${totals.balance.toFixed(2)}</span>
                 </div>
               ) : status === "paid" || (totals.paid > 0 && totals.balance <= 0.004) ? (
                 <div data-testid="paid-in-full" className="mt-2 flex items-baseline justify-between cr-tone-good rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-lg font-bold text-emerald-800 print:bg-transparent print:px-0">

@@ -1,12 +1,13 @@
 import { crewKindLabel } from "@/lib/cost-categories";
 import { amountOf, documentTotals } from "@/lib/discount";
 import { isOpenBalance, readPayments } from "@/lib/payments";
-import { docAmounts, documentStage, STAGE_LABEL } from "@/lib/doc-stage";
+import { documentStage, STAGE_LABEL } from "@/lib/doc-stage";
 import { readApproval } from "@/lib/approval";
 import { readSchedule } from "@/lib/schedule";
 import { allConflicts, clockText } from "@/lib/conflicts";
 import { isPendingRecurringDraft, readRecurring, ymd } from "@/lib/recurring";
 import { readChangeOrderOf } from "@/lib/change-orders";
+import { effectiveAmounts } from "@/lib/change-order-revision";
 import { saveCloudDocument, type CloudDoc } from "@/lib/cloud-docs";
 
 /**
@@ -16,6 +17,9 @@ import { saveCloudDocument, type CloudDoc } from "@/lib/cloud-docs";
  * (e.g. the balance changes, a new approval link is sent, the expense amount is edited).
  * Reviewing never touches status, payments or any money field.
  */
+/** Client approvals from the last 14 days are shown (older ones are history, not news). */
+const recentCutoff = (today: string) => { const d = new Date(`${today}T12:00:00`); if (Number.isNaN(d.getTime())) return ""; d.setDate(d.getDate() - 14); return d.toISOString().slice(0, 10); };
+
 export type ReviewKind = "expense" | "done" | "balance" | "approval" | "recurring" | "change" | "missing" | "conflict";
 export type ReviewItem = { key: string; version: string; kind: ReviewKind; docId: string; title: string; detail: string; href: string };
 export type ExpenseRow = { id: string; doc_id: string; worker_name?: string; kind?: string; amount?: string; note?: string; created_at?: string };
@@ -104,9 +108,15 @@ export function reviewItems(docs: Doc[], expenses: ExpenseRow[], today = ymd(new
     const schedule = readSchedule(data);
     if (schedule?.status === "done" && !schedule.confirmedAt) {
       all.push({ key: "done", version: schedule.doneAt || `${schedule.date}|${schedule.startTime}`, kind: "done", docId: doc.id,
-        title: `Crew marked ${numberOf(doc)} done`, detail: `${schedule.date}${schedule.doneBy ? ` · ${schedule.doneBy}` : ""}${who(doc)} · awaiting your confirmation`, href: `${open(doc)}#job-done` });
+        // QA3: only say "Crew" when crew is assigned; otherwise the owner (or someone) marked it.
+        title: schedule.workerIds.length || schedule.doneBy ? `Crew marked ${numberOf(doc)} done` : `${numberOf(doc)} marked done`, detail: `${schedule.date}${schedule.doneBy ? ` · ${schedule.doneBy}` : ""}${who(doc)} · awaiting your confirmation`, href: `${open(doc)}#job-done` });
     }
     const approval = readApproval(data.approval);
+    // QA3: notify the owner when the client approves online (not owner-recorded phone approvals).
+    if (doc.type === "proposal" && approval?.status === "approved" && !approval.method && !approval.markedBy && approval.approvedAt && approval.approvedAt.slice(0, 10) >= recentCutoff(today)) {
+      all.push({ key: "client-approved", version: approval.approvedAt, kind: "approval", docId: doc.id,
+        title: `Client approved ${numberOf(doc)}`, detail: `${approval.approverName ? `By ${approval.approverName} · ` : ""}${approval.approvedAt.slice(0, 10)}${who(doc)}`, href: open(doc) });
+    }
     if (doc.type === "proposal" && approval?.status === "pending") {
       all.push({ key: "approval", version: approval.createdAt, kind: "approval", docId: doc.id,
         title: `${numberOf(doc)} waiting for client approval`, detail: `Link sent ${approval.createdAt.slice(0, 10)}${who(doc)}`, href: open(doc) });
@@ -135,8 +145,10 @@ export function reviewItems(docs: Doc[], expenses: ExpenseRow[], today = ymd(new
         title: `${numberOf(doc)} is missing ${gaps.map((gap) => MISSING_LABEL[gap]).join(", ")}`, detail: `${STAGE_LABEL[documentStage(doc, docs).stage]}${who(doc)}`, href: open(doc) });
     }
     // R128: the shared refund-aware owed amount (a refund never reopens a balance).
-    const owed = docAmounts(doc).owed;
-    if (isOpenBalance(status, owed)) {
+    // QA3: a replaced or void invoice owes nothing here (its revision carries the balance).
+    const eff = effectiveAmounts(docs as never, doc as never);
+    const owed = eff.replaced ? 0 : eff.owed;
+    if (!["void", "voided", "deleted"].includes(status) && isOpenBalance(status, owed)) {
       all.push({ key: "balance", version: owed.toFixed(2), kind: "balance", docId: doc.id,
         title: `${numberOf(doc)} has ${money(owed)} owed`, detail: `${STAGE_LABEL[documentStage(doc, docs).stage]}${data.dueDate ? ` · due ${data.dueDate}` : ""}${who(doc)}`, href: open(doc) });
     }

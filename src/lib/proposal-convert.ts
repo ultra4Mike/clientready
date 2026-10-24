@@ -25,6 +25,9 @@ export function conversionStages(percent: number, today: string, stamp = `${Date
   ];
 }
 
+/** QA3: history action written when the client approves online (activity + Needs review). */
+export const CLIENT_APPROVED_ACTION = "Approved by client online";
+
 export function invoiceFromProposal(proposal: Doc, ownerDocs: Doc[], opts: { today: string; token: string; approval: Record<string, unknown> | null }) {
   const pdata = proposal.data || {};
   const like = ownerDocs.filter((d) => d.type === "invoice").map((d) => String(d.data?.invoiceNumber || "")).find(Boolean) || "INV-1000";
@@ -34,7 +37,8 @@ export function invoiceFromProposal(proposal: Doc, ownerDocs: Doc[], opts: { tod
   delete (base as Record<string, unknown>).depositPercent;
   const data: Record<string, unknown> = {
     ...base,
-    status: "sent",
+    // QA3: approved by the client, not sent by the owner (no "Sent ✓", not in Invoices sent until really sent).
+    status: "approved",
     // Balance is due when the job is done, not on a calendar date the client was never given.
     dueDate: "",
     dueOnCompletion: true,

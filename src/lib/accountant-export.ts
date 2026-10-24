@@ -2,7 +2,8 @@ import { crewKindLabel } from "@/lib/cost-categories";
 import { csvText } from "@/lib/csv";
 import { documentTotals, amountOf } from "@/lib/discount";
 import { docAmounts } from "@/lib/doc-stage";
-import { readPayments, tipTotal } from "@/lib/payments";
+import { isRefundRow, readPayments, tipTotal } from "@/lib/payments";
+import { isBilledInvoice, isVoidOrDeleted } from "@/lib/ledger";
 import { isPendingRecurringDraft } from "@/lib/recurring";
 import { uniqueDocs } from "@/lib/change-orders";
 import { buildReport, MONTHS, yearMonth } from "@/lib/reports";
@@ -32,7 +33,7 @@ export function accountantRows(allDocs: Doc[], crew: CrewExpense[], trips: Trip[
   const docs = uniqueDocs(allDocs).filter((doc) => doc.type === "invoice" && !isPendingRecurringDraft(doc));
   const numberOf = (doc: Doc) => String(doc.data?.invoiceNumber || doc.title || "Invoice");
   const clientOf = (doc: Doc) => String(doc.data?.clientName || doc.clientName || "");
-  const billed = docs.filter((doc) => String(doc.data?.status || "draft") !== "draft" && yearMonth(doc.data?.invoiceDate || doc.createdAt)?.year === year);
+  const billed = docs.filter((doc) => isBilledInvoice(doc as never, docs as never) && yearMonth(doc.data?.invoiceDate || doc.createdAt)?.year === year);
 
   const invoiceRows = billed.map((doc) => {
     const data = doc.data || {};
@@ -45,12 +46,14 @@ export function accountantRows(allDocs: Doc[], crew: CrewExpense[], trips: Trip[
 
   const paymentRows: string[][] = [];
   for (const doc of docs) {
+    // QA3: a void invoice's payments are not income (same as cashEntries); refunds show as negative rows.
+    if (isVoidOrDeleted(doc as never)) continue;
     const data = doc.data || {};
-    const payments = readPayments(data).filter((payment) => amountOf(payment.amount) > 0);
+    const payments = readPayments(data).filter((payment) => !(payment as { voided?: unknown }).voided && (isRefundRow(payment) ? Number(String(payment.amount ?? "").replace(/[^0-9.-]/g, "")) < 0 : amountOf(payment.amount) > 0));
     for (const payment of payments) {
       const when = day(payment.date || data.invoiceDate || doc.createdAt);
       if (yearMonth(when)?.year !== year) continue;
-      paymentRows.push([when, numberOf(doc), clientOf(doc), payment.method || "", r2(amountOf(payment.amount)), r2(tipTotal([payment])), payment.ref || ""]);
+      paymentRows.push([when, numberOf(doc), clientOf(doc), payment.method || "", r2(isRefundRow(payment) ? Number(String(payment.amount ?? "").replace(/[^0-9.-]/g, "")) : amountOf(payment.amount)), r2(tipTotal([payment])), payment.ref || ""]);
     }
     if (!payments.length && data.status === "paid") {
       const when = day(data.paymentDate || data.invoiceDate || doc.createdAt);

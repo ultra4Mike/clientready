@@ -438,6 +438,8 @@ export default function CrewPage() {
   const clock = useMemo(() => withQueuedClock(loadedClock, queue), [loadedClock, queue]);
   // QA2 (R54): every open entry, not only the first (a missed clock-out can leave more than one).
   const openEntries = clock.filter((entry) => !entry.ended_at);
+  // QA3: links inside "Preview as crew" keep ?preview so they never drop to the owner dashboard.
+  const todayHref = preview ? `/crew?tab=today&preview=${encodeURIComponent(preview.mode === "worker" ? String(preview.employeeId || "sample") : "sample")}` : "/crew?tab=today";
   const open = openEntries[0];
   const openLabelFor = (entry: ClockEntry) => {
     const openCard = cards.find((card) => card.doc_id === entry.doc_id);
@@ -745,6 +747,11 @@ export default function CrewPage() {
                   </div>
                 ))}
               </div>
+            ) : preview ? (
+              // QA3: My day is hidden in preview, so clock in/out right here; taps write only to the on-device preview store (R54).
+              openEntries.some((entry) => entry.doc_id === card.doc_id)
+                ? <button type="button" data-testid={`preview-clock-out-${card.doc_id}`} onClick={() => clockTap("clock-out", card.doc_id)} className="cr-btn cr-btn-secondary min-h-11 shrink-0">Clock out (preview)</button>
+                : <button type="button" data-testid={`preview-clock-in-${card.doc_id}`} onClick={() => clockTap("clock-in", card.doc_id)} className="cr-btn cr-btn-primary min-h-11 shrink-0">Clock in (preview)</button>
             ) : (
               <a href="/crew?tab=today" data-testid={`clock-use-myday-${card.doc_id}`} className="cr-btn cr-btn-secondary min-h-11 shrink-0">Use My day</a>
             )}
@@ -924,7 +931,7 @@ export default function CrewPage() {
                 {card.client_address && <p className="mt-1 text-sm">{card.client_address}</p>}
                 {running
                   ? <button type="button" disabled={busy !== ""} data-testid="crew-detail-clock-out" onClick={() => clockTap("clock-out", card.doc_id)} className="cr-btn mt-3 w-full bg-amber-500 py-4 text-lg text-slate-950!" style={{ minHeight: "3.75rem" }}>Clock out</button>
-                  : <a href="/crew?tab=today" data-testid="crew-detail-start" className="cr-btn cr-btn-primary mt-3 flex min-h-14 w-full items-center justify-center text-lg" style={{ minHeight: "3.75rem" }}>Tap your time in My day</a>}
+                  : <a href={todayHref} data-testid="crew-detail-start" className="cr-btn cr-btn-primary mt-3 flex min-h-14 w-full items-center justify-center text-lg" style={{ minHeight: "3.75rem" }}>Tap your time in My day</a>}
                 {otherOpen && !running && <p className="mt-1 text-xs text-[var(--cr-muted)]" data-testid="crew-detail-other-open">An old clock-in is still open on another job. Clock out there.</p>}
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   {mapUrl ? <a href={mapUrl} target="_blank" rel="noreferrer" data-testid="crew-detail-map" className="cr-btn cr-btn-secondary">Map</a> : <span className="cr-btn cr-btn-secondary opacity-50" aria-disabled="true">Map</span>}

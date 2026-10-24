@@ -1,8 +1,8 @@
 import { docAmounts } from "@/lib/doc-stage";
 import { jobWhen } from "@/lib/job-when";
 import { cashEntries } from "@/lib/money";
-import { isVoidStatus, readPayments, refundedTotal } from "@/lib/payments";
-import { isPendingRecurringDraft } from "@/lib/recurring";
+import { isBilledInvoice } from "@/lib/ledger";
+import { readPayments, refundedTotal } from "@/lib/payments";
 import { dedupeCopies } from "@/lib/doc-dedupe";
 import { jobProfit, type ProfitLine } from "@/lib/job-profit";
 
@@ -51,10 +51,10 @@ export function buildReport(allDocs: Doc[], crewExpenses: CrewExpense[], year: s
   const months: MonthRow[] = MONTHS.map((_, month) => ({ month, billed: 0, collected: 0, jobCosts: 0, crewReceipts: 0 }));
   const jobs: JobRow[] = [];
   for (const doc of docs) {
-    if (doc.type !== "invoice" || isPendingRecurringDraft(doc) || isVoidStatus(doc.data?.status) || doc.data?.deleted) continue;
+    // QA3: one billed rule (ledger): not draft, void, deleted, pending recurring or replaced by a revision.
+    if (!isBilledInvoice(doc as never, docs as never)) continue;
     const data = doc.data || {};
     const { total } = docAmounts(doc);
-    if (String(data.status || "draft") === "draft") continue;
     const when = yearMonth(data.invoiceDate || doc.createdAt);
     // R107: profit by job is filed under the job date (when it was done); billing stays on the invoice date.
     const jobDay = scheduledDay(data);

@@ -34,7 +34,7 @@ const q = quarterlyEstimates([], "2026", 30, (f, t) => cashCollected(docs as nev
 assert.equal(q[3].collected, cashCollected(docs as never, "2026-10-01", "2026-12-31"));
 const rep = src("src/app/reports/page.tsx");
 assert.match(rep, /count: b\.owedCount/);
-assert.match(rep, /cashCollected\(documents as never, from, to\)/);
+assert.match(rep, /periodSummary\(documents as never, bizOcc, p\.from, p\.to/); // QA3: quarters come from the shared ledger
 
 // 1. Document filters use the derived status.
 const list = src("src/components/views/DocumentsListView.tsx");
@@ -58,5 +58,5 @@ assert.match(setAsideCopy(""), /30% of profit \(the default\)/);
 assert.doesNotMatch(src("src/app/profile/page.tsx"), /Default is 30%\./);
 
 // 8. Manual time entry on an approved day asks first.
-assert.match(src("src/components/timesheet/DayDetail.tsx"), /if \(approved && !window\.confirm\(UNAPPROVE_WARNING\)\) return;/);
+assert.match(src("src/components/timesheet/DayDetail.tsx"), /const warn = manualSaveWarning\(approved, Boolean\(props\.weekHasApproved\)\); if \(warn && !window\.confirm\(warn\)\) return;/);
 console.log("qa2d-fixes ok");

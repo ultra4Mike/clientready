@@ -22,7 +22,13 @@ const SETTING_LABEL: Record<string, string> = {
   halfDayHours: "Half day (h)", hireDate: "Hire date",
 };
 /** QA2: saving a manual time entry on an approved day takes the week out of Approved; ask first. */
-export const UNAPPROVE_WARNING = "This week is already approved. Saving this manual time entry will un-approve it, and you'll need to approve the hours again. Continue?";
+export const UNAPPROVE_WARNING = "This day is already approved. Saving this manual time entry will un-approve this day only (the rest of the week stays approved), and you'll need to approve its hours again. Continue?";
+/** QA3: adding hours to an unapproved day in a week that already has approved days. Only this day changes. */
+export const ADD_IN_APPROVED_WEEK_WARNING = "This week already has approved hours. Adding this entry leaves the other approved days as they are; this day will need approval. Continue?";
+/** Which warning (if any) a manual save needs: "" = none. */
+export function manualSaveWarning(dayApproved: boolean, weekHasApproved: boolean) {
+  return dayApproved ? UNAPPROVE_WARNING : weekHasApproved ? ADD_IN_APPROVED_WEEK_WARNING : "";
+}
 
 export const settingLabel = (k: string) => SETTING_LABEL[k] || k.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()).trim();
 const settingValue = (x: unknown) => (x === true ? "on" : x === false ? "off" : x == null || x === "" ? "—" : typeof x === "object" ? JSON.stringify(x) : String(x));
@@ -57,7 +63,7 @@ export default function DayDetail(props: {
   worker?: import("@/lib/timesheet").WorkerTimeOverrides;
   workerName: string; date: string; sheet?: DaySheet; approval?: DayApproval; minutes: number; extraFlags: string[];
   settings: TimesheetSettings; schedule: ScheduledJob[]; fixes: FixRequest[];
-  employeeId?: string; taps?: TapEvent[]; dayPay?: DayPay;
+  employeeId?: string; taps?: TapEvent[]; dayPay?: DayPay; weekHasApproved?: boolean;
   onApprove: () => void; onUnapprove: () => void; onSetMinutes: (minutes: number, approve: boolean, note?: string) => void;
   onDecide: (fix: FixRequest, status: "approved" | "denied", note?: string) => void; onClose: () => void;
 }) {
@@ -171,7 +177,7 @@ export default function DayDetail(props: {
             ))}
             <label className="flex items-center gap-2">Paid hours<input aria-label="Paid hours" name="ts-edit-hours" data-testid="ts-edit-hours" className="min-h-11 w-24 rounded border bg-transparent px-2" inputMode="decimal" value={hours} onChange={(e) => setHours(e.target.value)} /></label>
             <div className="flex gap-2">
-              <button className="min-h-11 rounded-lg bg-teal-600 px-4 font-semibold text-white" data-testid="ts-edit-save" onClick={() => { if (approved && !window.confirm(UNAPPROVE_WARNING)) return; props.onSetMinutes(Math.max(0, Number(hours) * 60 || 0), false, spans.filter((x) => x.start || x.end).map((x) => `${x.label || "Job"} ${x.start || "?"}–${x.end || "?"}`).join(", ")); setEditing(false); }}>Save</button>
+              <button className="min-h-11 rounded-lg bg-teal-600 px-4 font-semibold text-white" data-testid="ts-edit-save" onClick={() => { const warn = manualSaveWarning(approved, Boolean(props.weekHasApproved)); if (warn && !window.confirm(warn)) return; props.onSetMinutes(Math.max(0, Number(hours) * 60 || 0), false, spans.filter((x) => x.start || x.end).map((x) => `${x.label || "Job"} ${x.start || "?"}–${x.end || "?"}`).join(", ")); setEditing(false); }}>Save</button>
               <button className={btn} onClick={() => setEditing(false)}>Cancel</button>
             </div>
           </div>

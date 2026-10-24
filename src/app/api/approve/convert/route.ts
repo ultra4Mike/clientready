@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { serviceClient, stripeConfig } from "@/lib/stripe-server";
-import { invoiceFromProposal } from "@/lib/proposal-convert";
+import { invoiceFromProposal, CLIENT_APPROVED_ACTION } from "@/lib/proposal-convert";
 import { clientIp, rateLimitedShared, tooMany } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -50,8 +50,12 @@ export async function POST(request: Request) {
   const markProposal = async (inv: { id: string; data?: Record<string, unknown> }) => {
     const pd = (doc.data || {}) as Record<string, unknown>;
     const already = (pd.invoicedAs as { id?: string } | undefined)?.id === inv.id && pd.status === "invoiced";
-    if (already) return;
-    await client.from("documents").update({ data: { ...pd, status: "invoiced", invoicedAs: { id: inv.id, number: String(inv.data?.invoiceNumber || "") }, updatedAt: new Date().toISOString() } }).eq("id", doc.id);
+    // QA3: the client's approval is logged in the proposal's activity (append-only history), once.
+    const history = Array.isArray(pd.history) ? (pd.history as { action?: string }[]) : [];
+    const logged = history.some((e) => e?.action === CLIENT_APPROVED_ACTION);
+    if (already && logged) return;
+    const entry = { at: String(approval?.approvedAt || new Date().toISOString()), by: String(approval?.approverName || "Client"), action: CLIENT_APPROVED_ACTION };
+    await client.from("documents").update({ data: { ...pd, ...(logged ? {} : { history: [...history, entry] }), status: "invoiced", invoicedAs: { id: inv.id, number: String(inv.data?.invoiceNumber || "") }, updatedAt: new Date().toISOString() } }).eq("id", doc.id);
   };
   if (existing) {
     await markProposal(existing);

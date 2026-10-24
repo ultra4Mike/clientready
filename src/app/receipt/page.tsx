@@ -1,4 +1,5 @@
 "use client";
+import { printPage } from "@/lib/print-page";
 
 import { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
@@ -28,14 +29,14 @@ export default function ReceiptPage() {
     const raw = window.localStorage.getItem("clientready-receipt");
     if (raw) setReceipt(JSON.parse(raw));
     // R111: "Save and print receipt" really prints.
-    if (raw && new URLSearchParams(window.location.search).get("print") === "1") window.setTimeout(() => window.print(), 300);
+    if (raw && new URLSearchParams(window.location.search).get("print") === "1") window.setTimeout(() => printPage(), 300);
   }, []);
 
   return (
     <AppShell title="Cash receipt">
       <PageHeader title="Cash receipt" subtitle="Print or save this receipt for your customer." actions={<button
         type="button"
-        onClick={() => window.print()}
+        onClick={() => printPage()}
         className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 print:hidden"
       >
         Print / Save PDF

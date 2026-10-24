@@ -1,5 +1,6 @@
 "use client";
 
+import { jobDays } from "@/lib/job-days";
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
@@ -61,7 +62,7 @@ export default function UpcomingPage() {
   const today = localYmd();
   const last = addDaysYmd(today, 6);
   const jobs = useMemo(
-    () => scheduledJobs(documents).filter(({ doc, schedule }) => !hiddenFromCalendar(doc, documents) && schedule.date >= today && schedule.date <= last),
+    () => scheduledJobs(documents).filter(({ doc, schedule }) => !hiddenFromCalendar(doc, documents) && (schedule.date >= today && schedule.date <= last || jobDays(schedule as never, (Array.isArray(doc.data?.crew) ? doc.data!.crew : []) as never).some((day) => day.date >= today && day.date <= last))),
     [documents, today, last],
   );
   const upcoming = useMemo(() => {

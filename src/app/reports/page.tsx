@@ -18,8 +18,9 @@ import YearView, { type YearData } from "@/components/views/YearView";
 import DataTable, { usd } from "@/components/reports/DataTable";
 import BusinessExpenses from "@/components/reports/BusinessExpenses";
 import { bizByLine, bizExpenses, bizOccurrences, type BizExpense } from "@/lib/business-expenses";
-import { billedOutstanding, cashCollected } from "@/lib/money";
-import { DISCLAIMER, incomeSplit, mileageDeduction, NOT_TRACKED, payrollSummary, quarterlyEstimates, salesTaxReport, scheduleC, uncategorized, yearEndChecklist } from "@/lib/tax-workspace";
+import { billedOutstanding } from "@/lib/money";
+import { periodSummary } from "@/lib/ledger";
+import { DISCLAIMER, incomeSplit, mileageDeduction, NOT_TRACKED, payrollSummary, quarterPeriods, salesTaxReport, scheduleC, uncategorized, yearEndChecklist } from "@/lib/tax-workspace";
 import { REPORT_TABS, reportsParams, type ReportTab } from "@/lib/view-routes";
 
 type Doc = { id: string; type: string; title?: string; clientName?: string; createdAt?: string; data?: Record<string, unknown> };
@@ -85,7 +86,11 @@ export default function ReportsPage() {
   const acct = useMemo(() => accountantRows(documents, crewExpenses, trips, year, "", bizOcc), [documents, crewExpenses, trips, year, bizOcc]);
   const salesTax = useMemo(() => salesTaxReport(acct.invoiceRows), [acct]);
   const schedC = useMemo(() => scheduleC({ income, tax, miles, biz: bizLines }), [income, tax, miles, bizLines]);
-  const expensesTotal = tax.total + bizTotal;
+  // QA3: one ledger for Overview, Expenses and Taxes: job costs = monthly table's job costs; set-aside from one function.
+  const jobCostsYear = report.totals.jobCosts;
+  const expensesTotal = jobCostsYear + bizTotal;
+  const pct = yearData?.setAsidePercent ?? 30;
+  const yearLedger = useMemo(() => periodSummary(documents as never, bizOcc, `${year}-01-01`, `${year}-12-31`, pct), [documents, bizOcc, year, pct]);
   const netProfit = schedC.find((r) => r.line === "Line 31")?.amount ?? income.net - expensesTotal;
   const expenseLines = useMemo(() => {
     const map = new Map<string, { line: string; label: string; amount: number }>();
@@ -97,7 +102,7 @@ export default function ReportsPage() {
   const unpaid = useMemo(() => { const b = billedOutstanding(documents as never, `${year}-01-01`, `${year}-12-31`); return { total: b.outstanding, count: b.owedCount }; /* QA2: total and count from the one shared loop */ }, [documents, year]);
   const uncat = useMemo(() => uncategorized(acct.expenseRows, acct.crewRows), [acct]);
   const payroll = useMemo(() => (yearData ? payrollSummary(yearData.rows, yearData.employees) : null), [yearData]);
-  const quarters = useMemo(() => (yearData ? quarterlyEstimates(yearData.rows, year, yearData.setAsidePercent, (from, to) => cashCollected(documents as never, from, to)) : null), [yearData, year, documents]);
+  const quarters = useMemo(() => (yearData ? quarterPeriods(year).map((p) => ({ ...p, ...periodSummary(documents as never, bizOcc, p.from, p.to, yearData.setAsidePercent) })) : null), [yearData, year, documents, bizOcc]);
   const crewYear = crewExpenses.filter((c) => String(c.created_at || "").startsWith(year));
   const checklist = yearData && payroll ? yearEndChecklist({ businessName: yearData.businessName, taxId: yearData.taxId, uncategorized: uncat.length, crewReceipts: crewYear.length, crewMissingPhoto: crewYear.filter((c) => !c.receipt).length, miles: miles.miles, nec: payroll.nec.length, unpaid: unpaid.count, unpaidTotal: unpaid.total }) : null;
   const cell = "px-2 py-1.5 text-right tabular-nums";
@@ -126,9 +131,9 @@ export default function ReportsPage() {
           <div data-testid="reports-overview" className="space-y-6">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="pl-cards">
               <Stat testid="pl-income" label="Income (collected)" value={usd(income.net)} sub={`Billed ${usd(report.totals.billed)}`} />
-              <Stat testid="pl-expenses" label="Expenses" value={usd(expensesTotal)} sub={`Job costs ${usd(tax.total)} + business ${usd(bizTotal)}`} />
+              <Stat testid="pl-expenses" label="Expenses" value={usd(expensesTotal)} sub={`Job costs ${usd(jobCostsYear)} + business ${usd(bizTotal)}`} />
               <Stat testid="pl-net" label="Net profit (Sched. C Line 31)" value={usd(netProfit)} sub="Collected minus expenses" />
-              <Stat testid="pl-setaside" label="Set aside for taxes (estimate)" value={yearData ? usd(yearData.summary.setAside) : LOADING} sub={yearData ? `${yearData.setAsidePercent}% of log profit, from Settings` : ""} />
+              <Stat testid="pl-setaside" label="Set aside for taxes (estimate)" value={yearData ? usd(yearLedger.setAside) : LOADING} sub={yearData ? `${yearData.setAsidePercent}% of profit ${usd(yearLedger.profit)} (income without sales tax − expenses), from Settings` : ""} />
             </div>
             <section className={CARD}>
               <h2 className="text-base font-semibold">Month by month</h2>
@@ -280,7 +285,7 @@ export default function ReportsPage() {
         {tab === "expenses" && (
           <div data-testid="reports-expenses" className="space-y-6">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Stat testid="exp-job" label="Job costs" value={usd(tax.total)} sub="On sent invoices" />
+              <Stat testid="exp-job" label="Job costs" value={usd(jobCostsYear)} sub="On sent invoices" />
               <Stat testid="exp-biz" label="Business expenses" value={usd(bizTotal)} sub="Overhead, not on a job" />
               <Stat testid="exp-crew" label="Crew receipts" value={crewLoaded ? usd(report.totals.crewReceipts) : LOADING} sub="Logged by crew; apply on the invoice" />
               <Stat testid="exp-miles" label="Mileage (standard rate)" value={usd(miles.amount)} sub={`${miles.miles} business mi × IRS rate`} />
@@ -392,7 +397,7 @@ export default function ReportsPage() {
             </section>
             <section className={CARD} data-testid="quarterly">
               <h2 className="text-base font-semibold">Quarterly estimated tax helper</h2>
-              <p className="text-xs text-slate-500">Estimate only, not advice: each period&apos;s profit from the Sales and expense log × your set-aside %{yearData ? ` (${yearData.setAsidePercent}%)` : ""}. Federal 1040-ES dates; a weekend date moves to Monday. Your state may differ.</p>
+              <p className="text-xs text-slate-500">Estimate only, not advice: each period&apos;s profit (income without sales tax, minus job costs and business expenses, same as Overview) × your set-aside %{yearData ? ` (${yearData.setAsidePercent}%)` : ""}. Federal 1040-ES dates; a weekend date moves to Monday. Your state may differ.</p>
               {!quarters ? <p className="text-sm text-slate-500">{LOADING}</p> : (
                 <DataTable<(typeof quarters)[number]> testid="quarterly-table" csvName={`taxes-${year}-quarterly.csv`} empty="" rows={quarters}
                   columns={[

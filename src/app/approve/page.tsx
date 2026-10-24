@@ -1,4 +1,6 @@
 "use client";
+import { printPage } from "@/lib/print-page";
+import { ownerZone } from "@/lib/owner-zone";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import LegalLinks from "@/components/LegalLinks";
@@ -288,7 +290,7 @@ export default function ApprovePage() {
             <p className="mt-1">Receipt <span className="font-semibold" data-testid="receipt-number">{receiptNumber(receipt.id)}</span> · {number} · {receipt.date ? niceDate(receipt.date) : ""} · Card</p>
             <p className="mt-1">{totals.balance > 0.004 ? `Remaining balance: $${totals.balance.toFixed(2)}` : "Paid in full. Thank you!"}</p>
             <div className="print-hide mt-3 flex flex-wrap gap-2">
-              <button type="button" onClick={() => window.print()} className="min-h-11 rounded-lg bg-emerald-700 px-4 font-semibold text-white">Print / save receipt</button>
+              <button type="button" onClick={() => printPage()} className="min-h-11 rounded-lg bg-emerald-700 px-4 font-semibold text-white">Print / save receipt</button>
               <a href={`#receipt-${receipt.id}`} data-testid="receipt-link" className="inline-flex min-h-11 items-center rounded-lg border border-emerald-400 px-4 font-medium">Link to this receipt</a>
             </div>
           </div>
@@ -431,7 +433,7 @@ export default function ApprovePage() {
             {approved ? (
               <div className="space-y-2">
                 <p className="font-semibold text-emerald-700" data-testid="approve-done">
-                  Approved{approval?.approvedAt ? ` on ${new Date(approval.approvedAt).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" })}` : ""}
+                  Approved{approval?.approvedAt ? ` on ${new Date(approval.approvedAt).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short", timeZone: ownerZone(data.businessTimezone) })}` : ""}
                   {approval?.approverName ? ` by ${approval.approverName}` : ""}. Thank you!
                 </p>
                 {approvalSignature && <div data-testid="approval-signature"><SignatureBlock signature={approvalSignature} label="Approved and signed" /></div>}
@@ -473,7 +475,7 @@ export default function ApprovePage() {
           </div>
         )}
         <div className="print-hide flex justify-end">
-          <button type="button" onClick={() => window.print()} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-teal-500 hover:text-teal-700 max-sm:w-full">Print / Save PDF</button>
+          <button type="button" onClick={() => printPage()} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-teal-500 hover:text-teal-700 max-sm:w-full">Print / Save PDF</button>
         </div>
         {showRating && <RatingBox target={{ token, portal }} />}
       </section>

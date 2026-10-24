@@ -93,6 +93,12 @@ export function revisionData(root: Doc, latest: Doc, newNumber: string, today: s
 
 export type ChangeOrderNote = { id: string; number: string; createdAt: string };
 
+/** QA3: only notes whose change order still exists (not deleted/void), so the preview never points at a deleted one. */
+export function liveChangeOrderNotes(notes: ChangeOrderNote[], docs: { id?: string; data?: Record<string, unknown> }[]) {
+  if (!docs.length) return notes;
+  return notes.filter((note) => docs.some((doc) => doc.id === note.id && !doc.data?.deleted && !["void", "voided", "deleted"].includes(String(doc.data?.status || ""))));
+}
+
 export function readChangeOrderNotes(value: unknown): ChangeOrderNote[] {
   if (!Array.isArray(value)) return [];
   return value

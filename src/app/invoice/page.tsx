@@ -1,4 +1,6 @@
 "use client";
+import { printPage } from "@/lib/print-page";
+import { cachedBusinessZone } from "@/lib/overnight";
 
 import { CONTACT_METHODS, contactMethodLabel, readContactMethod } from "@/lib/contact-method";
 import Link from "next/link";
@@ -38,7 +40,7 @@ import { saveCrewJobs } from "@/lib/crew";
 import { depositInvoice, missingDeposits } from "@/lib/proposal-deposit";
 import { docTotal } from "@/lib/review";
 import { RefundPayment } from "@/components/RefundPayment";
-import { balanceDue, owedAfterRefunds, refundState, refundedTotal, paidTotal, tipTotal, paymentFields, methodLabel, paymentMethods, paymentRequirement, readPayments, type Payment } from "@/lib/payments";
+import { balanceDue, owedAfterRefunds, refundState, refundWording, refundedTotal, paidTotal, tipTotal, paymentFields, methodLabel, paymentMethods, paymentRequirement, readPayments, type Payment } from "@/lib/payments";
 import { JobPhotosEditor, JobPhotoStrip } from "@/components/JobPhotos";
 import { currentDocId } from "@/lib/doc-sync";
 import { isQuotaError, readPhotos, type JobPhoto } from "@/lib/photos";
@@ -52,8 +54,8 @@ import { clientFromRow, readCachedClients } from "@/lib/client-rows";
 import { ownerRating, starsText, type Rating } from "@/lib/ratings";
 import { applyPackage, deletePackage, readPackages, savePackage, syncPackages, type JobPackage } from "@/lib/packages";
 import { normalizeCategory, type LineCategory } from "@/lib/line-split";
-import { chainCredits, childRevision, creditLabel, newestDescendant, parentOf, revisionOwed } from "@/lib/change-order-revision";
-import { appendChangeOrderNote, changeOrdersFor, crewHandoff, revisionData, mergeChangeOrderNotes, readChangeOrderNotes, readChangeOrderOf, type ChangeOrderNote, type ChangeOrderOf } from "@/lib/change-orders";
+import { replacedBy, chainCredits, childRevision, creditLabel, newestDescendant, parentOf, revisionOwed } from "@/lib/change-order-revision";
+import { appendChangeOrderNote, changeOrdersFor, crewHandoff, revisionData, mergeChangeOrderNotes, readChangeOrderNotes, liveChangeOrderNotes, readChangeOrderOf, type ChangeOrderNote, type ChangeOrderOf } from "@/lib/change-orders";
 import ChangeOrderNotes from "@/components/ChangeOrderNotes";
 import { ApprovalBadge, ApprovalShare } from "@/components/Approval";
 import { useAutosaveDraft } from "@/hooks/useAutosaveDraft";
@@ -363,6 +365,7 @@ export default function NewInvoicePage() {
   const [emailOpen, setEmailOpen] = useState(false);
   useEffect(() => { if (sendHash && docId) { setEmailOpen(true); setSendHash(false); } }, [sendHash, docId]); // eslint-disable-line react-hooks/set-state-in-effect
   const [emailLog, setEmailLog] = useState<EmailLogEntry[]>([]);
+  const [autoConverted, setAutoConverted] = useState<unknown>(null); // QA3: kept on save
   const [businessEmail, setBusinessEmail] = useState("");
   const [businessPhone, setBusinessPhone] = useState("");
   const [savedClients, setSavedClients] = useState<SavedClient[]>([]);
@@ -656,6 +659,7 @@ export default function NewInvoicePage() {
       setApproval(readApproval(data.approval));
       setDocHistory(readHistory((data as Record<string, unknown>).history));
       setEmailLog(readEmailLog((data as Record<string, unknown>).emailLog));
+      setAutoConverted((data as Record<string, unknown>).autoConverted || null);
       setSchedule(readSchedule(doc.data as Record<string, unknown>));
       const loadedSchedule = (doc.data as Record<string, unknown>)?.schedule ? readSchedule(doc.data as Record<string, unknown>) : null;
       if (loadedSchedule?.startTime) { setJobStart(loadedSchedule.startTime); setJobEnd(loadedSchedule.endTime || ""); }
@@ -745,6 +749,19 @@ export default function NewInvoicePage() {
 
   // Picked client's id, else the one saved client with exactly this name (else none: match by name).
   const docClientId = clientId || clientIdFor({ clientName }, savedClients);
+  // QA3: a replaced or void invoice is retired: no Collect payment, no Resend/remind, no stepper.
+  const retired = !isProposal && (["void", "voided", "deleted"].includes(String(status)) || Boolean(docId && replacedBy(docsForStage() as never, docsForStage().find((d) => d.id === docId) as never)));
+  // QA3: the job/service date in the invoice header when there is one (scheduled date, plus later days).
+  const serviceDate = (() => {
+    if (!schedule?.date) return "";
+    const nice = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    const days = Array.isArray((schedule as { days?: unknown }).days) ? ((schedule as { days?: { date?: string }[] }).days || []).map((d) => String(d?.date || "")).filter(Boolean).sort() : [];
+    const last = days.length ? days[days.length - 1] : "";
+    return last && last > schedule.date ? `${nice(schedule.date)} – ${nice(last)}` : nice(schedule.date);
+  })();
+  // QA3: an invoice auto-made on approval skips the "Sent" step until it is really sent (emailed/texted).
+  const autoUnsent = !isProposal && Boolean(autoConverted) && emailLog.length === 0 && status !== "sent";
+  const stepStages = autoUnsent ? STAGES.filter((stage) => stage !== "sent") : STAGES;
   // Read-only stage of what is on screen (never changes status).
   const docStage = rowStage(
     { id: docId, type: isProposal ? "proposal" : "invoice", data: { status, approval, schedule, items, payments, taxPercent, discountType, discountValue, dueDate, ...(changeOrderOf ? { changeOrderOf } : {}) } },
@@ -987,7 +1004,7 @@ export default function NewInvoicePage() {
     setDocId(""); setClientSearch(""); setClientName(""); setClientId(""); setClientCompany(""); setContactName(""); setStockUsed([]); setDepositPercent(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
     setInvoiceNumber(nextNumber(docKind)); setInvoiceDate(ymd(new Date())); setDueDate(plusDays(isProposal ? 14 : defaultInvoiceTerms().days)); setJobStart(""); setJobEnd("");
     setNotes(isProposal ? "This proposal is valid for 14 days." : defaultInvoiceTerms().notes);
-    setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setLegacyPaymentIds([]); setSignature(null); setProposalSignature(null); setPadKey((key) => key + 1); setDocPayLink(""); setPhotos([]); setShowPhotos(false); setChangeOrderOf(null); setFromProposal(null); setMadeInvoices([]); setChangeOrderNotes([]); setRecFreq("off"); setRecNext(""); setRecLoadedNext(""); setRecurringFrom(null); setApproval(null); setEmailLog([]); setEmailOpen(false); setSchedule(null); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
+    setTaxPercent("0"); setDiscountType("percent"); setDiscountValue(""); setPayments([]); setLegacyPaymentIds([]); setSignature(null); setProposalSignature(null); setPadKey((key) => key + 1); setDocPayLink(""); setPhotos([]); setShowPhotos(false); setChangeOrderOf(null); setFromProposal(null); setMadeInvoices([]); setChangeOrderNotes([]); setRecFreq("off"); setRecNext(""); setRecLoadedNext(""); setRecurringFrom(null); setApproval(null); setEmailLog([]); setAutoConverted(null); setEmailOpen(false); setSchedule(null); setItems([{ ...emptyItem }]); setSaveMessage(""); setStatus("draft");
     setStyle("clean"); setJobTime(""); setCosts(emptyCosts); setCrew([]); setOtherFees([]); setCrewReport(null);
   }
 
@@ -1084,7 +1101,7 @@ export default function NewInvoicePage() {
       title: invoiceNumber || (isProposal ? "Proposal" : "Invoice"),
       clientName: clientName || "No client",
       createdAt: new Date().toLocaleDateString(),
-      data: { clientName, ...(linkedClientId ? { clientId: linkedClientId } : {}), clientCompany, ...(contactName.trim() ? { contactName: contactName.trim() } : {}), ...(stockUsed.length ? { stockUsed } : {}), ...(isProposal && Number(depositPercent) > 0 ? { depositPercent: String(Math.min(Number(depositPercent), 100)) } : {}), clientEmail, clientPhone, clientAddress, invoiceNumber: fixedNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Number(jobRate) > 0 && !isProposal ? { jobRate: String(Number(jobRate)) } : {}), ...(taskType.trim() && !isProposal ? { taskType: taskType.trim().slice(0, 40) } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), ...(rebillRefund ? { rebillRefund: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(revision && !isProposal ? revision : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(storedSchedule && (stored?.data?.schedule || !isProposal) ? { schedule: storedSchedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.autoSent ? { autoSent: (stored?.data as Record<string, unknown>).autoSent } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviewAskedAt ? { reviewAskedAt: (stored?.data as Record<string, unknown>).reviewAskedAt } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.history ? { history: (stored?.data as Record<string, unknown>).history } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew: savedCrew, ...(crewReport ? { crewReport } : {}), ...(Object.keys(crewKindFix).length ? { crewKindFix } : {}), ...(crewUndo.length ? { crewUndo } : {}) },
+      data: { ...(autoConverted && !isProposal ? { autoConverted } : {}), businessTimezone: cachedBusinessZone(), clientName, ...(linkedClientId ? { clientId: linkedClientId } : {}), clientCompany, ...(contactName.trim() ? { contactName: contactName.trim() } : {}), ...(stockUsed.length ? { stockUsed } : {}), ...(isProposal && Number(depositPercent) > 0 ? { depositPercent: String(Math.min(Number(depositPercent), 100)) } : {}), clientEmail, clientPhone, clientAddress, invoiceNumber: fixedNumber, invoiceDate, dueDate, jobStart, jobEnd, ...(jobMiles.trim() && !isProposal ? { jobMiles: jobMiles.trim() } : {}), ...(Number(jobRate) > 0 && !isProposal ? { jobRate: String(Number(jobRate)) } : {}), ...(taskType.trim() && !isProposal ? { taskType: taskType.trim().slice(0, 40) } : {}), ...(Object.keys(hoursApprovals).length ? { hoursApprovals } : {}), ...(visitNotes.length && !isProposal ? { visitNotes } : {}), notes, taxPercent, discountType, discountValue, ...(noLateFee ? { noLateFee: true } : {}), ...(rebillRefund ? { rebillRefund: true } : {}), discountAmount: totals.discount.toFixed(2), ...paymentFields(savePayments), signature, proposalSignature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), ...(stages.length && !isProposal ? { stages } : {}), ...(changeOrderOf && !isProposal ? { changeOrderOf } : {}), ...(revision && !isProposal ? revision : {}), ...(fromProposal && !isProposal ? { fromProposal } : {}), ...(keptNotes.length ? { changeOrderNotes: keptNotes } : {}), ...(recurring ? { recurring } : {}), ...(recurringFrom && !isProposal ? { recurringFrom } : {}), ...(stored?.data?.approval ? { approval: stored.data.approval } : {}), ...(storedSchedule && (stored?.data?.schedule || !isProposal) ? { schedule: storedSchedule } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviews ? { reviews: (stored?.data as Record<string, unknown>).reviews } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.autoSent ? { autoSent: (stored?.data as Record<string, unknown>).autoSent } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.reviewAskedAt ? { reviewAskedAt: (stored?.data as Record<string, unknown>).reviewAskedAt } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.history ? { history: (stored?.data as Record<string, unknown>).history } : {}), ...((stored?.data as Record<string, unknown> | undefined)?.emailLog ? { emailLog: (stored?.data as Record<string, unknown>).emailLog } : {}), items, status: saveStatus, style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew: savedCrew, ...(crewReport ? { crewReport } : {}), ...(Object.keys(crewKindFix).length ? { crewKindFix } : {}), ...(crewUndo.length ? { crewUndo } : {}) },
     };
     // Retest bug 1: a sent revision takes the job's unworked crew rows off the version it replaces (and gives
     // them back when voided / back to draft), so the replaced invoice no longer holds the crew.
@@ -1467,12 +1484,12 @@ export default function NewInvoicePage() {
           </div>
         )}
       </div>
-      {docId && (
+      {docId && !retired && (
         <div className="print-hide mt-4 border-t border-teal-500/15 pt-4" data-testid="stage-bar" data-stage={docStage.stage} data-next-action={docStage.next}>
           <StageBar
             embedded
-            stages={STAGES.map((stage) => STAGE_LABEL[stage])}
-            current={STAGES.indexOf(docStage.stage)}
+            stages={stepStages.map((stage) => STAGE_LABEL[stage])}
+            current={stepStages.indexOf(docStage.stage)}
             nextActionLabel={NEXT_LABEL[docStage.next] || undefined}
             {...stageAction}
           />
@@ -1527,7 +1544,7 @@ export default function NewInvoicePage() {
             <select className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={effStatus} data-testid="doc-status-select" onChange={(event) => setStatus(event.target.value)}>
               <option value="draft">Draft</option>
               <option value="sent">Sent</option>
-              {isProposal ? <><option value="accepted">Accepted</option>{effStatus === "invoiced" && <option value="invoiced">Invoiced</option>}</> : <><option value="paid">Paid</option><option value="overdue">Overdue</option><option value="void">Void</option></>}
+              {isProposal ? <><option value="accepted">Accepted</option>{effStatus === "invoiced" && <option value="invoiced">Invoiced</option>}</> : <>{status === "approved" && <option value="approved">Approved by client (not sent)</option>}<option value="paid">Paid</option><option value="overdue">Overdue</option><option value="void">Void</option></>}
             </select>
             {!isProposal && status === "paid" && !payments.some((row) => amountOf(row.amount) > 0) && !legacyPaymentIds.length && <p className="text-xs font-medium text-amber-700 dark:text-amber-300" data-testid="paid-needs-payment">To save as Paid, add the payment below (amount and how it was paid), or use Mark paid.</p>}
             <select className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={style} onChange={(event) => setStyle(event.target.value)}>
@@ -1904,7 +1921,7 @@ export default function NewInvoicePage() {
         </form>
         <div className="lg:sticky lg:top-20 lg:self-start">
           <div className="print-hide mb-4 flex flex-wrap gap-2 sm:gap-3">
-            <button type="button" onClick={() => window.print()} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Print / Save PDF</button>
+            <button type="button" onClick={() => printPage()} className="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 disabled:opacity-50">Print / Save PDF</button>
             {!locked && !isProposal && status !== "paid" && <button type="button" onClick={copyPayLink} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">{paymentLink.trim() ? "Pay / Copy pay link" : "Add how to pay"}</button>}
             {!locked && lateFee && (
               <div className="w-full rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" data-testid="late-fee" data-amount={lateFee.amount.toFixed(2)} data-days-late={lateFee.daysLate}>
@@ -1972,7 +1989,7 @@ export default function NewInvoicePage() {
                 <button type="button" data-testid="mark-paid-cash" onClick={markPaidCash} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">{markMethod === "Cash" ? "Mark paid in cash" : `Mark paid by ${methodLabel(markMethod)}`} (${totals.balance.toFixed(2)})</button>
               </span>
             )}
-            {!isProposal && docId && effStatus !== "draft" && effStatus !== "paid" && totals.balance > 0 && <button type="button" data-testid="invoice-reminder" onClick={() => setReminderOpen((open) => !open)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Reminder</button>}
+            {!isProposal && !retired && docId && effStatus !== "draft" && effStatus !== "paid" && totals.balance > 0 && <button type="button" data-testid="invoice-reminder" onClick={() => setReminderOpen((open) => !open)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Reminder</button>}
           </div>
           {docId && <div className="print-hide mb-4 -mt-2"><button type="button" data-testid="invoice-email" onClick={() => setEmailOpen((open) => !open)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">{emailOpen ? "Close email" : `Email ${isProposal ? "proposal" : "invoice"}…`}</button></div>}
           {emailOpen && docId && (
@@ -2003,7 +2020,7 @@ export default function NewInvoicePage() {
               />
             </div>
           )}
-          {reminderOpen && !isProposal && totals.balance > 0 && (
+          {reminderOpen && !retired && !isProposal && totals.balance > 0 && (
             <div className="print-hide mb-4">
               <ReminderPanel
                 input={{ clientName, contactName, clientCompany, invoiceNumber, owed: totals.balance, dueDate, payUrl: payUrlFor(docPayLink, paymentLink), businessName: businessName === "Your business" ? "" : businessName, ownerName, today: ymd(new Date()) }}
@@ -2023,7 +2040,7 @@ export default function NewInvoicePage() {
             return text ? <div role="status" data-testid="co-signature-banner" className="cr-tone-warn print-hide mb-3 rounded-xl border border-amber-400 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">✍ {text}.</div> : null;
           })()}
           <div id="preview" className={`${previewClass} relative`}>
-            {!isProposal && totals.total > 0 && totals.balance <= 0.004 && (status !== "draft" || effStatus === "paid") && <div aria-label="Paid" data-testid="paid-stamp" className="pointer-events-none absolute right-6 top-24 rotate-[-12deg] rounded-lg border-4 border-emerald-600 px-4 py-1 text-3xl font-black tracking-widest text-emerald-600 opacity-80">PAID</div>}
+            {!isProposal && !refund && totals.total > 0 && totals.balance <= 0.004 && (status !== "draft" || effStatus === "paid") && <div aria-label="Paid" data-testid="paid-stamp" className="pointer-events-none absolute right-6 top-24 rotate-[-12deg] rounded-lg border-4 border-emerald-600 px-4 py-1 text-3xl font-black tracking-widest text-emerald-600 opacity-80">PAID</div>}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
               <div className={`min-w-0 text-sm ${mutedClass}`}>
                 {logo && <img src={logo} alt="Business logo" className="mb-2 h-10 w-auto" />}
@@ -2038,11 +2055,12 @@ export default function NewInvoicePage() {
                 <p className={`text-xs uppercase tracking-wide ${labelClass}`}>{isProposal ? "Proposal" : "Invoice"}</p>
                 <h2 className="text-xl font-semibold leading-tight">{invoiceNumber || (isProposal ? "PROP-0000" : "INV-0000")}</h2>
                 <div className={`text-sm ${mutedClass}`}>
-                  <div>Date: {invoiceDate || "-"} · {!isProposal && totals.total > 0 && totals.balance <= 0.004 ? <span data-testid="preview-paid-in-full">Paid in full</span> : <>{isProposal ? "Valid until" : "Due"}: {dueDate || "-"}</>}</div>
+                  <div>Date: {invoiceDate || "-"} · {!isProposal && refund ? <span data-testid="preview-refunded">{refundWording(totals.total, payments)}</span> : !isProposal && totals.total > 0 && totals.balance <= 0.004 ? <span data-testid="preview-paid-in-full">Paid in full</span> : <>{isProposal ? "Valid until" : "Due"}: {dueDate || "-"}</>}</div>
+                  {serviceDate && <div data-testid="preview-service-date">Service date: {serviceDate}</div>}
                   {(jobStart || jobEnd) && <div>Time: {jobStart || "-"} to {jobEnd || "-"}</div>}
                   {changeOrderOf && !isProposal && <div data-testid="change-order-link">Change order to <a className="underline" href={`/invoice?id=${encodeURIComponent(changeOrderOf.id)}`}>{changeOrderOf.number}</a></div>}
                   {recurringFrom && !isProposal && <div className="print-hide" data-testid="recurring-link">Recurring from <a className="underline" href={`/invoice?id=${encodeURIComponent(recurringFrom.id)}`}>{recurringFrom.number}</a></div>}
-                  {!isProposal && <ChangeOrderNotes notes={changeOrderNotes} className="text-xs" />}
+                  {!isProposal && <ChangeOrderNotes notes={liveChangeOrderNotes(changeOrderNotes, docsForStage() as never)} className="text-xs" />}
                 </div>
               </div>
             </div>

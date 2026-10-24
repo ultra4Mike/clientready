@@ -1,4 +1,5 @@
-import { readPayments } from "@/lib/payments";
+import { isRefundRow, readPayments } from "@/lib/payments";
+import { isBilledInvoice, taxParts } from "@/lib/ledger";
 import { isOpenBalance } from "@/lib/payments";
 import { clientIdFor, clientKey } from "@/lib/portal";
 import { readSchedule, statusLabel } from "@/lib/schedule";
@@ -50,12 +51,14 @@ export function clientTimeline(client: TimelineClient, docs: Doc[], clients: Tim
     const href = `/invoice?id=${encodeURIComponent(doc.id)}`;
     items.push({ key: `doc-${doc.id}`, date: docDate(doc), type: kind, title: `${kind === "proposal" ? "Proposal" : "Invoice"} ${number}`.trim(), amount: amounts.total, status: documentStage(doc, docs).stage, href });
     if (doc.type === "invoice") {
-      if (status !== "draft") billed += amounts.total;
+      // QA3: billed = the ledger rule (refunds, partial refunds and paid drafts still count; void/replaced do not).
+      if (isBilledInvoice(doc, docs)) billed += taxParts(doc).total;
       paid += amounts.paid;
       if (isOpenBalance(status, amounts.owed)) owed += amounts.owed;
       readPayments(doc.data).forEach((payment, index) => {
         const amount = Number(payment.amount) || 0;
-        if (amount > 0) items.push({ key: `pay-${doc.id}-${index}`, date: ymdOf(payment.date), type: "payment", title: `Payment${payment.method ? ` · ${payment.method}` : ""} · ${number}`, amount, status: "paid", href });
+        if (isRefundRow(payment) && Math.abs(amount) > 0.004) items.push({ key: `refund-${doc.id}-${index}`, date: ymdOf(payment.date), type: "payment", title: `Refund · ${number}`, amount: -Math.abs(amount), status: "refunded", href });
+        else if (amount > 0) items.push({ key: `pay-${doc.id}-${index}`, date: ymdOf(payment.date), type: "payment", title: `Payment${payment.method ? ` · ${payment.method}` : ""} · ${number}`, amount, status: "paid", href });
       });
     }
     const schedule = readSchedule(doc.data);

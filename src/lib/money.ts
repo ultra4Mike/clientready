@@ -64,7 +64,18 @@ export function cashCollected(docs: Doc[], from = "", to = "") {
  * R126: the ONE billed / outstanding calculation. Each doc id once, invoices only, never drafts, voided
  * or pending recurring drafts. Outstanding is refund-aware (docAmounts). Optional invoice-date range.
  */
+/**
+ * QA3: was this invoice actually sent to the client? An invoice auto-made when the client approved the
+ * proposal is "approved", not sent, until the owner emails/texts it (emailLog or sentAt).
+ */
+export function wasActuallySent(doc: Doc) {
+  const data = doc.data || {};
+  if (!data.autoConverted) return String(data.status || "draft") !== "draft";
+  return (Array.isArray(data.emailLog) && data.emailLog.length > 0) || Boolean(data.sentAt);
+}
+
 export function billedOutstanding(allDocs: Doc[], from = "", to = "") {
+  let sentCount = 0;
   let count = 0, billed = 0, outstanding = 0, owedCount = 0;
   const docs = dedupeCopies(allDocs);
   for (const doc of docs) {
@@ -76,8 +87,9 @@ export function billedOutstanding(allDocs: Doc[], from = "", to = "") {
     const { total, owed, replaced } = effectiveAmounts(docs as never, doc as never);
     if (replaced) continue;
     count += 1; billed += total; outstanding += owed;
+    if (wasActuallySent(doc)) sentCount += 1;
     if (owed > 0.004) owedCount += 1; // QA2: the "N invoice(s)" next to Still owed comes from this same loop
   }
   const r = (n: number) => Math.round(n * 100) / 100;
-  return { count, billed: r(billed), outstanding: r(outstanding), owedCount };
+  return { count, sentCount, billed: r(billed), outstanding: r(outstanding), owedCount };
 }

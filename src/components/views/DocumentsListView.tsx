@@ -1,5 +1,6 @@
 "use client";
 
+import { hasMoneyRecords, resetSourceProposal, voidInvoice } from "@/lib/void-invoice";
 import { effectiveAmounts } from "@/lib/change-order-revision";
 import { writeBases } from "@/lib/three-way";
 import { csvText, downloadCsv } from "@/lib/csv";
@@ -159,9 +160,22 @@ export default function DocumentsPage({ initialView = "all" }: { initialView?: "
   }
 
   function removeDocument(id: string) {
+    const doc = documents.find((d) => d.id === id);
+    // QA3: never hard-delete an invoice with payments or refunds; offer Void (records kept, out of billed totals).
+    if (doc && hasMoneyRecords(doc as never)) {
+      if (!window.confirm(`${String(doc.data?.invoiceNumber || doc.title)} has payments or refunds, so it can't be deleted. Void it instead? It stays in your records and reports as Void and is removed from billed totals.`)) return;
+      const voided = voidInvoice(doc as never) as unknown as SavedDocument;
+      const proposal = resetSourceProposal(doc as never, documents as never) as unknown as SavedDocument | null;
+      saveList(documents.map((d) => (d.id === id ? voided : proposal && d.id === proposal.id ? proposal : d)));
+      void saveCloudDocument(voided as never).catch(() => undefined);
+      if (proposal) void saveCloudDocument(proposal as never).catch(() => undefined);
+      return;
+    }
     const ok = window.confirm("Are you sure you want to delete this document?");
     if (!ok) return;
-    saveList(documents.filter((doc) => doc.id !== id));
+    const proposal = doc ? (resetSourceProposal(doc as never, documents as never) as unknown as SavedDocument | null) : null;
+    saveList(documents.filter((d) => d.id !== id).map((d) => (proposal && d.id === proposal.id ? proposal : d)));
+    if (proposal) void saveCloudDocument(proposal as never).catch(() => undefined);
     deleteCloudDocument(id);
   }
 
@@ -179,12 +193,14 @@ export default function DocumentsPage({ initialView = "all" }: { initialView?: "
   /** Removes selected documents after one confirm. Paid invoices and invoices with payments are kept (records). */
   function removeSelected() {
     const chosen = documents.filter((doc) => selected.has(doc.id));
-    const keep = chosen.filter((doc) => doc.type === "invoice" && (doc.data?.status === "paid" || paidTotal(readPayments(doc.data || {})) > 0));
+    const keep = chosen.filter((doc) => doc.type === "invoice" && (doc.data?.status === "paid" || paidTotal(readPayments(doc.data || {})) > 0 || hasMoneyRecords(doc as never)));
     const remove = chosen.filter((doc) => !keep.includes(doc));
     if (!remove.length) return setBulkMessage("Nothing removed: paid invoices and invoices with payments are kept.");
     if (!window.confirm(`Delete ${remove.length} document${remove.length === 1 ? "" : "s"}?${keep.length ? ` ${keep.length} with payments will be kept.` : ""} This can't be undone.`)) return;
     const ids = new Set(remove.map((doc) => doc.id));
-    saveList(documents.filter((doc) => !ids.has(doc.id)));
+    let next = documents.filter((doc) => !ids.has(doc.id));
+    for (const doc of remove) { const p = resetSourceProposal(doc as never, next as never) as unknown as SavedDocument | null; if (p) { next = next.map((d) => (d.id === p.id ? p : d)); void saveCloudDocument(p as never).catch(() => undefined); } }
+    saveList(next);
     remove.forEach((doc) => deleteCloudDocument(doc.id));
     setSelected(new Set([...selected].filter((id) => !ids.has(id))));
     setBulkMessage(`Deleted ${remove.length}.${keep.length ? ` Kept ${keep.length} with payments.` : ""}`);
@@ -214,7 +230,8 @@ export default function DocumentsPage({ initialView = "all" }: { initialView?: "
         if (doc.type !== "invoice" || !invoicePastDue(doc.data, info.total, info.owed)) return false;
       } else if (statusFilter === "paid") {
         // R80: Paid = nothing owed (payments, not just the status box).
-        if (!(doc.type === "invoice" && !isVoidDoc(doc) && shown === "paid")) return false;
+        // QA3: a partially refunded invoice that owes nothing is Paid (labelled Partially refunded); if it still owes, Outstanding.
+        if (!(doc.type === "invoice" && !isVoidDoc(doc) && (shown === "paid" || ((shown === "partially_refunded" || shown === "partially-refunded") && info.owed <= 0.004)))) return false;
       } else if (statusFilter === "accepted") {
         // R80: "Accepted" = proposals the client approved (approval link) or marked accepted.
         if (!(doc.type === "proposal" && (status === "accepted" || (doc.data?.approval as { status?: string } | undefined)?.status === "approved"))) return false;
@@ -244,9 +261,9 @@ export default function DocumentsPage({ initialView = "all" }: { initialView?: "
 
   const overview = useMemo(() => {
     const from = fromDate, to = toDate;
-    let count = 0, billed = 0, owed = 0, overdue = 0, paid = 0;
+    let count = 0, sentCount = 0, billed = 0, owed = 0, overdue = 0, paid = 0;
     // R126: billed / owed from the shared billedOutstanding (each id once, no drafts or void).
-    ({ count, billed, outstanding: owed } = billedOutstanding(documents as never, from, to));
+    ({ count, sentCount, billed, outstanding: owed } = billedOutstanding(documents as never, from, to));
     const seen = new Set<string>();
     for (const doc of documents) {
       if (doc.type !== "invoice" || seen.has(doc.id)) continue;
@@ -257,7 +274,8 @@ export default function DocumentsPage({ initialView = "all" }: { initialView?: "
       if (invoicePastDue(doc.data, info.total, info.owed)) overdue += info.owed;
     }
     paid = cashCollected(documents, from, to); // R104: cash basis, by payment date
-    return { count, billed, owed, overdue, paid };
+    void count;
+    return { count: sentCount, billed, owed, overdue, paid };
   }, [documents, factsById, fromDate, toDate]);
 
   function choosePeriod(range: PeriodRange) {

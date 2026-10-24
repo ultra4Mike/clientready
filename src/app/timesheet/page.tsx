@@ -409,6 +409,7 @@ export default function TimesheetPage() {
       <p className="mt-4 text-xs text-[var(--cr-muted)]" data-testid="ts-footer-hint">Overtime and time off rules are in <Link href="/profile#overtime" className="underline" data-testid="ts-footer-settings">Settings</Link>. Day rules (gap, “Still driving?”, half day) are on <Link href="/employees" className="underline">Team</Link> under Timesheet rules. <Link href="/help?a=timesheet-how-counted" className="underline" data-testid="ts-footer-how">How hours are counted</Link></p>
       {open && openWorker && (
         <DayDetail key={`${open}|${approvalOf(openWorker.id, openDate)?.editedMinutes ?? ""}`} workerName={openWorker.name} date={openDate} sheet={sheets.get(open)} approval={approvalOf(openWorker.id, openDate)}
+          weekHasApproved={days.some((d) => d !== openDate && Boolean(approvalOf(openWorker.id, d)?.approvedAt))}
           minutes={minutesOf(openWorker.id, openDate)} extraFlags={flagsOf(openWorker.id, openDate).filter((f) => f === "edited" || f === "changed_since_approved")}
           settings={settings} schedule={scheduleFor(docs, openWorker.id, openDate)} employeeId={openWorker.id} worker={readWorkerOverrides(openWorker)}
           taps={events.filter((e) => e.employeeId === openWorker.id && e.date === openDate)} dayPay={payOf(openWorker.id, openDate)} fixes={fixes.filter((f) => f.employeeId === openWorker.id && f.date === openDate)}

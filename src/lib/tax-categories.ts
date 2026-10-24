@@ -2,6 +2,7 @@ import { readPayments, tipTotal } from "@/lib/payments";
 import { isPendingRecurringDraft } from "@/lib/recurring";
 import { uniqueDocs } from "@/lib/change-orders";
 import { yearMonth } from "@/lib/reports";
+import { isBilledInvoice } from "@/lib/ledger";
 
 /**
  * Read-only mapping of the owner's job-cost fields to IRS Schedule C lines, for the year's totals.
@@ -36,7 +37,7 @@ export function taxCategories(allDocs: Doc[], year: string) {
     for (const payment of readPayments(data)) {
       if (yearMonth(payment.date || data.invoiceDate || doc.createdAt)?.year === year) tips += tipTotal([payment]);
     }
-    if (String(data.status || "draft") === "draft") continue;
+    if (!isBilledInvoice(doc as never, allDocs as never)) continue; // QA3: same billed rule as Overview/Documents
     if (yearMonth(data.invoiceDate || doc.createdAt)?.year !== year) continue;
     const costs = (data.jobCosts || {}) as Record<string, unknown>;
     const fees = Array.isArray(costs.otherFees) ? (costs.otherFees as Fee[]) : [];

@@ -1,4 +1,5 @@
 "use client";
+import { setAsideOf } from "@/lib/ledger";
 import { unallocatedSalary } from "@/lib/timesheet-sync";
 import { isTimesheetRow, readPaySettings, rowHours, rowPayMoney, weekOf, type PayType } from "@/lib/pay-types";
 import { readSetAside } from "@/lib/profit-alerts";
@@ -415,7 +416,7 @@ export default function YearPage({ embedded = false, year: yearProp, onData, cov
     const spent = rows.filter((row) => row.kind === "out" || row.kind === "pay").reduce((sum, row) => sum + row.amount, 0);
     const wages = rows.filter((row) => row.kind === "pay").reduce((sum, row) => sum + row.amount, 0);
     const profit = collected - spent;
-    const setAside = profit > 0 ? profit * (setAsidePercent / 100) : 0;
+    const setAside = setAsideOf(profit, setAsidePercent); // QA3: one set-aside rule
     return { collected, spent, wages, profit, setAside, yours: profit - setAside };
   }, [rows, setAsidePercent]);
 

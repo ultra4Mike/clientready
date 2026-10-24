@@ -24,7 +24,7 @@ const inc = incomeSplit(docs as never, "2026");
 ok(inc.deposits <= inc.gross && inc.net === Math.round((inc.gross - inc.refunds) * 100) / 100, "income split adds up");
 
 // Schedule C: Line 28 = job costs + business, Line 31 = Line 7 - Line 28; untracked lines are null, never 0.
-const sc = scheduleC({ income: { payments: 1000, deposits: 0, refunds: 100, gross: 1000, net: 900 }, tax: { lines: [{ key: "supplies", line: "Line 22", label: "Supplies", amount: 200 }], total: 200, tips: 0 }, miles: { miles: 0, amount: 0 }, biz: [{ line: "Line 15", amount: 50 }, { line: "Line 22", amount: 10 }] });
+const sc = scheduleC({ income: { payments: 1000, deposits: 0, refunds: 100, gross: 1000, salesTax: 0, net: 900 }, tax: { lines: [{ key: "supplies", line: "Line 22", label: "Supplies", amount: 200 }], total: 200, tips: 0 }, miles: { miles: 0, amount: 0 }, biz: [{ line: "Line 15", amount: 50 }, { line: "Line 22", amount: 10 }] });
 const L = (l: string) => sc.find((r) => r.line === l);
 ok(L("Line 3")?.amount === 900 && L("Line 28")?.amount === 260 && L("Line 31")?.amount === 640, "Schedule C totals");
 ok(L("Line 22")?.amount === 210 && L("Line 15")?.amount === 50, "business expenses land on their lines");
