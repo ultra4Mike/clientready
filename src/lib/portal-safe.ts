@@ -32,8 +32,11 @@ export function publicApproval(value: unknown): Record<string, unknown> | null {
   return out;
 }
 
+/** Owner/employee-only keys public_document_data drops (deploy31 adds crew pay rows, wage rate, task type, pin). */
+export const PRIVATE_DOC_KEYS = ["jobCosts", "crew", "crewMoved", "crewMovedTo", "crewReport", "crewKindFix", "crewUndo", "hoursApprovals", "jobRate", "taskType", "pin", "lat", "lng", "jobMiles", "visitNotes", "stockUsed", "emailLog", "schedule", "jobTime", "changeOrderNotes"];
 export function publicDocData(data: Record<string, unknown> | null | undefined): Record<string, unknown> {
   const out: Record<string, unknown> = { ...(data || {}) };
+  for (const k of PRIVATE_DOC_KEYS) delete out[k];
   if ("approval" in out) out.approval = publicApproval(out.approval);
   if ("history" in out) out.history = publicHistory(out.history);
   return out;
