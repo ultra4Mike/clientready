@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { liveItems } from "../src/lib/live-items";
+const src = readFileSync("src/app/invoice/page.tsx", "utf8");
+const block = src.slice(src.indexOf("function commitHandlers"), src.indexOf("function commitHandlers") + 600);
+for (const h of ["onChange", "onInput", "onBlur", "onPaste"]) assert.ok(block.includes(h + ":"), h);
+for (const f of ["description", "qty", "rate"]) assert.ok(src.includes(`{...commitHandlers(index, "${f}")}`), f);
+assert.ok(/saveDocumentInner[\s\S]{0,300}liveItems\(/.test(src), "save reads live boxes");
+const list = [{ description: "Work", qty: "1", rate: "" }, { description: "B", qty: "2", rate: "10" }];
+const box = (i: number, f: string, v: string) => ({ value: v, dataset: { itemIndex: String(i), itemField: f } });
+const out = liveItems(list, [box(0, "rate", "45"), box(1, "rate", "10")]);
+assert.equal(out[0].rate, "45"); assert.equal(out[1].rate, "10"); assert.equal(list[0].rate, "");
+assert.equal(liveItems(list, [box(1, "rate", "10")]), list);
+assert.equal(liveItems(list, [box(9, "rate", "1"), box(0, "bogus", "1")]), list);
+console.log("invoice-rate-commit ok");

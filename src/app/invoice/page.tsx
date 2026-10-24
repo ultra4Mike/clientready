@@ -13,7 +13,8 @@ import { clientIdFor } from "@/lib/portal";
 import JobDonePanel from "@/components/JobDonePanel";
 import { StageEditor, StageSchedule } from "@/components/StageSchedule";
 import { balanceLabel, readStages, type Stage } from "@/lib/stages";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
+import { liveItems, type ItemTextField } from "@/lib/live-items";
 import { deleteCloudDocument, isUuid, saveCloudDocument } from "@/lib/cloud-docs";
 import { unsyncedIds } from "@/lib/sync-status";
 import { displayStatus, jobMessageKind, rowStage } from "@/lib/doc-status";
@@ -318,6 +319,7 @@ export default function NewInvoicePage() {
   const [clockEntries, setClockEntries] = useState<ClockEntry[]>([]);
   const [clockFix, setClockFix] = useState<{ id: string; start: string; end: string } | null>(null);
   const [items, setItems] = useState<LineItem[]>([{ ...emptyItem }]);
+  const itemsState = items;
   const [packages, setPackages] = useState<JobPackage[]>([]);
   const [packageName, setPackageName] = useState("");
   const [rating, setRating] = useState<Rating | null>(null);
@@ -978,6 +980,9 @@ export default function NewInvoicePage() {
 
   /** `cash` (from "Mark paid in cash") saves with that payment list and status instead of the form's. */
   async function saveDocumentInner(cash?: unknown) {
+    // Save what is on screen: a Rate filled/pasted and blurred in the same tick may not be in state yet.
+    const items = liveItems(itemsState, typeof document === "undefined" ? [] : [...document.querySelectorAll<HTMLInputElement>("input[data-item-field][data-item-index]")]);
+    if (items !== itemsState) setItems(items);
     const over = cash && typeof cash === "object" && Array.isArray((cash as { payments?: unknown }).payments) ? (cash as { payments: Payment[]; status: string }) : null;
     const savePayments = over ? over.payments : payments;
     const saveStatus = over ? over.status : status;
@@ -1330,7 +1335,17 @@ export default function NewInvoicePage() {
   }
 
   function updateItem(index: number, field: keyof LineItem, value: string) {
-    setItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
+    setItems((current) => current.map((item, itemIndex) => itemIndex === index && item[field] !== value ? { ...item, [field]: value } : item));
+  }
+  /** Line-item text fields commit on input, change, paste and blur (a fill() or paste then an instant blur + Save never leaves $0). */
+  function commitHandlers(index: number, field: ItemTextField) {
+    const commit = (event: { currentTarget: HTMLInputElement }) => updateItem(index, field, event.currentTarget.value);
+    return {
+      onChange: commit,
+      onInput: commit,
+      onBlur: commit,
+      onPaste: (event: ClipboardEvent<HTMLInputElement>) => { const el = event.currentTarget; commit(event); window.setTimeout(() => updateItem(index, field, el.value), 0); },
+    };
   }
 
   const jobMath = useMemo(() => {
@@ -1509,9 +1524,9 @@ export default function NewInvoicePage() {
               {items.map((item, index) => (
                 <div key={index} className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-2 sm:grid-cols-[minmax(0,1fr)_4.5rem_6rem_8.5rem] sm:border-0 sm:p-0">
                   {revision && <span data-testid="line-version-chip" className="col-span-full -mb-1 text-xs font-semibold text-amber-700 dark:text-amber-300">{(item as { fromVersion?: string }).fromVersion ? `From ${(item as { fromVersion?: string }).fromVersion}` : "Added"}</span>}
-                  <input className="col-span-2 sm:col-span-1 rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Description" value={item.description} onChange={(event) => updateItem(index, "description", event.target.value)} />
-                  <input className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Qty" value={item.qty} onChange={(event) => updateItem(index, "qty", event.target.value)} />
-                  <input className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Rate" value={item.rate} onChange={(event) => updateItem(index, "rate", event.target.value)} />
+                  <input className="col-span-2 sm:col-span-1 rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Description" data-item-field="description" data-item-index={index} value={item.description} {...commitHandlers(index, "description")} />
+                  <input className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Qty" data-item-field="qty" data-item-index={index} value={item.qty} {...commitHandlers(index, "qty")} />
+                  <input className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Rate" data-item-field="rate" data-item-index={index} value={item.rate} {...commitHandlers(index, "rate")} />
                   <select aria-label="Item type" data-testid="item-category" className="col-span-2 w-full min-w-0 sm:col-span-1 rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={item.category || ""} onChange={(event) => setItems((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, category: normalizeCategory(event.target.value) } : row))}>
                     <option value="">Unmarked</option>
                     <option value="labor">Labor</option>
