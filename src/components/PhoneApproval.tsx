@@ -27,6 +27,8 @@ export default function PhoneApproval({ docId, status, approval, ownerName, onCh
     setAsking(""); setNote(""); onChange(r.approval);
   };
   const approved = approval?.status === "approved";
+  // QA2: a paid / invoiced / void document never offers "Send for approval" or the draft text.
+  const settled = ["paid", "invoiced", "converted", "void", "voided"].includes(status);
   return (
     <div className={compact ? "space-y-2" : "space-y-2"} data-testid="phone-approval" data-state={approved ? "approved" : status === "draft" ? "draft" : "waiting"}>
       {approved ? (
@@ -34,7 +36,7 @@ export default function PhoneApproval({ docId, status, approval, ownerName, onCh
           <p className="cr-tone-good rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-800" data-testid="approval-line">{approvalLine(approval)}</p>
           <button type="button" data-testid="undo-approval" onClick={() => setAsking("undo")} className={`${btn} border border-slate-300 hover:border-red-400`}>Undo approval</button>
         </div>
-      ) : status === "draft" ? (
+      ) : settled ? null : status === "draft" ? (
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" data-testid="send-for-approval" onClick={onSend} className={`${btn} bg-teal-500 text-slate-950! hover:bg-teal-400`}>Send for approval</button>
           <p className="text-xs text-[var(--cr-muted)]" data-testid="draft-explain">This is a draft. Send it to the client first; you can mark it approved by phone after it is sent.</p>

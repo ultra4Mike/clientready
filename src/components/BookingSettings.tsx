@@ -59,10 +59,17 @@ export default function BookingSettings() {
           <label className="mt-3 block text-sm">Link name
             <input data-testid="booking-slug" className="mt-1 block w-full min-h-11 rounded border border-slate-300 px-3" value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase())} maxLength={40} placeholder="your-business" />
           </label>
+          {/* QA2: the public /book link only shows (and copies) while booking is on. */}
+          {enabled ? (
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
             <code data-testid="booking-link" className="break-all">{link}</code>
             <button type="button" data-testid="booking-copy" className="min-h-11 rounded border px-3" onClick={() => navigator.clipboard?.writeText(link).then(() => setMessage("Link copied."), () => setMessage("Copy failed; select the link and copy it."))}>Copy link</button>
           </div>
+          ) : (
+          <p className="mt-2 flex flex-wrap items-center gap-2 text-sm" data-testid="booking-off">
+            Online booking is off — <button type="button" data-testid="booking-turn-on" disabled={busy} onClick={() => save(true)} className="min-h-11 rounded border border-teal-500/50 px-3 font-semibold disabled:opacity-60">Turn it on</button>
+          </p>
+          )}
           <label className="mt-3 block text-sm">Services customers can choose (one per line)
             <textarea data-testid="booking-services" className="mt-1 block w-full rounded border border-slate-300 px-3 py-2" rows={4} value={services} onChange={(e) => setServices(e.target.value)} />
           </label>

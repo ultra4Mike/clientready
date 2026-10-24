@@ -16,7 +16,7 @@ import { useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react
 import { liveItems, type ItemTextField } from "@/lib/live-items";
 import { deleteCloudDocument, isUuid, saveCloudDocument } from "@/lib/cloud-docs";
 import { unsyncedIds } from "@/lib/sync-status";
-import { displayStatus, jobMessageKind, rowStage } from "@/lib/doc-status";
+import { displayStatus, effectiveDocStatus, isSettledStatus, jobMessageKind, rowStage } from "@/lib/doc-status";
 import InventoryUse, { type StockUse } from "@/components/InventoryUse";
 import { OwnerVisitNotes } from "@/components/CrewVisitNote";
 import { refreshEmployeesCache } from "@/lib/account-cache";
@@ -750,6 +750,11 @@ export default function NewInvoicePage() {
     { id: docId, type: isProposal ? "proposal" : "invoice", data: { status, approval, schedule, items, payments, taxPercent, discountType, discountValue, dueDate, ...(changeOrderOf ? { changeOrderOf } : {}) } },
     madeInvoices.length ? [{ type: "invoice", data: { fromProposal: { id: docId } } }] : []
   );
+  // QA2: one effective status for the dropdown, approval buttons and draft banner (matches the header badge).
+  const effStatus = effectiveDocStatus(
+    { id: docId, type: isProposal ? "proposal" : "invoice", data: { status, approval, schedule, items, payments, taxPercent, discountType, discountValue, dueDate, stages, ...(fromProposal ? { fromProposal } : {}), ...(changeOrderOf ? { changeOrderOf } : {}) } },
+    [...docsForStage(), ...(madeInvoices.length ? [{ type: "invoice", data: { fromProposal: { id: docId } } }] : [])]
+  );
   // StageBar's button runs the existing screen action for the next step (owner click only; nothing automatic).
   const stageAction: { onNext?: () => void; href?: string } =
     docStage.next === "send" ? { onNext: () => setEmailOpen(true) }
@@ -1454,9 +1459,9 @@ export default function NewInvoicePage() {
           </div>
           <p className="mt-1 text-sm text-[var(--cr-muted)]">{clientName || "No client yet"} · Total ${totals.total.toFixed(2)}</p>
         </div>
-        {docId && status !== "paid" && (status === "draft" || approval?.status === "approved" || (status !== "accepted" && totals.balance > 0.004) || isProposal) && (
+        {docId && !isSettledStatus(effStatus) && (effStatus === "draft" || approval?.status === "approved" || (effStatus !== "accepted" && totals.balance > 0.004) || isProposal) && (
           <div data-testid="approval-actions">
-            <PhoneApproval docId={docId} status={status} approval={approval} ownerName={ownerName}
+            <PhoneApproval docId={docId} status={effStatus} approval={approval} ownerName={ownerName}
               onSend={() => { setEmailOpen(true); window.setTimeout(() => document.querySelector("[data-testid=invoice-email]")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
               onChange={(next) => { setApproval(next); setDocHistory(readHistory((JSON.parse(window.localStorage.getItem("clientready-documents") || "[]") as { id: string; data?: { history?: unknown } }[]).find((d) => d.id === docId)?.data?.history)); if (isProposal) setStatus(next?.status === "approved" ? "accepted" : "sent"); setSaveMessage(next?.status === "approved" ? "Approved by phone. Added to the document history." : "Approval undone. Added to the document history."); }} />
           </div>
@@ -1519,10 +1524,10 @@ export default function NewInvoicePage() {
             <Section id="details" label="Details" className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Details & schedule</h2>
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder={isProposal ? "Proposal number" : "Invoice number"} value={invoiceNumber} onChange={(event) => setInvoiceNumber(event.target.value)} />
-            <select className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={!isProposal && status === "draft" && totals.paid > 0 && totals.balance <= 0.004 ? "paid" : status} data-testid="doc-status-select" onChange={(event) => setStatus(event.target.value)}>
+            <select className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={effStatus} data-testid="doc-status-select" onChange={(event) => setStatus(event.target.value)}>
               <option value="draft">Draft</option>
               <option value="sent">Sent</option>
-              {isProposal ? <option value="accepted">Accepted</option> : <><option value="paid">Paid</option><option value="overdue">Overdue</option><option value="void">Void</option></>}
+              {isProposal ? <><option value="accepted">Accepted</option>{effStatus === "invoiced" && <option value="invoiced">Invoiced</option>}</> : <><option value="paid">Paid</option><option value="overdue">Overdue</option><option value="void">Void</option></>}
             </select>
             {!isProposal && status === "paid" && !payments.some((row) => amountOf(row.amount) > 0) && !legacyPaymentIds.length && <p className="text-xs font-medium text-amber-700 dark:text-amber-300" data-testid="paid-needs-payment">To save as Paid, add the payment below (amount and how it was paid), or use Mark paid.</p>}
             <select className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={style} onChange={(event) => setStyle(event.target.value)}>
@@ -1967,7 +1972,7 @@ export default function NewInvoicePage() {
                 <button type="button" data-testid="mark-paid-cash" onClick={markPaidCash} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">{markMethod === "Cash" ? "Mark paid in cash" : `Mark paid by ${methodLabel(markMethod)}`} (${totals.balance.toFixed(2)})</button>
               </span>
             )}
-            {!isProposal && docId && status !== "draft" && status !== "paid" && totals.balance > 0 && <button type="button" data-testid="invoice-reminder" onClick={() => setReminderOpen((open) => !open)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Reminder</button>}
+            {!isProposal && docId && effStatus !== "draft" && effStatus !== "paid" && totals.balance > 0 && <button type="button" data-testid="invoice-reminder" onClick={() => setReminderOpen((open) => !open)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">Reminder</button>}
           </div>
           {docId && <div className="print-hide mb-4 -mt-2"><button type="button" data-testid="invoice-email" onClick={() => setEmailOpen((open) => !open)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium transition hover:border-teal-500 hover:text-teal-600">{emailOpen ? "Close email" : `Email ${isProposal ? "proposal" : "invoice"}…`}</button></div>}
           {emailOpen && docId && (
@@ -2018,7 +2023,7 @@ export default function NewInvoicePage() {
             return text ? <div role="status" data-testid="co-signature-banner" className="cr-tone-warn print-hide mb-3 rounded-xl border border-amber-400 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">✍ {text}.</div> : null;
           })()}
           <div id="preview" className={`${previewClass} relative`}>
-            {!isProposal && totals.total > 0 && totals.balance <= 0.004 && status !== "draft" && <div aria-label="Paid" data-testid="paid-stamp" className="pointer-events-none absolute right-6 top-24 rotate-[-12deg] rounded-lg border-4 border-emerald-600 px-4 py-1 text-3xl font-black tracking-widest text-emerald-600 opacity-80">PAID</div>}
+            {!isProposal && totals.total > 0 && totals.balance <= 0.004 && (status !== "draft" || effStatus === "paid") && <div aria-label="Paid" data-testid="paid-stamp" className="pointer-events-none absolute right-6 top-24 rotate-[-12deg] rounded-lg border-4 border-emerald-600 px-4 py-1 text-3xl font-black tracking-widest text-emerald-600 opacity-80">PAID</div>}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
               <div className={`min-w-0 text-sm ${mutedClass}`}>
                 {logo && <img src={logo} alt="Business logo" className="mb-2 h-10 w-auto" />}

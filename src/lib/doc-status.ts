@@ -111,3 +111,24 @@ export function jobRowLabel(doc: AnyDoc, allDocs: AnyDoc[], jobStatus: string) {
   const tag = needsApproval(doc, allDocs) ? "Not approved" : shown.label;
   return `${tag} · Job ${jobStatus.toLowerCase()}`;
 }
+
+/**
+ * QA2: the one status value the editor dropdown, the approval/send buttons and the draft banner use, so they can
+ * never disagree with the header badge. A proposal already turned into an invoice is "invoiced"; an invoice with
+ * nothing left owing (header "Paid") is "paid" even if its saved status still says draft/sent/overdue.
+ */
+export function effectiveDocStatus(doc: AnyDoc, allDocs: AnyDoc[] = [], today?: string): string {
+  const raw = statusOf(doc);
+  if (isVoidDoc(doc)) return raw;
+  if (doc.type === "proposal") return isConvertedProposal(doc, allDocs) ? "invoiced" : raw;
+  if (doc.type === "invoice" && ["draft", "sent", "overdue", ""].includes(raw) && (displayStatus(doc as Doc, allDocs as Doc[], today).key === "paid" || fullyPaidNow(doc, allDocs))) return "paid";
+  return raw;
+}
+function fullyPaidNow(doc: AnyDoc, allDocs: AnyDoc[]) {
+  if (replacedBy(allDocs as never, doc as never)) return false;
+  const { total, owed } = effectiveAmounts(allDocs as never, doc as never);
+  const paid = readPayments(dataOf(doc)).reduce((sum, row) => sum + (Number(String((row as { amount?: unknown }).amount ?? "").replace(/[^0-9.-]/g, "")) || 0), 0);
+  return total > 0 && paid > 0 && owed <= 0.004;
+}
+/** Owner may still send / mark approved: never for a paid, invoiced or void document. */
+export const isSettledStatus = (status: string) => ["paid", "invoiced", "converted", "void", "voided"].includes(status);

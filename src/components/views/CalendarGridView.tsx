@@ -15,7 +15,7 @@ import { expandJobDays, dragPayload, readDragPayload } from "@/lib/job-days";
 import { chipTimeRange } from "@/lib/chip-time";
 import { allConflicts, bookingConflicts, clashPrompts, clockText, nextOpenSlot, readOverrides, splitConflicts } from "@/lib/conflicts";
 import { ignoresTentative, isTentative, PRESETS, readCalendarFilter, saveCalendarFilter, visibleOnCalendar, type CalendarFilter } from "@/lib/calendar-filter";
-import { belongsInUnscheduled, isDueInvoice } from "@/lib/doc-status";
+import { belongsInUnscheduled, effectiveDocStatus, isDueInvoice, isSettledStatus } from "@/lib/doc-status";
 import CalendarFilterBar from "@/components/CalendarFilterBar";
 import { applySchedule, confirmRemovalFor, moveSchedule, omwTime, readSchedule, readWorkers, saveSchedule, DONE_CLASS, DONE_LABEL, doneState, STATUS_CLASS, STATUS_LABEL, statusClass, statusLabel, type DoneState, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
 
@@ -466,9 +466,9 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
               <p className="font-semibold">{editingDoc.title} · {editingDoc.clientName}</p>
               <a href={`/invoice?id=${encodeURIComponent(editingDoc.id)}`} className="text-sm font-medium text-teal-600 hover:underline dark:text-teal-300">Open {editingDoc.type}</a>
             </div>
-            {String((editingDoc.data as Record<string, unknown> | undefined)?.status || "draft") !== "paid" && (isTentative(editingDoc, docs) || readApproval((editingDoc.data as Record<string, unknown> | undefined)?.approval)?.status === "approved") && (
+            {!isSettledStatus(effectiveDocStatus(editingDoc as never, docs as never)) && (isTentative(editingDoc, docs) || readApproval((editingDoc.data as Record<string, unknown> | undefined)?.approval)?.status === "approved") && (
               <div className="mb-3" data-testid="popover-approval">
-                <PhoneApproval compact docId={editingDoc.id} status={String((editingDoc.data as Record<string, unknown> | undefined)?.status || "draft")} approval={readApproval((editingDoc.data as Record<string, unknown> | undefined)?.approval)}
+                <PhoneApproval compact docId={editingDoc.id} status={effectiveDocStatus(editingDoc as never, docs as never)} approval={readApproval((editingDoc.data as Record<string, unknown> | undefined)?.approval)}
                   ownerName={(() => { try { return String(JSON.parse(window.localStorage.getItem("clientready-profile") || "{}").ownerName || ""); } catch { return ""; } })()}
                   onSend={() => { window.location.href = `/invoice?id=${encodeURIComponent(editingDoc.id)}#send`; }}
                   onChange={() => setState((prev) => ({ ...prev, docs: readDocs() }))} />

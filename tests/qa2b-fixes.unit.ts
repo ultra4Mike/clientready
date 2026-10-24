@@ -18,7 +18,7 @@ const src = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "ut
 // 2 + 3. Status shows Paid when fully paid; new payment rows start blank
 {
   const inv = src("src/app/invoice/page.tsx");
-  assert.match(inv, /status === "draft" && totals\.paid > 0 && totals\.balance <= 0\.004 \? "paid" : status/);
+  assert.match(inv, /value=\{effStatus\}/); // QA2c: the shared effective-status helper replaced the inline rule
   assert.match(inv, /amount: "", method: "", date: ymd\(new Date\(\)\)/);
   assert.doesNotMatch(inv, /method: "Cash", date: ymd/);
   assert.match(inv, /payment-fill-suggested/);
