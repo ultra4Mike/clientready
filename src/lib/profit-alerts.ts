@@ -2,6 +2,7 @@ import { docAmounts } from "@/lib/doc-stage";
 import { ownerJobCost } from "@/lib/reports";
 import { uniqueDocs } from "@/lib/change-orders";
 import { isPendingRecurringDraft } from "@/lib/recurring";
+import { jobProfit, type JobProfit } from "@/lib/job-profit";
 
 /**
  * Profit alerts (owner only, never shown to customers or crew). A job is flagged when its owner job costs
@@ -40,15 +41,23 @@ export function crewReportTotal(value: unknown) {
   return r2(lines.reduce((sum, line) => sum + Math.max(0, num(line.amount)), 0));
 }
 
-export function profitAlerts(input: { total: number; jobCost: number; crewTotal?: number; minMargin: number }): ProfitAlert[] {
-  const { total, jobCost, minMargin } = input;
+/**
+ * Help retest fix: with `breakdown` (lib/job-profit, the "Profit after all costs" line on the invoice) the loss and
+ * margin checks use the SAME all-in profit the owner sees (card fees, mileage and refunds included); before, the
+ * alert only counted the job-cost boxes, so an invoice could show e.g. 12% after all costs with no alert.
+ */
+export function profitAlerts(input: { total: number; jobCost: number; crewTotal?: number; minMargin: number; breakdown?: JobProfit }): ProfitAlert[] {
+  const { jobCost, minMargin, breakdown } = input;
+  const total = breakdown ? breakdown.total : input.total;
+  const allCost = breakdown ? r2(breakdown.total - breakdown.profit) : jobCost;
   const crewTotal = input.crewTotal || 0;
   const out: ProfitAlert[] = [];
-  if (total > 0 && jobCost > 0) {
-    const left = r2(total - jobCost);
+  if (total > 0 && allCost > 0) {
+    const left = r2(total - allCost);
     const margin = Math.round((left / total) * 100);
-    if (left < 0) out.push({ kind: "loss", text: `Job costs ($${jobCost.toFixed(2)}) are more than the price ($${total.toFixed(2)}): a $${(-left).toFixed(2)} loss.` });
-    else if (minMargin > 0 && margin < minMargin) out.push({ kind: "low-margin", text: `Only ${margin}% left after job costs ($${left.toFixed(2)} of $${total.toFixed(2)}). Your minimum is ${minMargin}%.` });
+    const label = breakdown ? "All costs" : "Job costs";
+    if (left < 0) out.push({ kind: "loss", text: `${label} ($${allCost.toFixed(2)}) are more than the price ($${total.toFixed(2)}): a $${(-left).toFixed(2)} loss.` });
+    else if (minMargin > 0 && margin < minMargin) out.push({ kind: "low-margin", text: `Only ${margin}% left after ${breakdown ? "all costs" : "job costs"} ($${left.toFixed(2)} of $${total.toFixed(2)}). Your minimum is ${minMargin}%.` });
   }
   if (crewTotal > 0 && crewTotal - jobCost > Math.max(5, jobCost * 0.1)) {
     out.push({ kind: "crew-over", text: `Crew reported $${crewTotal.toFixed(2)} in costs, $${(crewTotal - jobCost).toFixed(2)} more than your job costs ($${jobCost.toFixed(2)}).` });
@@ -63,13 +72,14 @@ export function profitAlertJobs(allDocs: Doc[], minMargin: number, today = new D
   for (const doc of uniqueDocs(allDocs)) {
     if (doc.type !== "invoice" || isPendingRecurringDraft(doc)) continue;
     const data = doc.data || {};
-    if (String(data.status || "draft") === "draft") continue;
+    if (["draft", "void", "voided", "deleted"].includes(String(data.status || "draft")) || data.deleted) continue;
     const date = String(data.invoiceDate || doc.createdAt || "").slice(0, 10);
     if (date && date < since) continue;
     const { total } = docAmounts(doc);
     const jobCost = r2(ownerJobCost(data));
-    const alerts = profitAlerts({ total, jobCost, crewTotal: crewReportTotal(data.crewReport), minMargin });
-    if (alerts.length) rows.push({ id: doc.id, number: String(data.invoiceNumber || doc.title || "Invoice"), client: String(data.clientName || doc.clientName || ""), total, jobCost, left: r2(total - jobCost), alerts });
+    const breakdown = jobProfit({ total, data });
+    const alerts = profitAlerts({ total, jobCost, crewTotal: crewReportTotal(data.crewReport), minMargin, breakdown });
+    if (alerts.length) rows.push({ id: doc.id, number: String(data.invoiceNumber || doc.title || "Invoice"), client: String(data.clientName || doc.clientName || ""), total: breakdown.total, jobCost, left: breakdown.profit, alerts });
   }
   return rows.sort((a, b) => a.left / (a.total || 1) - b.left / (b.total || 1));
 }
@@ -79,7 +89,7 @@ export function profitAlertsForDoc(doc: Doc | null | undefined, minMargin: numbe
   if (!doc || (doc.type !== "invoice" && doc.type !== "proposal")) return [];
   const data = doc.data || {};
   const { total } = docAmounts(doc);
-  return profitAlerts({ total, jobCost: r2(ownerJobCost(data)), crewTotal: crewReportTotal(data.crewReport), minMargin });
+  return profitAlerts({ total, jobCost: r2(ownerJobCost(data)), crewTotal: crewReportTotal(data.crewReport), minMargin, breakdown: jobProfit({ total, data }) });
 }
 
 /** This device's cached profile (the account value after loadAccountIntoCache). */
