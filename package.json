@@ -9,7 +9,8 @@
     "lint": "eslint",
     "cap:sync": "cap sync",
     "cap:open:ios": "cap open ios",
-    "cap:open:android": "cap open android"
+    "cap:open:android": "cap open android",
+    "test": "for f in tests/*.unit.ts; do echo \"== $f\"; npx --yes tsx --import ./tests/helpers/test-setup.ts \"$f\" || exit 1; done"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",
