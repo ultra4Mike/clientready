@@ -9,5 +9,5 @@ assert.equal(a.method, "phone"); assert.equal(a.note, "John on phone");
 assert.match(approvalLine(a), /^Approved by phone · Oct 2[34], 2026 .* · by Pat · John on phone$/);
 assert.equal(readHistory([{ at: "x", action: "A", by: "b" }, { bad: 1 }, "s"]).length, 1);
 const tl = portalTimeline([{ id: "d", type: "proposal", title: "P", data: { invoiceNumber: "PROP-1", approval: a }, total: 10, owed: 0 }], "2026-10-24");
-assert.ok(tl.some((i) => i.kind === "approved" && /approved by phone \(recorded by Pat\)/.test(i.title)));
+assert.ok(tl.some((i) => i.kind === "approved" && i.title === "Proposal PROP-1 approved by phone"));
 console.log("phone-approval: ok");

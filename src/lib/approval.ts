@@ -1,3 +1,4 @@
+import { publicDocData } from "@/lib/portal-safe";
 import { linkOrigin } from "@/lib/site";
 import { supabase } from "@/lib/supabase";
 import { getUserId, isUuid, type CloudDoc } from "@/lib/cloud-docs";
@@ -198,13 +199,15 @@ export async function refreshApproval(docId: string): Promise<Approval | null | 
 export async function fetchApprovalDoc(token: string) {
   const { data, error } = await supabase.rpc("get_document_by_approval_token", { p_token: token });
   if (error) throw error;
-  return data as null | {
+  const out = data as null | {
     type: string;
     title: string;
     clientName: string;
     data: Record<string, unknown>;
     business: { name: string; logo: string; paymentLink: string; email: string; phone: string };
   };
+  if (out) out.data = publicDocData(out.data);
+  return out;
 }
 
 /** Public: approves the document behind a token. Returns the new approval, or null if not pending/unknown. */

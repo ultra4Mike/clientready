@@ -1,3 +1,4 @@
+import { publicDocData } from "@/lib/portal-safe";
 import { linkOrigin } from "@/lib/site";
 import { supabase } from "@/lib/supabase";
 import { getUserId } from "@/lib/cloud-docs";
@@ -167,13 +168,17 @@ export type PortalBusiness = { name: string; logo: string; paymentLink: string; 
 export async function fetchPortal(token: string) {
   const { data, error } = await supabase.rpc("get_client_portal", { p_token: token });
   if (error) throw error;
-  return data as null | { clientName: string; business: PortalBusiness; documents: PortalDoc[] };
+  const out = data as null | { clientName: string; business: PortalBusiness; documents: PortalDoc[] };
+  if (out?.documents) out.documents = out.documents.map((doc) => ({ ...doc, data: publicDocData(doc.data) }));
+  return out;
 }
 
 export async function fetchPortalDoc(token: string, docId: string) {
   const { data, error } = await supabase.rpc("get_portal_document", { p_token: token, p_doc_id: docId });
   if (error) throw error;
-  return data as null | { type: string; title: string; clientName: string; data: Record<string, unknown>; business: PortalBusiness };
+  const out = data as null | { type: string; title: string; clientName: string; data: Record<string, unknown>; business: PortalBusiness };
+  if (out) out.data = publicDocData(out.data);
+  return out;
 }
 
 export async function portalApprove(token: string, docId: string, name: string, signature: Signature | null) {

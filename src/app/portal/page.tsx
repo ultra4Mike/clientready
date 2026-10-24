@@ -82,7 +82,7 @@ export default function PortalPage() {
 
   const rows = portal.documents.map((doc) => ({ doc, ...figures(doc, portal.documents, chain[doc.id]), approval: readApproval(doc.data.approval) }));
   const owed = rows.reduce((sum, row) => sum + row.owed, 0);
-  const timeline = portalTimeline(rows.map((row) => ({ ...row.doc, total: row.total, owed: row.owed })));
+  const timeline = portalTimeline(rows.map((row) => ({ ...row.doc, total: row.total, owed: row.owed })), undefined, portal.business?.name || "");
   const dueNow = Math.round(rows.reduce((sum, row) => sum + row.dueNow, 0) * 100) / 100;
 
   return (
