@@ -11,6 +11,7 @@ import { docHref, jobChain, type JobChain } from "@/lib/job-chain";
 import { crewIds, readWorkers, statusLabel } from "@/lib/schedule";
 import { niceYmd, timeLabel } from "@/lib/scheduled-jobs";
 import DocTrail from "@/components/DocTrail";
+import { cachedMinMargin, profitAlertsForDoc } from "@/lib/profit-alerts";
 
 type Doc = { id: string; type: string; title: string; clientName?: string; createdAt?: string; data?: Record<string, unknown> };
 type Tab = "request" | "quote" | "job" | "invoice";
@@ -22,6 +23,7 @@ export default function JobPage() {
   const [docs, setDocs] = useState<Doc[]>([]);
   const [chain, setChain] = useState<JobChain<Doc> | null | undefined>(undefined);
   const [tab, setTab] = useState<Tab>("job");
+  const [minMargin, setMinMargin] = useState(20);
   const [workers, setWorkers] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
@@ -33,6 +35,7 @@ export default function JobPage() {
       const all = raw ? (JSON.parse(raw) as Doc[]) : [];
       const found = jobChain(all, id);
       setDocs(all);
+      setMinMargin(cachedMinMargin());
       setChain(found);
       setWorkers(new Map(readWorkers().map((w) => [w.id, w.name])));
       if (wanted && TABS.some(([k]) => k === wanted)) setTab(wanted);
@@ -62,6 +65,10 @@ export default function JobPage() {
       {chain && (
         <>
           {main && <DocTrail docs={docs} currentId={main.id} />}
+          {/* Owner-only profit warning (in-app; no email). Same math as the dashboard card and the editor. */}
+          {profitAlertsForDoc(main, minMargin).map((alert) => (
+            <p key={alert.kind} role="status" data-testid="job-profit-alert" data-kind={alert.kind} className={`mb-3 rounded-lg border px-3 py-2 text-sm ${alert.kind === "loss" ? "border-rose-400/60 bg-rose-50 text-rose-800" : "border-amber-400/60 bg-amber-50 text-amber-900"}`}>⚠ {alert.text} {main && <a href={`${docHref(main)}#costs`} className="underline">Review costs</a>}</p>
+          ))}
           <div role="tablist" data-testid="job-tabs" className="mb-3 flex w-full gap-1 rounded-xl border border-slate-500/30 bg-[var(--cr-card)] p-1 shadow-sm sm:w-auto">
             {TABS.map(([key, label], i) => (
               <button key={key} type="button" role="tab" aria-selected={tab === key} data-testid={`job-tab-${key}`} onClick={() => setTab(key)} className={`cr-btn flex-1 sm:flex-none ${tab === key ? "cr-btn-primary" : "cr-btn-text"}`}>

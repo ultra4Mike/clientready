@@ -12,7 +12,7 @@ type Session = {
   currency?: string;
   created?: number;
   payment_intent?: string | null;
-  metadata?: { doc_id?: string; owed_cents?: string; owner_id?: string };
+  metadata?: { doc_id?: string; owed_cents?: string; owner_id?: string; tip_cents?: string };
   client_reference_id?: string | null;
   mode?: string;
 };
@@ -72,13 +72,16 @@ export async function POST(request: Request) {
   const { data: started, error: startedError } = await client.from("stripe_checkout_sessions").select("doc_id, cents").eq("session_id", session.id).maybeSingle();
   const startedRow = started as { doc_id?: string; cents?: number } | null;
   const metaCents = Number(session.metadata?.owed_cents || "");
-  if (startedError || !startedRow || String(startedRow.doc_id) !== String(docId) || Number(startedRow.cents) !== session.amount_total || (metaCents && metaCents !== session.amount_total)) {
+  // Tip: charged as its own line; the invoice part is amount_total minus the tip (metadata we set, signed by Stripe).
+  const tipPart = Math.max(0, Math.floor(Number(session.metadata?.tip_cents || 0)) || 0);
+  const billCents = session.amount_total - tipPart;
+  if (startedError || !startedRow || String(startedRow.doc_id) !== String(docId) || Number(startedRow.cents) !== billCents || (metaCents && metaCents !== billCents)) {
     return park("no matching checkout for this invoice and amount", fromMinor(session.amount_total, String(session.currency || "")));
   }
   const v2 = await client.rpc("record_stripe_payment_v2", {
     p_doc_id: docId,
     p_session_id: session.id,
-    p_amount: fromMinor(session.amount_total, String(session.currency || "usd")),
+    p_amount: fromMinor(billCents, String(session.currency || "usd")),
     p_paid_at: paidAt,
     p_ref: ref,
     p_event_id: String(event.id || ""),
@@ -88,19 +91,25 @@ export async function POST(request: Request) {
     // 'pending': invoice missing or not synced yet. It is saved in stripe_pending_payments; a non-2xx
     // makes Stripe retry (for up to ~3 days), and a later retry records it once (idempotent).
     if (v2.data === "pending") return Response.json({ error: "Invoice not found yet; payment kept as pending." }, { status: 409 });
+    if (tipPart > 0 && (v2.data === "recorded" || v2.data === "duplicate")) await recordTip(client, docId, session.id, fromMinor(tipPart, String(session.currency || "usd")));
     return Response.json({ received: true, recorded: v2.data === "recorded" || v2.data === "duplicate" });
   }
   // Before migration 20261015130000 runs, fall back to the original function (UTC date).
   const { data, error } = await client.rpc("record_stripe_payment", {
     p_doc_id: docId,
     p_session_id: session.id,
-    p_amount: fromMinor(session.amount_total, String(session.currency || "usd")),
+    p_amount: fromMinor(billCents, String(session.currency || "usd")),
     p_paid_at: paidAt,
     p_ref: ref,
   });
   // A failure or a missing invoice returns non-2xx so Stripe retries; recording is idempotent per session.
   if (error || !data) return Response.json({ error: "Could not record payment." }, { status: error ? 500 : 409 });
   return Response.json({ received: true, recorded: true });
+}
+
+/** Adds the tip to the Stripe payment row (deploy26.sql). Before that SQL runs the tip stays only in Stripe. */
+async function recordTip(client: ReturnType<typeof serviceClient>, docId: string, sessionId: string, tip: number) {
+  await client.rpc("set_stripe_payment_tip", { p_doc_id: docId, p_session_id: sessionId, p_tip: tip }).then(() => null, () => null);
 }
 
 type Refund = { id?: string; amount?: number; currency?: string; status?: string; created?: number; payment_intent?: string | null; charge?: string | null };

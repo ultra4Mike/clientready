@@ -65,3 +65,16 @@ export function profitAlertJobs(allDocs: Doc[], minMargin: number, today = new D
   }
   return rows.sort((a, b) => a.left / (a.total || 1) - b.left / (b.total || 1));
 }
+
+/** Job page: alerts for one invoice or quote (any status), same math as the dashboard and the editor. */
+export function profitAlertsForDoc(doc: Doc | null | undefined, minMargin: number): ProfitAlert[] {
+  if (!doc || (doc.type !== "invoice" && doc.type !== "proposal")) return [];
+  const data = doc.data || {};
+  const { total } = docAmounts(doc);
+  return profitAlerts({ total, jobCost: r2(ownerJobCost(data)), crewTotal: crewReportTotal(data.crewReport), minMargin });
+}
+
+/** This device's cached profile (the account value after loadAccountIntoCache). */
+export function cachedMinMargin() {
+  try { return readMinMargin(JSON.parse(window.localStorage.getItem("clientready-profile") || "{}")); } catch { return 20; }
+}
