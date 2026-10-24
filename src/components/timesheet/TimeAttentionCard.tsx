@@ -2,6 +2,8 @@
 /** Dashboard > Needs attention: who's on the clock, missing clock-outs, missed breaks, pending fixes, late/no-show. */
 import { TIMESHEET_CHANGED_EVENT } from "@/lib/timesheet-sync";
 import { useEffect, useState } from "react";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { DAY_APPROVALS_KEY } from "@/lib/day-events";
 import Link from "next/link";
 import { loadPtoRequests } from "@/lib/phase2-data";
 import { loadTimeWeek, localYmd, timeAttention, type TimeAttention } from "@/lib/time-owner";
@@ -11,11 +13,14 @@ export default function TimeAttentionCard() {
   const [ptoPending, setPtoPending] = useState(0);
   useEffect(() => {
     let live = true;
-    const load = () => { const now = new Date().toISOString(); void loadTimeWeek(localYmd(), now).then((w) => { if (live && w.workers.length) setT(timeAttention(w, now)); }).catch(() => undefined); void loadPtoRequests(localYmd().slice(0, 4)).then((r) => { if (live) setPtoPending(r.filter((x) => x.status === "pending").length); }).catch(() => undefined); };
+    const load = () => { const now = new Date().toISOString(); void loadTimeWeek(localYmd(), now).then((w) => { if (live) setT(w.workers.length ? timeAttention(w, now) : null); }).catch(() => undefined); void loadPtoRequests(localYmd().slice(0, 4)).then((r) => { if (live) setPtoPending(r.filter((x) => x.status === "pending").length); }).catch(() => undefined); };
     load();
     window.addEventListener(TIMESHEET_CHANGED_EVENT, load);
     return () => { live = false; window.removeEventListener(TIMESHEET_CHANGED_EVENT, load); };
   }, []);
+  // pt473u: the phone and the web must agree. Re-read on focus / visible / online / every minute (keeps what's shown
+  // until the server copy lands, so no flash); resolved days on another device drop off here too.
+  useLiveRefresh(() => { const now = new Date().toISOString(); void loadTimeWeek(localYmd(), now).then((w) => setT(w.workers.length ? timeAttention(w, now) : null)).catch(() => undefined); void loadPtoRequests(localYmd().slice(0, 4)).then((r) => setPtoPending(r.filter((x) => x.status === "pending").length)).catch(() => undefined); }, { storageKeys: [DAY_APPROVALS_KEY] });
   if ((!t || (!t.onClock.length && !t.alerts.length)) && !ptoPending) return null;
   if (!t) return (
     <section className="cr-section rounded-xl border px-4 py-3 text-sm" data-testid="dash-time" data-state="attention"><Link href="/timesheet#pto" className="cr-chip2 cr-tone-warn" data-testid="dash-time-pto">{ptoPending} time-off request{ptoPending === 1 ? "" : "s"} waiting</Link></section>);

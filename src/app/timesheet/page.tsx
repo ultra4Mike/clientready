@@ -15,13 +15,14 @@ import { weekOf } from "@/lib/pay-types";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { refreshEmployeesCache } from "@/lib/account-cache";
-import { splitAlerts, mergeApprovals, resolvedInPeriod, scheduleAlertLabel, pendingSurfaces, statusChip, LOADING_LABEL, type OwnerAlert } from "@/lib/timesheet-alerts";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { splitAlerts, mergeApprovals, stampSaved, resolvedInPeriod, scheduleAlertLabel, pendingSurfaces, statusChip, LOADING_LABEL, type OwnerAlert } from "@/lib/timesheet-alerts";
 import { timesheetEmptyKind, type CrewLoad } from "@/lib/timesheet-crew-state";
 import DayDetail from "@/components/timesheet/DayDetail";
 import PtoOwnerCard from "@/components/phase2/PtoOwnerCard";
 import { loadPtoForRange, loadPtoRequests } from "@/lib/phase2-data";
 import { ptoDays, ptoKindLabel, type PtoRequest } from "@/lib/pay-phase2";
-import { loadBusinessTz, loadAttestations, decideFix, loadOwnerTimesheet, readLocalTimesheetSettings, readLocalApprovals, saveApprovals, type DayApproval } from "@/lib/day-events";
+import { loadBusinessTz, loadAttestations, decideFix, loadOwnerTimesheet, readLocalTimesheetSettings, readLocalApprovals, saveApprovals, DAY_APPROVALS_KEY, type DayApproval } from "@/lib/day-events";
 import { dayState, DEFAULT_TIMESHEET_SETTINGS, reviewDayInfo, weekStatus, type DayStateName, type DaySheet, type FixRequest, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
 import { addDays, applyWeekToDocs, pushChangedDocs, readDocs, syncTimesheetCutover, scheduleFor, weekShares, weekSheets } from "@/lib/timesheet-sync";
 import type { DayPay } from "@/lib/timesheet-pay";
@@ -102,6 +103,23 @@ export default function TimesheetPage() {
     void loadAttestations(week).then((r) => { if (live) setAttest(r); });
     return () => { live = false; };
   }, [week]);
+  // pt473u: re-read the server when the app comes back to the front / goes online / every minute, quietly (the
+  // screen keeps its current data, no loading flash). The server copy wins for approved/resolved days.
+  const weekRef = useRef(week);
+  useEffect(() => { weekRef.current = week; }, [week]);
+  const refreshing = useRef(false);
+  useLiveRefresh(() => {
+    const wk = weekRef.current;
+    if (!wk || refreshing.current) return;
+    refreshing.current = true;
+    void loadOwnerTimesheet(wk, addDays(wk, 6)).then((data) => {
+      if (weekRef.current !== wk || !data.cloud) return; // never replace good data with a failed read
+      setCloud(true); setCloudError(""); setEvents(data.events); setFixes(data.fixes); setSettings(data.settings);
+      setApprovals(mergeApprovals(data.approvals, [...savedApprovals.current.values()].filter((a) => a.date >= wk && a.date <= addDays(wk, 6))));
+      setDocs(readDocs()); setNow(new Date().toISOString());
+    }).catch(() => undefined).finally(() => { refreshing.current = false; });
+    void loadPtoForRange(wk, addDays(wk, 6)).then((r) => { if (weekRef.current === wk) setWeekPto(r); }).catch(() => {});
+  }, { enabled: Boolean(week) && !weekLoading, storageKeys: [DAY_APPROVALS_KEY] });
   const { days, sheets } = useMemo(() => (week && now ? weekSheets({ workers, docs, events, fixes, settings, week, now }) : { days: [] as string[], sheets: new Map<string, DaySheet>() }), [workers, docs, events, fixes, settings, week, now]);
   const offDays = useMemo(() => (week ? ptoDays(weekPto || [], workers as never, week, addDays(week, 6)) : new Map<string, { hours: number; kind: string }>()), [weekPto, workers, week]);
   const { pays, shares } = useMemo(() => (week && days.length ? weekShares({ workers, docs, days, sheets, approvals, settings, pto: weekPto }) : { pays: new Map<string, DayPay[]>(), shares: new Map() as ReturnType<typeof weekShares>["shares"] }), [workers, docs, days, sheets, approvals, settings, weekPto, week]);
@@ -114,7 +132,7 @@ export default function TimesheetPage() {
   const approvalOf = (id: string, date: string) => approvals.find((a) => a.employeeId === id && a.date === date);
   const minutesOf = (id: string, date: string) => { const a = approvalOf(id, date); const s = sheets.get(`${id}|${date}`); return a?.editedMinutes != null ? a.editedMinutes : a?.approvedAt ? a.paidMinutes : s?.paidMinutes || 0; };
 
-  const savedApprovals = useRef(new Map<string, DayApproval>()); // saved this session; a slower in-flight load can't undo them
+  const savedApprovals = useRef(new Map<string, DayApproval & { savedAt?: number }>()); // saved this session; a slower in-flight load can't undo them
   async function commit(rows: DayApproval[], before: DayApproval[], record = true, note = "") {
     const keys = new Set(rows.map((r) => `${r.employeeId}|${r.date}`));
     rows = rows.map((r) => (r.approvedAt ? { ...r, changedAt: null } : r)); // approved is never "changed since approved"
@@ -127,7 +145,7 @@ export default function TimesheetPage() {
       setMessage(`Not saved: ${error}`);
       return false;
     }
-    for (const r of rows) savedApprovals.current.set(`${r.employeeId}|${r.date}`, r);
+    for (const r of rows) savedApprovals.current.set(`${r.employeeId}|${r.date}`, stampSaved(r));
     return true;
   }
   const blank = (employeeId: string, date: string): DayApproval => ({ employeeId, date, paidMinutes: 0, driveMinutes: 0, editedMinutes: null, approvedAt: null, changedAt: null });

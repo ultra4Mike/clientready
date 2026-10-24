@@ -13,6 +13,7 @@ const missing = (error: { message?: string; code?: string } | null | undefined) 
 const KEY_EVENTS = "clientready-day-events";
 const KEY_FIXES = "clientready-time-fixes";
 const KEY_APPROVALS = "clientready-day-approvals";
+export const DAY_APPROVALS_KEY = KEY_APPROVALS;
 const KEY_SETTINGS = "clientready-timesheet-settings";
 function readLocal<T>(key: string, fallback: T): T {
   try { const raw = window.localStorage.getItem(key); return raw ? (JSON.parse(raw) as T) : fallback; } catch { return fallback; }
@@ -182,8 +183,12 @@ export async function loadOwnerTimesheet(from: string, to: string): Promise<Owne
   const cloud = signedIn && !ev.error && !ap.error;
   const cloudError = !signedIn ? "not signed in" : errs.join(" | ");
   const cloudApprovals = !signedIn || ap.error ? [] : ((ap.data || []) as Record<string, unknown>[]).map((r) => ({ employeeId: String(r.employee_id), date: String(r.work_date).slice(0, 10), paidMinutes: Number(r.paid_minutes) || 0, driveMinutes: Number(r.drive_minutes) || 0, editedMinutes: r.edited_minutes == null ? null : Number(r.edited_minutes), approvedAt: (r.approved_at as string) || null, changedAt: (r.changed_at as string) || null }));
-  const seen = new Set(cloudApprovals.map((a) => `${a.employeeId}|${a.date}`));
-  const approvals = !signedIn || ap.error ? localApprovals : [...cloudApprovals, ...localApprovals.filter((a) => !seen.has(`${a.employeeId}|${a.date}`) && a.approvedAt)];
+  // pt473u: a good server read is the truth for this range. A row only this device still has (approved/resolved on a
+  // stale copy, or un-approved on another device) used to be merged back in, so the phone kept showing different
+  // alerts than the web. Signed-in saves go straight to the server (failed saves are reverted), so nothing is lost.
+  const approvals = !signedIn || ap.error ? localApprovals : cloudApprovals;
+  // Refresh this device's cache for the range so a cold start (before the read lands) starts from the server copy.
+  if (signedIn && !ap.error) writeLocal(KEY_APPROVALS, [...localApprovals.filter((a) => a.date < from || a.date > to), ...cloudApprovals]);
   const s = st.data as Record<string, unknown> | null;
   return {
     events: ev.error ? [] : dedupeTaps(((ev.data || []) as EventRow[]).map(fromRow)),

@@ -1,0 +1,31 @@
+// pt473u: phone and web open at once must agree on resolved alerts (server wins; refresh on focus/visible/online/interval).
+import { readFileSync } from "node:fs";
+import { mergeApprovals, SESSION_WIN_MS, stampSaved } from "@/lib/timesheet-alerts";
+import { liveRefreshTriggers } from "@/hooks/useLiveRefresh";
+let fails = 0; const ok = (c: boolean, m: string) => { if (!c) fails++; console.log((c ? "ok " : "FAIL ") + m); };
+type R = { employeeId: string; date: string; approvedAt?: string | null };
+const server: R[] = [{ employeeId: "e1", date: "2026-10-22", approvedAt: "2026-10-23T03:00:00Z" }];
+const mineOld = { employeeId: "e1", date: "2026-10-22", approvedAt: null as string | null, savedAt: 1000 };
+ok(mergeApprovals(server, [mineOld], 1000 + SESSION_WIN_MS + 1)[0].approvedAt !== null, "old local save no longer beats the server (other device's approval shows)");
+ok(mergeApprovals(server, [mineOld], 1000 + 500)[0].approvedAt === null, "a save from the last few seconds still beats an in-flight read");
+ok(!("savedAt" in mergeApprovals<R>([], [stampSaved<R>({ employeeId: "a", date: "d" }, 5)], 6)[0]), "savedAt is not leaked into rows");
+// triggers
+type L = Record<string, ((e: Event) => void)[]>;
+const mk = () => { const l: L = {}; return { l, addEventListener: (t: string, f: (e: Event) => void) => { (l[t] ||= []).push(f); }, removeEventListener: (t: string, f: (e: Event) => void) => { l[t] = (l[t] || []).filter((x) => x !== f); } }; };
+const win = mk(), doc = { ...mk(), visibilityState: "visible" as DocumentVisibilityState };
+let t = 0; const runs: string[] = [];
+const stop = liveRefreshTriggers(win as never, doc as never, (r) => runs.push(r), { now: () => t, storageKeys: ["k"] });
+doc.l.visibilitychange[0](new Event("x")); win.l.focus[0](new Event("x"));
+ok(runs.join() === "visible", "visible + focus together = one read");
+t = 5000; win.l.online[0](new Event("x")); ok(runs.at(-1) === "online", "online refetches");
+t = 10000; win.l.storage[0]({ key: "other" } as never); ok(runs.length === 2, "unrelated storage key ignored");
+win.l.storage[0]({ key: "k" } as never); ok(runs.at(-1) === "storage", "approvals key change from another tab refetches");
+t = 20000; doc.visibilityState = "hidden"; win.l.focus[0](new Event("x")); ok(runs.length === 3, "no reads while hidden");
+stop(); ok(!(win.l.focus || []).length && !(doc.l.visibilitychange || []).length, "listeners removed");
+const de = readFileSync("src/lib/day-events.ts", "utf8");
+ok(/const approvals = !signedIn \|\| ap\.error \? localApprovals : cloudApprovals;/.test(de), "good server read is the truth (no local-only rows merged back)");
+ok(/writeLocal\(KEY_APPROVALS, \[\.\.\.localApprovals\.filter/.test(de), "device cache refreshed from the server");
+ok(/useLiveRefresh\(/.test(readFileSync("src/app/timesheet/page.tsx", "utf8")) && /useLiveRefresh\(/.test(readFileSync("src/components/timesheet/TimeAttentionCard.tsx", "utf8")), "Timesheet and Dashboard card refresh live");
+const sw = readFileSync("public/sw.js", "utf8");
+ok(/url\.origin !== self\.location\.origin \|\| url\.pathname\.startsWith\("\/api\/"\)\) return;/.test(sw), "SW never caches API / Supabase data");
+if (fails) { console.log(`${fails} failed`); process.exit(1); } else console.log("all passed");

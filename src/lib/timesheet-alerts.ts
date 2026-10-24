@@ -12,11 +12,20 @@ export function scheduleAlertLabel(kind: string, paidMinutes: number) {
 }
 
 type ApprovalLike = { employeeId: string; date: string };
-/** A server read that started before an approve/unapprove finished must not undo it: rows saved in this session win. */
-export function mergeApprovals<T extends ApprovalLike>(loaded: T[], savedThisSession: T[]) {
-  const keys = new Set(savedThisSession.map((a) => `${a.employeeId}|${a.date}`));
-  return [...loaded.filter((a) => !keys.has(`${a.employeeId}|${a.date}`)), ...savedThisSession];
+/** How long a row saved on this device beats the server copy: only long enough to cover a read already in flight. */
+export const SESSION_WIN_MS = 15_000;
+/**
+ * A server read that started before an approve/unapprove finished must not undo it, so rows saved on this device in
+ * the last SESSION_WIN_MS win. After that the server copy wins (pt473u: the other device's approval must show here).
+ * `savedThisSession` entries may carry `savedAt` (ms); entries without it are treated as just saved.
+ */
+export function mergeApprovals<T extends ApprovalLike>(loaded: T[], savedThisSession: (T & { savedAt?: number })[], now = Date.now()) {
+  const fresh = savedThisSession.filter((a) => a.savedAt == null || now - a.savedAt < SESSION_WIN_MS).map(({ savedAt: _s, ...a }) => { void _s; return a as unknown as T; });
+  const keys = new Set(fresh.map((a) => `${a.employeeId}|${a.date}`));
+  return [...loaded.filter((a) => !keys.has(`${a.employeeId}|${a.date}`)), ...fresh];
 }
+/** Mark a row as saved on this device now (it beats the server copy for SESSION_WIN_MS). */
+export function stampSaved<T extends object>(row: T, now = Date.now()) { return { ...row, savedAt: now }; }
 /** Resolved list: only alerts inside the current pay period (older ones auto-hide). */
 export function resolvedInPeriod<T extends { date?: string }>(list: T[], period: { from: string; to: string }) {
   return list.filter((a) => !a.date || (a.date >= period.from && a.date <= period.to));
