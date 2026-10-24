@@ -1,5 +1,6 @@
 "use client";
 
+import BookingRequestsCard from "@/components/BookingRequestsCard";
 import { needsCoSignature } from "@/lib/co-signature";
 import TimeAttentionCard from "@/components/timesheet/TimeAttentionCard";
 import { profitAlertJobs, readMinMargin } from "@/lib/profit-alerts";
@@ -400,6 +401,7 @@ export default function DashboardPage() {
           {recurringReady} recurring draft{recurringReady === 1 ? "" : "s"} ready for review
         </a>
       )}
+      <BookingRequestsCard />
       <ProfitAlertsCard loaded={loaded} documents={documents} />
       <GettingStarted loading={!loaded} documents={documents} />
           {loaded && reviewCount === 0 && recurringReady === 0 && stats.overdueCount === 0 && (

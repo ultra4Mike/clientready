@@ -1,9 +1,10 @@
 import { toCents } from "@/lib/stripe-money";
+import { tipCents } from "@/lib/tip";
 import { isRevision, replacedBy, revisionOwed } from "@/lib/change-order-revision";
 import { loadChain } from "@/lib/chain-server";
 import { amountToCharge, serviceClient, stripeConfig } from "@/lib/stripe-server";
 
-import { clientIp, rateLimited, tooMany } from "@/lib/rate-limit";
+import { clientIp, rateLimitedShared, tooMany } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,14 +17,16 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const config = stripeConfig();
   if (!config.checkoutEnabled) return Response.json({ error: "Card payment is not set up." }, { status: 503 });
-  if (rateLimited(`pay:${clientIp(request)}`, 15, 60_000)) return tooMany();
+  if (await rateLimitedShared(`pay:${clientIp(request)}`, 15, 60_000)) return tooMany();
   let token = "";
   let portal = "";
   let docId = "";
   let full = false;
+  let tipChoice: unknown = null;
   try {
-    const body = (await request.json()) as { token?: unknown; portal?: unknown; docId?: unknown; full?: unknown };
+    const body = (await request.json()) as { token?: unknown; portal?: unknown; docId?: unknown; full?: unknown; tip?: unknown };
     full = body.full === true;
+    tipChoice = body.tip;
     token = String(body.token || "");
     portal = String(body.portal || "");
     docId = String(body.docId || "");
@@ -54,6 +57,8 @@ export async function POST(request: Request) {
   // Never charge more than the saved remaining balance.
   const cents = toCents(Math.min(charge, owed)); // R98: integer cents, no float drift
   if (cents < 50) return Response.json({ error: "Nothing is owed on this invoice." }, { status: 400 });
+  // Optional tip: its own line, computed here (never trusted from the browser as an amount beyond the cap).
+  const tip = tipCents(cents, tipChoice);
 
   // Reuse an open Checkout for the same invoice and amount; expire stale ones so a client can't pay
   // twice from two tabs. Skipped quietly until migration 20261015130000 creates the table.
@@ -69,13 +74,13 @@ export async function POST(request: Request) {
         continue;
       }
       const live = await fetch(`${config.apiBase}/v1/checkout/sessions/${encodeURIComponent(row.session_id)}`, { headers: auth })
-        .then((r) => (r.ok ? r.json() : null)).catch(() => null) as { status?: string; payment_status?: string } | null;
+        .then((r) => (r.ok ? r.json() : null)).catch(() => null) as { status?: string; payment_status?: string; metadata?: { tip_cents?: string } } | null;
       if (live?.status === "complete" || live?.payment_status === "paid") {
         // Paid but not recorded yet (webhook pending): don't start another payment.
         await sessions().update({ status: "complete" }).eq("session_id", row.session_id);
         return Response.json({ error: "A payment for this invoice is already being processed. Refresh in a minute." }, { status: 409 });
       }
-      if (live?.status === "open" && row.cents === cents && new Date(row.expires_at).getTime() > Date.now() + 60_000) {
+      if (live?.status === "open" && row.cents === cents && Number(live.metadata?.tip_cents || 0) === tip && new Date(row.expires_at).getTime() > Date.now() + 60_000) {
         return Response.json({ url: row.url });
       }
       if (live?.status === "open") await fetch(`${config.apiBase}/v1/checkout/sessions/${encodeURIComponent(row.session_id)}/expire`, { method: "POST", headers: auth }).catch(() => null);
@@ -112,6 +117,13 @@ export async function POST(request: Request) {
     "line_items[0][price_data][product_data][name]": `${number} · ${staged ? "payment due now" : "balance due"}`,
     "metadata[doc_id]": String(doc.id),
     "metadata[owed_cents]": String(cents),
+    "metadata[tip_cents]": String(tip),
+    ...(tip > 0 ? {
+      "line_items[1][quantity]": "1",
+      "line_items[1][price_data][currency]": config.currency,
+      "line_items[1][price_data][unit_amount]": String(tip),
+      "line_items[1][price_data][product_data][name]": "Tip (not part of the invoice)",
+    } : {}),
     ...(ownerId ? { "metadata[owner_id]": ownerId } : {}),
     "payment_intent_data[metadata][doc_id]": String(doc.id),
     client_reference_id: String(doc.id),

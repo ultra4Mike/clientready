@@ -7,6 +7,7 @@
  * Only this worker's own taps are written. No prices or pay are shown here, only minutes.
  */
 import { useEffect, useMemo, useState } from "react";
+import { authedFetch } from "@/lib/authed-fetch";
 import { currentPosition, directionsUrl, loadBusinessTz, loadMyDayStatus, locationPermission, loadMyFixes, loadMyTaps, loadMyTimeOverrides, loadMyTimeRules, localDate, recordTap, requestFix, syncPendingTaps } from "@/lib/day-events";
 import {
   allowedTaps, applyFixes, buildDay, clockMs, fmtTime, hhmmTz, wallToIso, lateStartMinutes, dayState, DEFAULT_TIMESHEET_SETTINGS, crewFlagReasons, geofencePrompt, geofenceRadius, hm, isAllowed, metersBetween, nextActions, stillDrivingDue,
@@ -33,7 +34,7 @@ async function jobPin(address: string) {
   if (!address) return null;
   if (pins.has(address)) return pins.get(address) || null;
   try {
-    const res = await fetch(`/api/drive-time?geocode=${encodeURIComponent(address)}`);
+    const res = await authedFetch(`/api/drive-time?geocode=${encodeURIComponent(address)}`);
     const data = await res.json();
     const pin = typeof data.lat === "number" ? { lat: data.lat, lng: data.lng } : null;
     pins.set(address, pin);

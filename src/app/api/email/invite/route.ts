@@ -1,6 +1,6 @@
 import { emailConfig } from "@/lib/email-server";
 import { inviteText } from "@/lib/crew-invite";
-import { clientIp, rateLimited, tooMany } from "@/lib/rate-limit";
+import { clientIp, rateLimitedShared, tooMany } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   if (!config.enabled) return fail(503, "Email sending is not set up. Use “Open in email app”.");
   const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   if (!token) return fail(401, "Sign in first.");
-  if (rateLimited(`invite:${clientIp(request)}`, 10, 60_000)) return tooMany();
+  if (await rateLimitedShared(`invite:${clientIp(request)}`, 10, 60_000)) return tooMany();
   const body = (await request.json().catch(() => null)) as { employeeId?: unknown } | null;
   const employeeId = String(body?.employeeId || "");
   if (!employeeId || employeeId.length > 100) return fail(400, "Pick an employee.");

@@ -1,6 +1,6 @@
 import { chainInfo } from "@/lib/chain-server";
 import { serviceClient, stripeConfig } from "@/lib/stripe-server";
-import { clientIp, rateLimited, tooMany } from "@/lib/rate-limit";
+import { clientIp, rateLimitedShared, tooMany } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
  * already paid on earlier versions and the net balance. Read only; amounts only, no other documents' data.
  */
 export async function POST(request: Request) {
-  if (rateLimited(`chain:${clientIp(request)}`, 30, 60_000)) return tooMany();
+  if (await rateLimitedShared(`chain:${clientIp(request)}`, 30, 60_000)) return tooMany();
   const body = (await request.json().catch(() => null)) as { token?: unknown; portal?: unknown; docId?: unknown } | null;
   const token = String(body?.token || ""), portal = String(body?.portal || ""), docId = String(body?.docId || "");
   const viaPortal = portal.length >= 32 && /^[0-9a-f-]{36}$/i.test(docId);

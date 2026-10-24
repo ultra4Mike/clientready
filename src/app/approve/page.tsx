@@ -52,6 +52,9 @@ export default function ApprovePage() {
   const [message, setMessage] = useState("");
   const [cardEnabled, setCardEnabled] = useState(false);
   const [paying, setPaying] = useState(false);
+  // Optional tip: none / 10 / 15 / 20 % / custom. Charged as its own line, never added to the invoice or its tax.
+  const [tipKind, setTipKind] = useState<"none" | "10" | "15" | "20" | "custom">("none");
+  const [tipCustom, setTipCustom] = useState("");
   const [payMessage, setPayMessage] = useState("");
   const [portal, setPortal] = useState<{ p: string; d: string } | null>(null);
   const [portalDocs, setPortalDocs] = useState<PortalDoc[]>([]);
@@ -153,7 +156,7 @@ export default function ApprovePage() {
     setPaying(true);
     setPayMessage("");
     try {
-      const response = await fetch("/api/pay/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...(target || (portal ? { portal: portal.p, docId: portal.d } : { token })), full }) });
+      const response = await fetch("/api/pay/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...(target || (portal ? { portal: portal.p, docId: portal.d } : { token })), full, tip: tipKind === "none" ? { kind: "none" } : tipKind === "custom" ? { kind: "custom", dollars: tipCustom } : { kind: "percent", percent: Number(tipKind) } }) });
       const result = (await response.json().catch(() => ({}))) as { url?: string; error?: string };
       if (response.ok && result.url && /^https?:\/\//.test(result.url)) {
         window.location.assign(result.url);
@@ -376,6 +379,20 @@ export default function ApprovePage() {
 
           {!isProposal && !replaced && !chainPending && !paidInFull && totals.balance > 0.004 && (cardEnabled || payMessage) && (
             <div className="print-hide mt-4 cr-tone-teal rounded-xl border border-teal-500/30 bg-teal-50 p-4 text-sm text-slate-800" data-testid="card-pay">
+              {cardEnabled && totals.balance >= 0.5 && (
+                <fieldset className="mb-3" data-testid="tip-picker">
+                  <legend className="mb-1 font-medium">Add a tip? (optional)</legend>
+                  <div className="flex flex-wrap gap-2">
+                    {(["none", "10", "15", "20", "custom"] as const).map((k) => (
+                      <button key={k} type="button" data-testid={`tip-${k}`} aria-pressed={tipKind === k} onClick={() => setTipKind(k)} className={`min-h-11 rounded-lg border px-3 ${tipKind === k ? "border-teal-600 bg-teal-600 text-white!" : "border-slate-300 bg-white"}`}>
+                        {k === "none" ? "No tip" : k === "custom" ? "Custom" : `${k}%`}
+                      </button>
+                    ))}
+                  </div>
+                  {tipKind === "custom" && <input data-testid="tip-custom-amount" inputMode="decimal" aria-label="Tip amount in dollars" placeholder="0.00" value={tipCustom} onChange={(e) => setTipCustom(e.target.value)} className="mt-2 min-h-11 w-32 rounded-lg border border-slate-300 px-3" />}
+                  <p className="mt-1 text-xs text-slate-500" data-testid="tip-note">A tip is charged separately and is not part of the invoice total or tax.</p>
+                </fieldset>
+              )}
               {cardEnabled && totals.balance >= 0.5 && (
                 <button type="button" data-testid="pay-card" disabled={paying} onClick={() => payByCard(false)} className="min-h-14 w-full rounded-xl bg-teal-600 px-6 py-3 text-lg font-semibold text-white! shadow-md transition hover:bg-teal-500 disabled:opacity-60">
                   {paying ? "Opening secure checkout…" : `Pay $${payNow.toFixed(2)} by card`}

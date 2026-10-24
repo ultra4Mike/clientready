@@ -1,5 +1,6 @@
 "use client";
 
+import BookingSettings from "@/components/BookingSettings";
 import { lateFeeRulesFromRow, lateFeeRulesToRow } from "@/lib/late-fees";
 import PlanSection from "@/components/PlanSection";
 import PtoSettingsCard from "@/components/timesheet/PtoSettingsCard";
@@ -364,6 +365,7 @@ export default function ProfilePage() {
         {passwordMessage && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-[var(--cr-muted)]">{passwordMessage}</p>}
       </form>
 
+      <BookingSettings />
       <PushSettings />
 
       <section id="delete-account" className="scroll-mt-24 mt-6 rounded-2xl border border-rose-500/40 bg-rose-500/5 p-4 shadow-sm sm:p-6" data-testid="settings-delete">
