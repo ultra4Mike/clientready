@@ -7,6 +7,8 @@ import { CalendarViewTabs } from "@/components/ViewTabs";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import ScheduleEditor from "@/components/ScheduleEditor";
+import PhoneApproval from "@/components/PhoneApproval";
+import { readApproval } from "@/lib/approval";
 import { uniqueDocs } from "@/lib/change-orders";
 import { scheduledJobs } from "@/lib/scheduled-jobs";
 import { expandJobDays, dragPayload, readDragPayload } from "@/lib/job-days";
@@ -150,7 +152,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
   }
 
   /** One move path for mouse drag, touch long-press drag and the mobile Move/Schedule pickers. */
-  async function moveJob(docId: string, offset: number, dropDate: string, startTime?: string) {
+  async function moveJob(docId: string, offset: number, dropDate: string, startTime?: string, endTime?: string) {
     {
       const date = offset ? addDays(dropDate, -offset) : dropDate;
       // Item 2 (repeat drags): decide on the list as stored NOW, not the copy loaded with the page. A background
@@ -166,9 +168,13 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
       }
       if (docs !== state.docs) setState((prev) => ({ ...prev, docs }));
       const existing = readSchedule(doc.data);
-      const next = existing
+      const moved = existing
         ? moveSchedule(existing, date, startTime)
         : unscheduledDrop(doc.data, date, startTime);
+      // Move/Schedule sheet: an explicit end time applies to every day of the block.
+      const next = endTime
+        ? { ...moved, endTime, ...(moved.days ? { days: moved.days.map((d) => ({ ...d, ...(startTime ? { startTime } : {}), endTime })) } : {}) }
+        : moved;
       // Same double-booking check as the schedule editor: offer the next open time, else Book anyway (recorded).
       // R127: an approved job there blocks (below); a pending/draft one only warns, with a move option.
       const { hard: clash, soft } = splitConflicts(bookingConflicts(docs, docId, next));
@@ -209,7 +215,8 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
   // ---- Mobile (<900px): List / Calendar toggle, touch long-press drag, Move picker, Unscheduled section ----
   const [mobileMode, setMobileModeState] = useState<"list" | "calendar">("list");
   const [pickedDay, setPickedDay] = useState("");
-  const [moving, setMoving] = useState<{ docId: string; offset: number; date: string; title: string } | null>(null);
+  const [moving, setMoving] = useState<{ docId: string; offset: number; date: string; title: string; start: string; end: string; dayCount: number; workerIds: string[]; schedule?: boolean } | null>(null);
+  const openDoc = (docId: string) => { window.location.assign(`/invoice?id=${encodeURIComponent(docId)}`); };
   const [unschedOpen, setUnschedOpen] = useState(false);
   const [touchDrag, setTouchDrag] = useState<{ docId: string; offset: number; label: string; x: number; y: number; over: string } | null>(null);
   useEffect(() => { Promise.resolve().then(() => { try { const m = window.localStorage.getItem(MOBILE_MODE_KEY); if (m === "calendar" || m === "list") setMobileModeState(m); } catch { /* private mode */ } }); }, []);
@@ -328,9 +335,9 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
         {...(agenda ? touchHandlers(job.doc.id, job.day?.offset || 0, job.doc.clientName || job.doc.title) : {})}
         role="button"
         tabIndex={0}
-        onKeyDown={onActivateKey(() => setEditing({ docId: job.doc.id }))}
-        onClick={(event) => { event.stopPropagation(); if (suppressClick.current) return; setEditing({ docId: job.doc.id }); }}
-        className={agenda ? `relative select-none [-webkit-touch-callout:none] [-webkit-user-select:none] touch-manipulation transition-transform ${touchDrag?.docId === job.doc.id ? "scale-[1.03] opacity-60 shadow-lg ring-2 ring-teal-400" : ""} flex min-h-11 pr-16 cursor-grab active:cursor-grabbing flex-col justify-center rounded-lg border border-l-4 px-3 py-2 text-left text-sm font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc, jobDocs) ? " cr-tentative border-dashed opacity-60" : ""}` : `cr-chip2 cursor-grab min-w-0 break-words rounded-md border border-l-4 px-1.5 py-1 text-left text-xs font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc, jobDocs) ? " cr-tentative border-dashed opacity-60" : ""}`}
+        onKeyDown={onActivateKey(() => (agenda ? openDoc(job.doc.id) : setEditing({ docId: job.doc.id })))}
+        onClick={(event) => { event.stopPropagation(); if (suppressClick.current) return; if (agenda) openDoc(job.doc.id); else setEditing({ docId: job.doc.id }); }}
+        className={agenda ? `relative select-none [-webkit-touch-callout:none] [-webkit-user-select:none] touch-manipulation transition-transform ${touchDrag?.docId === job.doc.id ? "scale-[1.03] opacity-60 shadow-lg ring-2 ring-teal-400" : ""} flex min-h-11 pr-16 cursor-grab active:cursor-grabbing flex-col justify-center rounded-lg border border-l-4 px-3 py-2 text-left text-sm font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc, jobDocs) ? " cr-tentative border-dashed [&>*:not(button)]:opacity-60" : ""}` : `cr-chip2 cursor-grab min-w-0 break-words rounded-md border border-l-4 px-1.5 py-1 text-left text-xs font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc, jobDocs) ? " cr-tentative border-dashed opacity-60" : ""}`}
         title={`${crossesMidnight(job.schedule.startTime, job.schedule.endTime) ? `${timeLabel(job.schedule.startTime || "")}–${timeLabel(job.schedule.endTime || "")} (next day) · ` : ""}${job.doc.title} · ${job.doc.clientName} · ${statusLabel(job.schedule)}${job.schedule.onMyWayAt && job.schedule.status !== "done" ? ` · ${job.schedule.onMyWayBy || "Crew"} on the way` : ""}${people ? ` · ${people}` : ""}`}
       >
         {agenda ? (
@@ -345,7 +352,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
             {job.doc.clientName || job.doc.title}
           </>
         )}
-        {agenda && <button type="button" data-testid={`move-${job.doc.id}${later ? `-${job.day!.index}` : ""}`} aria-label={`Move ${job.doc.title || job.doc.clientName || "job"} to another day`} onClick={(event) => { event.stopPropagation(); setMoving({ docId: job.doc.id, offset: job.day?.offset || 0, date: job.schedule.date, title: job.doc.clientName || job.doc.title }); }} onKeyDown={(event) => event.stopPropagation()} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md border border-current/30 bg-[var(--cr-card)]/70 px-2.5 py-1.5 text-xs font-semibold">Move</button>}
+        {agenda && <button type="button" data-testid={`move-${job.doc.id}${later ? `-${job.day!.index}` : ""}`} aria-label={`Move ${job.doc.title || job.doc.clientName || "job"} to another day`} onClick={(event) => { event.stopPropagation(); setMoving({ docId: job.doc.id, offset: job.day?.offset || 0, date: job.schedule.date, title: job.doc.clientName || job.doc.title, start: job.schedule.startTime || "", end: job.schedule.endTime || "", dayCount: job.day?.count || 1, workerIds: job.schedule.workerIds }); }} onKeyDown={(event) => event.stopPropagation()} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md border border-current/30 bg-[var(--cr-card)]/70 px-2.5 py-1.5 text-xs font-semibold">Move</button>}
         {agenda && job.day && <span data-testid={`${tid}day-label`} className="mt-0.5 block w-fit rounded bg-black/10 px-1 text-[10px] font-semibold uppercase tracking-wide dark:bg-white/10">Day {job.day.index} of {job.day.count}</span>}
         {isTentative(job.doc, jobDocs) && <span data-testid="not-approved-tag" className="mt-0.5 inline-block rounded border border-dashed border-current px-1 text-[10px] font-semibold uppercase tracking-wide">Not approved</span>}
         {!compact && people && <span className="block truncate opacity-80">{people}</span>}
@@ -457,6 +464,14 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
               <p className="font-semibold">{editingDoc.title} · {editingDoc.clientName}</p>
               <a href={`/invoice?id=${encodeURIComponent(editingDoc.id)}`} className="text-sm font-medium text-teal-600 hover:underline dark:text-teal-300">Open {editingDoc.type}</a>
             </div>
+            {String((editingDoc.data as Record<string, unknown> | undefined)?.status || "draft") !== "paid" && (isTentative(editingDoc, docs) || readApproval((editingDoc.data as Record<string, unknown> | undefined)?.approval)?.status === "approved") && (
+              <div className="mb-3" data-testid="popover-approval">
+                <PhoneApproval compact docId={editingDoc.id} status={String((editingDoc.data as Record<string, unknown> | undefined)?.status || "draft")} approval={readApproval((editingDoc.data as Record<string, unknown> | undefined)?.approval)}
+                  ownerName={(() => { try { return String(JSON.parse(window.localStorage.getItem("clientready-profile") || "{}").ownerName || ""); } catch { return ""; } })()}
+                  onSend={() => { window.location.href = `/invoice?id=${encodeURIComponent(editingDoc.id)}#send`; }}
+                  onChange={() => setState((prev) => ({ ...prev, docs: readDocs() }))} />
+              </div>
+            )}
             {!readSchedule(editingDoc.data) && (
               <label className="mb-3 flex flex-col gap-1.5 text-sm font-medium">Job
                 <select aria-label="Job to schedule" value={editing.docId} onChange={(event) => setEditing({ ...editing, docId: event.target.value })} className="rounded-md border border-slate-300 bg-transparent px-2 py-1.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30">
@@ -547,7 +562,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
                     {unscheduled.map((doc) => (
                       <div key={doc.id} data-testid={`m-unscheduled-${doc.id}`} {...touchHandlers(doc.id, 0, doc.clientName || doc.title)} className={`flex min-h-11 select-none touch-manipulation items-center gap-2 rounded-lg border border-slate-500/40 px-3 transition-transform [-webkit-touch-callout:none] ${touchDrag?.docId === doc.id ? "scale-[1.03] opacity-60 shadow-lg ring-2 ring-teal-400" : ""}`}>
                         <span className="min-w-0 flex-1 truncate text-xs font-medium">{doc.title} · {doc.clientName || "No client"}</span>
-                        <button type="button" data-testid={`m-schedule-${doc.id}`} onClick={() => { if (suppressClick.current) return; setEditing({ docId: doc.id, date: pickedDay || current }); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="shrink-0 rounded-md bg-teal-500 px-3 py-1.5 text-xs font-semibold text-slate-950!">Schedule</button>
+                        <button type="button" data-testid={`m-schedule-${doc.id}`} onClick={() => { if (suppressClick.current) return; setMoving({ docId: doc.id, offset: 0, date: pickedDay || current, title: doc.clientName || doc.title, start: "", end: "", dayCount: 1, workerIds: readSchedule(doc.data)?.workerIds || [], schedule: true }); }} className="shrink-0 rounded-md bg-teal-500 px-3 py-1.5 text-xs font-semibold text-slate-950!">Schedule</button>
                       </div>
                     ))}
                   </div>
@@ -710,14 +725,29 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
         {moving && (
           <div className="fixed inset-0 z-[200] flex items-end bg-black/40" role="dialog" aria-modal="true" aria-label="Move job" data-testid="move-sheet" onClick={() => setMoving(null)}>
             <div className="w-full rounded-t-2xl bg-[var(--cr-card)] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-xl" onClick={(event) => event.stopPropagation()}>
-              <p className="font-semibold">Move {moving.title}</p>
-              <p className="mb-3 text-xs opacity-80">Keeps the time and crew. A multi-day job moves as a block.</p>
-              <label className="flex flex-col gap-1.5 text-sm font-medium">New day
-                <input type="date" data-testid="move-date" value={moving.date} onChange={(event) => setMoving({ ...moving, date: event.target.value })} className="min-h-11 rounded-lg border border-slate-500/40 bg-transparent px-3" />
-              </label>
+              <p className="font-semibold">{moving.schedule ? "Schedule" : "Move"} {moving.title}</p>
+              <p className="mb-3 text-xs opacity-80">{moving.dayCount > 1 ? `A ${moving.dayCount}-day job moves as a block. ` : ""}Keeps the crew. Leave the times to keep them as they are.</p>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="col-span-2 flex flex-col gap-1.5 text-sm font-medium">{moving.dayCount > 1 ? "First day" : "Day"}
+                  <input type="date" data-testid="move-date" value={moving.date} onChange={(event) => setMoving({ ...moving, date: event.target.value })} className="min-h-11 rounded-lg border border-slate-500/40 bg-transparent px-3" />
+                </label>
+                {moving.dayCount > 1 && moving.date && <p className="col-span-2 text-xs opacity-80" data-testid="move-end-date">Last day: {parse(addDays(moving.date, moving.dayCount - 1)).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</p>}
+                <label className="flex flex-col gap-1.5 text-sm font-medium">Start
+                  <input type="time" data-testid="move-start" value={moving.start} onChange={(event) => { const v = event.target.value; const len = moving.start && moving.end ? jobMinutes(moving.start, moving.end) : 60; setMoving({ ...moving, start: v, end: v ? `${String(Math.floor(((toMin(v) + len) % 1440) / 60)).padStart(2, "0")}:${String((toMin(v) + len) % 60).padStart(2, "0")}` : moving.end }); }} className="min-h-11 rounded-lg border border-slate-500/40 bg-transparent px-3" />
+                </label>
+                <label className="flex flex-col gap-1.5 text-sm font-medium">End
+                  <input type="time" data-testid="move-end" value={moving.end} onChange={(event) => setMoving({ ...moving, end: event.target.value })} className="min-h-11 rounded-lg border border-slate-500/40 bg-transparent px-3" />
+                </label>
+              </div>
+              {(() => {
+                const len = moving.start && moving.end ? jobMinutes(moving.start, moving.end) : 60;
+                const slot = moving.date ? nextOpenSlot(readDocs().length ? readDocs() : state.docs, moving.docId, moving.date, moving.workerIds, len, 7 * 60, { ignoreTentative: skipTentative }) : "";
+                return <button type="button" data-testid="move-next-open" disabled={!slot || slot === moving.start} onClick={() => { const e = (toMin(slot) + len) % 1440; setMoving({ ...moving, start: slot, end: `${String(Math.floor(e / 60)).padStart(2, "0")}:${String(e % 60).padStart(2, "0")}` }); }} className="mt-3 inline-flex min-h-11 items-center rounded-full border border-teal-500 px-4 text-sm font-semibold disabled:opacity-50">Use next open time{slot ? `: ${clockText(toMin(slot))}` : ""}</button>;
+              })()}
+              <button type="button" data-testid="move-more" onClick={() => { const m = moving; setMoving(null); setEditing({ docId: m.docId, date: m.date }); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="mt-2 block text-sm font-medium text-teal-600 underline dark:text-teal-300">More options (days, crew)</button>
               <div className="mt-4 flex gap-2">
                 <button type="button" onClick={() => setMoving(null)} className="min-h-11 flex-1 rounded-lg border border-slate-500/40 font-medium">Cancel</button>
-                <button type="button" data-testid="move-save" disabled={!moving.date} onClick={() => { const m = moving; setMoving(null); void moveJob(m.docId, m.offset, m.date); }} className="min-h-11 flex-1 rounded-lg bg-teal-500 font-semibold text-slate-950! disabled:opacity-50">Move</button>
+                <button type="button" data-testid="move-save" disabled={!moving.date || (moving.schedule && !moving.start)} onClick={() => { const m = moving; setMoving(null); void moveJob(m.docId, m.offset, m.date, m.start || undefined, m.end || undefined); }} className="min-h-11 flex-1 rounded-lg bg-teal-500 font-semibold text-slate-950! disabled:opacity-50">Move</button>
               </div>
             </div>
           </div>
