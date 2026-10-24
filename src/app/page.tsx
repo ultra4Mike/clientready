@@ -60,10 +60,10 @@ export default function HomePage() {
       {deleted && <p role="status" data-testid="account-deleted" className="flex items-center justify-center gap-2 bg-emerald-600 px-4 py-3 text-center text-sm font-medium text-white!"><span aria-hidden="true">✓</span>Your account was deleted.</p>}
       <header className="sticky top-0 z-20 border-b border-teal-500/20 bg-[var(--cr-panel)] pt-[env(safe-area-inset-top)] print:hidden">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3 sm:py-4">
-          <Link href="/" className="flex items-center gap-2.5 font-semibold">
+          <Link href="/" className="flex shrink-0 items-center gap-2.5 font-semibold">
             <BrandMark className="h-9 w-9" />
             <span className="flex flex-col leading-none">
-              <span className="text-[17px] font-bold tracking-tight">ClientReady</span>
+              <span className="whitespace-nowrap text-[17px] font-extrabold tracking-[-0.02em] text-slate-900 dark:text-slate-50">Client<span className="text-teal-600 dark:text-teal-300">Ready</span></span>
             </span>
           </Link>
           <div className="flex items-center gap-2 text-sm sm:gap-4">
@@ -78,7 +78,7 @@ export default function HomePage() {
         <div className="mb-8 flex items-center gap-4 lg:justify-center">
           <BrandMark className="h-14 w-14 sm:h-16 sm:w-16" />
           <div className="text-left">
-            <p className="text-2xl font-extrabold tracking-tight sm:text-3xl">ClientReady</p>
+            <p className="whitespace-nowrap text-2xl font-extrabold tracking-[-0.02em] text-slate-900 dark:text-slate-50 sm:text-3xl">Client<span className="text-teal-600 dark:text-teal-300">Ready</span></p>
             <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-teal-600 dark:text-teal-300 sm:text-xs">INVOICING • SCHEDULING • CLIENT READY</p>
           </div>
         </div>

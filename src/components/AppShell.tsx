@@ -18,9 +18,9 @@ import MobileNav, { BOTTOM_LINKS, NAV_GROUPS } from "@/components/MobileNav";
 
 function Logo() {
   return (
-    <a href="/dashboard" className="flex items-center gap-2 font-semibold">
+    <a href="/dashboard" className="flex shrink-0 items-center gap-2 font-semibold">
       <BrandMark className="h-8 w-8" />
-      <span className="text-[17px] font-bold tracking-tight">ClientReady</span>
+      <span className="whitespace-nowrap text-[17px] font-extrabold tracking-[-0.02em] text-slate-900 dark:text-slate-50">Client<span className="text-teal-600 dark:text-teal-300">Ready</span></span>
     </a>
   );
 }
