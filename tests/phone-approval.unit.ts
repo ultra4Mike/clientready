@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import { approvalLine, canOwnerMarkApproved, readApproval, readHistory } from "../src/lib/approval";
+import { portalTimeline } from "../src/lib/portal-timeline";
+assert.equal(canOwnerMarkApproved("draft", null), false, "drafts must be sent first");
+assert.equal(canOwnerMarkApproved("sent", { createdAt: "", status: "pending" }), true);
+assert.equal(canOwnerMarkApproved("sent", { createdAt: "", status: "approved" }), false);
+const a = readApproval({ status: "approved", createdAt: "x", approvedAt: "2026-10-24T03:29:00.000Z", method: "phone", approvedBy: "Pat", note: "John on phone", token: "t" })!;
+assert.equal(a.method, "phone"); assert.equal(a.note, "John on phone");
+assert.match(approvalLine(a), /^Approved by phone · Oct 2[34], 2026 .* · by Pat · John on phone$/);
+assert.equal(readHistory([{ at: "x", action: "A", by: "b" }, { bad: 1 }, "s"]).length, 1);
+const tl = portalTimeline([{ id: "d", type: "proposal", title: "P", data: { invoiceNumber: "PROP-1", approval: a }, total: 10, owed: 0 }], "2026-10-24");
+assert.ok(tl.some((i) => i.kind === "approved" && /approved by phone \(recorded by Pat\)/.test(i.title)));
+console.log("phone-approval: ok");

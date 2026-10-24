@@ -23,7 +23,7 @@ export function portalTimeline(docs: (Doc & Figures)[], today = todayYmd()): Por
     const sent = ymd(doc.data.invoiceDate);
     if (sent) out.push({ key: `sent-${doc.id}`, date: sent, kind: "sent", title: `${name} sent`, amount: doc.total, docId: doc.id });
     const approval = readApproval(doc.data.approval);
-    if (approval?.status === "approved" && ymd(approval.approvedAt)) out.push({ key: `ok-${doc.id}`, date: ymd(approval.approvedAt), kind: "approved", title: `${name} approved${approval.approverName ? ` by ${approval.approverName}` : ""}`, docId: doc.id });
+    if (approval?.status === "approved" && ymd(approval.approvedAt)) out.push({ key: `ok-${doc.id}`, date: ymd(approval.approvedAt), kind: "approved", title: approval.method === "phone" ? `${name} approved by phone${approval.approvedBy ? ` (recorded by ${approval.approvedBy})` : ""}` : `${name} approved${approval.approverName ? ` by ${approval.approverName}` : ""}`, docId: doc.id });
     if (doc.type !== "invoice") continue;
     const payments = readPayments(doc.data).filter((payment) => num(payment.amount) > 0);
     payments.forEach((payment, index) => out.push({ key: `pay-${doc.id}-${index}`, date: ymd(payment.date) || sent, kind: "payment", title: `Payment received${payment.method ? ` (${payment.method})` : ""} · ${name}`, amount: num(payment.amount), docId: doc.id }));

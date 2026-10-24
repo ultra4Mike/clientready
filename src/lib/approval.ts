@@ -8,7 +8,29 @@ export type Approval = {
   status: "pending" | "approved";
   approvedAt?: string;
   approverName?: string;
+  markedBy?: string; // owner recorded the approval (e.g. the client said yes by phone)
+  method?: string; // "phone" when the owner recorded it; absent for the client's own online approval
+  approvedBy?: string; // owner's name
+  note?: string;
 };
+
+/** Append-only document history entry. Entries are only ever added (never edited or removed) by these helpers. */
+export type HistoryEntry = { at: string; by: string; byId?: string; action: string; note?: string };
+export function readHistory(value: unknown): HistoryEntry[] {
+  return Array.isArray(value) ? value.filter((e) => e && typeof e === "object" && typeof (e as HistoryEntry).at === "string" && typeof (e as HistoryEntry).action === "string") as HistoryEntry[] : [];
+}
+/** "Oct 23, 2026 10:29 PM CT" style (the viewer's zone, short label). */
+export function historyTime(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const zone = new Intl.DateTimeFormat("en-US", { timeZoneName: "short" }).formatToParts(d).find((p) => p.type === "timeZoneName")?.value || "";
+  const label = /^C[SD]T$/.test(zone) ? "CT" : /^E[SD]T$/.test(zone) ? "ET" : /^M[SD]T$/.test(zone) ? "MT" : /^P[SD]T$/.test(zone) ? "PT" : zone;
+  return `${d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} ${label}`.trim();
+}
+export function approvalLine(a: Approval | null) {
+  if (!a || a.status !== "approved" || !a.approvedAt) return "";
+  return a.method === "phone" ? `Approved by phone · ${historyTime(a.approvedAt)} · by ${a.approvedBy || a.markedBy || "owner"}${a.note ? ` · ${a.note}` : ""}` : `Approved · ${historyTime(a.approvedAt)}${a.approverName ? ` · by ${a.approverName}` : ""}`;
+}
 
 const DOCS_KEY = "clientready-documents";
 
@@ -22,6 +44,10 @@ export function readApproval(value: unknown): Approval | null {
     status: raw.status,
     ...(raw.approvedAt ? { approvedAt: String(raw.approvedAt) } : {}),
     ...(raw.approverName ? { approverName: String(raw.approverName) } : {}),
+    ...(raw.markedBy ? { markedBy: String(raw.markedBy) } : {}),
+    ...(raw.method ? { method: String(raw.method) } : {}),
+    ...(raw.approvedBy ? { approvedBy: String(raw.approvedBy) } : {}),
+    ...(raw.note ? { note: String(raw.note) } : {}),
   };
 }
 
@@ -107,6 +133,49 @@ export async function setApproval(docId: string, mode: "create" | "revoke"): Pro
   if (error) return { approval: null, error: "Could not reach your account. The link was not changed." };
   const docs = readDocs().map((item) => (item.id === docId ? { ...item, data } : item));
   window.localStorage.setItem(DOCS_KEY, JSON.stringify(docs));
+  return { approval, error: "" };
+}
+
+/** Owner rule: drafts can't be approved until sent; already-approved stays as is. */
+export function canOwnerMarkApproved(status: string, approval: Approval | null) {
+  return status !== "draft" && approval?.status !== "approved";
+}
+
+/**
+ * The owner records an approval the client gave outside the app (phone, in person). Who and when go on the approval
+ * and into the document history. Saved to the cloud like setApproval (cloud is the source of truth for approval).
+ */
+export async function ownerMarkApproved(docId: string, ownerName: string, options: { method?: string; note?: string; undo?: boolean } = {}): Promise<{ approval: Approval | null; error: string }> {
+  const blocker = await approvalBlocker(docId);
+  if (blocker) return { approval: null, error: blocker };
+  const doc = readDocs().find((item) => item.id === docId);
+  if (!doc) return { approval: null, error: "Save this document first." };
+  const cur = (doc.data || {}) as Record<string, unknown>;
+  const status = String(cur.status || "draft");
+  const current = readApproval(cur.approval);
+  const at = new Date().toISOString();
+  const by = ownerName.trim() || "Owner";
+  const byId = (await getUserId()) as string;
+  const note = (options.note || "").trim().slice(0, 200);
+  let approval: Approval | null;
+  let entry: HistoryEntry;
+  if (options.undo) {
+    if (current?.status !== "approved") return { approval: current, error: "" };
+    // Undo goes back to "sent, waiting for approval"; a fresh token is not needed, the old link keeps working.
+    approval = { ...(current.token ? { token: current.token } : {}), createdAt: current.createdAt || at, status: "pending" };
+    entry = { at, by, byId, action: "Approval undone by owner", ...(note ? { note } : {}) };
+  } else {
+    if (!canOwnerMarkApproved(status, current)) return { approval: current, error: status === "draft" ? "Send it to the client first. Drafts can't be approved." : "" };
+    const method = options.method || "phone";
+    approval = { ...(current || { createdAt: at }), status: "approved", approvedAt: at, approverName: `${by} (${method === "phone" ? "by phone" : "marked by owner"})`, markedBy: by, method, approvedBy: by, ...(note ? { note } : {}) };
+    entry = { at, by, byId, action: method === "phone" ? "Approved by phone" : "Marked approved by owner", ...(note ? { note } : {}) };
+  }
+  const history = [...readHistory(cur.history), entry];
+  const data: Record<string, unknown> = { ...cur, approval, history, updatedAt: at };
+  if (options.undo && doc.type === "proposal" && cur.status === "accepted") data.status = "sent";
+  const { error } = await supabase.from("documents").update({ data }).eq("id", docId).eq("user_id", byId);
+  if (error) return { approval: current, error: "Could not reach your account. Nothing was changed." };
+  window.localStorage.setItem(DOCS_KEY, JSON.stringify(readDocs().map((item) => (item.id === docId ? { ...item, data } : item))));
   return { approval, error: "" };
 }
 
