@@ -66,6 +66,7 @@ function fromRow(row: Record<string, unknown>): Employee {
     rateHistory: Array.isArray(row.rate_history) ? (row.rate_history as RateChange[]) : [],
     paySettings: readPaySettings(row.pay_settings),
     timeOverrides: readWorkerOverrides({ timeOverrides: row.time_overrides }),
+    ...(row.removed_at ? { removedAt: String(row.removed_at) } : {}),
   };
 }
 
@@ -83,6 +84,8 @@ function toRow(person: Employee, userId: string) {
     active: person.active,
     rate_history: person.rateHistory,
     time_overrides: timeOverridesRow(person.timeOverrides || {}),
+    // QA4: soft remove (deploy34.sql adds employees.removed_at); only sent when set, retried without it on older databases.
+    ...(person.removedAt ? { removed_at: person.removedAt } : {}),
     // Only sent once the owner picked something other than the default (older databases have no column).
     ...(person.paySettings && (person.paySettings.type !== "hourly" || person.paySettings.overtime || person.paySettings.travelRate) ? { pay_settings: person.paySettings } : {}),
   };
@@ -147,7 +150,13 @@ export default function EmployeesPage() {
 
   async function saveCloud(person: Employee) {
     if (!userId) return;
-    const { error } = await supabase.from("employees").upsert(toRow(person, userId));
+    const row = toRow(person, userId);
+    let { error } = await supabase.from("employees").upsert(row);
+    if (error && "removed_at" in row && /removed_at/i.test(error.message || "")) {
+      // Older database without the removed_at column: save the rest (active=false still hides the worker everywhere).
+      const { removed_at: _drop, ...rest } = row; void _drop;
+      ({ error } = await supabase.from("employees").upsert(rest));
+    }
     if (error) setMessage("Saved on this computer. Cloud save failed: " + error.message);
   }
 

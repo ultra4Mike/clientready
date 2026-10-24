@@ -8,6 +8,7 @@ import EmptyState from "@/components/EmptyState";
 import { newId } from "@/lib/synced-list";
 import { addedMiles, mileage, mileageCsv, milesOf, totalMiles, type Trip } from "@/lib/mileage";
 import { periodRange } from "@/lib/period";
+import { irsMileageRate, MILEAGE_RATE_KEY, ownerMileageRate } from "@/lib/job-profit";
 
 const input = "w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2.5 text-base outline-none sm:text-sm min-h-11 mt-1 transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30";
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
@@ -18,8 +19,11 @@ export default function MileagePage() {
   const [form, setForm] = useState({ date: "", miles: "", from: "", to: "", purpose: "" });
   const [year, setYear] = useState("");
   const [error, setError] = useState("");
+  const [editingId, setEditingId] = useState(""); // QA4: edit a logged trip
+  const [rate, setRate] = useState(""); // QA4: owner mileage rate ($/mi); blank = IRS rate
+  const [rateNote, setRateNote] = useState("");
   useEffect(() => {
-    Promise.resolve().then(() => { setTrips(mileage.read()); setYear(String(new Date().getFullYear())); setForm((f) => ({ ...f, date: today() })); });
+    Promise.resolve().then(() => { setTrips(mileage.read()); setYear(String(new Date().getFullYear())); setForm((f) => ({ ...f, date: today() })); const own = ownerMileageRate(); setRate(own ? String(own) : ""); });
     void mileage.sync().then(setTrips);
   }, []);
   const years = [...new Set([year, ...trips.map((trip) => trip.date.slice(0, 4))].filter(Boolean))].sort().reverse();
@@ -28,8 +32,22 @@ export default function MileagePage() {
   function add() {
     if (!form.date || !(Number(form.miles) > 0)) return setError("Enter a date and the miles driven.");
     setError("");
-    setTrips(mileage.upsert({ id: newId("trip"), ...form }));
-    setForm({ date: form.date, miles: "", from: form.to, to: "", purpose: "" });
+    const before = editingId ? trips.find((trip) => trip.id === editingId) : undefined;
+    setTrips(mileage.upsert({ ...(before || {}), id: editingId || newId("trip"), ...form } as Trip));
+    setForm({ date: form.date, miles: "", from: editingId ? "" : form.to, to: "", purpose: "" });
+    setEditingId("");
+    void mileage.sync().catch(() => {});
+  }
+  function edit(trip: Trip) {
+    setEditingId(trip.id); setError("");
+    setForm({ date: trip.date, miles: String(trip.miles || ""), from: trip.from || "", to: trip.to || "", purpose: trip.purpose || "" });
+  }
+  function saveRate() {
+    const value = rate.trim();
+    const n = Number(value);
+    if (value && !(n > 0 && n < 10)) return setRateNote("Enter dollars per mile, like 0.70, or leave blank for the IRS rate.");
+    try { if (value) window.localStorage.setItem(MILEAGE_RATE_KEY, String(n)); else window.localStorage.removeItem(MILEAGE_RATE_KEY); } catch { /* storage full */ }
+    setRateNote(value ? `Job costs now use $${n.toFixed(3)}/mi.` : `Job costs use the IRS rate ($${irsMileageRate(today()).toFixed(3)}/mi today).`);
   }
   const [quick, setQuick] = useState({ day: "", week: "" });
   const [quickNote, setQuickNote] = useState("");
@@ -72,7 +90,8 @@ export default function MileagePage() {
           <label className="text-sm">From<input name="from" className={input} value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value })} /></label>
           <label className="text-sm">To<input name="to" className={input} value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} /></label>
           <label className="text-sm">Purpose<input name="purpose" placeholder="Job, supply run…" className={input} value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} /></label>
-          <button type="button" data-testid="mileage-add" onClick={add} className="min-h-11 self-end rounded-lg bg-teal-500 px-4 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">Add trip</button>
+          <button type="button" data-testid="mileage-add" onClick={add} className="min-h-11 self-end rounded-lg bg-teal-500 px-4 font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400">{editingId ? "Save trip" : "Add trip"}</button>
+          {editingId && <button type="button" data-testid="mileage-cancel-edit" onClick={() => { setEditingId(""); setForm({ date: today(), miles: "", from: "", to: "", purpose: "" }); }} className="min-h-11 self-end rounded-lg border border-slate-300 px-4 text-sm">Cancel edit</button>}
           {error && <p role="alert" className="text-sm text-red-600 sm:col-span-6">{error}</p>}
         </div>
         <div className="grid gap-4 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm sm:grid-cols-2 sm:p-5" data-testid="mileage-quick">
@@ -87,12 +106,19 @@ export default function MileagePage() {
           <p className="text-xs text-slate-500 sm:col-span-2">A total counts only miles not already logged that day or week (invoice miles and trips), so nothing is counted twice. Saving again replaces it.</p>
           {quickNote && <p role="status" className="text-sm sm:col-span-2" data-testid="mileage-quick-note">{quickNote}</p>}
         </div>
+        <div className="flex flex-wrap items-end gap-2 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 shadow-sm" data-testid="mileage-rate">
+          <label className="text-sm">Mileage rate ($ per mile)<input name="mileageRate" data-testid="mileage-rate-input" inputMode="decimal" placeholder={`IRS ${irsMileageRate(today()).toFixed(3)}`} className={input} value={rate} onChange={(e) => setRate(e.target.value)} /></label>
+          <button type="button" data-testid="mileage-rate-save" onClick={saveRate} className="min-h-11 rounded-lg border border-teal-500/50 px-4 text-sm font-medium">Save rate</button>
+          <p className="w-full text-xs text-slate-500">Used for mileage in job costs on this device. Leave blank to use the IRS business rate for each trip date.</p>
+          {rateNote && <p role="status" className="w-full text-sm" data-testid="mileage-rate-note">{rateNote}</p>}
+        </div>
         <p className="text-lg font-semibold" data-testid="mileage-total">{year}: {totalMiles(trips, year)} miles</p>
         {shown.length === 0 ? <EmptyState icon="🚗" title="No trips logged for this year." /> : (
           <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200">
             {shown.map((trip) => (
               <li key={trip.id} data-testid={`trip-${trip.id}`} data-source={trip.source || "trip"} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
                 <span><span className="font-medium tabular-nums">{trip.date}{trip.until ? `–${trip.until}` : ""}</span> · {trip.source === "daily" || trip.source === "weekly" ? `${milesOf(trip)} mi total, adds ${addedMiles(trip, trips)} mi` : `${milesOf(trip)} mi`}{trip.source === "invoice" ? <span className="ml-1 rounded-full border border-teal-500/30 px-2 py-0.5 text-xs text-teal-700 dark:text-teal-300" data-testid="trip-from-invoice"> · from invoice</span> : null}{trip.from || trip.to ? ` · ${trip.from || "?"} → ${trip.to || "?"}` : ""}{trip.purpose ? ` · ${trip.purpose}` : ""}</span>
+                {!trip.docId && !trip.source && <button type="button" data-testid={`trip-edit-${trip.id}`} aria-label={`Edit trip on ${trip.date}`} className="min-h-11 px-2 text-teal-700" onClick={() => edit(trip)}>Edit</button>}
                 <button type="button" aria-label={`Delete trip on ${trip.date}`} className="min-h-11 px-2 text-slate-500" onClick={() => window.confirm("Delete this trip?") && setTrips(mileage.remove(trip.id))}>Delete</button>
               </li>
             ))}

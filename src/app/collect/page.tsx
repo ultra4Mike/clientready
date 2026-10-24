@@ -1,4 +1,5 @@
 "use client";
+import { billedOutstanding } from "@/lib/money";
 
 import { openInvoiceIds } from "@/lib/money";
 import { docAmounts } from "@/lib/doc-stage";
@@ -201,10 +202,11 @@ export default function CollectPage() {
   const unpaid = invoices.filter((doc) => openIds.has(doc.id));
 
   const totals = useMemo(() => {
-    const openAmount = unpaid.reduce((sum, doc) => sum + balance(doc), 0);
+    // QA4: Still owed is the ONE billedOutstanding number (deduped copies, replaced versions skipped), = the dashboard card.
+    const openAmount = billedOutstanding(documents as never).outstanding;
     const overdueAmount = unpaid.filter(isOverdue).reduce((sum, doc) => sum + balance(doc), 0);
     return { openAmount, overdueAmount, unpaidCount: unpaid.length };
-  }, [unpaid]);
+  }, [unpaid, documents]);
 
   const refLabel =
     method === "Check"

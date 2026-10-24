@@ -20,7 +20,9 @@ import BusinessExpenses from "@/components/reports/BusinessExpenses";
 import { bizByLine, bizExpenses, bizOccurrences, type BizExpense } from "@/lib/business-expenses";
 import { billedOutstanding } from "@/lib/money";
 import { periodSummary } from "@/lib/ledger";
-import { DISCLAIMER, incomeSplit, mileageDeduction, NOT_TRACKED, payrollSummary, quarterPeriods, salesTaxReport, scheduleC, uncategorized, yearEndChecklist } from "@/lib/tax-workspace";
+import { readLocalTimesheetSettings } from "@/lib/day-events";
+import { payPeriodOf } from "@/lib/timesheet";
+import { DISCLAIMER, payrollByPeriod, incomeSplit, mileageDeduction, NOT_TRACKED, payrollSummary, quarterPeriods, salesTaxReport, scheduleC, uncategorized, yearEndChecklist } from "@/lib/tax-workspace";
 import { REPORT_TABS, reportsParams, type ReportTab } from "@/lib/view-routes";
 
 type Doc = { id: string; type: string; title?: string; clientName?: string; createdAt?: string; data?: Record<string, unknown> };
@@ -102,6 +104,7 @@ export default function ReportsPage() {
   const unpaid = useMemo(() => { const b = billedOutstanding(documents as never, `${year}-01-01`, `${year}-12-31`); return { total: b.outstanding, count: b.owedCount }; /* QA2: total and count from the one shared loop */ }, [documents, year]);
   const uncat = useMemo(() => uncategorized(acct.expenseRows, acct.crewRows), [acct]);
   const payroll = useMemo(() => (yearData ? payrollSummary(yearData.rows, yearData.employees) : null), [yearData]);
+  const periods = useMemo(() => { if (!yearData) return []; const ts = readLocalTimesheetSettings(); return payrollByPeriod(yearData.rows, (d) => payPeriodOf(d, ts.payPeriod, ts.payPeriodAnchor || "")); }, [yearData]);
   const quarters = useMemo(() => (yearData ? quarterPeriods(year).map((p) => ({ ...p, ...periodSummary(documents as never, bizOcc, p.from, p.to, yearData.setAsidePercent) })) : null), [yearData, year, documents, bizOcc]);
   const crewYear = crewExpenses.filter((c) => String(c.created_at || "").startsWith(year));
   const checklist = yearData && payroll ? yearEndChecklist({ businessName: yearData.businessName, taxId: yearData.taxId, uncategorized: uncat.length, crewReceipts: crewYear.length, crewMissingPhoto: crewYear.filter((c) => !c.receipt).length, miles: miles.miles, nec: payroll.nec.length, unpaid: unpaid.count, unpaidTotal: unpaid.total }) : null;
@@ -359,6 +362,16 @@ export default function ReportsPage() {
                     { key: "worker", label: "Worker", value: (r) => r.name, filter: true },
                     { key: "category", label: "Type", value: (r) => (r.kind === "contractor" ? "Contractor (1099)" : "Employee (W-2)"), filter: true },
                     { key: "paytype", label: "Pay type", value: (r) => r.payType, filter: true },
+                    { key: "hours", label: "Hours", type: "number", value: (r) => r.hours },
+                    { key: "total", label: "Paid", type: "money", value: (r) => r.total },
+                  ]} />
+              </section>
+              <section className={CARD} data-testid="pay-periods">
+                <h2 className="text-base font-semibold">Crew pay by pay period</h2>
+                <DataTable<(typeof periods)[number]> testid="pay-periods-table" csvName={`payroll-${year}-periods.csv`} empty={`No crew pay in ${year}.`} rows={periods} initialSort={{ key: "from", dir: "desc" }}
+                  columns={[
+                    { key: "from", label: "Period", value: (r) => `${r.from} to ${r.to}` },
+                    { key: "people", label: "People", type: "number", value: (r) => r.people },
                     { key: "hours", label: "Hours", type: "number", value: (r) => r.hours },
                     { key: "total", label: "Paid", type: "money", value: (r) => r.total },
                   ]} />

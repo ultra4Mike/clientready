@@ -2,7 +2,8 @@ import { readPayments, tipTotal } from "@/lib/payments";
 import { isPendingRecurringDraft } from "@/lib/recurring";
 import { uniqueDocs } from "@/lib/change-orders";
 import { yearMonth } from "@/lib/reports";
-import { isBilledInvoice } from "@/lib/ledger";
+import { isCostedJob } from "@/lib/ledger";
+import { jobLabour } from "@/lib/job-profit";
 
 /**
  * Read-only mapping of the owner's job-cost fields to IRS Schedule C lines, for the year's totals.
@@ -37,12 +38,13 @@ export function taxCategories(allDocs: Doc[], year: string) {
     for (const payment of readPayments(data)) {
       if (yearMonth(payment.date || data.invoiceDate || doc.createdAt)?.year === year) tips += tipTotal([payment]);
     }
-    if (!isBilledInvoice(doc as never, allDocs as never)) continue; // QA3: same billed rule as Overview/Documents
+    // QA4: costs follow the job-costs set (every real job, as Overview / Profit by job), so Line 11 = job labour.
+    if (!isCostedJob(doc as never, allDocs as never)) continue;
     if (yearMonth(data.invoiceDate || doc.createdAt)?.year !== year) continue;
     const costs = (data.jobCosts || {}) as Record<string, unknown>;
     const fees = Array.isArray(costs.otherFees) ? (costs.otherFees as Fee[]) : [];
     sums.car += money(costs.gas);
-    sums.labor += money(costs.labor);
+    sums.labor += jobLabour(data);
     sums.supplies += money(costs.parts) + money(costs.tools);
     sums.meals += money(costs.lunch);
     sums.other += fees.reduce((sum, fee) => sum + money(fee.amount), 0);

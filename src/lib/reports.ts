@@ -68,7 +68,8 @@ export function buildReport(allDocs: Doc[], crewExpenses: CrewExpense[], year: s
     if (when?.year !== year) continue;
     if (billedTotal !== null) months[when.month].billed += billedTotal;
     // R128: the same cost as Profit by job (owner costs + card fees + mileage), so the two agree; refunds lower collected, never costs.
-    months[when.month].jobCosts += all.cost;
+    // QA4: one job-costs source: the same set (isCostedJob) and number (jobCostOf) as the ledger / Overview.
+    if (isCostedJob(doc as never, docs as never)) months[when.month].jobCosts += all.cost;
   }
   // R104: collected = the shared cash-basis entries (refunds, deposits, legacy paid), by payment date.
   for (const entry of cashEntries(docs)) {

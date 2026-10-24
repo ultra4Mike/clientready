@@ -159,6 +159,18 @@ export function payrollSummary(rows: PayRow[], employees: Person[]) {
   };
 }
 
+/** QA4: crew pay grouped by the owner's pay period (same rows as the packet / Payroll tab). */
+export function payrollByPeriod(rows: (PayRow & { date?: string })[], periodOf: (date: string) => { from: string; to: string }) {
+  const by = new Map<string, { from: string; to: string; hours: number; total: number; workers: Set<string> }>();
+  for (const r of rows) {
+    if (r.kind !== "pay" || !/^\d{4}-\d{2}-\d{2}/.test(String(r.date))) continue;
+    const p = periodOf(String(r.date).slice(0, 10)); const k = p.from;
+    const cur = by.get(k) || { ...p, hours: 0, total: 0, workers: new Set<string>() };
+    cur.hours += num(r.hours); cur.total += r.amount; if (r.worker) cur.workers.add(r.worker); by.set(k, cur);
+  }
+  return [...by.values()].map((v) => ({ from: v.from, to: v.to, hours: r2(v.hours), total: r2(v.total), people: v.workers.size })).sort((a, b) => b.from.localeCompare(a.from));
+}
+
 /** Costs that need a category: unnamed "other fees" and crew receipts typed Other. */
 export function uncategorized(expenseRows: string[][], crewRows: string[][]) {
   const owner = expenseRows.filter((r) => r[3] === "Other fee").map((r) => ({ source: "Job cost", date: r[0], invoice: r[1], who: r[2], amount: num(r[5]) }));

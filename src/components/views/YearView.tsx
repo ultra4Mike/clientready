@@ -1,7 +1,7 @@
 "use client";
 import { setAsideOf } from "@/lib/ledger";
 import { unallocatedSalary } from "@/lib/timesheet-sync";
-import { isTimesheetRow, readPaySettings, rowHours, rowPayMoney, weekOf, type PayType } from "@/lib/pay-types";
+import { isTimesheetRow, labourRowHours, readPaySettings, rowHours, rowPayMoney, weekOf, type PayType } from "@/lib/pay-types";
 import { readSetAside } from "@/lib/profit-alerts";
 import { buildReport } from "@/lib/reports";
 
@@ -310,8 +310,8 @@ export default function YearPage({ embedded = false, year: yearProp, onData, cov
           method: "",
           ref: "",
           note: row.note || "",
-          // QA4: timesheet-paid rows carry minutes, not typed hours (Payroll showed 0 h for them).
-          hours: fromSheet && Number((row as { timesheetMinutes?: number }).timesheetMinutes) > 0 ? String(Math.round(Number((row as { timesheetMinutes?: number }).timesheetMinutes) / 60 * 100) / 100) : row.hours || "",
+          // QA4: one hours rule (labourRowHours): timesheet minutes, else typed hours or start/end (Payroll showed 0 h).
+          hours: String(labourRowHours(row)),
           rate: row.rate || "",
           worker: name,
           workerKind: kindFor(name, row.employeeId),

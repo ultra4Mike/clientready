@@ -1,10 +1,11 @@
-import { docAmounts } from "@/lib/doc-stage";
 import { readPayments } from "@/lib/payments";
 import { isPendingRecurringDraft } from "@/lib/recurring";
 import { uniqueDocs } from "@/lib/change-orders";
 import { clientKey } from "@/lib/portal";
 import { ownerJobCost, yearMonth } from "@/lib/reports";
-import { cashEntries, draftMoneyTaken } from "@/lib/money";
+import { billedAmount, cashEntries } from "@/lib/money";
+import { effectiveAmounts } from "@/lib/change-order-revision";
+import { dedupeCopies } from "@/lib/doc-dedupe";
 import { isVoidStatus } from "@/lib/payments";
 
 /**
@@ -13,7 +14,7 @@ import { isVoidStatus } from "@/lib/payments";
  * average days to pay (invoices paid in full), still owed now (any year) and last job date.
  */
 type Doc = { id: string; type: string; title?: string; clientName?: string; createdAt?: string; data?: Record<string, unknown> };
-export type CustomerRow = { key: string; clientId: string; name: string; jobs: number; billed: number; collected: number; profit: number; owed: number; avgDaysToPay: number | null; lastJob: string };
+export type CustomerRow = { key: string; clientId: string; name: string; jobs: number; billed: number; collected: number; otherCash?: number; profit: number; owed: number; avgDaysToPay: number | null; lastJob: string };
 export type CustomerSort = "profit" | "billed" | "collected" | "jobs";
 
 const num = (value: unknown) => Number(String(value ?? "").replace(/[^0-9.-]/g, "")) || 0;
@@ -28,7 +29,7 @@ const days = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:0
 
 export function bestCustomers(allDocs: Doc[], year: string, sort: CustomerSort = "profit") {
   const map = new Map<string, CustomerRow & { payDays: number[] }>();
-  const docs = uniqueDocs(allDocs);
+  const docs = uniqueDocs(dedupeCopies(allDocs as never) as Doc[]);
   const rowFor = (doc: Doc) => {
     const data = doc.data || {};
     const name = String(data.clientName || doc.clientName || "").trim() || "No client";
@@ -49,9 +50,12 @@ export function bestCustomers(allDocs: Doc[], year: string, sort: CustomerSort =
     if (doc.type !== "invoice" || isPendingRecurringDraft(doc) || isVoidStatus(doc.data?.status) || doc.data?.deleted) continue;
     const data = doc.data || {};
     const row = rowFor(doc);
-    const { total, owed } = docAmounts(doc);
+    // QA4: the ledger billed rule (billedAmount) so a version replaced by a revision is not billed or owed twice.
+    const billedTotal = billedAmount(doc as never, docs as never);
+    if (billedTotal === null) continue;
+    const total = billedTotal;
+    const owed = effectiveAmounts(docs as never, doc as never).owed;
     const payments = readPayments(data).filter((payment) => num(payment.amount) > 0);
-    if (String(data.status || "draft") === "draft" && !draftMoneyTaken(doc as never)) continue;
     row.owed += owed;
     const date = ymd(data.invoiceDate || doc.createdAt);
     if (yearMonth(date)?.year !== year) continue;
@@ -65,7 +69,8 @@ export function bestCustomers(allDocs: Doc[], year: string, sort: CustomerSort =
     }
   }
   const rows: CustomerRow[] = [...map.values()].filter((row) => row.jobs > 0 || row.collected > 0).map(({ payDays, ...row }) => ({
-    ...row, billed: r2(row.billed), collected: r2(row.collected), profit: r2(row.profit), owed: r2(row.owed),
+    // QA4: Collected for the year never shows above Billed; money received for other years' jobs (or ahead) is otherCash.
+    ...row, billed: r2(row.billed), collected: r2(Math.min(row.collected, row.billed)), otherCash: r2(Math.max(0, row.collected - row.billed)), profit: r2(row.profit), owed: r2(row.owed),
     avgDaysToPay: payDays.length ? Math.round(payDays.reduce((sum, value) => sum + value, 0) / payDays.length) : null,
   }));
   return rows.sort((a, b) => b[sort] - a[sort] || b.collected - a.collected || a.name.localeCompare(b.name));

@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { adjust, inventory, type Part } from "@/lib/inventory";
 
-export type StockUse = { id: string; partId: string; name: string; qty: number; cost: number };
+export type StockUse = { id: string; partId: string; name: string; qty: number; cost: number; applied?: boolean };
 type Fee = { id: string; name: string; amount: string };
 
 /**
- * R88: owner takes parts from stock for this job. Stock goes down now; the cost is added to Job costs
+ * R88: owner takes parts from stock for this job. QA4: stock goes down only when the invoice is saved
+ * (Clear form or leaving without saving leaves stock alone); the cost is added to Job costs
  * as an "other fee" line (owner-only, not on the client's invoice). Undo puts both back.
  */
 export default function InventoryUse({ used, onUsed, fees, onFees, locked }: { used: StockUse[]; onUsed: (list: StockUse[]) => void; fees: Fee[]; onFees: (fees: Fee[]) => void; locked: boolean }) {
@@ -22,17 +23,16 @@ export default function InventoryUse({ used, onUsed, fees, onFees, locked }: { u
     const part = parts.find((item) => item.id === partId);
     const amount = Math.round((Number(qty) || 0) * 100) / 100;
     if (!part || amount <= 0) { setMessage("Pick a part and a quantity."); return; }
-    setParts(inventory.upsert(adjust(part, -amount)));
     const cost = Math.round(amount * (Number(String(part.cost || "").replace(/[^0-9.-]/g, "")) || 0) * 100) / 100;
     const id = `stock-${Date.now()}`;
-    onUsed([...used, { id, partId: part.id, name: part.name, qty: amount, cost }]);
+    onUsed([...used, { id, partId: part.id, name: part.name, qty: amount, cost, applied: false }]);
     if (cost > 0) onFees([...fees, { id, name: `Stock: ${part.name} x${amount}`, amount: cost.toFixed(2) }]);
-    setMessage(`Took ${amount} ${part.unit || ""} ${part.name} from stock. Save the invoice to keep the record.`.replace(/\s+/g, " "));
+    setMessage(`Took ${amount} ${part.unit || ""} ${part.name} for this job. Stock goes down when you save the invoice.`.replace(/\s+/g, " "));
   }
 
   function undo(entry: StockUse) {
     const part = inventory.read().find((item) => item.id === entry.partId);
-    if (part) setParts(inventory.upsert(adjust(part, entry.qty)));
+    if (part && entry.applied !== false) setParts(inventory.upsert(adjust(part, entry.qty))); // pending lines never left stock
     onUsed(used.filter((item) => item.id !== entry.id));
     onFees(fees.filter((fee) => fee.id !== entry.id));
     setMessage(`Put ${entry.qty} ${entry.name} back in stock.`);

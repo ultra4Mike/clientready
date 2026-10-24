@@ -106,6 +106,19 @@ export function weekSheets(input: { workers: Worker[]; docs: Doc[]; events: TapE
   return { days, sheets };
 }
 
+/** Pay on the job rows (not following the timesheet) for one worker + day, in cents; null when he has no row that day. */
+export function legacyDayCents(docs: Doc[], employeeId: string, date: string): number | null {
+  let found = false; let cents = 0;
+  for (const doc of docs) {
+    if ((doc as { type?: string }).type !== "invoice" || doc.data?.status === "void" || doc.data?.deleted) continue;
+    for (const r of ((doc.data?.crew || []) as (PayRow & { employeeId?: string; workDate?: string; paySource?: string })[])) {
+      if (r.employeeId !== employeeId || rowDate(r, doc) !== date || r.paySource === "timesheet") continue;
+      found = true; cents += Math.round(rowPayMoney(r) * 100);
+    }
+  }
+  return found ? cents : null;
+}
+
 /** One allocation per distinct rate; each day takes the result computed at its own rate. */
 export function pickByDayRate<D extends { date: string }>(list: { date: string }[], dayRate: Map<string, string>, run: (rate: string) => D[]): D[] {
   const rates = [...new Set(list.map((d) => dayRate.get(d.date) || ""))];
@@ -116,7 +129,7 @@ export function pickByDayRate<D extends { date: string }>(list: { date: string }
 }
 
 /** Per worker: the week's day pay and job shares from sheets + approvals. */
-export function weekShares(input: { workers: Worker[]; docs: Doc[]; days: string[]; sheets: Map<string, DaySheet>; approvals: DayApproval[]; settings?: Partial<TimesheetSettings>; pto?: PtoRequest[] }) {
+export function weekShares(input: { workers: Worker[]; docs: Doc[]; days: string[]; sheets: Map<string, DaySheet>; approvals: DayApproval[]; settings?: Partial<TimesheetSettings>; pto?: PtoRequest[]; cutover?: string }) {
   const pays = new Map<string, DayPay[]>();
   const shares = new Map<string, JobShare>(); // employeeId|date|docId
   for (const w of input.workers) {
@@ -152,6 +165,13 @@ export function weekShares(input: { workers: Worker[]; docs: Doc[]; days: string
     if (week.some((d) => d.unallocated)) {
       const owed = unallocatedSalaryWeeks({ workers: [w], docs: [], cutover: readCutover() || timesheetCutover(), today: localYmd(new Date().toISOString()) }).some((u) => u.week === weekOf(input.days[0]));
       if (!owed) week.forEach((d) => { if (d.unallocated) { d.cents = 0; d.unallocated = false; } });
+    }
+    // QA4 (one labour number): days before "Timesheet pay starts" are paid from the job rows, exactly as the
+    // invoice / payroll / Schedule C count them; the timesheet shows that pay, not a clock-based estimate.
+    const cut = input.cutover ?? readCutover();
+    if (cut) for (const d of week) if (d.date < cut) {
+      const legacy = legacyDayCents(input.docs, w.id, d.date);
+      if (legacy != null) { d.cents = legacy; d.shares = []; (d as DayPay & { legacy?: boolean }).legacy = true; }
     }
     pays.set(w.id, week);
     for (const day of week) for (const s of day.shares) shares.set(`${w.id}|${s.date}|${s.docId}`, s);
@@ -227,6 +247,31 @@ async function refreshWeek(date: string, week: string, opts: { approvals?: DayAp
   const applied = applyWeekToDocs(docs, shares, cutover);
   void pushChangedDocs(applied.changed);
   return { ...applied, pays, sheets, approvals };
+}
+
+/**
+ * QA4: totals for a whole pay period (weekly / every 2 weeks / twice a month) per worker: worked minutes, PTO hours and
+ * pay (cents) incl. PTO. Overtime stays per workweek (FLSA); a twice-a-month period takes only its own days of each week.
+ */
+export async function periodPay(from: string, to: string) {
+  const out = new Map<string, { minutes: number; ptoHours: number; cents: number }>();
+  const workers = readAllWorkers(); const docs = readDocs();
+  const { ptoDays } = await import("@/lib/pay-phase2");
+  const pto = ptoDays(await loadPtoForRange(from, to).catch(() => [] as PtoRequest[]), workers as never, from, to);
+  for (let wk = weekOf(from); wk <= to; wk = addDays(wk, 7)) {
+    const data = await loadOwnerTimesheet(wk, addDays(wk, 6));
+    const ws = weekSheets({ workers, docs, events: data.events, fixes: data.fixes, settings: data.settings, week: wk, now: new Date().toISOString() });
+    const sh = weekShares({ workers, docs, days: ws.days, sheets: ws.sheets, approvals: data.approvals, settings: data.settings, pto: await loadPtoForRange(wk, addDays(wk, 6)).catch(() => undefined) });
+    for (const w of workers) for (const p of sh.pays.get(w.id) || []) {
+      if (p.date < from || p.date > to) continue;
+      const a = data.approvals.find((x) => x.employeeId === w.id && x.date === p.date); const sheet = ws.sheets.get(`${w.id}|${p.date}`);
+      const mins = a?.editedMinutes != null ? a.editedMinutes : a?.approvedAt ? a.paidMinutes : sheet?.paidMinutes || 0;
+      const cur = out.get(w.id) || { minutes: 0, ptoHours: 0, cents: 0 };
+      cur.minutes += mins; cur.cents += p.cents; out.set(w.id, cur);
+    }
+  }
+  for (const [k, v] of pto) { const id = k.split("|")[0]; const cur = out.get(id) || { minutes: 0, ptoHours: 0, cents: 0 }; cur.ptoHours += v.hours; cur.cents += v.cents; out.set(id, cur); }
+  return out;
 }
 
 /** Invoice-card shortcut: approve (or undo) ONE worker's whole day on the timesheet, then refresh the jobs. */

@@ -10,6 +10,7 @@ import { fmtTime, ymdTz, readWorkerOverrides, timeAlerts, payPeriodOf, type Sche
 import { useEffect, useMemo, useRef, useState } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
+import PayPeriodTotals from "@/components/timesheet/PayPeriodTotals";
 import { readAllWorkers, type Worker } from "@/lib/schedule";
 import { weekOf } from "@/lib/pay-types";
 import Link from "next/link";
@@ -326,6 +327,7 @@ export default function TimesheetPage() {
     <AppShell title="Timesheet">
       <PageHeader title="Weekly timesheet" subtitle="Tap any day to see its timeline, fix it or approve it." />
       {todayYmd && <PtoOwnerCard workers={workers.map((w) => ({ id: w.id, name: w.name, hireDate: w.hireDate, pto: readWorkerOverrides(w) }))} settings={settings} today={todayYmd} onAdded={() => { if (week) void loadPtoForRange(week, addDays(week, 6)).then(setWeekPto).catch(() => {}); }} />}
+      {week && <PayPeriodTotals week={week} settings={settings} names={new Map(workers.map((w) => [w.id, w.name]))} />}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <button className="min-h-11 rounded-lg border px-3" onClick={() => setWeek(addDays(week, -7))} data-testid="ts-prev" aria-label="Previous week">‹</button>
         <span className="font-semibold" data-testid="ts-week">Week of {week}</span>

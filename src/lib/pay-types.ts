@@ -121,6 +121,13 @@ export type PayRow = {
 };
 
 /** Hours used for an hourly row: exact clocked minutes when the hours came from the clock (R55). */
+/** QA4: the one hours figure for a crew row everywhere (packet, payroll, labour report): timesheet minutes when it follows the timesheet. */
+export function labourRowHours(row: PayRow & { timesheetMinutes?: number; paySource?: string }) {
+  const m = Number(row.timesheetMinutes);
+  if (row.paySource === "timesheet" && m > 0) return Math.round((m / 60) * 100) / 100;
+  return Math.round(rowHours(row) * 100) / 100;
+}
+
 export function rowHours(row: PayRow) {
   return row.hoursFromClock && row.clockMinutes ? row.clockMinutes / 60 : num(row.hours);
 }
