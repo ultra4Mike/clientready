@@ -17,6 +17,10 @@ export const IDLE_KEY = "clientready-idle-minutes";
 export const ACTIVITY_KEY = "clientready-last-activity";
 export const PENDING_KEY = "clientready-policy-signout"; // "closed" | "idle": AppShell finishes the sign-out
 export const LIVE_COOKIE = "cr_live";
+export const TAB_MARK = "clientready-tab-live"; // sessionStorage: this tab was opened during a live login
+export const BEAT_KEY = "clientready-live-beat"; // localStorage: last heartbeat from any open tab
+export const BEAT_MS = 10_000;
+export const BEAT_STALE_MS = 30_000;
 export const IDLE_CHOICES = [15, 30, 60, 240, 0] as const; // 0 = never
 export const WARN_MS = 60_000;
 
@@ -52,6 +56,15 @@ export function hasCookie(cookie: string, name: string) {
 }
 
 /** Why a stored session must be dropped at startup, or "" to keep it. */
+/**
+ * "This browser session is still live" for keep-unchecked logins. A session cookie alone is NOT enough: Chrome keeps
+ * session cookies across restarts with a persistent profile (deploy 28 retest: the login survived a full restart).
+ * Live = this tab carries the sessionStorage mark, or another open tab sent a heartbeat in the last 30s.
+ */
+export function liveSession(input: { tabMark: boolean; lastBeat: number; now: number }) {
+  return input.tabMark || (input.lastBeat > 0 && input.now - input.lastBeat < BEAT_STALE_MS);
+}
+
 export function startupDropReason(input: { hasSession: boolean; keep: string | null; liveCookie: boolean; now: number; lastActivity: number; idleLimit: number }): "" | "closed" | "idle" {
   if (!input.hasSession) return "";
   if (input.keep === "0" && !input.liveCookie) return "closed";
@@ -74,6 +87,8 @@ export function dropStoredSession(reason: "closed" | "idle") {
     authKeys(window.sessionStorage).forEach((k) => window.sessionStorage.removeItem(k));
     window.localStorage.setItem(PENDING_KEY, reason);
     window.localStorage.removeItem(ACTIVITY_KEY);
+    window.localStorage.removeItem(BEAT_KEY);
+    window.sessionStorage.removeItem(TAB_MARK);
   } catch { /* storage blocked */ }
   try {
     // There is no server auth cookie today (auth is token-in-storage); expire any sb- cookie defensively.
@@ -89,14 +104,28 @@ export function applySessionPolicyEarly() {
     const reason = startupDropReason({
       hasSession: authKeys(ls).length > 0,
       keep: ls.getItem(KEEP_KEY),
-      liveCookie: hasCookie(document.cookie, LIVE_COOKIE),
+      liveCookie: liveSession({ tabMark: window.sessionStorage.getItem(TAB_MARK) === "1", lastBeat: Number(ls.getItem(BEAT_KEY) || 0), now: Date.now() }),
       now: Date.now(),
       lastActivity: Number(ls.getItem(ACTIVITY_KEY) || 0),
       idleLimit: idleMinutes(ls.getItem(IDLE_KEY), ls.getItem(ROLE_KEY)),
     });
     if (reason) dropStoredSession(reason);
+    else if (authKeys(ls).length) startBeat();
     return reason;
   } catch { return ""; }
+}
+
+let beating = false;
+/** Mark this tab live and keep a shared heartbeat while it is open (see liveSession). */
+export function startBeat() {
+  try {
+    window.sessionStorage.setItem(TAB_MARK, "1");
+    const beat = () => { try { window.localStorage.setItem(BEAT_KEY, String(Date.now())); } catch { /* storage blocked */ } };
+    beat();
+    if (beating) return;
+    beating = true;
+    window.setInterval(beat, BEAT_MS);
+  } catch { /* storage blocked */ }
 }
 
 /** Call right after a successful sign-in. */
@@ -108,6 +137,7 @@ export function markSignedIn(keep: boolean, role: Role) {
     window.localStorage.removeItem(PENDING_KEY);
     document.cookie = `${LIVE_COOKIE}=1; path=/; SameSite=Lax${window.location.protocol === "https:" ? "; Secure" : ""}`;
   } catch { /* storage blocked */ }
+  startBeat();
 }
 
 export function touchActivity(now = Date.now()) {

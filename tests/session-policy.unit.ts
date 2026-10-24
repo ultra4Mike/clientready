@@ -38,3 +38,11 @@ assert.equal(startupDropReason({ ...base, hasSession: false, liveCookie: false }
 assert.match(loginReasonMessage("idle"), /no activity/);
 assert.equal(loginReasonMessage(null), "");
 console.log("session-policy ok");
+
+// Deploy 28 retest: a restored session cookie must not keep an unchecked login alive; the tab mark / heartbeat decide.
+import { liveSession, BEAT_STALE_MS } from "../src/lib/session-policy";
+assert.equal(liveSession({ tabMark: true, lastBeat: 0, now: t }), true, "this tab was opened during the login");
+assert.equal(liveSession({ tabMark: false, lastBeat: t - 5_000, now: t }), true, "another tab is open (new tab)");
+assert.equal(liveSession({ tabMark: false, lastBeat: t - BEAT_STALE_MS - 1, now: t }), false, "browser was closed");
+assert.equal(liveSession({ tabMark: false, lastBeat: 0, now: t }), false, "no heartbeat at all");
+console.log("session-policy live-session: ok");
