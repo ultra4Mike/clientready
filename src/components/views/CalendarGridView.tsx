@@ -17,6 +17,14 @@ import { belongsInUnscheduled, isDueInvoice } from "@/lib/doc-status";
 import CalendarFilterBar from "@/components/CalendarFilterBar";
 import { confirmRemovalFor, moveSchedule, omwTime, readSchedule, readWorkers, saveSchedule, DONE_CLASS, DONE_LABEL, doneState, STATUS_CLASS, STATUS_LABEL, statusClass, statusLabel, type DoneState, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
 
+/** Enter/Space on a role="button" element does what a click does (the target only, so nested buttons keep their own keys). */
+function onActivateKey(run: () => unknown) {
+  return (event: { key: string; target: EventTarget; currentTarget: EventTarget; preventDefault: () => void; stopPropagation: () => void }) => {
+    if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault(); event.stopPropagation(); run();
+  };
+}
+
 type SavedDocument = {
   id: string;
   type: string;
@@ -200,6 +208,9 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
         data-state={clashing.has(job.doc.id) ? "blocked" : undefined}
         data-done={doneState(job.schedule) || undefined}
         onDragStart={(event) => event.dataTransfer.setData("text/plain", dragPayload(job.doc.id, job.day?.offset || 0))}
+        role="button"
+        tabIndex={0}
+        onKeyDown={onActivateKey(() => setEditing({ docId: job.doc.id }))}
         onClick={(event) => { event.stopPropagation(); setEditing({ docId: job.doc.id }); }}
         className={agenda ? `flex min-h-11 cursor-pointer flex-col justify-center rounded-lg border border-l-4 px-3 py-2 text-left text-sm font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc, jobDocs) ? " cr-tentative border-dashed opacity-60" : ""}` : `cr-chip2 cursor-grab min-w-0 break-words rounded-md border border-l-4 px-1.5 py-1 text-left text-xs font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc, jobDocs) ? " cr-tentative border-dashed opacity-60" : ""}`}
         title={`${crossesMidnight(job.schedule.startTime, job.schedule.endTime) ? `${timeLabel(job.schedule.startTime || "")}–${timeLabel(job.schedule.endTime || "")} (next day) · ` : ""}${job.doc.title} · ${job.doc.clientName} · ${statusLabel(job.schedule)}${job.schedule.onMyWayAt && job.schedule.status !== "done" ? ` · ${job.schedule.onMyWayBy || "Crew"} on the way` : ""}${people ? ` · ${people}` : ""}`}
@@ -220,8 +231,8 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
         {isTentative(job.doc, jobDocs) && <span data-testid="not-approved-tag" className="mt-0.5 inline-block rounded border border-dashed border-current px-1 text-[10px] font-semibold uppercase tracking-wide">Not approved</span>}
         {!compact && people && <span className="block truncate opacity-80">{people}</span>}
         {compact && softClashing.has(job.doc.id) && <span data-testid="overlap-dot" data-soft="true" title="A job that isn't approved yet holds this time" className="block text-amber-700/80 dark:text-amber-300/80">Pending overlap</span>}
-        {compact && clashing.has(job.doc.id) && <span data-testid="overlap-dot" title="Overlap: same worker on another job at this time" className="block font-semibold text-amber-700 dark:text-amber-300">⚠ Overlap</span>}
-        {!compact && (clashing.has(job.doc.id) || softClashing.has(job.doc.id)) && <span className="block" onClick={(event) => event.stopPropagation()}><OverlapBadge docs={docs} doc={job.doc} onMoved={() => setState((prev) => ({ ...prev, docs: readDocs() }))} /></span>}
+        {compact && clashing.has(job.doc.id) && <button type="button" data-testid="overlap-dot" aria-label={`Overlap: same worker on another job at this time. Open ${job.doc.title || job.doc.clientName || "job"}`} title="Overlap: same worker on another job at this time" onClick={(event) => { event.stopPropagation(); setEditing({ docId: job.doc.id }); }} onKeyDown={(event) => event.stopPropagation()} className="block text-left font-semibold text-amber-700 dark:text-amber-300">⚠ Overlap</button>}
+        {!compact && (clashing.has(job.doc.id) || softClashing.has(job.doc.id)) && <span role="presentation" className="block" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}><OverlapBadge docs={docs} doc={job.doc} onMoved={() => setState((prev) => ({ ...prev, docs: readDocs() }))} /></span>}
         {job.schedule.onMyWayAt && job.schedule.status !== "done" && <span className="block truncate opacity-80" data-testid={`${tid}omw`}>🚗 {compact ? "On way" : `On the way · ${omwTime(job.schedule.onMyWayAt)}`}</span>}
         {doneState(job.schedule) === "awaiting" && <span className="block truncate opacity-80" data-testid={`${tid}done-awaiting`}>{compact ? "To confirm" : DONE_LABEL.awaiting}</span>}
         {!compact && doneState(job.schedule) === "confirmed" && <span className="block truncate opacity-80">{DONE_LABEL.confirmed}</span>}
@@ -237,6 +248,9 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
         key={`cont-${job.doc.id}`}
         data-testid={`${agenda ? "agenda-" : ""}job-cont-${job.doc.id}`}
         data-overnight="continued"
+        role="button"
+        tabIndex={0}
+        onKeyDown={onActivateKey(() => setEditing({ docId: job.doc.id }))}
         onClick={(event) => { event.stopPropagation(); setEditing({ docId: job.doc.id }); }}
         title={`${crossesMidnight(job.schedule.startTime, job.schedule.endTime) ? `${timeLabel(job.schedule.startTime || "")}–${timeLabel(job.schedule.endTime || "")} (next day) · ` : ""}Continues from the day before · ${job.doc.clientName || job.doc.title}${job.doc.clientName ? ` · ${job.doc.title}` : ""}`}
         aria-label={`Until ${timeLabel(job.schedule.endTime || "")} · ${job.doc.clientName || job.doc.title} · continues from the night before`}
@@ -361,7 +375,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
                   ))}
                   <div className="p-1.5 pr-2 text-right text-[11px] font-medium uppercase tracking-wide opacity-70">Any</div>
                   {weekDays.map((day) => (
-                    <div key={`any-${day}`} data-testid={`slot-${day}-any`} onDragOver={(event) => event.preventDefault()} onDrop={dropOn(day, "")} className={`min-h-10 space-y-1 border-b border-l border-slate-500/20 bg-slate-500/5 p-1 ${day === today ? "bg-teal-500/10" : ""}`}>
+                    <div key={`any-${day}`} data-testid={`slot-${day}-any`} role="group" aria-label={`${day}, any time`} onDragOver={(event) => event.preventDefault()} onDrop={dropOn(day, "")} className={`min-h-10 space-y-1 border-b border-l border-slate-500/20 bg-slate-500/5 p-1 ${day === today ? "bg-teal-500/10" : ""}`}>
                       {jobs.filter((job) => job.schedule.date === day && !job.schedule.startTime).map((job) => chip(job, true))}
                     </div>
                   ))}
@@ -380,6 +394,10 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
                             data-testid={`slot-${day}-${String(hour).padStart(2, "0")}`}
                             onDragOver={(event) => event.preventDefault()}
                             onDrop={dropOn(day, slot)}
+                            role="button"
+                            tabIndex={-1}
+                            aria-label={`Schedule at ${day} ${slot}`}
+                            onKeyDown={onActivateKey(() => unscheduled.length ? setEditing({ docId: unscheduled[0].id, date: day, startTime: slot }) : setMessage("Every job is scheduled. Click a job to change it."))}
                             onClick={() => unscheduled.length ? setEditing({ docId: unscheduled[0].id, date: day, startTime: slot }) : setMessage("Every job is scheduled. Click a job to change it.")}
                             className={`min-h-12 space-y-1 border-b border-l border-slate-500/20 p-1 transition hover:bg-teal-500/10 ${day === today ? "bg-teal-500/10" : ""} ${hour < 6 || hour >= 20 ? "cr-night-slot bg-slate-500/5" : ""}`}
                           >
@@ -435,6 +453,10 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
                       data-testid={day ? `day-${day}` : undefined}
                       onDragOver={(event) => day && event.preventDefault()}
                       onDrop={day ? dropOn(day) : undefined}
+                      role={day ? "button" : undefined}
+                      tabIndex={day ? -1 : undefined}
+                      aria-label={day ? `Schedule on ${day}` : undefined}
+                      onKeyDown={onActivateKey(() => day && unscheduled.length && setEditing({ docId: unscheduled[0].id, date: day }))}
                       onClick={() => day && unscheduled.length && setEditing({ docId: unscheduled[0].id, date: day })}
                       className={`min-h-28 rounded-xl border p-1.5 text-xs transition hover:bg-teal-500/5 ${day ? "border-slate-500/25 bg-[var(--cr-bg)]" : "border-transparent"} ${day === today ? "ring-2 ring-teal-400" : ""}`}
                     >
@@ -491,6 +513,9 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
                   draggable
                   data-testid={`unscheduled-${doc.id}`}
                   onDragStart={(event) => event.dataTransfer.setData("text/plain", doc.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={onActivateKey(() => setEditing({ docId: doc.id, date: current }))}
                   onClick={() => setEditing({ docId: doc.id, date: current })}
                   className="flex min-h-11 cursor-grab items-center truncate rounded-lg border border-slate-500/40 px-3 text-xs font-medium transition hover:border-teal-400 hover:bg-teal-500/5"
                 >

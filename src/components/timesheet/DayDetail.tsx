@@ -91,8 +91,8 @@ export default function DayDetail(props: {
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" role="dialog" aria-modal="true" aria-label={`${props.workerName} ${date}`} onClick={props.onClose}>
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-[var(--cr-panel)] p-4 text-sm text-[var(--cr-text)] shadow-xl sm:rounded-2xl" data-testid="ts-daydetail" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" role="dialog" aria-modal="true" aria-label={`${props.workerName} ${date}`} onClick={(e) => { if (e.target === e.currentTarget) props.onClose(); }} onKeyDown={(e) => { if (e.key === "Escape") props.onClose(); }}>
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-[var(--cr-panel)] p-4 text-sm text-[var(--cr-text)] shadow-xl sm:rounded-2xl" data-testid="ts-daydetail">
         <div className="mb-2 flex items-start justify-between gap-2">
           <div>
             <h2 className="text-base font-bold">{props.workerName}</h2>
