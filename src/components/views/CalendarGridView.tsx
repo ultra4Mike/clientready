@@ -15,7 +15,7 @@ import { allConflicts, bookingConflicts, clashPrompts, clockText, nextOpenSlot, 
 import { ignoresTentative, isTentative, PRESETS, readCalendarFilter, saveCalendarFilter, visibleOnCalendar, type CalendarFilter } from "@/lib/calendar-filter";
 import { belongsInUnscheduled, isDueInvoice } from "@/lib/doc-status";
 import CalendarFilterBar from "@/components/CalendarFilterBar";
-import { confirmRemovalFor, moveSchedule, omwTime, readSchedule, readWorkers, saveSchedule, DONE_CLASS, DONE_LABEL, doneState, STATUS_CLASS, STATUS_LABEL, statusClass, statusLabel, type DoneState, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
+import { applySchedule, confirmRemovalFor, moveSchedule, omwTime, readSchedule, readWorkers, saveSchedule, DONE_CLASS, DONE_LABEL, doneState, STATUS_CLASS, STATUS_LABEL, statusClass, statusLabel, type DoneState, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
 
 /** Enter/Space on a role="button" element does what a click does (the target only, so nested buttons keep their own keys). */
 function onActivateKey(run: () => unknown) {
@@ -104,12 +104,16 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
   async function save(docId: string, schedule: Schedule | null, options?: { keepOpen?: boolean; confirmed?: string[] }) {
     // Retest bug 1: report what really happened (a refused or failed save no longer shows "Booked anyway").
     let saved = false;
+    // Help retest (f): show the move right away (optimistic); the real save (job pin lookup + cloud) follows and
+    // the list is re-read from storage after it, so a refused save snaps the job back.
+    setState((prev) => { const moved = applySchedule(prev.docs as never[], docId, schedule, options?.confirmed); return moved ? { ...prev, docs: moved.docs as typeof prev.docs } : prev; });
     try {
       saved = Boolean(await saveSchedule(docId, schedule, options?.confirmed));
       setState((prev) => ({ ...prev, docs: readDocs() }));
       setMessage(saved ? (schedule ? "Schedule saved" : "Job unscheduled") : "Not saved: this job could not be moved (see the job for details).");
     } catch {
       setMessage("Could not save the schedule.");
+      setState((prev) => ({ ...prev, docs: readDocs() }));
     }
     if (!saved) setConflictNote((note) => (note ? { state: "blocked", text: "Not moved: the schedule could not be saved." } : note));
     if (!options?.keepOpen) setEditing(null);
