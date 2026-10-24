@@ -19,6 +19,7 @@ export const PENDING_KEY = "clientready-policy-signout"; // "closed" | "idle": A
 export const LIVE_COOKIE = "cr_live";
 export const TAB_MARK = "clientready-tab-live"; // sessionStorage: this tab was opened during a live login
 export const BEAT_KEY = "clientready-live-beat"; // localStorage: last heartbeat from any open tab
+export const TAB_ID_KEY = "clientready-tab-id";
 export const BEAT_MS = 10_000;
 export const BEAT_STALE_MS = 30_000;
 export const IDLE_CHOICES = [15, 30, 60, 240, 0] as const; // 0 = never
@@ -104,7 +105,7 @@ export function applySessionPolicyEarly() {
     const reason = startupDropReason({
       hasSession: authKeys(ls).length > 0,
       keep: ls.getItem(KEEP_KEY),
-      liveCookie: liveSession({ tabMark: window.sessionStorage.getItem(TAB_MARK) === "1", lastBeat: Number(ls.getItem(BEAT_KEY) || 0), now: Date.now() }),
+      liveCookie: liveSession({ tabMark: window.sessionStorage.getItem(TAB_MARK) === "1", lastBeat: lastBeat(ls.getItem(BEAT_KEY)), now: Date.now() }),
       now: Date.now(),
       lastActivity: Number(ls.getItem(ACTIVITY_KEY) || 0),
       idleLimit: idleMinutes(ls.getItem(IDLE_KEY), ls.getItem(ROLE_KEY)),
@@ -120,13 +121,34 @@ let beating = false;
 export function startBeat() {
   try {
     window.sessionStorage.setItem(TAB_MARK, "1");
-    const beat = () => { try { window.localStorage.setItem(BEAT_KEY, String(Date.now())); } catch { /* storage blocked */ } };
-    beat();
+    let id = window.sessionStorage.getItem(TAB_ID_KEY);
+    if (!id) { id = Math.random().toString(36).slice(2); window.sessionStorage.setItem(TAB_ID_KEY, id); }
+    const tab = id;
+    const write = (stamp: number | null) => {
+      try {
+        const map = readBeats(window.localStorage.getItem(BEAT_KEY));
+        if (stamp) map[tab] = stamp; else delete map[tab];
+        if (Object.keys(map).length) window.localStorage.setItem(BEAT_KEY, JSON.stringify(map)); else window.localStorage.removeItem(BEAT_KEY);
+      } catch { /* storage blocked */ }
+    };
+    write(Date.now());
     if (beating) return;
     beating = true;
-    window.setInterval(beat, BEAT_MS);
+    window.setInterval(() => write(Date.now()), BEAT_MS);
+    // Closing the browser fires pagehide in every tab: each tab removes its own beat, so a quick relaunch finds none.
+    // (A reload or same-tab navigation keeps the sessionStorage tab mark, so it stays signed in.)
+    window.addEventListener("pagehide", () => write(null));
+    window.addEventListener("pageshow", (event) => { if ((event as PageTransitionEvent).persisted) write(Date.now()); });
   } catch { /* storage blocked */ }
 }
+
+/** Heartbeats per open tab ({tabId: ms}); tolerates the older single-number format. */
+export function readBeats(raw: string | null): Record<string, number> {
+  if (!raw) return {};
+  try { const v = JSON.parse(raw); if (typeof v === "number") return { legacy: v }; if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).filter(([, t]) => typeof t === "number")) as Record<string, number>; } catch { /* bad value */ }
+  return {};
+}
+export function lastBeat(raw: string | null) { return Math.max(0, ...Object.values(readBeats(raw))); }
 
 /** Call right after a successful sign-in. */
 export function markSignedIn(keep: boolean, role: Role) {

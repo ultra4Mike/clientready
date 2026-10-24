@@ -46,3 +46,9 @@ assert.equal(liveSession({ tabMark: false, lastBeat: t - 5_000, now: t }), true,
 assert.equal(liveSession({ tabMark: false, lastBeat: t - BEAT_STALE_MS - 1, now: t }), false, "browser was closed");
 assert.equal(liveSession({ tabMark: false, lastBeat: 0, now: t }), false, "no heartbeat at all");
 console.log("session-policy live-session: ok");
+import { lastBeat, readBeats } from "../src/lib/session-policy";
+assert.deepEqual(readBeats(null), {});
+assert.equal(lastBeat(JSON.stringify({ a: 5, b: 9 })), 9, "newest tab beat");
+assert.equal(lastBeat("123"), 123, "older single-number format");
+assert.equal(lastBeat("{}"), 0, "every tab removed its beat on close");
+console.log("session-policy beats: ok");
