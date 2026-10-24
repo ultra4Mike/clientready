@@ -55,18 +55,19 @@ export default function TimesheetPage() {
   const [message, setMessage] = useState("");
   const [now, setNow] = useState("");
   const [cutover, setCutover] = useState("");
+  const [weekLoading, setWeekLoading] = useState(true);
   const [crewLoad, setCrewLoad] = useState<CrewLoad>("loading");
   // Browser-only data, loaded once after the owner's shared pay cutover is synced (async, so no setState during the effect).
   useEffect(() => {
     let live = true;
-    void loadBusinessTz().then(() => syncTimesheetCutover()).then((day) => {
-      if (!live) return;
-      const q = new URLSearchParams(window.location.search).get("date");
-      setCutover(day);
-      if (new URLSearchParams(window.location.search).get("filter") === "review") setFilter("review");
-      setWeek(weekOf(q && /^\d{4}-\d{2}-\d{2}$/.test(q) ? q : localYmd(new Date().toISOString())));
-      setWorkers(readWorkers()); setDocs(readDocs()); setSettings(readLocalTimesheetSettings()); setNow(new Date().toISOString());
-    });
+    // Render this device's copy right away; the zone, cutover and server reads fill in alongside (never one after another).
+    const q = new URLSearchParams(window.location.search).get("date");
+    const pickWeek = () => weekOf(q && /^\d{4}-\d{2}-\d{2}$/.test(q) ? q : localYmd(new Date().toISOString()));
+    if (new URLSearchParams(window.location.search).get("filter") === "review") setFilter("review");
+    const first = pickWeek();
+    setWeek(first); setWorkers(readWorkers()); setDocs(readDocs()); setSettings(readLocalTimesheetSettings()); setNow(new Date().toISOString());
+    void loadBusinessTz().then(() => { if (live) { setWeek((w) => (w === first ? pickWeek() : w)); setNow(new Date().toISOString()); } });
+    void syncTimesheetCutover().then((day) => { if (live) setCutover(day); });
     // The crew list is a browser cache filled by Team; a fresh browser/sign-in has none, so read it from the server here too.
     void supabase.auth.getUser().then(async ({ data }) => {
       if (!live) return;
@@ -80,19 +81,21 @@ export default function TimesheetPage() {
   }, []);
   useEffect(() => {
     if (!week) return;
-    void loadOwnerTimesheet(week, addDays(week, 6)).then((data) => { setCloud(data.cloud); setCloudError(data.cloudError || ""); setEvents(data.events); setFixes(data.fixes); setApprovals(data.approvals); setSettings(data.settings); });
-    void loadPtoForRange(week, addDays(week, 6)).then(setWeekPto).catch(() => {});
-    void loadAttestations(week).then(setAttest);
+    let live = true; setWeekLoading(true);
+    void loadOwnerTimesheet(week, addDays(week, 6)).then((data) => { if (!live) return; setWeekLoading(false); setCloud(data.cloud); setCloudError(data.cloudError || ""); setEvents(data.events); setFixes(data.fixes); setApprovals(data.approvals); setSettings(data.settings); }).catch(() => { if (live) { setWeekLoading(false); setCloud(false); } });
+    void loadPtoForRange(week, addDays(week, 6)).then((r) => { if (live) setWeekPto(r); }).catch(() => {});
+    void loadAttestations(week).then((r) => { if (live) setAttest(r); });
+    return () => { live = false; };
   }, [week]);
   const { days, sheets } = useMemo(() => (week && now ? weekSheets({ workers, docs, events, fixes, settings, week, now }) : { days: [] as string[], sheets: new Map<string, DaySheet>() }), [workers, docs, events, fixes, settings, week, now]);
   const offDays = useMemo(() => (week ? ptoDays(weekPto || [], workers as never, week, addDays(week, 6)) : new Map<string, { hours: number; kind: string }>()), [weekPto, workers, week]);
-  const { pays, shares } = useMemo(() => weekShares({ workers, docs, days, sheets, approvals, settings, pto: weekPto }), [workers, docs, days, sheets, approvals, settings, weekPto]);
+  const { pays, shares } = useMemo(() => (week && days.length ? weekShares({ workers, docs, days, sheets, approvals, settings, pto: weekPto }) : { pays: new Map<string, DayPay[]>(), shares: new Map() as ReturnType<typeof weekShares>["shares"] }), [workers, docs, days, sheets, approvals, settings, weekPto, week]);
   // Keep the jobs in step with the week (estimates for unapproved days, the approved day's split otherwise).
   useEffect(() => {
-    if (!week || !now || !cutover || !shares.size || !cloud) return; // never push estimates built from a failed/empty cloud read
+    if (!week || !now || !cutover || !shares.size || !cloud || weekLoading) return; // never push estimates built from a failed/empty cloud read
     const res = applyWeekToDocs(readDocs(), shares, cutover);
     if (res.changed.length) void pushChangedDocs(res.changed);
-  }, [shares, week, now, cutover, cloud]);
+  }, [shares, week, now, cutover, cloud, weekLoading]);
   const approvalOf = (id: string, date: string) => approvals.find((a) => a.employeeId === id && a.date === date);
   const minutesOf = (id: string, date: string) => { const a = approvalOf(id, date); const s = sheets.get(`${id}|${date}`); return a?.editedMinutes != null ? a.editedMinutes : a?.approvedAt ? a.paidMinutes : s?.paidMinutes || 0; };
 
@@ -291,6 +294,7 @@ export default function TimesheetPage() {
         <button className="cr-btn cr-btn-secondary" data-testid="ts-export-csv" onClick={() => void exportCsv()}>Export hours (CSV)</button>
         <Link href="/help?a=timesheet-how-counted" className="text-sm underline" data-testid="ts-how">How hours are counted</Link>
       </div>
+      {(weekLoading || crewLoad === "loading") && <p role="status" aria-live="polite" className="mb-2 text-sm text-[var(--cr-muted)]" data-testid="ts-loading">Loading this week’s hours…</p>}
       {message && <p role="status" data-testid="ts-message" className="mb-2 text-sm">{message}</p>}
       <section className="cr-section mb-3" data-testid="ts-on-clock">
         <p className="cr-section-label">On the clock now ({onClock.length})</p>

@@ -12,4 +12,8 @@ const page = readFileSync("src/app/timesheet/page.tsx", "utf8");
 ok(/refreshEmployeesCache\(/.test(page), "timesheet reads crew from the server, not only the Team cache");
 ok(/href="\/profile#overtime"[^>]*>Settings</.test(page), "footer links to Settings");
 ok(/ts-footer-how/.test(page) && /How hours are counted/.test(page), "footer has How hours are counted");
+ok(!/loadBusinessTz\(\)\.then\(\(\) => syncTimesheetCutover\(\)\)/.test(page), "zone and cutover are not chained before render");
+ok(page.indexOf("setWorkers(readWorkers())") < page.indexOf("void loadBusinessTz()"), "cached crew renders before any network wait");
+ok(/week && days\.length \? weekShares/.test(page), "pay shares wait for a week (no crash when crew loads first)");
+ok(/weekLoading\) return;/.test(page) && /data-testid="ts-loading"/.test(page), "no job estimates pushed while loading; visible loading line");
 if (fails) { console.log(`${fails} failed`); process.exit(1); } else console.log("all passed");
