@@ -118,8 +118,9 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
     let saved = false;
     // Help retest (f): show the move right away (optimistic); the real save (job pin lookup + cloud) follows and
     // the list is re-read from storage after it, so a refused save snaps the job back.
-    setState((prev) => { const moved = applySchedule(prev.docs as never[], docId, schedule, options?.confirmed); return moved ? { ...prev, docs: moved.docs as typeof prev.docs } : prev; });
     try {
+      // QA4: an optimistic update that throws (e.g. a refused crew change) used to kill the save with no toast.
+      setState((prev) => { try { const moved = applySchedule(prev.docs as never[], docId, schedule, options?.confirmed); return moved ? { ...prev, docs: moved.docs as typeof prev.docs } : prev; } catch { return prev; } });
       saved = Boolean(await saveSchedule(docId, schedule, options?.confirmed));
       setState((prev) => ({ ...prev, docs: readDocs() }));
       setMessage(saved ? (schedule ? "Schedule saved" : "Job unscheduled") : "Not saved: this job could not be moved (see the job for details).");

@@ -1,7 +1,7 @@
 import { docAmounts } from "@/lib/doc-stage";
 import { jobWhen } from "@/lib/job-when";
-import { cashEntries } from "@/lib/money";
-import { isBilledInvoice, isCostedJob } from "@/lib/ledger";
+import { billedAmount, cashEntries } from "@/lib/money";
+import { isCostedJob } from "@/lib/ledger";
 import { readPayments, refundedTotal } from "@/lib/payments";
 import { dedupeCopies } from "@/lib/doc-dedupe";
 import { jobProfit, type ProfitLine } from "@/lib/job-profit";
@@ -53,7 +53,9 @@ export function buildReport(allDocs: Doc[], crewExpenses: CrewExpense[], year: s
   for (const doc of docs) {
     // QA3: one billed rule (ledger): not draft, void, deleted, pending recurring or replaced by a revision.
     // QA3c: Profit by job and job costs include unsent (draft) and paid invoices; billed stays the ledger rule.
-    const billed = isBilledInvoice(doc as never, docs as never);
+    // QA4: Billed uses the Documents/billedOutstanding rule and amount so Reports Billed = Documents billed.
+    const billedTotal = billedAmount(doc as never, docs as never);
+    const billed = billedTotal !== null;
     if (!billed && !isCostedJob(doc as never, docs as never)) continue;
     const data = doc.data || {};
     const { total } = docAmounts(doc);
@@ -64,7 +66,7 @@ export function buildReport(allDocs: Doc[], crewExpenses: CrewExpense[], year: s
     const all = jobProfit({ total, data });
     if (jobAt?.year === year) jobs.push({ id: doc.id, type: doc.type, number: String(data.invoiceNumber || doc.title || "Invoice"), client: doc.clientName || "No client", date: jobDay || String(data.invoiceDate || doc.createdAt || ""), month: jobAt.month, total, refunded: refundedTotal(readPayments(data)), net: Math.round((total - refundedTotal(readPayments(data))) * 100) / 100, cost: all.cost, profit: all.profit, jobDate: jobDay, lines: all.lines });
     if (when?.year !== year) continue;
-    if (billed) months[when.month].billed += total;
+    if (billedTotal !== null) months[when.month].billed += billedTotal;
     // R128: the same cost as Profit by job (owner costs + card fees + mileage), so the two agree; refunds lower collected, never costs.
     months[when.month].jobCosts += all.cost;
   }

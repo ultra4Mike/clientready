@@ -154,7 +154,7 @@ export default function DashboardPage() {
 
   // eslint-disable-next-line react-hooks/globals -- module-level chain cache feeds the existing owed/balance helpers; left as-is to keep pay math unchanged
   chainDocs = documents;
-  const invoices = documents.filter((doc) => doc.type === "invoice");
+  const invoices = documents.filter((doc) => doc.type === "invoice" && !["void", "voided"].includes(String(doc.data?.status || "")) && !(doc.data as Record<string, unknown> | undefined)?.deleted); // QA4: void never counts as Paid
   const hour = now ? now.getHours() : -1;
   const hello = hour < 0 ? "Hello" :
     hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";

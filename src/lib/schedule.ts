@@ -424,14 +424,22 @@ export function applySchedule<T extends CloudDoc>(docs: T[], docId: string, sche
     // moved with day 1; an explicit `days` (even []) replaces them.
     const days = "days" in schedule ? readScheduleDays(schedule.days, schedule.date) : readScheduleDays(shiftScheduleDays(prev?.days, prev?.date || "", schedule.date), schedule.date);
     const { days: _drop, ...rest } = schedule; void _drop;
-    data.schedule = { ...rest, ...(days.length ? { days } : {}), workerIds: ids, updatedAt: new Date().toISOString() };
+    // QA4: rescheduling an unscheduled job brings back its checklist.
+    const parked = (data.unscheduled || {}) as { checklist?: unknown };
+    const checklist = rest.checklist?.length ? rest.checklist : readChecklist(parked.checklist);
+    delete data.unscheduled;
+    data.schedule = { ...rest, ...(checklist.length ? { checklist } : {}), ...(days.length ? { days } : {}), workerIds: ids, updatedAt: new Date().toISOString() };
     data.crew = crewForWorkers(shiftCrewDays(crew, prev, schedule.date), ids, schedule);
   } else {
     // QA3c: Unschedule clears the date, time and crew, so the job does not come back from the old
     // Job start / crew work date. Rows with hours or pay recorded stay (history; pay unchanged).
+    // QA4: the job's times and checklist are kept (in data.unscheduled) so rescheduling restores them; only
+    // the date and the unlogged crew rows go. Rows with hours, a bonus or pay stay (the save never throws).
+    const kept = prev ? { startTime: prev.startTime || "", endTime: prev.endTime || "", ...(prev.checklist?.length ? { checklist: prev.checklist } : {}) } : {};
     delete data.schedule;
-    delete data.jobStart; delete data.jobEnd; delete data.jobTime;
-    data.crew = crew.filter((row) => row.paidToWorker || Number(String(row.hours ?? "").replace(/[^0-9.]/g, "")) > 0);
+    data.unscheduled = { ...((data.unscheduled as object) || {}), ...kept, at: new Date().toISOString() };
+    const num = (v: unknown) => Number(String(v ?? "").replace(/[^0-9.-]/g, "")) || 0;
+    data.crew = crew.filter((row) => row.paidToWorker || num(row.hours) > 0 || num(row.bonus) > 0).map((row) => ({ ...row, workDate: "" }));
   }
   const updated = { ...doc, data } as T;
   guardDroppedRows(crew, (updated.data.crew || []) as CrewRow[], confirmed);

@@ -1,10 +1,12 @@
+import { displayStatus } from "@/lib/doc-status";
 import { isRefundRow, readPayments } from "@/lib/payments";
-import { isBilledInvoice, taxParts } from "@/lib/ledger";
+import { dedupeCopies } from "@/lib/doc-dedupe";
+import { isBilledInvoice, isVoidOrDeleted, taxParts } from "@/lib/ledger";
 import { isOpenBalance } from "@/lib/payments";
 import { clientIdFor, clientKey } from "@/lib/portal";
 import { readSchedule, statusLabel } from "@/lib/schedule";
 import { readEmailLog } from "@/lib/email";
-import { docAmounts, documentStage } from "@/lib/doc-stage";
+import { docAmounts } from "@/lib/doc-stage";
 
 type Doc = { id: string; type: string; title: string; clientName: string; createdAt: string; data: Record<string, unknown> };
 export type TimelineClient = { id: string; name: string; notes?: string };
@@ -37,24 +39,37 @@ export function clientDocs<T extends Doc>(client: TimelineClient, docs: T[], cli
  * One client's history as a single newest-first list (documents, payments, scheduled jobs, emails, notes)
  * and totals. Billed = non-draft invoices; paid = recorded payments; owed = open balances (same rule as Collect).
  */
+/** The first document of a job chain: the proposal an invoice came from, or the invoice a change order changes. */
+export function visitRoot(doc: Doc, docs: Doc[]): string {
+  const of = (doc.data?.changeOrderOf || {}) as { id?: string };
+  if (of.id) { const parent = docs.find((d) => d.id === of.id); return parent ? visitRoot(parent, docs.filter((d) => d.id !== doc.id)) : String(of.id); }
+  const prop = (doc.data?.fromProposal || doc.data?.proposalRef || {}) as { id?: string };
+  return String(prop.id || "") || doc.id;
+}
+
 export function clientTimeline(client: TimelineClient, docs: Doc[], clients: TimelineClient[]) {
-  const mine = clientDocs(client, docs, clients);
+  // QA4: device + cloud copies once, so a voided copy (INV-1049) or a synced change order never counts twice.
+  const mine = dedupeCopies(clientDocs(client, docs, clients));
   const items: ClientTimelineItem[] = [];
   let billed = 0;
   let paid = 0;
   let owed = 0;
+  const seenVisits = new Set<string>();
   for (const doc of mine) {
     const number = String(doc.data?.invoiceNumber || doc.title || "");
     const status = String(doc.data?.status || "draft");
     const amounts = docAmounts(doc);
     const kind = doc.type === "proposal" ? "proposal" : "invoice";
     const href = `/invoice?id=${encodeURIComponent(doc.id)}`;
-    items.push({ key: `doc-${doc.id}`, date: docDate(doc), type: kind, title: `${kind === "proposal" ? "Proposal" : "Invoice"} ${number}`.trim(), amount: amounts.total, status: documentStage(doc, docs).stage, href });
+    items.push({ key: `doc-${doc.id}`, date: docDate(doc), type: kind, title: `${kind === "proposal" ? "Proposal" : "Invoice"} ${number}`.trim(), amount: amounts.total, status: displayStatus(doc as never, docs as never).key /* QA4: derived status in History */, href });
     if (doc.type === "invoice") {
       // QA3: billed = the ledger rule (refunds, partial refunds and paid drafts still count; void/replaced do not).
       if (isBilledInvoice(doc, docs)) billed += taxParts(doc).total;
-      paid += amounts.paid;
-      if (isOpenBalance(status, amounts.owed)) owed += amounts.owed;
+      // QA4: a void invoice adds nothing to paid or owed either.
+      if (!isVoidOrDeleted(doc)) {
+        paid += amounts.paid;
+        if (isOpenBalance(status, amounts.owed)) owed += amounts.owed;
+      }
       readPayments(doc.data).forEach((payment, index) => {
         const amount = Number(payment.amount) || 0;
         if (isRefundRow(payment) && Math.abs(amount) > 0.004) items.push({ key: `refund-${doc.id}-${index}`, date: ymdOf(payment.date), type: "payment", title: `Refund · ${number}`, amount: -Math.abs(amount), status: "refunded", href });
@@ -62,7 +77,11 @@ export function clientTimeline(client: TimelineClient, docs: Doc[], clients: Tim
       });
     }
     const schedule = readSchedule(doc.data);
-    if (schedule) items.push({ key: `job-${doc.id}`, date: schedule.date, type: "job", title: `Job · ${number}${schedule.startTime ? ` · ${schedule.startTime}` : ""}`, status: statusLabel(schedule), href });
+    // QA4: one job per visit: the proposal, its invoice and change orders share one chain (and the same day).
+    const visit = schedule ? `${visitRoot(doc, mine)}|${schedule.date}` : "";
+    const firstForVisit = Boolean(schedule) && !isVoidOrDeleted(doc) && !seenVisits.has(visit);
+    if (firstForVisit) seenVisits.add(visit);
+    if (schedule && firstForVisit) items.push({ key: `job-${doc.id}`, date: schedule.date, type: "job", title: `Job · ${number}${schedule.startTime ? ` · ${schedule.startTime}` : ""}`, status: statusLabel(schedule), href });
     readEmailLog(doc.data?.emailLog).forEach((entry, index) => {
       items.push({ key: `email-${doc.id}-${index}`, date: ymdOf(entry.sentAt), type: "email", title: `Email · ${entry.subject}`, status: entry.via === "email" ? "sent" : "opened in email app", href });
     });

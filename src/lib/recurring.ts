@@ -302,7 +302,8 @@ export function isPendingRecurringDraft(doc: { type: string; data?: Record<strin
 }
 
 export function recurringDraftsReady(docs: { type: string; data?: Record<string, unknown> }[]) {
-  return docs.filter(isPendingRecurringDraft).length;
+  // QA4: a draft the owner already marked reviewed (Needs review → Mark reviewed stores data.reviews.recurring) is not "ready".
+  return docs.filter((doc) => isPendingRecurringDraft(doc) && !(doc.data?.reviews as Record<string, unknown> | undefined)?.recurring).length;
 }
 
 /**
@@ -324,4 +325,23 @@ export function scheduleFromForm(
     ...(stored?.lastGeneratedId ? { lastGeneratedId: stored.lastGeneratedId } : {}),
     ...(form.frequency === "monthly" ? { anchorDay } : {}),
   };
+}
+
+/**
+ * QA4: deleting a recurring template. "Delete series" also removes its unsent, unpaid drafts; anything sent or with
+ * money is kept. Every kept instance is detached (no recurringFrom / pending review), so nothing points at a missing template.
+ */
+export function seriesDeletePlan<T extends Doc>(docs: T[], templateId: string, deleteSeries: boolean) {
+  const removeIds: string[] = [];
+  const detached: T[] = [];
+  for (const doc of generatedFrom(docs, templateId) as T[]) {
+    const data = doc.data || {};
+    const payments = Array.isArray(data.payments) ? data.payments.length : 0;
+    if (deleteSeries && (data.status || "draft") === "draft" && !payments) { removeIds.push(doc.id); continue; }
+    const next = { ...data } as Record<string, unknown>;
+    delete next.recurringFrom;
+    if (next.recurringReview === "pending") delete next.recurringReview;
+    detached.push({ ...doc, data: next });
+  }
+  return { removeIds, detached };
 }

@@ -48,6 +48,9 @@ export function invoiceFromProposal(proposal: Doc, ownerDocs: Doc[], opts: { tod
     ...(pdata.jobStart ? { jobStart: pdata.jobStart } : {}),
     ...(pdata.jobEnd ? { jobEnd: pdata.jobEnd } : {}),
     ...(pdata.schedule ? { schedule: pdata.schedule } : {}),
+    // QA4: proposal photos carry over to the invoice.
+    ...(Array.isArray(pdata.photos) && pdata.photos.length ? { photos: pdata.photos } : {}),
+    ...(pdata.showPhotos ? { showPhotos: pdata.showPhotos } : {}),
     proposalSignature: (opts.approval?.signature as unknown) || pdata.signature || null,
     fromProposal: { id: proposal.id, number: String(pdata.invoiceNumber || proposal.title || "Proposal"), depositApplied: true, auto: true },
     approval: { ...(opts.approval || {}), token: opts.token, status: "approved", viaProposal: true },

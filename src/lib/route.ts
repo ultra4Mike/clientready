@@ -1,4 +1,4 @@
-import { scheduledJobs } from "@/lib/scheduled-jobs";
+import { jobsOnDay } from "@/lib/day-jobs";
 import type { Schedule } from "@/lib/schedule";
 
 type Doc = { id: string; type: string; title: string; clientName?: string; data?: Record<string, unknown> };
@@ -6,8 +6,8 @@ export type RouteStop = { id: string; title: string; client: string; address: st
 
 /** One day's stops in time order ("any time" last), optionally for one worker. Done jobs stay listed but are skipped in the directions. */
 export function dayRoute(docs: Doc[], date: string, workerId = "all") {
-  const stops: RouteStop[] = scheduledJobs(docs)
-    .filter(({ schedule }) => schedule.date === date && (workerId === "all" || schedule.workerIds.includes(workerId)))
+  const stops: RouteStop[] = jobsOnDay(docs, date) // QA4: same jobs as the calendar, one per visit
+    .filter(({ schedule }) => workerId === "all" || schedule.workerIds.includes(workerId))
     .map(({ doc, schedule }) => ({
       id: doc.id,
       title: String(doc.data?.invoiceNumber || doc.title || "Job"),

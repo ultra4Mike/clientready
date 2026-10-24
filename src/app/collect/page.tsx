@@ -1,5 +1,6 @@
 "use client";
 
+import { openInvoiceIds } from "@/lib/money";
 import { docAmounts } from "@/lib/doc-stage";
 import { preferredContactFor } from "@/lib/contact-method";
 import EmptyState from "@/components/EmptyState";
@@ -9,7 +10,7 @@ import PageHeader from "@/components/PageHeader";
 import StuckPayments from "@/components/StuckPayments";
 import { saveCloudDocument } from "@/lib/cloud-docs";
 import { amountOf, documentTotals } from "@/lib/discount";
-import { balanceDue, effectiveDueDate, nextDueDate, invoicePastDue, methodLabel, isOpenBalance, isVoidStatus, paidTotal, paymentFields, paymentMethods, readPayments } from "@/lib/payments";
+import { balanceDue, effectiveDueDate, nextDueDate, invoicePastDue, methodLabel, isVoidStatus, paidTotal, paymentFields, paymentMethods, manualMethodsFrom, readPayments } from "@/lib/payments";
 import { uniqueDocs } from "@/lib/change-orders";
 import { effectiveAmounts } from "@/lib/change-order-revision";
 import { isPendingRecurringDraft } from "@/lib/recurring";
@@ -43,7 +44,7 @@ type SavedDocument = {
   };
 };
 
-const methods = paymentMethods;
+const methods = manualMethodsFrom(paymentMethods); // QA4: no "Card (Stripe)" by hand
 
 function invoiceTotal(doc: SavedDocument) {
   const items = doc.data?.items || [];
@@ -195,7 +196,9 @@ export default function CollectPage() {
   // Recurring drafts nobody has reviewed yet are not money to collect: keep them out of the
   // list and totals, and point to them below so they aren't lost.
   const pendingDrafts = invoices.filter(isPendingRecurringDraft).length;
-  const unpaid = invoices.filter((doc) => (doc.data?.status || "draft") !== "paid" && isOpenBalance(doc.data?.status, balance(doc)));
+  // QA4: the same list as Documents "Still owed" (a box set to Paid with money still owed is listed; e.g. INV-1019).
+  const openIds = openInvoiceIds(documents as never);
+  const unpaid = invoices.filter((doc) => openIds.has(doc.id));
 
   const totals = useMemo(() => {
     const openAmount = unpaid.reduce((sum, doc) => sum + balance(doc), 0);
@@ -224,7 +227,7 @@ export default function CollectPage() {
           <p className="mt-1 truncate text-base font-bold tabular-nums sm:mt-2 sm:text-2xl">{totals.unpaidCount}</p>
         </div>
         <div className="min-w-0 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 shadow-sm sm:p-6">
-          <p className="text-[10px] font-semibold uppercase leading-tight tracking-wide text-[var(--cr-muted)] sm:text-xs">Open amount</p>
+          <p className="text-[10px] font-semibold uppercase leading-tight tracking-wide text-[var(--cr-muted)] sm:text-xs">Still owed</p>
           <p className="mt-1 truncate text-base font-bold tabular-nums sm:mt-2 sm:text-2xl">${totals.openAmount.toFixed(2)}</p>
         </div>
         <div className="min-w-0 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 shadow-sm sm:p-6">
@@ -246,7 +249,7 @@ export default function CollectPage() {
 
         {unpaid.length > 0 && (
           <div className="hidden grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto] gap-4 rounded-xl px-5 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--cr-muted)] lg:grid">
-            <span>Invoice</span><span className="text-right">Balance</span><span className="w-[27rem] text-right">Actions</span>
+            <span>Invoice</span><span className="text-right">Owed</span><span className="w-[27rem] text-right">Actions</span>
           </div>
         )}
         <div className="space-y-3 lg:space-y-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-teal-500/20 lg:bg-[var(--cr-card)] lg:divide-y lg:divide-teal-500/15">

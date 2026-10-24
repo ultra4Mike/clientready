@@ -13,6 +13,8 @@ export type Approval = {
   method?: string; // "phone" when the owner recorded it; absent for the client's own online approval
   approvedBy?: string; // owner's name
   note?: string;
+  declinedAt?: string; // QA4: the client tapped Decline (status stays pending so they can still change their mind)
+  declineReason?: string;
 };
 
 /** Append-only document history entry. Entries are only ever added (never edited or removed) by these helpers. */
@@ -54,6 +56,8 @@ export function readApproval(value: unknown): Approval | null {
     ...(raw.method ? { method: String(raw.method) } : {}),
     ...(raw.approvedBy ? { approvedBy: String(raw.approvedBy) } : {}),
     ...(raw.note ? { note: String(raw.note) } : {}),
+    ...(raw.declinedAt && raw.status === "pending" ? { declinedAt: String(raw.declinedAt) } : {}),
+    ...(raw.declineReason && raw.status === "pending" ? { declineReason: String(raw.declineReason).slice(0, 500) } : {}),
   };
 }
 
@@ -87,6 +91,7 @@ export function approvalBadgeApplies(doc: { id?: string; type?: string; data?: R
 
 export function approvalLabel(approval: Approval | null) {
   if (!approval) return "";
+  if (approval.status === "pending" && approval.declinedAt) return `Declined by client${approval.declineReason ? `: “${approval.declineReason}”` : ""}`;
   if (approval.status === "approved") {
     const when = approval.approvedAt ? new Date(approval.approvedAt) : null;
     const text = when && !Number.isNaN(when.getTime())
@@ -218,6 +223,13 @@ export async function fetchApprovalDoc(token: string) {
   };
   if (out) out.data = publicDocData(out.data);
   return out;
+}
+
+/** QA4: the client declines from the link, with an optional reason. Needs deploy34 (decline_document); null before it. */
+export async function declineByToken(token: string, reason: string) {
+  const { data, error } = await supabase.rpc("decline_document", { p_token: token, p_reason: reason.trim().slice(0, 500) });
+  if (error) throw error;
+  return readApproval(data);
 }
 
 /** Public: approves the document behind a token. Returns the new approval, or null if not pending/unknown. */

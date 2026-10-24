@@ -135,7 +135,7 @@ export default function ProfilePage() {
       document.querySelector<HTMLInputElement>('[data-testid="set-aside-percent"]')?.focus();
       return;
     }
-    window.localStorage.setItem("clientready-profile", JSON.stringify({ ...profile, setAsidePercent: pct, automations }));
+    window.localStorage.setItem("clientready-profile", JSON.stringify({ ...profile, setAsidePercent: pct, automations, timezone }));
 
     const { data } = await supabase.auth.getUser();
     const user = data.user;

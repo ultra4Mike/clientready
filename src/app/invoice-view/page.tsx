@@ -1,16 +1,20 @@
 "use client";
+import { visibleLines } from "@/lib/visible-lines";
 import { printPage } from "@/lib/print-page";
 
 import PayOptions from "@/components/PayOptions";
 import { readLocalPaymentMethods, type PaymentMethodsConfig } from "@/lib/payments/providers";
 import { StageSchedule } from "@/components/StageSchedule";
+import { whenLabel } from "@/lib/job-when";
 import { balanceLabel, readStages, type Stage } from "@/lib/stages";
 import { useEffect, useMemo, useState } from "react";
 import { viewStatusLabel } from "@/lib/portal-chain";
 import { chainCredits, creditLabel, isRevision, replacedBy, revisionOwed } from "@/lib/change-order-revision";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
-import { owedAfterRefunds, paidTotal, refundState, refundWording, readPayments, tipTotal, type Payment } from "@/lib/payments";
+import { isRefundRow, owedAfterRefunds, paidTotal, refundedTotal, refundState, refundWording, readPayments, tipTotal, type Payment } from "@/lib/payments";
+
+const refundAmount = (payment: Payment) => Math.abs(Number(String(payment.amount ?? "").replace(/[^0-9.-]/g, "")) || 0);
 import { JobPhotoStrip } from "@/components/JobPhotos";
 import { readPhotos, type JobPhoto } from "@/lib/photos";
 import LineSplit from "@/components/LineSplit";
@@ -146,10 +150,10 @@ export default function InvoiceViewPage() {
       const found = changeOrdersFor(docs, doc.id).map((order) => ({ id: order.id, number: order.number, createdAt: "" }));
       setChangeOrderNotes(mergeChangeOrderNotes(readChangeOrderNotes(data.changeOrderNotes), found));
       setProposalSignature(readSignature(data.proposalSignature));
-      setItems(data.items || []);
+      setItems(visibleLines(data.items || []));
       setStages(doc.type === "invoice" ? readStages((doc.data as Record<string, unknown> | undefined)?.stages) : []);
       setStatus(data.status || "draft");
-      setJobTime(data.jobTime || "");
+      setJobTime(whenLabel(doc.data as Record<string, unknown> | undefined) || data.jobTime || ""); // QA4: date with the time
       setApproval(readApproval(doc.data?.approval));
       refreshApproval(doc.id).then((latest) => { if (latest !== undefined) setApproval(latest); });
     }
@@ -267,7 +271,7 @@ export default function InvoiceViewPage() {
             <div className="min-w-0 text-sm text-slate-600">
               {logo && <img src={logo} alt="Business logo" className="mb-2 h-10 w-auto" />}
               <p className="font-semibold">{businessName}</p>
-              {jobTime && <p>Scheduled time: {jobTime}</p>}
+              {jobTime && <p data-testid="view-job-when">Scheduled: {jobTime}</p>}
             </div>
             <div className="shrink-0 text-right">
               {replaced && (
@@ -317,10 +321,17 @@ export default function InvoiceViewPage() {
             <div className="space-y-0.5 text-slate-600">
               <LineSplit items={items} />
               {payments.some((payment) => amountOf(payment.amount) > 0) && <p className="text-xs text-slate-500">Payments</p>}
-              {payments.filter((payment) => amountOf(payment.amount) > 0).map((payment) => (
-                <div key={payment.id} className="flex justify-between gap-2">
+              {/* QA4: payments are listed as positive amounts; refunds get their own lines. */}
+              {payments.filter((payment) => amountOf(payment.amount) > 0 && !isRefundRow(payment)).map((payment) => (
+                <div key={payment.id} className="flex justify-between gap-2" data-testid="view-payment-line">
                   <span>Paid{payment.date ? ` ${payment.date}` : ""}{payment.method ? ` · ${payment.method}` : ""}{payment.ref ? ` · ${payment.ref}` : ""}</span>
-                  <span>-${amountOf(payment.amount).toFixed(2)}</span>
+                  <span>${amountOf(payment.amount).toFixed(2)}</span>
+                </div>
+              ))}
+              {payments.filter((payment) => isRefundRow(payment) && refundAmount(payment) > 0).map((payment) => (
+                <div key={payment.id} className="flex justify-between gap-2 text-amber-800" data-testid="view-refund-line">
+                  <span>Refunded{payment.date ? ` ${payment.date}` : ""}{payment.method ? ` · ${payment.method}` : ""}</span>
+                  <span>${refundAmount(payment).toFixed(2)}</span>
                 </div>
               ))}
               {paymentLink && !replaced && <p className="break-all pt-1 text-xs">Pay here: {paymentLink}</p>}
@@ -347,7 +358,7 @@ export default function InvoiceViewPage() {
               {totals.paid > 0 && (
                 <div className="flex justify-between font-medium text-emerald-700 dark:text-emerald-300">
                   <span>Paid</span>
-                  <span>-${totals.paid.toFixed(2)}</span>
+                  <span>${totals.paid.toFixed(2)}</span>
                 </div>
               )}
               {tipTotal(payments) > 0 && (
@@ -368,7 +379,7 @@ export default function InvoiceViewPage() {
                   <span>{refundWording(totals.total, payments)}</span>
                   <span>${totals.balance.toFixed(2)}</span>
                 </div>
-              ) : status === "paid" || (totals.paid > 0 && totals.balance <= 0.004) ? (
+              ) : (status === "paid" || (totals.paid > 0 && totals.balance <= 0.004)) && refundedTotal(payments) <= 0.004 ? (
                 <div data-testid="paid-in-full" className="mt-2 flex items-baseline justify-between cr-tone-good rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-lg font-bold text-emerald-800 print:bg-transparent print:px-0">
                   <span>✓ Paid in full</span>
                   <span>${totals.balance.toFixed(2)}</span>

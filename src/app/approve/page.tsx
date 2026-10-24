@@ -1,10 +1,11 @@
 "use client";
+import { visibleLines } from "@/lib/visible-lines";
 import { printPage } from "@/lib/print-page";
 import { ownerZone } from "@/lib/owner-zone";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import LegalLinks from "@/components/LegalLinks";
-import { approveByTokenSigned, fetchApprovalDoc, fetchVisitByToken, readApproval, type Approval, type PublicVisit } from "@/lib/approval";
+import { approveByTokenSigned, declineByToken, fetchApprovalDoc, fetchVisitByToken, readApproval, type Approval, type PublicVisit } from "@/lib/approval";
 import { amountOf, documentTotals, discountLabel } from "@/lib/discount";
 import { grossPaid, isRefundRow, owedAfterRefunds, paidTotal, readPayments, refundedTotal, refundWording } from "@/lib/payments";
 import { readPhotos } from "@/lib/photos";
@@ -52,6 +53,8 @@ export default function ApprovePage() {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [declineOpen, setDeclineOpen] = useState(false);
+  const [declineReason, setDeclineReason] = useState("");
   const [cardEnabled, setCardEnabled] = useState(false);
   const [paying, setPaying] = useState(false);
   // Optional tip: none / 10 / 15 / 20 % / custom. Charged as its own line, never added to the invoice or its tax.
@@ -70,6 +73,7 @@ export default function ApprovePage() {
   // R128: after Stripe sends the client back: confirming, then a receipt with a number.
   const [receiptState, setReceiptState] = useState<"" | "confirming" | "done" | "slow">("");
   const [receiptId, setReceiptId] = useState("");
+  const [receiptAll, setReceiptAll] = useState(false);
   // Option A: replaced by a sent revision change order (no pay, link forward) or a revision's chain credits.
   const [chain, setChain] = useState<{ replaced?: { id: string; number: string; token: string }; revision?: { owed: number; credits: { number: string; paid: number; marked?: boolean }[]; wasNumber: string; wasTotal: number } } | null>(null);
 
@@ -133,7 +137,7 @@ export default function ApprovePage() {
   }, []);
 
   const data = useMemo(() => doc?.data || {}, [doc]);
-  const items = useMemo(() => (Array.isArray(data.items) ? (data.items as LineItem[]) : []), [data]);
+  const items = useMemo(() => (Array.isArray(data.items) ? visibleLines(data.items as LineItem[]) : []), [data]);
   const payments = useMemo(() => readPayments(data), [data]);
   const rawTotals = useMemo(() => {
     const subtotal = items.reduce((sum, item) => sum + amountOf(item.qty) * amountOf(item.rate), 0);
@@ -188,6 +192,20 @@ export default function ApprovePage() {
     const link = { target, href, number: String(result.number || "") };
     setInvoiceLink({ href, number: link.number });
     return link;
+  }
+
+  // QA4: the client can decline (optional reason); the owner sees "Declined by client". Token links only.
+  async function decline() {
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = await declineByToken(token, declineReason);
+      if (result) { setApproval(result); setDeclineOpen(false); }
+      else setMessage("Could not decline right now. The link may have been turned off.");
+    } catch {
+      setMessage("Could not decline right now. Check your connection and try again.");
+    }
+    setBusy(false);
   }
 
   async function approve(thenPay = false) {
@@ -287,7 +305,10 @@ export default function ApprovePage() {
           <div id={`receipt-${receipt.id}`} className="rounded-2xl border border-emerald-300 bg-emerald-50 p-5 text-sm text-emerald-900 shadow-sm" data-testid="pay-receipt">
             <p className="text-xs font-semibold uppercase tracking-wide">Payment receipt</p>
             <p className="mt-1 text-2xl font-bold tabular-nums">${amountOf(receipt.amount).toFixed(2)} paid</p>
-            <p className="mt-1">Receipt <span className="font-semibold" data-testid="receipt-number">{receiptNumber(receipt.id)}</span> · {number} · {receipt.date ? niceDate(receipt.date) : ""} · Card</p>
+            <p className="mt-1">Receipt <span className="font-semibold" data-testid="receipt-number">{receiptNumber(receipt.id)}</span> · {number} · {receipt.date ? niceDate(receipt.date) : ""} · {String(receipt.method || "Card")}</p>
+            {/* QA4: "show all payments" lists every payment on this invoice, any method. */}
+            <button type="button" className="print-hide mt-2 text-xs font-semibold underline" data-testid="receipt-show-all" onClick={() => setReceiptAll((v) => !v)}>{receiptAll ? "Hide other payments" : "Show all payments"}</button>
+            {receiptAll && <ul className="mt-1 space-y-0.5 text-xs tabular-nums" data-testid="receipt-all">{payments.filter((p) => amountOf(p.amount) > 0 && !isRefundRow(p)).map((p) => <li key={p.id}>{receiptNumber(p.id)} · {p.date ? niceDate(p.date) : ""} · {String(p.method || "Payment")} · ${amountOf(p.amount).toFixed(2)}</li>)}</ul>}
             <p className="mt-1">{totals.balance > 0.004 ? `Remaining balance: $${totals.balance.toFixed(2)}` : refundText ? `${refundText}. No balance due.` : "Paid in full. Thank you!"}</p>
             <div className="print-hide mt-3 flex flex-wrap gap-2">
               <button type="button" onClick={() => printPage()} className="min-h-11 rounded-lg bg-emerald-700 px-4 font-semibold text-white">Print / save receipt</button>
@@ -350,7 +371,7 @@ export default function ApprovePage() {
               {payments.filter((payment) => amountOf(payment.amount) > 0 && !isRefundRow(payment)).map((payment, index) => (
                 <div key={payment.id} className="flex items-start justify-between gap-3 py-0.5 text-emerald-700" data-testid="approve-payment">
                   <span className="min-w-0">{index === 0 && (isProposal || stages.some((stage) => stage.kind === "deposit")) ? "Deposit paid" : "Paid"}{payment.date ? ` ${niceDate(payment.date)}` : ""}{payment.method ? ` · ${payment.method}` : ""}</span>
-                  <span className="shrink-0 text-right font-medium tabular-nums">-${amountOf(payment.amount).toFixed(2)}</span>
+                  <span className="shrink-0 text-right font-medium tabular-nums">${amountOf(payment.amount).toFixed(2)}{" "}<button type="button" className="print-hide text-xs underline" data-testid="approve-payment-receipt" onClick={() => { setReceiptId(payment.id); setReceiptState("done"); }}>Receipt</button></span>
                 </div>
               ))}
               {chain?.revision?.credits.map((c) => (
@@ -469,6 +490,21 @@ export default function ApprovePage() {
                 {isProposal && depositAmount > 0 && cardEnabled && (
                   <button type="button" data-testid="approve-one-tap" disabled={busy || paying} onClick={() => approve(false)} className="min-h-11 w-full rounded-lg text-sm font-medium text-slate-600 underline">Approve now, pay the deposit another way</button>
                 )}
+                {!portal && token && (approval?.declinedAt ? (
+                  <p data-testid="approve-declined" className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">You declined this{approval.declineReason ? ` (“${approval.declineReason}”)` : ""}. Your contractor has been told. Changed your mind? You can still approve above.</p>
+                ) : declineOpen ? (
+                  <div className="space-y-2 rounded-lg border border-slate-200 p-3" data-testid="approve-decline-box">
+                    <label className="block text-sm font-medium text-slate-700">Reason (optional)
+                      <textarea data-testid="approve-decline-reason" maxLength={500} value={declineReason} onChange={(event) => setDeclineReason(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" rows={3} />
+                    </label>
+                    <div className="flex gap-2">
+                      <button type="button" data-testid="approve-decline-confirm" disabled={busy} onClick={() => void decline()} className="min-h-11 flex-1 rounded-lg border border-rose-300 px-4 text-sm font-semibold text-rose-700 disabled:opacity-60">{busy ? "One moment…" : "Decline"}</button>
+                      <button type="button" disabled={busy} onClick={() => setDeclineOpen(false)} className="min-h-11 flex-1 rounded-lg border border-slate-300 px-4 text-sm text-slate-700">Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" data-testid="approve-decline" disabled={busy} onClick={() => setDeclineOpen(true)} className="min-h-11 w-full rounded-lg text-sm font-medium text-slate-500 underline">Decline</button>
+                ))}
               </div>
             )}
             {message && <p className="cr-tone-bad mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{message}</p>}

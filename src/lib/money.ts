@@ -7,7 +7,7 @@
 import { docAmounts } from "./doc-stage";
 import { readPayments, isRefundRow } from "./payments";
 import { dedupeCopies } from "./doc-dedupe";
-import { effectiveAmounts } from "./change-order-revision";
+import { effectiveAmounts, isRevision, revisionLive } from "./change-order-revision";
 
 type Doc = { id: string; type: string; title?: string; createdAt?: string; data?: Record<string, unknown> };
 export type CashEntry = { docId: string; date: string; amount: number };
@@ -80,12 +80,34 @@ export function draftMoneyTaken(doc: Doc) {
   return data.status === "paid" || readPayments(data).some((p) => !(p as { voided?: unknown }).voided && !isRefundRow(p) && num(p.amount) > 0.004);
 }
 
+/** QA4: the invoices behind "Still owed" (same rules as billedOutstanding), for Collect: Collect open = Documents owed. */
+export function openInvoiceIds(allDocs: Doc[]) {
+  const out = new Map<string, number>();
+  const docs = dedupeCopies(allDocs);
+  for (const doc of docs) {
+    if (doc.type !== "invoice" || voided(doc) || (String(doc.data?.status || "draft") === "draft" && !draftMoneyTaken(doc))) continue;
+    if (isRevision(doc as never) && !revisionLive(doc as never)) continue;
+    const { owed, replaced } = effectiveAmounts(docs as never, doc as never);
+    if (!replaced && owed > 0.004) out.set(doc.id, Math.round(owed * 100) / 100);
+  }
+  return out;
+}
+
+/** QA4: the amount one invoice adds to Billed (same rule as billedOutstanding), or null when it is not billed. Docs must be deduped. */
+export function billedAmount(doc: Doc, docs: Doc[]): number | null {
+  if (doc.type !== "invoice" || voided(doc) || (String(doc.data?.status || "draft") === "draft" && !draftMoneyTaken(doc))) return null;
+  if (isRevision(doc as never) && !revisionLive(doc as never)) return null;
+  const { total, replaced } = effectiveAmounts(docs as never, doc as never);
+  return replaced ? null : total;
+}
+
 export function billedOutstanding(allDocs: Doc[], from = "", to = "") {
   let sentCount = 0;
   let count = 0, billed = 0, outstanding = 0, owedCount = 0;
   const docs = dedupeCopies(allDocs);
   for (const doc of docs) {
     if (doc.type !== "invoice" || voided(doc) || (String(doc.data?.status || "draft") === "draft" && !draftMoneyTaken(doc))) continue;
+    if (isRevision(doc as never) && !revisionLive(doc as never)) continue; // QA4: same rule as ledger isBilledInvoice
     const date = ymd(doc.data?.invoiceDate) || ymd(doc.createdAt);
     if ((from && date < from) || (to && date > to)) continue;
     // Option A (owner-approved): a version replaced by a SENT revision change order is not billed or owed

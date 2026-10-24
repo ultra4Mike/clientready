@@ -89,7 +89,7 @@ export function StageEditor({ stages, onChange, total, balance, dueDate = "", de
         <button type="button" data-testid="stage-preset-deposit" onClick={() => onChange(asAmounts(depositRemainderStages(pct, todayYmd(), dueDate, total - balance)))} className="tap min-h-11 w-full rounded-lg border border-teal-500/50 bg-teal-500/5 px-4 py-2.5 text-left text-sm font-semibold leading-snug text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">
           {total - balance > 0.004
             ? <>Use the ${(total - balance).toFixed(2)} already paid as the deposit + remaining balance ${balance.toFixed(2)} {dueDate ? `due ${dueDate}` : "later"}</>
-            : <>Deposit now + remaining balance {dueDate ? `due ${dueDate}` : "later"} <span className="font-normal text-slate-500">(${pct}% · ${(Math.round(total * pct) / 100).toFixed(2)} deposit, edit below)</span></>}
+            : <>Deposit now + remaining balance {dueDate ? `due ${dueDate}` : "later"} <span className="font-normal text-slate-500">({pct}% · ${(Math.round(total * pct) / 100).toFixed(2)} deposit, edit below)</span></>}
         </button>
       )}
       {stages.length === 0 && <p className="text-xs text-slate-500">Split this invoice into deposit / progress / final payments with due dates. The invoice total does not change.</p>}

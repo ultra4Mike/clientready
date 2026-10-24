@@ -3,6 +3,8 @@ import { bizToday } from "./biz-today";
 /** tip: extra the client gave on top of the bill; never counts toward the balance. */
 export type Payment = { id: string; amount: string; method: string; date: string; ref: string; tip?: string; note?: string; of?: string };
 
+/** QA4: methods the owner can pick by hand ("Card (Stripe)" is only set by a real Stripe payment). */
+export const manualMethodsFrom = (all: string[]) => all.filter((m) => m !== "Card (Stripe)");
 export const paymentMethods = ["Cash", "Check", "Venmo", "Cash App", "Zelle", "PayPal", "Bank", "Card", "Card (Stripe)", "Other"];
 
 type PaymentData = {
@@ -240,3 +242,5 @@ export function refundableFor(payments: Payment[], paymentId: string) {
 }
 /** R2: a card payment taken through Stripe (refund goes back to the card through Stripe). */
 export const isStripeCardPayment = (payment: Payment) => payment.id.startsWith("stripe_") && payment.ref.startsWith("pi_");
+
+export const manualPaymentMethods = manualMethodsFrom(paymentMethods);

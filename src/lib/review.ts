@@ -56,7 +56,7 @@ export const MISSING_LABEL: Record<MissingField, string> = {
 export function missingFields(doc: Doc): MissingField[] {
   const data = doc.data || {};
   const status = String(data.status || "draft");
-  if (doc.type !== "invoice" || status === "draft") return [];
+  if (doc.type !== "invoice" || status === "draft" || ["void", "voided", "deleted"].includes(status) || data.deleted) return [];
   const text = (value: unknown) => String(value ?? "").trim();
   const out: MissingField[] = [];
   // R128: an address is only needed when there is no other way to reach or bill the client.
@@ -77,7 +77,9 @@ export function missingFields(doc: Doc): MissingField[] {
   return [...new Set(out)];
 }
 
-export function reviewItems(docs: Doc[], expenses: ExpenseRow[], today = ymd(new Date())): ReviewItem[] {
+export function reviewItems(allDocs: Doc[], expenses: ExpenseRow[], today = ymd(new Date())): ReviewItem[] {
+  // QA4: a void or deleted document is never "done", missing a signature or anything else to review.
+  const docs = allDocs.filter((doc) => !["void", "voided", "deleted"].includes(String(doc.data?.status || "")) && !doc.data?.deleted);
   const byId = new Map(docs.map((doc) => [doc.id, doc]));
   const all: ReviewItem[] = [];
   const open = (doc: Doc) => `/invoice?id=${encodeURIComponent(doc.id)}`;

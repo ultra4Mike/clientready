@@ -1,7 +1,7 @@
 "use client";
 
 import { overLimit, ownerOvertimeHours, weekScheduledHours } from "@/lib/overtime";
-import { checklistFromLines, checklistMissing, checklistNeedsPhoto, checklistNote } from "@/lib/checklist";
+import { checklistFromLines, checklistMissing, checklistNeedsPhoto, checklistNote, doneChecklistWarning, toggleChecklistItem, type ChecklistItem } from "@/lib/checklist";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { refreshOwnerUnavailable, unavailableOn, type Unavailable } from "@/lib/unavailable";
 import { bookedBlocks, bookingConflicts, clockText, DEFAULT_JOB_MINUTES, nextOpenSlot, readOverrides, splitConflicts, type Override } from "@/lib/conflicts";
@@ -118,7 +118,10 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
   }
 
   // R53: every change saves by itself shortly after (date, time, crew, status, notes, checklist).
-  const fingerprint = JSON.stringify([date, startTime, endTime, workerIds, status, crewNote, checklistText, bookAnyway]);
+  // QA4: owner ticks on this page (null = use the stored list).
+  const [ticks, setTicks] = useState<ChecklistItem[] | null>(null);
+  const checklistNow = ticks || value?.checklist || [];
+  const fingerprint = JSON.stringify([date, startTime, endTime, workerIds, status, crewNote, checklistText, bookAnyway, ticks]);
   const first = useRef(fingerprint);
   // The latest save(), read from the timers below (save is declared further down).
   const saveRef = useRef<(auto: boolean) => void>(() => undefined);
@@ -150,7 +153,7 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
     // Autosave plan: a start is never saved without an end (default job length when none is set yet).
     const end = endTime || (startTime && /^\d\d:\d\d$/.test(startTime) ? toHhmm(toMin(startTime) + DEFAULT_JOB_MINUTES) : "");
     if (end !== endTime) setEndTime(end);
-    onSave({ date, startTime, ...(end ? { endTime: end } : {}), workerIds, status, updatedAt: value?.updatedAt || "", ...(overrides.length ? { overrides } : {}), ...(crewNote.trim() ? { crewNote: crewNote.trim() } : {}), ...(checklistFromLines(checklistText, value?.checklist).length ? { checklist: checklistFromLines(checklistText, value?.checklist) } : {}) }, auto || autoSave ? { keepOpen: true, confirmed } : undefined);
+    onSave({ date, startTime, ...(end ? { endTime: end } : {}), workerIds, status, updatedAt: value?.updatedAt || "", ...(overrides.length ? { overrides } : {}), ...(crewNote.trim() ? { crewNote: crewNote.trim() } : {}), ...(checklistFromLines(checklistText, checklistNow).length ? { checklist: checklistFromLines(checklistText, checklistNow) } : {}) }, auto || autoSave ? { keepOpen: true, confirmed } : undefined);
     if (auto || autoSave) { first.current = fingerprint; setAutoState("saved"); }
   }  useEffect(() => { saveRef.current = save; });
 
@@ -162,7 +165,7 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
         <label className="flex flex-col gap-1">Start<input aria-label="Start time" type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className="rounded-md border border-slate-300 bg-transparent px-2 py-1.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" /></label>
         <label className="flex flex-col gap-1">End<input aria-label="End time" type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} className="rounded-md border border-slate-300 bg-transparent px-2 py-1.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" /></label>
         <label className="flex flex-col gap-1">Status
-          <select aria-label="Job status" value={status} onChange={(event) => setStatus(event.target.value as JobStatus)} className="rounded-md border border-slate-300 bg-transparent px-2 py-1.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30">
+          <select aria-label="Job status" value={status} onChange={(event) => { const next = event.target.value as JobStatus; const warn = next === "done" ? doneChecklistWarning(checklistFromLines(checklistText, checklistNow)) : ""; if (warn && !window.confirm(warn)) return; setStatus(next); }} className="rounded-md border border-slate-300 bg-transparent px-2 py-1.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30">
             {(Object.keys(STATUS_LABEL) as JobStatus[]).map((key) => <option key={key} value={key}>{STATUS_LABEL[key]}</option>)}
           </select>
         </label>
@@ -180,11 +183,11 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
       <label className="flex flex-col gap-1">Job-complete checklist <span className="text-xs opacity-60">(one per line; crew tick these before marking the job done)</span>
         <textarea aria-label="Job-complete checklist" data-testid="checklist-input" rows={3} value={checklistText} onChange={(event) => setChecklistText(event.target.value)} placeholder={"Blow off driveway\nClose the gate\nPhoto of the back yard"} className="min-h-20 rounded-md border border-slate-300 bg-transparent px-2.5 py-2 leading-relaxed text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" />
       </label>
-      {(value?.checklist || []).length > 0 && (
+      {checklistNow.length > 0 && (
         <ul className="space-y-1 text-sm" data-testid="checklist-ticks" aria-label="Crew checklist progress">
-          {(value?.checklist || []).map((item) => (
+          {checklistNow.map((item) => (
             <li key={item.id} data-testid="checklist-tick" data-done={item.done ? "1" : "0"} data-needs={item.done ? undefined : "1"} className={item.done ? "text-emerald-700" : "cr-needs rounded-md border border-amber-400 bg-amber-500/10 px-2 py-1 font-medium text-amber-900 dark:text-amber-100"}>
-              {item.done ? "✓" : "○"} {item.text}{!item.done && checklistNeedsPhoto(item) ? <a href="#pay-photos" className="ml-1 text-xs underline">Add photo ›</a> : null}{item.done && item.doneBy ? <span className="text-xs opacity-70"> · {item.doneBy}{item.doneAt ? ` ${new Date(item.doneAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}</span> : null}
+              <button type="button" data-testid="checklist-owner-tick" aria-pressed={Boolean(item.done)} aria-label={`${item.done ? "Untick" : "Tick"} ${item.text}`} onClick={() => setTicks(toggleChecklistItem(checklistNow, item.id, "Owner"))} className="mr-1 inline-flex min-h-8 min-w-8 items-center justify-center rounded border border-current">{item.done ? "✓" : "○"}</button> {item.text}{!item.done && checklistNeedsPhoto(item) ? <a href="#pay-photos" className="ml-1 text-xs underline">Add photo ›</a> : null}{item.done && item.doneBy ? <span className="text-xs opacity-70"> · {item.doneBy}{item.doneAt ? ` ${new Date(item.doneAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}</span> : null}
             </li>
           ))}
         </ul>

@@ -8,7 +8,7 @@ import EmptyState from "@/components/EmptyState";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { fetchCloudDocuments, deleteCloudDocument, getUserId } from "@/lib/cloud-docs";
 import { mergeDocs, OWNER_KEY, writeLocalDocsKeepingNewer } from "@/lib/doc-sync";
-import { runDueRecurring } from "@/lib/recurring";
+import { generatedFrom, runDueRecurring, seriesDeletePlan } from "@/lib/recurring";
 import { ApprovalBadge } from "@/components/Approval";
 import { needsCoSignature } from "@/lib/co-signature";
 import { approvalBadgeApplies, readApproval } from "@/lib/approval";
@@ -25,7 +25,7 @@ import { NEXT_LABEL, STAGE_LABEL } from "@/lib/doc-stage";
 import { displayStatus, effectiveDocStatus, isChangeOrder, isSettledStatus, isVoidDoc, rowStage } from "@/lib/doc-status";
 import PeriodToggle from "@/components/PeriodToggle";
 import { inPeriod, periodRange, type PeriodRange } from "@/lib/period";
-import { isOpenBalance, isVoidStatus, invoicePastDue, owedAfterRefunds, paidTotal, readPayments } from "@/lib/payments";
+import { isOpenBalance, isVoidStatus, invoicePastDue, owedAfterRefunds, paidTotal, readPayments, refundedTotal } from "@/lib/payments";
 import { searchWithNumbers } from "@/lib/doc-number";
 
 type SavedDocument = {
@@ -56,7 +56,7 @@ function num(value: unknown) {
 /** Amounts and dates used by search and filters (computed once per document list). */
 function facts(doc: SavedDocument) {
   const data = doc.data || {};
-  const items = Array.isArray(data.items) ? (data.items as { qty?: unknown; rate?: unknown }[]) : [];
+  const items = Array.isArray(data.items) ? (data.items as { qty?: unknown; rate?: unknown; description?: unknown; name?: unknown }[]) : [];
   const subtotal = items.reduce((sum, item) => sum + num(item.qty) * num(item.rate), 0);
   const total = documentTotals(subtotal, data.taxPercent as string, data.discountType as string, data.discountValue as string).total;
   const owed = doc.type === "invoice" ? owedAfterRefunds(total, readPayments(data), data.status, data.rebillRefund) : 0;
@@ -64,8 +64,22 @@ function facts(doc: SavedDocument) {
   const date = String(data.invoiceDate || "") || (Number.isNaN(created) ? "" : new Date(created).toISOString().slice(0, 10));
   const updated = Date.parse(String(data.updatedAt || ""));
   const stamp = !Number.isNaN(updated) ? updated : Number(doc.id) || (Number.isNaN(created) ? 0 : created);
-  const text = [doc.title, doc.clientName, doc.type, data.invoiceNumber, data.clientCompany, data.clientEmail, data.clientPhone, data.status, date, total.toFixed(2)].join(" ").toLowerCase();
+  const text = [doc.title, doc.clientName, doc.type, data.invoiceNumber, data.clientCompany, data.clientEmail, data.clientPhone, data.status, date, total.toFixed(2), ...items.map((item) => `${item.description ?? ""} ${item.name ?? ""}`)].join(" ").toLowerCase();
   return { total, owed, date, stamp, text };
+}
+
+/** QA4: one CSV row: derived status, Paid net of refunds, Refunded on its own column. */
+export function csvRow(doc: SavedDocument, f: { total: number; owed: number; date: string }, all: SavedDocument[]) {
+  const payments = readPayments(doc.data || {});
+  const isInv = doc.type === "invoice";
+  return [doc.type, String(doc.data?.invoiceNumber || doc.title || ""), doc.clientName || "", f.date, displayStatus(doc as never, all as never).label,
+    f.total.toFixed(2), (isInv ? paidTotal(payments) : 0).toFixed(2), (isInv ? refundedTotal(payments) : 0).toFixed(2), f.owed.toFixed(2)];
+}
+
+/** QA4: the date shown is the date the range filter uses (the document date, else created). */
+export function shownDate(f: { date: string }, fallback: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f.date)) return fallback;
+  return new Date(`${f.date}T12:00:00`).toLocaleDateString();
 }
 
 export default function DocumentsPage({ initialView = "all" }: { initialView?: "all" | "drafts" }) {
@@ -173,8 +187,15 @@ export default function DocumentsPage({ initialView = "all" }: { initialView?: "
     }
     const ok = window.confirm("Are you sure you want to delete this document?");
     if (!ok) return;
+    // QA4: a recurring template with generated invoices: delete the series (unsent drafts) or keep the instances; none are left pointing at it.
+    const instances = generatedFrom(documents as never, id).length;
+    const plan = instances ? seriesDeletePlan(documents as never, id, window.confirm(`This recurring invoice made ${instances} invoice${instances === 1 ? "" : "s"}.\n\nOK = delete series (also deletes its unsent drafts; sent or paid ones are kept).\nCancel = keep instances (they stay as normal invoices).`)) : { removeIds: [] as string[], detached: [] as SavedDocument[] };
+    const gone = new Set([id, ...plan.removeIds]);
+    const detached = new Map((plan.detached as SavedDocument[]).map((d) => [d.id, d]));
     const proposal = doc ? (resetSourceProposal(doc as never, documents as never) as unknown as SavedDocument | null) : null;
-    saveList(documents.filter((d) => d.id !== id).map((d) => (proposal && d.id === proposal.id ? proposal : d)));
+    saveList(documents.filter((d) => !gone.has(d.id)).map((d) => (proposal && d.id === proposal.id ? proposal : detached.get(d.id) || d)));
+    plan.removeIds.forEach((rid) => deleteCloudDocument(rid));
+    detached.forEach((d) => void saveCloudDocument(d as never).catch(() => undefined));
     if (proposal) void saveCloudDocument(proposal as never).catch(() => undefined);
     deleteCloudDocument(id);
   }
@@ -182,12 +203,9 @@ export default function DocumentsPage({ initialView = "all" }: { initialView?: "
   const toggleSelected = (id: string) => setSelected((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
 
   function exportCsv(list: SavedDocument[]) {
-    const rows = list.map((doc) => {
-      const f = factsById.get(doc.id) || facts(doc);
-      return [doc.type, String(doc.data?.invoiceNumber || doc.title || ""), doc.clientName || "", f.date, String(doc.data?.status || "draft"), f.total.toFixed(2), (f.total - f.owed > 0 && doc.type === "invoice" ? f.total - f.owed : 0).toFixed(2), f.owed.toFixed(2)];
-    });
-    downloadCsv(`documents-${new Date().toISOString().slice(0, 10)}.csv`, csvText(["Type", "Number", "Client", "Date", "Status", "Total", "Paid", "Owed"], rows));
-    setBulkMessage(`Exported ${list.length} document${list.length === 1 ? "" : "s"}.`);
+    // QA4: the status shown in the app (derived: Paid, Partially refunded…), and Paid net of refunds.
+    const rows = list.map((doc) => csvRow(doc, factsById.get(doc.id) || facts(doc), documents));
+    downloadCsv(`documents-${new Date().toISOString().slice(0, 10)}.csv`, csvText(["Type", "Number", "Client", "Date", "Status", "Total", "Paid", "Refunded", "Owed"], rows));
   }
 
   /** Removes selected documents after one confirm. Paid invoices and invoices with payments are kept (records). */
@@ -231,7 +249,7 @@ export default function DocumentsPage({ initialView = "all" }: { initialView?: "
       } else if (statusFilter === "paid") {
         // R80: Paid = nothing owed (payments, not just the status box).
         // QA3: a partially refunded invoice that owes nothing is Paid (labelled Partially refunded); if it still owes, Outstanding.
-        if (!(doc.type === "invoice" && !isVoidDoc(doc) && (shown === "paid" || ((shown === "partially_refunded" || shown === "partially-refunded") && info.owed <= 0.004)))) return false;
+        if (!(doc.type === "invoice" && !isVoidDoc(doc) && (shown === "paid" || shown === "partially_refunded" || shown === "partially-refunded") /* QA4: paid in full, part refunded (no balance billed) */)) return false;
       } else if (statusFilter === "accepted") {
         // R80: "Accepted" = proposals the client approved (approval link) or marked accepted.
         if (!(doc.type === "proposal" && (status === "accepted" || (doc.data?.approval as { status?: string } | undefined)?.status === "approved"))) return false;
@@ -382,7 +400,7 @@ export default function DocumentsPage({ initialView = "all" }: { initialView?: "
           <span className="col-span-3 font-semibold min-[900px]:mr-2" data-testid="bulk-count">{selected.size} selected</span>
           <button type="button" data-testid="bulk-all" className="min-h-11 rounded-lg border border-slate-300 px-3 font-medium transition hover:border-teal-500" onClick={() => setSelected(new Set(visibleDocs.map((doc) => doc.id)))}>Select all shown</button>
           <button type="button" data-testid="bulk-none" disabled={!selected.size} className="min-h-11 rounded-lg border border-slate-300 px-3 font-medium transition hover:border-teal-500 disabled:opacity-50" onClick={() => setSelected(new Set())}>Clear</button>
-          <button type="button" data-testid="bulk-remove" disabled={!selected.size} className="min-h-11 rounded-lg bg-rose-600 px-3 font-semibold text-white! shadow-sm transition hover:bg-rose-500 disabled:opacity-50" onClick={removeSelected}>Delete selected</button>
+          <button type="button" data-testid="bulk-remove" disabled={!selected.size} className="min-h-11 rounded-lg bg-rose-600 px-3 font-semibold text-white! shadow-sm transition hover:bg-rose-500 disabled:opacity-50" onClick={removeSelected}>Delete selected{selected.size ? ` (${selected.size})` : ""}</button>
           {bulkMessage && <span role="status" className="col-span-3 text-xs text-[var(--cr-muted)]" data-testid="bulk-message">{bulkMessage}</span>}
         </div>
       )}
@@ -428,10 +446,10 @@ export default function DocumentsPage({ initialView = "all" }: { initialView?: "
             </span>
             <div className="min-w-0 text-sm">
               <p className="truncate">{doc.clientName || "No client"}</p>
-              <p className="hidden text-xs tabular-nums text-[var(--cr-muted)] md:block xl:hidden">{doc.createdAt}</p>
+              <p className="hidden text-xs tabular-nums text-[var(--cr-muted)] md:block xl:hidden">{shownDate(factsById.get(doc.id) || facts(doc), doc.createdAt)}</p>
               {doc.data?.outcome ? <p className="truncate text-xs text-[var(--cr-muted)]">{doc.data.outcome}</p> : null}
             </div>
-            <p className="text-right text-sm tabular-nums text-[var(--cr-muted)] md:hidden xl:block xl:text-left">{doc.createdAt}</p>
+            <p className="text-right text-sm tabular-nums text-[var(--cr-muted)] md:hidden xl:block xl:text-left">{shownDate(factsById.get(doc.id) || facts(doc), doc.createdAt)}</p>
             <div>{(() => { const shown = displayStatus(doc, documents); return <><span data-testid="doc-status" data-status={shown.key} className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${({ paid: "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300", draft: "border-slate-400/40 bg-slate-400/15", sent: "border-sky-500/40 bg-sky-500/15 text-sky-700 dark:text-sky-300", overdue: "border-red-500/40 bg-red-500/15 text-red-700 dark:text-red-300", approved: "border-teal-500/40 bg-teal-500/15 text-teal-700 dark:text-teal-300", scheduled: "border-teal-500/40 bg-teal-500/15 text-teal-700 dark:text-teal-300" } as Record<string, string>)[shown.key] || "border-teal-500/30"}`} title={"why" in shown && shown.why ? shown.why : undefined}>{shown.label}</span>{"why" in shown && shown.why ? <span className="mt-0.5 block text-[11px] text-[var(--cr-muted)]" data-testid="doc-overdue-why">{shown.why} · <a href={`/invoice?id=${encodeURIComponent(doc.id)}#due-date`} onClick={(event) => event.stopPropagation()} data-testid="doc-change-due-date" className="font-semibold text-teal-700 underline dark:text-teal-300">Change due date</a></span> : null}</>; })()}</div>
             <div className="whitespace-nowrap text-right text-sm tabular-nums">
               <p className="font-semibold" data-testid="doc-total">{totalText(doc, factsById.get(doc.id)?.total || 0)}</p>

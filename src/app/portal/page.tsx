@@ -12,6 +12,7 @@ import { payNowAmount, readStages, stagePlan, todayYmd } from "@/lib/stages";
 import { isRevision, replacedBy, revisionOwed } from "@/lib/change-order-revision";
 import { effectiveDueDate, owedAfterRefunds, paidTotal, readPayments } from "@/lib/payments";
 import { readApproval } from "@/lib/approval";
+import { contractSummary } from "@/lib/change-order-summary";
 import { portalRowOwed, type ChainAnswer } from "@/lib/portal-chain";
 
 const text = (value: unknown) => (typeof value === "string" ? value : "");
@@ -115,6 +116,7 @@ export default function PortalPage() {
               </span>
               <span className="shrink-0 text-right text-sm">
                 <span className="block font-semibold tabular-nums">${total.toFixed(2)}</span>
+                {(() => { const sum = doc.type === "invoice" && !doc.data.changeOrderOf && portal ? contractSummary(portal.documents as never, doc.id) : null; return sum && sum.changeOrdersTotal > 0.004 ? <span className="block text-xs font-semibold text-teal-700" data-testid="portal-updated-total">Updated total ${sum.revisedTotal.toFixed(2)} with change orders</span> : null; })()}
                 {doc.type === "invoice" && replacedNumber && <span className="mt-0.5 inline-block text-xs font-semibold text-slate-500" data-testid="portal-replaced">Replaced by {replacedNumber}</span>}
                 {doc.type === "invoice" && !replacedNumber && <span className={`mt-0.5 inline-block text-xs font-semibold ${rowOwed > 0 ? "text-amber-700 cr-text-warn" : "text-emerald-700 cr-text-good"}`}>{rowOwed > 0 ? (paid > 0.004 ? <span data-testid="portal-remaining">${paid.toFixed(2)} paid · ${rowOwed.toFixed(2)} remaining</span> : `$${rowOwed.toFixed(2)} owed`) : total > 0 ? <span data-testid="portal-paid">Paid</span> : ""}</span>}
               </span>

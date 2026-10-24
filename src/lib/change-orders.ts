@@ -74,6 +74,9 @@ export function revisionCrewRow(row: Record<string, unknown>) {
 export function revisionData(root: Doc, latest: Doc, newNumber: string, today: string, due: string, latestTotal: number) {
   const data: Record<string, unknown> = JSON.parse(JSON.stringify(latest.data || {}));
   for (const key of REVISION_NOT_COPIED) delete data[key];
+  // QA4 409 fix: fromProposal is unique per proposal in the cloud (documents_one_invoice_per_proposal), so a
+  // change order that copied it could never upload. Keep the link under a name the index ignores.
+  if (data.fromProposal) { data.proposalRef = data.fromProposal; delete data.fromProposal; }
   const latestNumber = String(latest.data?.invoiceNumber || latest.title);
   const items = (Array.isArray(latest.data?.items) ? latest.data.items : []) as Record<string, unknown>[];
   const crew = (Array.isArray(data.crew) ? data.crew : []) as Record<string, unknown>[];
@@ -188,4 +191,16 @@ export function crewHandoff<D extends Doc>(parent: D | null | undefined, rev: D)
   const next: Record<string, unknown> = { ...pData, crew: [...pCrew, ...back.filter((row) => !have.has(String(row.id)))] };
   delete next.crewMovedTo; delete next.crewMoved;
   return { parent: { ...parent, data: next }, rev };
+}
+
+/**
+ * QA4: data safe to insert into `documents`. A change order (changeOrderOf set) must not carry fromProposal,
+ * which the one-invoice-per-proposal unique index reserves for the original invoice (else 23505 → HTTP 409).
+ * Returns the same object when nothing changes.
+ */
+export function insertSafeData(type: string, data: Record<string, unknown>): Record<string, unknown> {
+  if (type !== "invoice" || !data.changeOrderOf || !data.fromProposal) return data;
+  const out: Record<string, unknown> = { ...data, proposalRef: data.proposalRef || data.fromProposal };
+  delete out.fromProposal;
+  return out;
 }

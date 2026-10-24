@@ -4,7 +4,7 @@ const dot = (text: string) => (/[.!?]$/.test(text.trim()) ? text.trim() : `${tex
 // Owner-tap follow-up drafts: quotes waiting for approval, tomorrow's appointment reminders and
 // seasonal reminders (a client who had a job around this time last year and nothing booked since).
 // Nothing here sends anything; the owner opens each draft in their own text/email app.
-import { documentStage } from "@/lib/doc-stage";
+import { docAmounts, documentStage } from "@/lib/doc-stage";
 import { readApproval } from "@/lib/approval";
 import { readEmailLog } from "@/lib/email";
 import { readSchedule } from "@/lib/schedule";
@@ -57,7 +57,7 @@ export function followUps(docs: Doc[], today: string, businessName: string, appr
       if (since < QUOTE_FOLLOWUP_DAYS) continue;
       const link = approvalUrl(doc);
       out.push({ ...base, key: `quote:${doc.id}:${sent}`, kind: "quote", sinceDays: since, subject: `Following up on your quote${base.title ? ` ${base.title}` : ""}`,
-        body: `Hi ${greetingName(clientName)}, this is ${biz(businessName)} following up on the quote we sent${base.title ? ` (${base.title})` : ""}. Any questions, or would you like to go ahead?${link ? ` You can review and approve it here: ${link}` : ""} Thank you!` });
+        body: `Hi ${greetingName(clientName)}, this is ${biz(businessName)} following up on the quote we sent${base.title ? ` (${base.title}` : ""}${docAmounts(doc).total > 0 ? `${base.title ? ", " : " ("}$${docAmounts(doc).total.toFixed(2)})` : base.title ? ")" : ""}. Any questions, or would you like to go ahead?${link ? ` You can review and approve it here: ${link}` : ""} Thank you!` });
     }
     if (doc.type === "invoice") {
       const schedule = readSchedule(data);

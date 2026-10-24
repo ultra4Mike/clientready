@@ -14,7 +14,7 @@ export function mergePto(latest: TimesheetSettings, pto: TimesheetSettings): Tim
 
 /** Plain-language summary of the PTO rules (exported for tests). */
 export function ptoPreview(s: TimesheetSettings) {
-  return s.ptoPreset === "off" || !(s.ptoPerHours > 0) ? "No paid time off is earned." : `1 h earned per ${s.ptoPerHours} h worked${s.ptoCapHours ? `, up to ${s.ptoCapHours} h` : ""}${s.ptoUseCapHours ? `, ${s.ptoUseCapHours} h usable a year` : ""}${s.ptoWaitDays ? `, after ${s.ptoWaitDays} days` : ""}.`;
+  return s.ptoPreset === "off" || !(s.ptoPerHours > 0) ? "No paid time off is earned." : `1 h earned per ${s.ptoPerHours} h worked${s.ptoCapHours ? `, up to ${s.ptoCapHours} h` : ""}${s.ptoUseCapHours ? `, ${s.ptoUseCapHours} h usable a year` : ""}${s.ptoWaitDays ? `, after ${s.ptoWaitDays} day${s.ptoWaitDays === 1 ? "" : "s"}` : ""}.`;
 }
 
 /** Patch for a preset pick (California fills the sick-leave numbers; Off/Federal stop accrual). */

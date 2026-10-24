@@ -1,3 +1,4 @@
+import { insertSafeData } from "@/lib/change-orders";
 import { clockText, conflictsForDoc } from "./conflicts";
 import { mergeHoursApprovals } from "@/lib/hours-approval";
 import { supabase } from "./supabase";
@@ -80,7 +81,18 @@ export function keepNewerSchedule(mine: { schedule?: unknown; crew?: unknown }, 
   return out;
 }
 
-export async function saveCloudDocument(doc: CloudDoc) {
+// QA4: one upload at a time per local id, so a retry racing a save can never insert the same document twice.
+const inFlight = new Map<string, Promise<string>>();
+export async function saveCloudDocument(doc: CloudDoc): Promise<string> {
+  if (isUuid(doc.id)) return saveCloudDocumentNow(doc);
+  const running = inFlight.get(doc.id);
+  if (running) return running;
+  const job = saveCloudDocumentNow(doc).finally(() => inFlight.delete(doc.id));
+  inFlight.set(doc.id, job);
+  return job;
+}
+
+async function saveCloudDocumentNow(doc: CloudDoc): Promise<string> {
   // Every save records when it happened, so cloud/local merges can keep the newer copy.
   // (Mutates doc.data so callers that store the same object locally keep the same stamp.)
   doc.data = doc.data || {};
@@ -106,6 +118,7 @@ export async function saveCloudDocument(doc: CloudDoc) {
   }
 
   if (isUuid(doc.id)) {
+    { const safe = insertSafeData(doc.type, doc.data); if (safe !== doc.data) { for (const key of Object.keys(doc.data)) delete doc.data[key]; Object.assign(doc.data, safe); } }
     // The approval block is owned by the cloud (the customer approves there, and only the share/
     // revoke actions change it), so an ordinary save always carries the cloud's current block.
     const { data: current, error: readError } = await supabase
@@ -178,6 +191,10 @@ export async function saveCloudDocument(doc: CloudDoc) {
     return doc.id;
   }
 
+  // QA4: change orders (and stuck local copies made before this fix) drop the proposal link the unique index
+  // reserves for the original invoice; the same local id is inserted once, so a retry never duplicates.
+  const safe = insertSafeData(doc.type, doc.data);
+  if (safe !== doc.data) { for (const key of Object.keys(doc.data)) delete doc.data[key]; Object.assign(doc.data, safe); }
   const { data, error: insertError } = await supabase
     .from("documents")
     .insert({

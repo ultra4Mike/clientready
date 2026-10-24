@@ -64,3 +64,18 @@ export function checklistHref(docId: string) {
 export function wantsChecklistFocus(search: string) {
   return new URLSearchParams(search).get("focus") === "checklist";
 }
+
+/** QA4: the owner ticks (or unticks) an item on the job page; ticks record who and when. */
+export function toggleChecklistItem(items: ChecklistItem[], id: string, by: string, at = new Date().toISOString()): ChecklistItem[] {
+  return items.map((item) => {
+    if (item.id !== id) return item;
+    if (item.done) { const { done: _d, doneBy: _b, doneAt: _a, ...rest } = item; void _d; void _b; void _a; return rest as ChecklistItem; }
+    return { ...item, done: true, doneBy: by, doneAt: at };
+  });
+}
+
+/** QA4: the warning shown before marking a job Done with unticked items, or "" when all are ticked. */
+export function doneChecklistWarning(items: ChecklistItem[]): string {
+  const left = checklistMissing(items);
+  return left.length ? `${left.length} checklist item${left.length === 1 ? " is" : "s are"} not ticked: ${left.map((item) => item.text).join(", ")}. Mark the job done anyway?` : "";
+}

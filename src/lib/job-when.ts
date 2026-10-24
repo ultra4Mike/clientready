@@ -18,7 +18,7 @@ export function isoDate(value: unknown) {
 
 /** The schedule a job without data.schedule gets from its Job start/end and dates, or null. */
 export function derivedWhen(data: Record<string, unknown> | undefined): JobWhen | null {
-  if (!data || !isTime(data.jobStart)) return null;
+  if (!data || !isTime(data.jobStart) || data.unscheduled) return null; // QA4: unscheduled stays off the calendar
   const crew = (Array.isArray(data.crew) ? data.crew : []) as { employeeId?: unknown; workDate?: unknown }[];
   const date = [...crew.map((row) => row.workDate), data.invoiceDate].map(isoDate).find(Boolean);
   if (!date) return null;
@@ -33,4 +33,15 @@ export function jobWhen(data: Record<string, unknown> | undefined): JobWhen | nu
     return { date: String(raw.date), startTime: isTime(raw.startTime) ? String(raw.startTime) : "", ...(isTime(raw.endTime) ? { endTime: String(raw.endTime) } : {}), workerIds: Array.isArray(raw.workerIds) ? raw.workerIds.map(String) : [], derived: false };
   }
   return derivedWhen(data);
+}
+
+const ampm = (t: string) => { const [h, m] = t.split(":").map(Number); return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`; };
+/** QA4: printouts show the job date together with its time, e.g. "Sun, Oct 25, 2026 · 9:00 AM – 11:00 AM". */
+export function whenLabel(data: Record<string, unknown> | undefined): string {
+  const when = jobWhen(data);
+  if (!when) return "";
+  const [y, mo, d] = when.date.split("-").map(Number);
+  const day = new Date(y, mo - 1, d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  const time = when.startTime ? ` · ${ampm(when.startTime)}${when.endTime ? ` – ${ampm(when.endTime)}` : ""}` : "";
+  return `${day}${time}`;
 }

@@ -5,7 +5,7 @@
  */
 import { documentTotals, amountOf } from "./discount";
 import { cashEntries, draftMoneyTaken } from "./money";
-import { effectiveAmounts } from "./change-order-revision";
+import { effectiveAmounts, isRevision, revisionLive } from "./change-order-revision";
 import { dedupeCopies } from "./doc-dedupe";
 import { isPendingRecurringDraft } from "./recurring";
 import { jobProfit } from "./job-profit";
@@ -29,6 +29,8 @@ export function isBilledInvoice(doc: Doc, allDocs: Doc[]) {
   if (doc.type !== "invoice" || isVoidOrDeleted(doc) || isPendingRecurringDraft(doc as never)) return false;
   // A draft is not billed, unless money was already taken on it (it reads Paid everywhere else).
   if (String(doc.data?.status || "draft") === "draft" && !draftMoneyTaken(doc as never)) return false;
+  // QA4: an unsent revision repeats the whole job; it is billed only once it replaces the version it revises.
+  if (isRevision(doc as never) && !revisionLive(doc as never)) return false;
   return !effectiveAmounts(allDocs as never, doc as never).replaced;
 }
 
