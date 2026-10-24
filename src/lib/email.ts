@@ -1,5 +1,7 @@
 import { supabase } from "@/lib/supabase";
-import { saveCloudDocument, type CloudDoc } from "@/lib/cloud-docs";
+import { saveCloudDocument, getUserId, isUuid, type CloudDoc } from "@/lib/cloud-docs";
+import { writeBases } from "@/lib/three-way";
+import { markSynced } from "@/lib/sync-status";
 import { greetingName, reminderSubject, reminderText } from "@/lib/reminders";
 
 /**
@@ -95,23 +97,60 @@ export function readEmailLog(value: unknown): EmailLogEntry[] {
   return Array.isArray(value) ? (value.filter((entry) => entry && typeof entry === "object" && (entry as EmailLogEntry).sentAt) as EmailLogEntry[]) : [];
 }
 
+/** History line for a draft the owner marked sent while emailing it. */
+export function markedSentAction(via: EmailLogEntry["via"]) {
+  return via === "mailto" ? "Marked sent (sent from email app)" : "Marked sent (emailed from ClientReady)";
+}
+
 /**
  * Adds one entry to the document's email log (data.emailLog). The status changes only when the owner
- * ticked "mark as sent" and the document is still a draft. Money fields are never touched.
+ * ticked "mark as sent" and the document is still a draft; that also appends a history entry. Money fields
+ * are never touched. Same path for app sends and "Open in email app".
+ *
+ * Retest bug: the old version set status on a possibly stale local copy and went through the field merge,
+ * which treats a stale copy's fields as "unchanged" so the cloud's "draft" won and Sent was dropped. Now the
+ * change is applied to the cloud's current copy (cloud first, like approvals) and only these fields change.
  */
-export async function logEmail(docId: string, entry: EmailLogEntry, markSent: boolean) {
+export async function logEmail(docId: string, entry: EmailLogEntry, markSent: boolean, byName = "") {
   const raw = window.localStorage.getItem("clientready-documents");
   const docs = raw ? (JSON.parse(raw) as CloudDoc[]) : [];
   const doc = docs.find((item) => item.id === docId);
   if (!doc) return null;
-  const data = { ...(doc.data || {}) };
-  data.emailLog = [...readEmailLog(data.emailLog), entry];
-  const markedSent = markSent && (data.status || "draft") === "draft";
-  if (markedSent) data.status = "sent";
-  const next = { ...doc, data };
+  const apply = (source: Record<string, unknown>, byId?: string) => {
+    const data: Record<string, unknown> = { ...source };
+    data.emailLog = [...readEmailLog(data.emailLog), entry];
+    const markedSent = markSent && String(data.status || "draft") === "draft";
+    if (markedSent) {
+      data.status = "sent";
+      const history = Array.isArray(data.history) ? data.history : [];
+      data.history = [...history, { at: entry.sentAt, by: byName.trim() || "Owner", ...(byId ? { byId } : {}), action: markedSentAction(entry.via) }];
+    }
+    data.updatedAt = new Date().toISOString();
+    return { data, markedSent };
+  };
+  const userId = isUuid(docId) ? await getUserId() : null;
+  if (userId) {
+    const { data: row, error } = await supabase.from("documents").select("data").eq("id", docId).eq("user_id", userId).maybeSingle();
+    if (!error && row) {
+      const result = apply((row.data as Record<string, unknown> | null) || {}, userId);
+      const { error: writeError } = await supabase.from("documents").update({ data: result.data }).eq("id", docId).eq("user_id", userId);
+      if (!writeError) {
+        const next = { ...doc, data: result.data };
+        const latestRaw = window.localStorage.getItem("clientready-documents");
+        const latest = latestRaw ? (JSON.parse(latestRaw) as CloudDoc[]) : docs;
+        window.localStorage.setItem("clientready-documents", JSON.stringify(latest.map((item) => (item.id === docId ? next : item))));
+        writeBases([{ id: docId, data: result.data }]);
+        markSynced(docId);
+        return { log: result.data.emailLog as EmailLogEntry[], markedSent: result.markedSent, history: result.data.history };
+      }
+    }
+  }
+  // Offline / local-only: change the local copy and save it the normal way (uploaded later if unreachable).
+  const result = apply((doc.data || {}) as Record<string, unknown>);
+  const next = { ...doc, data: result.data };
   await saveCloudDocument(next);
   const latestRaw = window.localStorage.getItem("clientready-documents");
   const latest = latestRaw ? (JSON.parse(latestRaw) as CloudDoc[]) : docs;
   window.localStorage.setItem("clientready-documents", JSON.stringify(latest.map((item) => (item.id === docId ? next : item))));
-  return { log: data.emailLog as EmailLogEntry[], markedSent };
+  return { log: next.data.emailLog as EmailLogEntry[], markedSent: result.markedSent, history: next.data.history };
 }

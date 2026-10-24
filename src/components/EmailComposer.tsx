@@ -24,7 +24,7 @@ type Props = {
   contactName?: string;
   clientCompany?: string;
   log: EmailLogEntry[];
-  onLogged: (log: EmailLogEntry[], markedSent: boolean) => void;
+  onLogged: (log: EmailLogEntry[], markedSent: boolean, history?: unknown) => void;
   onClose?: () => void;
 };
 
@@ -68,8 +68,8 @@ export default function EmailComposer(props: Props) {
 
   async function record(via: EmailLogEntry["via"], id = "") {
     const entry: EmailLogEntry = { sentAt: new Date().toISOString(), to: to.trim(), subject: subject.trim(), kind, via, ...(id ? { id } : {}) };
-    const result = await logEmail(props.docId, entry, canMarkSent && markSent);
-    if (result) props.onLogged(result.log, result.markedSent);
+    const result = await logEmail(props.docId, entry, canMarkSent && markSent, props.ownerName || "");
+    if (result) props.onLogged(result.log, result.markedSent, result.history);
     return result;
   }
 

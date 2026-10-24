@@ -1978,9 +1978,9 @@ export default function NewInvoicePage() {
                 ownerName={ownerName}
                 approvalToken={approval?.token}
                 log={emailLog}
-                onLogged={(log, markedSent) => {
+                onLogged={(log, markedSent, history) => {
                   setEmailLog(log);
-                  if (markedSent) setStatus("sent");
+                  if (markedSent) { setStatus("sent"); setDocHistory(readHistory(history)); setSaveMessage("Marked as sent. Added to the document history."); }
                 }}
                 onClose={() => setEmailOpen(false)}
               />
