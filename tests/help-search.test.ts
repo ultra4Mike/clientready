@@ -90,9 +90,22 @@ test("Deploy 9 help: multi-day jobs, Holiday, FLSA label, alerts wording", async
   assert.match(by["tt-owner-pto"], /Add time off \(PTO \/ Sick \/ Holiday\)/); assert.match(by["tt-owner-pto"], /never comes out of the PTO balance/);
   assert.match(by["tt-owner-pto"], /Count holiday hours toward overtime/);
   assert.match(by["tt-owner-flsa-nonhourly"], /\(multiplier - 1\) x regular rate after N h/); assert.doesNotMatch(by["tt-owner-flsa-nonhourly"], /still says/);
-  assert.match(by["tt-owner-alerts"], /No tap recorded/); assert.match(by["tt-owner-alerts"], /unapprove or reopen/); assert.doesNotMatch(by["tt-owner-alerts"], /Resolved/);
+  assert.match(by["tt-owner-alerts"], /No tap recorded/); assert.match(by["tt-owner-alerts"], /unapprove or reopen/); assert.match(by["tt-owner-alerts"], /Resolved \(n\)/);
   for (const a of HELP_ARTICLES) assert.doesNotMatch(JSON.stringify(a), /\[TODO/, a.id);
   const ids = new Set(HELP_ARTICLES.map((a) => a.id)); assert.equal(ids.size, HELP_ARTICLES.length);
   for (const a of HELP_ARTICLES) for (const r of a.related || []) assert.ok(ids.has(r), `${a.id} → ${r}`);
   assert.ok(hay("add day").includes("multi-day-jobs"));
+});
+test("Help deploy 10: booking, Reports & Taxes, Resolved, tips, offline login", () => {
+  const ids = new Set(HELP_ARTICLES.map((a) => a.id));
+  for (const id of ["online-booking", "reports", "reports-add-expense", "portal-tips", "ts-cant-reach-server", "tt-owner-alerts"]) assert.ok(ids.has(id), id);
+  for (const a of HELP_ARTICLES) for (const r of a.related || []) assert.ok(ids.has(r), `${a.id} → ${r}`);
+  const text = JSON.stringify(HELP_ARTICLES);
+  assert.ok(!text.includes("[TODO]"));
+  for (const s of ["Online booking isn't available for this business.", "Thanks! Your request was received.", "Mark handled", "Payroll & contractors", "Accountant / Export", "Add expense", "Resolved (n)", "They clear at the end of the pay period.", "A tip is charged separately and is not part of the invoice total or tax.", "Can't reach the server. Check your connection and try again."]) assert.ok(text.includes(s), s);
+  assert.ok(hay("booking").includes("online-booking"));
+  assert.ok(hay("tip").includes("portal-tips"));
+  assert.ok(hay("business expense").includes("reports-add-expense"));
+  assert.ok(hay("failed to fetch").includes("ts-cant-reach-server"));
+  assert.ok(hay("resolved").includes("tt-owner-alerts"));
 });
