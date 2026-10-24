@@ -69,6 +69,7 @@ function readDocsForDraftCheck() {
 import RestoreDraftBanner from "@/components/RestoreDraftBanner";
 import FormDraft from "@/components/FormDraft";
 import ScheduleEditor from "@/components/ScheduleEditor";
+import { checklistMissing, checklistNeedsPhoto, wantsChecklistFocus } from "@/lib/checklist";
 import { entryHours, fmtHours, hoursByWorker, ownerEditClock, fixTimeProblem, crewFixReason, refreshOwnerClock, type ClockEntry } from "@/lib/clock";
 import { allDayWorkerIds, jobDays } from "@/lib/job-days";
 import { confirmRemoval, jobDonePhotos, crewForWorkers, followSchedule, jobScheduleFromForm, crewIds, workLogged, clockHoursFor, dedupeWorkerIds, readSchedule, readScheduleDays, readWorkers, shiftScheduleDays, saveAssignment, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
@@ -322,6 +323,15 @@ export default function NewInvoicePage() {
   // R83: photos the crew took when marking the job done.
   const [crewPhotos, setCrewPhotos] = useState<Awaited<ReturnType<typeof jobDonePhotos>>>([]);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
+  // D30: ?focus=checklist (from the calendar badge) opens and scrolls to the checklist; photo items highlight the photos area.
+  const [checklistFocus] = useState(() => typeof window !== "undefined" && wantsChecklistFocus(window.location.search));
+  const photoNeeded = checklistMissing(schedule?.checklist || []).some(checklistNeedsPhoto);
+  const checklistScrolled = useRef(false);
+  useEffect(() => {
+    if (!checklistFocus || checklistScrolled.current || !schedule) return;
+    checklistScrolled.current = true;
+    window.setTimeout(() => document.getElementById("checklist")?.scrollIntoView({ block: "center", behavior: "smooth" }), 250);
+  }, [checklistFocus, schedule]);
   useEffect(() => { let live = true; if (docId) jobDonePhotos(docId).then((rows) => live && setCrewPhotos(rows)).catch(() => {}); else setCrewPhotos([]); return () => { live = false; }; }, [docId]);
   // R81: always re-read the team from the cloud once, so "+ Add crew" sees everyone Active.
   useEffect(() => { refreshEmployeesCache().then((ok) => { if (ok) setWorkers(readWorkers()); }).catch(() => {}); }, []);
@@ -1523,7 +1533,7 @@ export default function NewInvoicePage() {
               <label className="text-sm text-slate-600">Job end<input type="time" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={jobEnd} onChange={(event) => setJobEnd(event.target.value)} /></label>
             </div>
             </Section>
-            <Section id="schedule" label="Schedule" className="print-hide space-y-3 rounded-xl border border-slate-200 p-4 text-sm sm:p-5" testId="schedule-section">
+            <Section id="schedule" forceOpen={checklistFocus || checklistMissing(schedule?.checklist || []).length > 0} label="Schedule" className="print-hide space-y-3 rounded-xl border border-slate-200 p-4 text-sm sm:p-5" testId="schedule-section">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-semibold">Schedule</p>
                 {schedule && <span className="text-xs" data-testid="schedule-summary">{schedule.date}{schedule.startTime ? ` ${schedule.startTime}` : ""}{schedule.endTime ? `–${schedule.endTime}` : ""}{jobDays(schedule, crew).length > 1 ? ` · ${jobDays(schedule, crew).length} days` : ""} · {STATUS_LABEL[schedule.status]}</span>}
@@ -1633,7 +1643,7 @@ export default function NewInvoicePage() {
             {!isProposal && <StageEditor stages={stages} onChange={(next) => { setStages(next); /* Overdue v2: header Due date follows the last stage date. */ const last = effectiveDueDate({ stages: next }); if (next.length && last) setDueDate(last); }} total={totals.total} balance={totals.balance} dueDate={dueDate} />}
             </Section>
             <p className="cr-group-heading">Payments</p>
-            <Section id="pay-photos" label="Payment, photos and notes" className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
+            <Section id="pay-photos" forceOpen={photoNeeded} label="Payment, photos and notes" className={`space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5 scroll-mt-24 ${photoNeeded ? "outline outline-2 outline-offset-2 outline-amber-400" : ""}`} testId={photoNeeded ? "photos-needed" : undefined}>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Payment, photos & notes</h2>
             {!isProposal && (
               <label className="block text-sm font-medium text-slate-600">

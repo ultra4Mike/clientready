@@ -48,13 +48,15 @@ export function useOpenedExisting() {
   );
 }
 
-export default function Section({ id, label, summary, className = "", testId, headerFirst = true, children }: {
+export default function Section({ id, label, summary, className = "", testId, headerFirst = true, forceOpen = false, children }: {
   id: string;
   label: string;
   summary?: ReactNode;
   className?: string;
   testId?: string;
   headerFirst?: boolean;
+  /** Show the body even if the user collapsed it (e.g. ?focus=checklist). */
+  forceOpen?: boolean;
   children: ReactNode;
 }) {
   const defaults = useContext(SectionDefaults);
@@ -66,7 +68,7 @@ export default function Section({ id, label, summary, className = "", testId, he
   } catch {
     stored = undefined;
   }
-  const collapsed = stored ?? defaults.collapsed.includes(id);
+  const collapsed = forceOpen ? false : stored ?? defaults.collapsed.includes(id);
   const bodyId = useId();
   const items = Children.toArray(children);
   const header = headerFirst ? items[0] : null;

@@ -38,3 +38,29 @@ export function checklistProgress(items: ChecklistItem[]) {
   const done = items.filter((item) => item.done).length;
   return { done, total: items.length, complete: done === items.length };
 }
+
+/** Items not ticked yet, in order. */
+export function checklistMissing(items: ChecklistItem[]) {
+  return items.filter((item) => !item.done);
+}
+
+/** True when an item asks for a photo (it is completed with the job photos). */
+export function checklistNeedsPhoto(item: Pick<ChecklistItem, "text">) {
+  return /\b(photos?|pictures?|pics?|snapshots?|images?)\b/i.test(item.text);
+}
+
+/** "Needs completing: A, B" (or "" when complete). */
+export function checklistNote(items: ChecklistItem[]) {
+  const missing = checklistMissing(items);
+  return missing.length ? `Needs completing: ${missing.map((item) => item.text).join(", ")}` : "";
+}
+
+/** Link from a calendar badge straight to the document's checklist. */
+export function checklistHref(docId: string) {
+  return `/invoice?id=${encodeURIComponent(docId)}&focus=checklist#checklist`;
+}
+
+/** Whether a URL search string asks to focus the checklist. */
+export function wantsChecklistFocus(search: string) {
+  return new URLSearchParams(search).get("focus") === "checklist";
+}
