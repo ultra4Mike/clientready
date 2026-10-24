@@ -10,6 +10,7 @@ import { docAmounts, NEXT_LABEL, STAGE_LABEL, STAGES } from "@/lib/doc-stage";
 import { readEmailLog, type EmailLogEntry } from "@/lib/email";
 import { clientIdFor } from "@/lib/portal";
 import { StageEditor, StageSchedule } from "@/components/StageSchedule";
+import { sourceDepositPercent } from "@/lib/stages";
 import { balanceLabel, readStages, type Stage } from "@/lib/stages";
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
 import { liveItems, type ItemTextField } from "@/lib/live-items";
@@ -294,7 +295,7 @@ export default function NewInvoicePage() {
   const [showPhotos, setShowPhotos] = useState(false);
   const [stages, setStages] = useState<Stage[]>([]);
   const [changeOrderOf, setChangeOrderOf] = useState<ChangeOrderOf | null>(null);
-  const [fromProposal, setFromProposal] = useState<{ id: string; number: string } | null>(null);
+  const [fromProposal, setFromProposal] = useState<{ id: string; number: string; depositPercent?: string } | null>(null);
   const [madeInvoices, setMadeInvoices] = useState<{ id: string; number: string }[]>([]);
   const [changeOrderNotes, setChangeOrderNotes] = useState<ChangeOrderNote[]>([]);
   const [recFreq, setRecFreq] = useState<Frequency | "off">("off");
@@ -640,7 +641,7 @@ export default function NewInvoicePage() {
         const raw = data as Record<string, unknown>;
         setRevision(kind === "invoice" && raw.coMode === "revision" ? { coMode: "revision", revises: (raw.revises || {}) as Record<string, unknown> } : null);
       }
-      setFromProposal(kind === "invoice" && data.fromProposal?.id ? { id: String(data.fromProposal.id), number: String(data.fromProposal.number || "proposal") } : null);
+      setFromProposal(kind === "invoice" && data.fromProposal?.id ? { id: String(data.fromProposal.id), number: String(data.fromProposal.number || "proposal"), ...((data.fromProposal as { depositPercent?: unknown }).depositPercent ? { depositPercent: String((data.fromProposal as { depositPercent?: unknown }).depositPercent) } : {}) } : null);
       // Invoices already made from this proposal (the proposal itself is never changed).
       setMadeInvoices(kind === "proposal" ? (docs as unknown as { id: string; type: string; title: string; data?: { invoiceNumber?: string; fromProposal?: { id?: string } } }[])
         .filter((item) => item.type === "invoice" && item.data?.fromProposal?.id === doc.id)
@@ -764,8 +765,10 @@ export default function NewInvoicePage() {
     // R115: every new payment row defaults to what is still owed (total minus the rows already there).
     setPayments((current) => {
       const left = Math.max(0, Math.round((totals.total - paidTotal(current)) * 100) / 100);
-      const amount = isProposal && !current.length && deposit ? deposit : left;
-      return [...current, { id: Date.now().toString(), amount: amount > 0 ? amount.toFixed(2) : "", method: "Cash", date: ymd(new Date()), ref: "" }];
+      void left; void deposit;
+      // QA2: a new row starts blank (amount and Method "Choose…"), so a stray tap can't record a full payment.
+      // The suggested amount shows as the placeholder with a one-tap "Use $X" fill; the blank-method block stays.
+      return [...current, { id: Date.now().toString(), amount: "", method: "", date: ymd(new Date()), ref: "" }];
     });
   }
   const lateFee = isProposal || !docId ? null : suggestedLateFee({ settings: lateFeeSettings, status, dueDate, balance: totals.balance, items, today: ymd(new Date()), skip: noLateFee });
@@ -1341,7 +1344,7 @@ export default function NewInvoicePage() {
       data: {
         clientName, ...(docClientId ? { clientId: docClientId } : {}), clientCompany, clientEmail, clientPhone, clientAddress,
         invoiceNumber: number, invoiceDate: ymd(new Date()), dueDate: plusDays(defaultInvoiceTerms().days),
-        jobStart, jobEnd, notes: defaultInvoiceTerms().notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(copyDeposit ? payments : []), signature: null, proposalSignature: signature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), fromProposal: { id: proposalId, number: invoiceNumber || "Proposal", ...(copyDeposit ? { depositApplied: true } : {}) }, items,
+        jobStart, jobEnd, notes: defaultInvoiceTerms().notes, taxPercent, discountType, discountValue, discountAmount: totals.discount.toFixed(2), ...paymentFields(copyDeposit ? payments : []), signature: null, proposalSignature: signature, payLink: docPayLink, photos, ...(showPhotos && photos.length ? { showPhotos: true } : {}), fromProposal: { id: proposalId, number: invoiceNumber || "Proposal", ...(Number(depositPercent) > 0 && Number(depositPercent) < 100 ? { depositPercent: String(Number(depositPercent)) } : {}), ...(copyDeposit ? { depositApplied: true } : {}) }, items,
         status: "draft", style, jobTime, jobCosts: { ...costs, labor, otherFees }, crew,
       },
     };
@@ -1516,7 +1519,7 @@ export default function NewInvoicePage() {
             <Section id="details" label="Details" className="space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600">Details & schedule</h2>
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder={isProposal ? "Proposal number" : "Invoice number"} value={invoiceNumber} onChange={(event) => setInvoiceNumber(event.target.value)} />
-            <select className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={status} onChange={(event) => setStatus(event.target.value)}>
+            <select className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={!isProposal && status === "draft" && totals.paid > 0 && totals.balance <= 0.004 ? "paid" : status} data-testid="doc-status-select" onChange={(event) => setStatus(event.target.value)}>
               <option value="draft">Draft</option>
               <option value="sent">Sent</option>
               {isProposal ? <option value="accepted">Accepted</option> : <><option value="paid">Paid</option><option value="overdue">Overdue</option><option value="void">Void</option></>}
@@ -1629,8 +1632,14 @@ export default function NewInvoicePage() {
               </div>
               {payments.map((payment) => (
                 <div key={payment.id} className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-2">
-                  <label className="text-sm font-medium text-slate-600">Amount paid<input className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 text-right tabular-nums" inputMode="decimal" placeholder="300" value={payment.amount} onChange={(event) => updatePayment(payment.id, { amount: event.target.value })} /></label>
-                  <label className="text-sm font-medium text-slate-600">Method<select className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" data-testid="payment-method" data-missing={!payment.method && Number(payment.amount) > 0 ? "true" : undefined} title={!payment.method && Number(payment.amount) > 0 ? "Saved before methods were required. Pick one if you know it." : undefined} value={payment.method} onChange={(event) => updatePayment(payment.id, { method: event.target.value })}><option value="">Choose…</option>{(payment.method && !paymentMethods.includes(payment.method) ? [payment.method, ...paymentMethods] : paymentMethods).map((method) => <option key={method} value={method}>{methodLabel(method)}</option>)}</select></label>
+                  {(() => {
+                    const others = payments.filter((row) => row.id !== payment.id);
+                    const owed = Math.max(0, Math.round((totals.total - paidTotal(others)) * 100) / 100);
+                    const dep = isProposal && Number(depositPercent) > 0 && payments[0]?.id === payment.id ? Math.round(totals.total * Number(depositPercent)) / 100 : 0;
+                    const suggest = dep || owed;
+                    return <label className="text-sm font-medium text-slate-600">Amount paid<input data-testid="payment-amount" className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 text-right tabular-nums" inputMode="decimal" placeholder={suggest > 0 ? suggest.toFixed(2) : "300"} value={payment.amount} onChange={(event) => updatePayment(payment.id, { amount: event.target.value })} />{!payment.amount.trim() && suggest > 0 && <button type="button" data-testid="payment-fill-suggested" className="mt-1 min-h-9 text-xs font-semibold text-teal-700 underline dark:text-teal-300" onClick={() => updatePayment(payment.id, { amount: suggest.toFixed(2) })}>Use ${suggest.toFixed(2)}{dep ? " (deposit)" : " (balance)"}</button>}</label>;
+                  })()}
+                  <label className="text-sm font-medium text-slate-600">Method<select className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" data-testid="payment-method" data-missing={!payment.method && Number(payment.amount) > 0 ? "true" : undefined} title={!payment.method && Number(payment.amount) > 0 ? "Pick how this was paid." : undefined} value={payment.method} onChange={(event) => updatePayment(payment.id, { method: event.target.value })}><option value="">Choose…</option>{(payment.method && !paymentMethods.includes(payment.method) ? [payment.method, ...paymentMethods] : paymentMethods).map((method) => <option key={method} value={method}>{methodLabel(method)}</option>)}</select></label>
                   <label className="text-sm font-medium text-slate-600">Date paid<input type="date" className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={payment.date} onChange={(event) => updatePayment(payment.id, { date: event.target.value })} /></label>
                   <label className="text-sm font-medium text-slate-600 sm:col-span-2">Reference / note<input className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Check number, confirmation, last 4" value={payment.ref} onChange={(event) => updatePayment(payment.id, { ref: event.target.value })} /></label>
                   <label className="text-sm font-medium text-slate-600">Tip (optional, not part of the bill)<input name="paymentTip" data-testid="payment-tip" className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 text-right tabular-nums" inputMode="decimal" placeholder="0.00" value={payment.tip || ""} onChange={(event) => updatePayment(payment.id, { tip: event.target.value })} /></label>
@@ -1643,7 +1652,7 @@ export default function NewInvoicePage() {
                 <p className="text-right"><span className="block text-sm font-medium text-slate-600">{isProposal && totals.paid > 0 ? "Balance after deposit" : balanceLabel(totals.paid, totals.balance)}</span><span data-testid="still-owed" className={`text-2xl font-bold tabular-nums ${totals.balance <= 0.004 && totals.paid > 0 ? "text-emerald-700 dark:text-emerald-300" : ""}`}>${totals.balance.toFixed(2)}</span></p>
               </div>
             </Section>
-            {!isProposal && <StageEditor stages={stages} onChange={(next) => { setStages(next); /* Overdue v2: header Due date follows the last stage date. */ const last = effectiveDueDate({ stages: next }); if (next.length && last) setDueDate(last); }} total={totals.total} balance={totals.balance} dueDate={dueDate} />}
+            {!isProposal && <StageEditor stages={stages} onChange={(next) => { setStages(next); /* Overdue v2: header Due date follows the last stage date. */ const last = effectiveDueDate({ stages: next }); if (next.length && last) setDueDate(last); }} total={totals.total} balance={totals.balance} dueDate={dueDate} depositPercent={sourceDepositPercent(fromProposal, docsForStage())} />}
             </Section>
             <p className="cr-group-heading">Payments</p>
             <Section id="pay-photos" forceOpen={photoNeeded} label="Payment, photos and notes" className={`space-y-3 rounded-xl border border-slate-200 p-4 sm:p-5 scroll-mt-24 ${photoNeeded ? "outline outline-2 outline-offset-2 outline-amber-400" : ""}`} testId={photoNeeded ? "photos-needed" : undefined}>

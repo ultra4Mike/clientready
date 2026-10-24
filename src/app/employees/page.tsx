@@ -252,6 +252,7 @@ export default function EmployeesPage() {
   return (
     <AppShell title="Team">
       <PageHeader title="Team" subtitle="Add the email they will use to log in. That email opens the crew page, not the owner books." />
+      <p className="-mt-2 mb-4 text-sm"><a href="/crew?preview=sample" data-testid="crew-preview-sample" className="font-medium text-teal-700 underline dark:text-teal-300">Preview the crew page with a sample worker</a> (nothing is saved or sent).</p>
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(340px,400px)_minmax(0,1fr)] xl:grid-cols-[minmax(360px,420px)_minmax(0,1fr)]">
       <div className="order-2 min-w-0 lg:order-none lg:sticky lg:top-20">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Add or edit a person</h2>
@@ -368,6 +369,7 @@ export default function EmployeesPage() {
             <p className="mt-1 text-sm text-[var(--cr-muted)]">{person.email || "No login email"}</p>
             <p className="text-sm text-[var(--cr-muted)]">{person.phone}</p>
             <div className="mt-4 flex flex-wrap gap-2 border-t border-teal-500/10 pt-3">
+              <a href={`/crew?preview=${encodeURIComponent(person.id)}`} data-testid={`crew-preview-${person.id}`} title="See their crew page. Nothing is saved, no invite or email." className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400 max-sm:min-h-11">Preview as crew</a>
               <button type="button" onClick={() => edit(person)} className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400 max-sm:min-h-11">Edit</button>
               <button type="button" onClick={() => setActive(person, !person.active)} className="rounded-lg border border-teal-500/30 px-3 py-1.5 text-sm font-medium transition hover:border-teal-400 max-sm:min-h-11">
                 {person.active ? "Mark inactive" : "Mark active"}

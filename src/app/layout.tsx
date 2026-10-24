@@ -35,7 +35,7 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: NATIVE_CLASS_SCRIPT + `try{var t=/^\\/(approve|portal|receipt)(\\/|$)/.test(location.pathname)?'light':(localStorage.getItem('clientready-theme')||'dark');var r=document.documentElement;r.classList.toggle('dark',t==='dark');r.classList.toggle('light',t==='light');}catch(e){}`,
+            __html: NATIVE_CLASS_SCRIPT + `try{var t;if(/^\\/(approve|portal|receipt|collect)(\\/|$)/.test(location.pathname)){var p=localStorage.getItem('clientready-portal-theme');t=(p==='light'||p==='dark')?p:(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}else{t=localStorage.getItem('clientready-theme')||'dark';}var r=document.documentElement;r.classList.toggle('dark',t==='dark');r.classList.toggle('light',t==='light');}catch(e){}`,
           }}
         />
       </head>

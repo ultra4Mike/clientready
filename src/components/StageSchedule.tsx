@@ -60,7 +60,9 @@ export function StageSchedule({ stages, total, balance, muted = "text-slate-600"
 }
 
 /** Owner editor for the stages. Shows each stage's amount and warns when they don't add up to the total. */
-export function StageEditor({ stages, onChange, total, balance, dueDate = "" }: { stages: Stage[]; onChange: (stages: Stage[]) => void; total: number; balance: number; dueDate?: string }) {
+export function StageEditor({ stages, onChange, total, balance, dueDate = "", depositPercent = 0 }: { stages: Stage[]; onChange: (stages: Stage[]) => void; total: number; balance: number; dueDate?: string; depositPercent?: number }) {
+  // QA2: the deposit suggestion uses the source proposal's deposit % when it had one; 30% only otherwise.
+  const pct = depositPercent > 0 && depositPercent < 100 ? depositPercent : 30;
   const plan = stagePlan(total, balance, stages, todayYmd());
   const field = "mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm";
   const update = (id: string, patch: Partial<Stage>) => onChange(stages.map((stage) => (stage.id === id ? { ...stage, ...patch } : stage)));
@@ -70,7 +72,7 @@ export function StageEditor({ stages, onChange, total, balance, dueDate = "" }: 
   function add() {
     const kind = stages.length === 0 ? "deposit" : "final";
     const next = stages.map((stage) => (stage.kind === "final" ? { ...stage, kind: "progress" as const } : stage));
-    onChange([...next, { id: `${Date.now()}`, label: "", kind, mode: "amount", value: kind === "deposit" ? (Math.round(total * 30) / 100).toFixed(2) : "", dueDate: "" }]);
+    onChange([...next, { id: `${Date.now()}`, label: "", kind, mode: "amount", value: kind === "deposit" ? (Math.round(total * pct) / 100).toFixed(2) : "", dueDate: "" }]);
   }
   return (
     <div className="space-y-2 rounded-xl border border-slate-200 p-4" data-testid="stage-editor">
@@ -84,10 +86,10 @@ export function StageEditor({ stages, onChange, total, balance, dueDate = "" }: 
       </>; })()}
       <PlanMaker total={total} balance={balance} hasStages={stages.length > 0} onMake={onChange} />
       {stages.length === 0 && balance > 0.004 && (
-        <button type="button" data-testid="stage-preset-deposit" onClick={() => onChange(asAmounts(depositRemainderStages(30, todayYmd(), dueDate, total - balance)))} className="tap min-h-11 w-full rounded-lg border border-teal-500/50 bg-teal-500/5 px-4 py-2.5 text-left text-sm font-semibold leading-snug text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">
+        <button type="button" data-testid="stage-preset-deposit" onClick={() => onChange(asAmounts(depositRemainderStages(pct, todayYmd(), dueDate, total - balance)))} className="tap min-h-11 w-full rounded-lg border border-teal-500/50 bg-teal-500/5 px-4 py-2.5 text-left text-sm font-semibold leading-snug text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">
           {total - balance > 0.004
             ? <>Use the ${(total - balance).toFixed(2)} already paid as the deposit + remaining balance ${balance.toFixed(2)} {dueDate ? `due ${dueDate}` : "later"}</>
-            : <>Deposit now + remaining balance {dueDate ? `due ${dueDate}` : "later"} <span className="font-normal text-slate-500">(${(Math.round(total * 30) / 100).toFixed(2)} deposit, edit below)</span></>}
+            : <>Deposit now + remaining balance {dueDate ? `due ${dueDate}` : "later"} <span className="font-normal text-slate-500">(${pct}% · ${(Math.round(total * pct) / 100).toFixed(2)} deposit, edit below)</span></>}
         </button>
       )}
       {stages.length === 0 && <p className="text-xs text-slate-500">Split this invoice into deposit / progress / final payments with due dates. The invoice total does not change.</p>}

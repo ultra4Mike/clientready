@@ -183,3 +183,13 @@ export function asAmountStage(stage: Stage, amount: number): Stage {
   if (stage.kind === "final" && stage.value.trim() === "") return { ...stage, mode: "amount" };
   return { ...stage, mode: "amount", value: round(amount).toFixed(2) };
 }
+
+/** QA2: the deposit % of the proposal an invoice was made from (0 = none, use the default). */
+export function sourceDepositPercent(fromProposal: { id?: string; depositPercent?: unknown } | null | undefined, docs: { id?: string; type?: string; data?: Record<string, unknown> }[]) {
+  const ok = (v: unknown) => { const n = Number(String(v ?? "").replace(/[^0-9.]/g, "")); return n > 0 && n < 100 ? n : 0; };
+  if (!fromProposal?.id) return 0;
+  const own = ok(fromProposal.depositPercent);
+  if (own) return own;
+  const proposal = docs.find((doc) => doc.id === fromProposal.id);
+  return proposal ? ok(proposal.data?.depositPercent) : 0;
+}

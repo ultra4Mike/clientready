@@ -22,6 +22,7 @@ import { compressPhoto } from "@/lib/photos";
 import CrewVisitNote from "@/components/CrewVisitNote";
 import { compressImage, crewClockIn, crewClockOut, crewEditClock, fixTimeProblem, entryHours, withQueuedClock, fmtHours, fmtTimer, type ClockEntry } from "@/lib/clock";
 import BrandMark from "@/components/BrandMark";
+import { mayPreview, parseCrewPreview, previewClockTap, readPreviewClock, sampleJobs, stripPay, type CrewPreview } from "@/lib/crew-preview";
 
 type Client = { id: string; name: string; phone: string; address: string };
 type Job = {
@@ -186,6 +187,8 @@ export default function CrewPage() {
   useEffect(() => setMounted(true), []);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [resync, setResync] = useState(0);
+  // Owner "Preview as crew": nothing is sent to the server; taps go to a separate on-device store.
+  const [preview, setPreview] = useState<(CrewPreview & { label: string }) | null>(null);
   const [name, setName] = useState("");
   const [ownerId, setOwnerId] = useState("");
   const [employeeId, setEmployeeId] = useState("");
@@ -233,6 +236,13 @@ export default function CrewPage() {
     if (!user) {
       window.location.href = "/login";
       return;
+    }
+    const wanted = parseCrewPreview(window.location.search);
+    if (wanted) {
+      const { data: me2 } = await supabase.rpc("is_crew_email");
+      const crewRow = (Array.isArray(me2) ? me2[0] : me2) as { user_id?: string } | null;
+      if (mayPreview(user.id, crewRow)) { await loadPreview(wanted, user.id); return; }
+      // Someone on another owner's crew: ignore ?preview and use the normal crew page.
     }
     // Only people on a crew list use this page. An owner who isn't on any employee list (their own
     // included) goes to the dashboard before anything is loaded or shown.
@@ -370,8 +380,32 @@ export default function CrewPage() {
     return error ? error.message : "";
   }
 
+  async function loadPreview(wanted: CrewPreview, uid: string) {
+    setOffline(false); setUserId(""); setEmail(""); setEmployeeId(""); setOwnerId(uid);
+    const day = ymdTz(new Date());
+    let label = "Sample worker";
+    let rows: Job[] = sampleJobs(day) as unknown as Job[];
+    if (wanted.mode === "worker") {
+      // Owner access (RLS): only this owner's own employees can be read. No invite, no email.
+      const { data: emp } = await supabase.from("employees").select("id,name,email").eq("id", wanted.employeeId).eq("user_id", uid).maybeSingle();
+      if (emp?.email) {
+        label = String(emp.name || "Worker");
+        const mail = String(emp.email).toLowerCase();
+        const { data: jobRows } = await supabase.from("crew_jobs").select("*").order("job_date", { ascending: true });
+        rows = ((jobRows || []) as (Job & { worker_email?: string })[]).filter((r) => String(r.worker_email || "").toLowerCase() === mail).map((r) => stripPay(r as unknown as Record<string, unknown>) as unknown as Job);
+      } else label = "Sample worker (that worker was not found)";
+    }
+    setPreview({ ...wanted, label });
+    setName(label); setJobs(rows); setExpenses([]); setDrafts([]); setClients([]);
+    setClock(readPreviewClock() as unknown as ClockEntry[]);
+  }
+
   /** One key per upload, used for the first try and every retry, so the server never adds it twice. */
   async function sendOrQueue(kind: QueueKind, docId: string, payload: Record<string, unknown>, send: (key: string) => Promise<string>) {
+    if (preview) {
+      if (kind === "clock-in" || kind === "clock-out") setClock(previewClockTap(kind, docId, String(payload.at)) as unknown as ClockEntry[]);
+      return { error: "", queued: false };
+    }
     const key = newUploadKey();
     const error = navigator.onLine ? await send(key).catch((reason: unknown) => String((reason as Error)?.message || reason)) : "offline";
     if (!error || !isNetworkError(error === "offline" ? "failed to fetch" : error)) return { error, queued: false };
@@ -385,6 +419,12 @@ export default function CrewPage() {
   }
 
   async function act(key: string, work: () => Promise<string>, done: string) {
+    if (preview) {
+      // Clock taps update the preview store; every other tap is shown but not saved.
+      if (key.startsWith("clock-")) await work();
+      setMessage(`Preview only, nothing was saved: ${done}`);
+      return;
+    }
     setBusy(key);
     const error = await work();
     setBusy("");
@@ -483,6 +523,7 @@ export default function CrewPage() {
   /** One tap: camera first, then the expense form opens with the receipt attached and the amount box focused. */
   // R125: a job photo any time from the card (owner sees it in Job photos). Changes nothing else.
   async function addJobPhoto(docId: string, file: File | undefined) {
+    if (preview) { setMessage("Preview only, the photo was not uploaded."); return; }
     if (!file) return;
     setBusy(`photo-${docId}`);
     try {
@@ -528,6 +569,7 @@ export default function CrewPage() {
 
   /** Job report insert; the upload key is the row id, so a retry after a lost reply cannot add it twice. */
   async function insertReport(row: Record<string, unknown>, key: string) {
+    if (preview) return "";
     let { error } = await supabase.from("job_drafts").insert({ ...row, id: key });
     // Before migration 20261016120000 there is no costs column; parts_cost / parts_note still carry the total.
     if (error && /costs/.test(error.message || "") && error.code !== "23505") ({ error } = await supabase.from("job_drafts").insert({ ...row, id: key, costs: undefined }));
@@ -621,7 +663,7 @@ export default function CrewPage() {
         </div>
         {card.client_address && <p className="mt-2 text-sm text-[var(--cr-muted)]">{card.client_address}</p>}
         {card.client_email && !card.client_phone && <p className="text-sm"><a className="tap underline" href={`mailto:${card.client_email}`}>{card.client_email}</a></p>}
-        <CrewVisitNote docId={card.doc_id} />
+        {!preview && <CrewVisitNote docId={card.doc_id} />}
         {(card.crewNote || card.payRow?.note) && (
           <p className="mt-2 rounded-xl bg-teal-500/10 px-3 py-2 text-sm flex items-start gap-2" data-testid="crew-note"><Icon name="note" className="mt-0.5 h-4 w-4 text-teal-700 dark:text-teal-300" /><span>{card.crewNote || card.payRow?.note}</span></p>
         )}
@@ -797,6 +839,12 @@ export default function CrewPage() {
 
   return (
     <main className="crew-page min-h-dvh bg-[var(--cr-bg)] pb-24 text-[var(--cr-text)]">
+      {preview && (
+        <div role="status" data-testid="crew-preview-banner" className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-2 bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-900">
+          <span>Preview as crew: {preview.label}. Nothing you tap here is saved or sent, and no one is invited or emailed.</span>
+          <a href="/dashboard" className="rounded-lg bg-slate-900 px-3 py-1 text-white">Exit preview</a>
+        </div>
+      )}
       <header className="app-topbar sticky top-0 z-10 border-b border-teal-500/20 bg-[var(--cr-bg)] px-4 py-3 shadow-sm print:hidden">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -891,8 +939,8 @@ export default function CrewPage() {
         {!detailId && tab === "today" && (
           <section className="space-y-3">
             <h2 className="text-xl font-bold tracking-tight">{today ? dayLabel(today) : "Today"}</h2>
-            {email && <MyDay email={email} employeeId={employeeId} jobs={todayCards.map((card) => ({ docId: card.doc_id, label: [card.client_name, card.invoice_number].filter(Boolean).join(" · ") || "Job", address: card.client_address || "", date: card.job_date, startTime: card.start_time || "", endTime: card.end_time || "" }))} />}
-            {email && <LeadPanel />}
+            {email && !preview && <MyDay email={email} employeeId={employeeId} jobs={todayCards.map((card) => ({ docId: card.doc_id, label: [card.client_name, card.invoice_number].filter(Boolean).join(" · ") || "Job", address: card.client_address || "", date: card.job_date, startTime: card.start_time || "", endTime: card.end_time || "" }))} />}
+            {email && !preview && <LeadPanel />}
             {todayCards.length === 0 && <EmptyState icon={<Icon name="sun" className="h-6 w-6" />} title="Nothing scheduled for you today." className={`${cardClass} border-dashed`} />}
             {(() => {
               const route = routeStops(todayCards);
@@ -982,8 +1030,8 @@ export default function CrewPage() {
           </section>
         )}
 
-        {!detailId && tab === "hours" && email && <MyWeek email={email} employeeId={employeeId} clock={clock} onRows={setMyWeekRows} />}
-        {!detailId && tab === "hours" && email && <CrewPto />}
+        {!detailId && tab === "hours" && email && !preview && <MyWeek email={email} employeeId={employeeId} clock={clock} onRows={setMyWeekRows} />}
+        {!detailId && tab === "hours" && email && !preview && <CrewPto />}
         {!detailId && tab === "hours" && (
           <section className={cardClass} data-testid="my-hours">
             <h2 className="text-lg font-bold tracking-tight">Logged hours this week</h2>
@@ -1011,7 +1059,7 @@ export default function CrewPage() {
           </section>
         )}
 
-        {!detailId && tab === "hours" && <CrewDaysOff />}
+        {!detailId && tab === "hours" && !preview && <CrewDaysOff />}
 
         {!detailId && tab === "reports" && (
           <section className="space-y-3">
