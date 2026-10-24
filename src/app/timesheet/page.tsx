@@ -47,6 +47,18 @@ export default function TimesheetPage() {
   const [history, setHistory] = useState<Record<string, DayApproval[][]>>({});
   const undoSteps = history[week] || [];
   const [open, setOpen] = useState<string | null>(null);
+  // Help retest: the day dialog must never come back on its own after a reload / back-forward restore.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (["open", "day", "worker"].some((k) => url.searchParams.has(k))) {
+      ["open", "day", "worker"].forEach((k) => url.searchParams.delete(k));
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    }
+    const close = (e: Event) => { if (e.type === "pagehide" || (e as PageTransitionEvent).persisted) setOpen(null); };
+    window.addEventListener("pageshow", close);
+    window.addEventListener("pagehide", close);
+    return () => { window.removeEventListener("pageshow", close); window.removeEventListener("pagehide", close); };
+  }, []);
   const [filter, setFilter] = useState<"all" | "review">("all");
   const [phone, setPhone] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
