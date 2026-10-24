@@ -4,6 +4,7 @@ import { paySnapshot, readPaySettings } from "@/lib/pay-types";
 import { derivedWhen, isoDate } from "@/lib/job-when";
 import { readChecklist, type ChecklistItem } from "@/lib/checklist";
 import { supabase } from "@/lib/supabase";
+import { authedFetch } from "@/lib/authed-fetch";
 import { isUuid, saveCloudDocument, type CloudDoc } from "@/lib/cloud-docs";
 import { crewHandoff, moneySnapshot } from "@/lib/change-orders";
 import { holdsSchedule, isRevision, parentOf } from "@/lib/change-order-revision";
@@ -486,7 +487,7 @@ export async function jobPinFor(data: Record<string, unknown> | undefined): Prom
   const old = data?.pin as { lat?: unknown; lng?: unknown; address?: unknown } | undefined;
   if (old && old.address === address && Number.isFinite(Number(old.lat)) && Number.isFinite(Number(old.lng))) return null;
   try {
-    const res = await fetch(`/api/drive-time?geocode=${encodeURIComponent(address)}`, { signal: AbortSignal.timeout(6000) });
+    const res = await authedFetch(`/api/drive-time?geocode=${encodeURIComponent(address)}`, { signal: AbortSignal.timeout(6000) });
     const json = await res.json();
     return typeof json?.lat === "number" && typeof json?.lng === "number" ? { lat: json.lat, lng: json.lng, address } : null;
   } catch { return null; }

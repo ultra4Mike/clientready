@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { serviceClient, stripeConfig } from "@/lib/stripe-server";
 import { invoiceFromProposal } from "@/lib/proposal-convert";
-import { clientIp, rateLimited, tooMany } from "@/lib/rate-limit";
+import { clientIp, rateLimitedShared, tooMany } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +20,7 @@ const ymdIn = (tz: string) => {
 export async function POST(request: Request) {
   const config = stripeConfig();
   if (!config.serviceKey || !config.supabaseUrl) return Response.json({ error: "Not available." }, { status: 503 });
-  if (rateLimited(`convert:${clientIp(request)}`, 20, 60_000)) return tooMany();
+  if (await rateLimitedShared(`convert:${clientIp(request)}`, 20, 60_000)) return tooMany();
   let token = "", portal = "", docId = "";
   try {
     const body = (await request.json()) as { token?: unknown; portal?: unknown; docId?: unknown };

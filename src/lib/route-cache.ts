@@ -23,7 +23,7 @@ export function writeRouteMinutes(date: string, fromDocId: string, toDocId: stri
   } catch { /* storage full */ }
 }
 /** Fetch and cache the Google route time for each leg (addresses), only when not cached. Returns how many were added. */
-export async function warmRoutes(legs: { date: string; fromDocId: string; toDocId: string; from: string; to: string }[], fetcher: typeof fetch = fetch) {
+export async function warmRoutes(legs: { date: string; fromDocId: string; toDocId: string; from: string; to: string }[], fetcher: (input: string) => Promise<Response> = (input) => import("@/lib/authed-fetch").then((m) => m.authedFetch(input))) {
   let added = 0;
   for (const leg of legs) {
     if (!leg.from || !leg.to || readRouteMinutes(leg.date, leg.fromDocId, leg.toDocId) !== undefined) continue;

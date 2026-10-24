@@ -3,7 +3,7 @@ import { isRevision, replacedBy, revisionOwed } from "@/lib/change-order-revisio
 import { loadChain } from "@/lib/chain-server";
 import { amountToCharge, serviceClient, stripeConfig } from "@/lib/stripe-server";
 
-import { clientIp, rateLimited, tooMany } from "@/lib/rate-limit";
+import { clientIp, rateLimitedShared, tooMany } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const config = stripeConfig();
   if (!config.checkoutEnabled) return Response.json({ error: "Card payment is not set up." }, { status: 503 });
-  if (rateLimited(`pay:${clientIp(request)}`, 15, 60_000)) return tooMany();
+  if (await rateLimitedShared(`pay:${clientIp(request)}`, 15, 60_000)) return tooMany();
   let token = "";
   let portal = "";
   let docId = "";

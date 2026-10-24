@@ -1,6 +1,6 @@
 import { serviceClient, stripeConfig } from "@/lib/stripe-server";
 import { currencyOk, fromMinor } from "@/lib/stripe-money";
-import { clientIp, rateLimited, tooMany } from "@/lib/rate-limit";
+import { clientIp, rateLimitedShared, tooMany } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const config = stripeConfig();
   if (!config.checkoutEnabled) return Response.json({ error: "Card payment is not set up." }, { status: 503 });
-  if (rateLimited(`confirm:${clientIp(request)}`, 30, 60_000)) return tooMany();
+  if (await rateLimitedShared(`confirm:${clientIp(request)}`, 30, 60_000)) return tooMany();
   let token = "", portal = "", docId = "", cs = "";
   try {
     const body = (await request.json()) as Record<string, unknown>;
