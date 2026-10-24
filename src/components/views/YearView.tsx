@@ -149,6 +149,7 @@ export default function YearPage({ embedded = false, year: yearProp, onData, cov
     const profileRaw = window.localStorage.getItem("clientready-profile");
     if (profileRaw) {
       const profile = JSON.parse(profileRaw);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
       setBusinessName(profile.businessName || "Your business");
       setTaxId(profile.taxId || "");
       setSetAsidePercent(readSetAside(profile.setAsidePercent));
@@ -434,7 +435,7 @@ export default function YearPage({ embedded = false, year: yearProp, onData, cov
   function openRow(row: Row) {
     if (!row.docId) return; // overtime premium rows span several jobs
     window.localStorage.setItem("clientready-open-document", row.docId);
-    window.location.href = `/invoice?id=${encodeURIComponent(row.docId)}`;
+    window.location.assign(`/invoice?id=${encodeURIComponent(row.docId)}`);
   }
 
   return (

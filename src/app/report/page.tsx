@@ -44,6 +44,7 @@ export default function ReportPage() {
     const raw = window.localStorage.getItem("clientready-profile");
     if (raw) {
       const profile = JSON.parse(raw);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
       setLogo(profile.logo || "");
       setBusinessName(profile.businessName || "");
     }
@@ -71,6 +72,7 @@ export default function ReportPage() {
       nextSteps?: string;
       issues?: string;
     };
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     setDocId(doc.id);
     setTitle(data.title || "");
     setClientName(data.clientName || "");

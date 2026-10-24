@@ -82,6 +82,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
   const [filter, setFilterState] = useState<CalendarFilter>(PRESETS.all);
   function setFilter(next: CalendarFilter) { setFilterState(next); saveCalendarFilter(next); }
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     setState({ docs: readDocs(), workers: readWorkers(), today: businessToday() }); // cal24: business-zone today, never UTC
     setFilterState(readCalendarFilter());
   }, []);

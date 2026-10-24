@@ -98,6 +98,7 @@ export default function CollectPage() {
 
   useEffect(() => {
     const raw = window.localStorage.getItem("clientready-documents");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     if (raw) setDocuments(uniqueDocs(JSON.parse(raw)));
     try {
       setProfile(JSON.parse(window.localStorage.getItem("clientready-profile") || "{}"));
@@ -185,9 +186,10 @@ export default function CollectPage() {
   }
 
   function openInvoice(id: string) {
-    window.location.href = `/invoice?id=${encodeURIComponent(id)}`;
+    window.location.assign(`/invoice?id=${encodeURIComponent(id)}`);
   }
 
+  // eslint-disable-next-line react-hooks/globals -- module-level chain cache feeds the existing owed/balance helpers; left as-is to keep pay math unchanged
   chainDocs = documents;
   const invoices = documents.filter((doc) => doc.type === "invoice");
   // Recurring drafts nobody has reviewed yet are not money to collect: keep them out of the

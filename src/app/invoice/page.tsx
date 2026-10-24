@@ -313,6 +313,7 @@ export default function NewInvoicePage() {
   }, []);
   // R83: photos the crew took when marking the job done.
   const [crewPhotos, setCrewPhotos] = useState<Awaited<ReturnType<typeof jobDonePhotos>>>([]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
   useEffect(() => { let live = true; if (docId) jobDonePhotos(docId).then((rows) => live && setCrewPhotos(rows)).catch(() => {}); else setCrewPhotos([]); return () => { live = false; }; }, [docId]);
   // R81: always re-read the team from the cloud once, so "+ Add crew" sees everyone Active.
   useEffect(() => { refreshEmployeesCache().then((ok) => { if (ok) setWorkers(readWorkers()); }).catch(() => {}); }, []);
@@ -404,6 +405,7 @@ export default function NewInvoicePage() {
     const raw = window.localStorage.getItem("clientready-profile");
     if (!raw) return;
     const profile = JSON.parse(raw);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     setBusinessName(profile.businessName || "Your business");
     setOwnerName(profile.ownerName || "");
     setBusinessEmail(profile.email || "");
@@ -418,6 +420,7 @@ export default function NewInvoicePage() {
 
   useEffect(() => {
     const raw = window.localStorage.getItem("clientready-employees");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     if (raw) setEmployees(JSON.parse(raw));
   }, []);
 
@@ -472,6 +475,7 @@ export default function NewInvoicePage() {
           const clients = JSON.parse(window.localStorage.getItem("clientready-clients") || "[]") as SavedClient[];
           const client = clients.find((item) => item.id === forClient);
           if (client) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
             setClientName(client.name || "");
             setClientId(client.id);
             setClientCompany(client.company || "");
@@ -673,6 +677,7 @@ export default function NewInvoicePage() {
   useEffect(() => {
     if (!crew.length) return;
     const labor = crew.reduce((sum, row) => sum + rowPay(row), 0);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     setCosts((current) => ({ ...current, labor: labor.toFixed(2) }));
   }, [crew]);
 

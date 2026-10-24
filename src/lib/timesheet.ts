@@ -778,7 +778,7 @@ export type OnClock = { employeeId: string; state: DayStateName; since?: string;
 export function whosOnClock(events: TapEvent[], today: string): OnClock[] {
   const by = new Map<string, TapEvent[]>();
   for (const e of events) if (e.date === today) by.set(e.employeeId, [...(by.get(e.employeeId) || []), e]);
-  return [...by.entries()].map(([employeeId, list]) => ({ employeeId, ...dayState(list) })).filter((x) => x.state !== "OFF_DUTY").map(({ outOfOrder: _o, ...rest }) => rest);
+  return [...by.entries()].map(([employeeId, list]) => ({ employeeId, ...dayState(list) })).filter((x) => x.state !== "OFF_DUTY").map((x) => { const rest = { ...x }; delete (rest as { outOfOrder?: unknown }).outOfOrder; return rest as Omit<typeof x, "outOfOrder">; });
 }
 
 /** Minutes the first tap came after the first planned start, past the grace (15 min): 0 when on time. Same rule as the owner's "Started late". */

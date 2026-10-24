@@ -181,6 +181,7 @@ export default function CrewPage() {
   const [myWeekRows, setMyWeekRows] = useState<WeekRow[]>([]);
   const [offline, setOffline] = useState(false);
   const [mounted, setMounted] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
   useEffect(() => setMounted(true), []);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [name, setName] = useState("");

@@ -19,10 +19,10 @@ export function PlansClient() {
     setSoon(plan);
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
-    if (!token) return void (window.location.href = `/signup?plan=${plan}`);
+    if (!token) return void (window.location.assign(`/signup?plan=${plan}`));
     const response = await fetch("/api/stripe/subscribe", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ plan }) }).catch(() => null);
     const result = (await response?.json().catch(() => null)) as { url?: string; error?: string } | null;
-    if (result?.url) window.location.href = result.url;
+    if (result?.url) window.location.assign(result.url);
     else { setSoon("error"); setErrorText(result?.error || ""); }
   }
   return (

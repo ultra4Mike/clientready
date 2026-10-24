@@ -41,7 +41,7 @@ export default function IntegrationsPage() {
     const json = (await response?.json().catch(() => null)) as { url?: string; error?: string; result?: Connection["last_sync_result"] } | null;
     setBusy("");
     if (!response?.ok) { setMessage(json?.error || "That didn't work. Try again."); return; }
-    if (action === "connect" && json?.url) { window.location.href = json.url; return; }
+    if (action === "connect" && json?.url) { window.location.assign(json.url); return; }
     if (action === "sync" && json?.result) {
       const r = json.result;
       setMessage(`${PROVIDER_LABEL[provider]}: sent ${r.clients || 0} clients, ${r.invoices || 0} invoices, ${r.payments || 0} payments${r.errors?.length ? ` · problems: ${r.errors.join("; ")}` : ""}.`);

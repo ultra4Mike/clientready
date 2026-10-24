@@ -34,6 +34,7 @@ export function HomeClient() {
   useEffect(() => {
     const done = new URLSearchParams(window.location.search).get("deleted") === "1";
     if (done) window.history.replaceState(null, "", "/");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     setDeleted(done);
   }, []);
 

@@ -25,6 +25,7 @@ export function JobPhotosEditor({ photos, onChange, showOnCopy = false, onShowOn
     for (const file of files) {
       try {
         const dataUrl = await compressPhoto(file);
+        // eslint-disable-next-line react-hooks/purity -- runs inside an async upload handler, not during render
         added.push({ id: `${Date.now()}-${added.length}`, dataUrl, caption: "", addedAt: new Date().toISOString() });
       } catch (error) {
         notes.push(error instanceof Error ? error.message : `${file.name}: could not add this photo.`);

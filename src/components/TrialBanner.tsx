@@ -12,6 +12,7 @@ export default function TrialBanner() {
     let live = true;
     // R118/R120: show the last known banner at once so the page doesn't jump ~57px when the trial check
     // finishes (that jump moved taps on a first-load invoice into the field above: Rate / Package name).
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     try { const cached = JSON.parse(window.localStorage.getItem("cr-trial-banner") || "null"); if (cached) setState(cached); } catch { /* none */ }
     getTrialState().then((trial) => {
       if (!live) return;

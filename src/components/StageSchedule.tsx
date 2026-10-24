@@ -129,7 +129,7 @@ function PlanMaker({ total, balance, hasStages, onMake }: { total: number; balan
   return (
     <details className="rounded-lg border border-dashed border-teal-500/40 p-3 text-sm" data-testid="plan-maker">
       <summary className="cursor-pointer font-medium text-teal-700 dark:text-teal-300" data-testid="plan-maker-label">{hasStages ? `Re-split the $${balance.toFixed(2)} still owed into new payments` : `Payment plan: split $${balance.toFixed(2)} owed into payments`}</summary>
-      {hasStages && <p className="mt-1 text-xs text-slate-500" data-testid="plan-maker-replace-note">This replaces the stages above with new payments for what's still owed. Money already paid stays recorded as &quot;Paid so far&quot;.</p>}
+      {hasStages && <p className="mt-1 text-xs text-slate-500" data-testid="plan-maker-replace-note">This replaces the stages above with new payments for what&apos;s still owed. Money already paid stays recorded as &quot;Paid so far&quot;.</p>}
       <div className="mt-2 grid grid-cols-3 gap-2">
         <label className="text-xs text-slate-600">Payments<input aria-label="Number of payments" data-testid="plan-count" inputMode="numeric" className={field} value={count} onChange={(event) => setCount(event.target.value)} /></label>
         <label className="text-xs text-slate-600">Every<select aria-label="How often" data-testid="plan-every" className={field} value={every} onChange={(event) => setEvery(event.target.value as PlanEvery)}><option value="week">Week</option><option value="2weeks">2 weeks</option><option value="month">Month</option></select></label>

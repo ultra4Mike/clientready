@@ -43,6 +43,7 @@ export default function TodayPage() {
   useEffect(() => {
     const day = businessToday() || localYmd(); // cal24: business-zone day (11:30 PM CT is still today)
     // Speed audit #1: cached jobs first, then refresh from the server.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     try { read(); setToday(day); if (window.localStorage.getItem("clientready-documents")) setLoaded(true); } catch { /* bad cache: wait for the server */ }
     loadAccountIntoCache()
       .catch(() => false)

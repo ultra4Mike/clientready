@@ -51,6 +51,7 @@ export default function AppShell({
   const [embeddedTabs, setEmbeddedTabs] = useState<ReactNode>(null);
   useEffect(() => {
     const search = window.location.search;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     if (pathname === "/calendar" && ["day", "list", "schedule"].includes(calendarView(search))) setEmbeddedTabs(<div className="mb-3"><CalendarViewTabs current={calendarView(search)} /></div>);
     else if (pathname === "/documents" && ["crew-drafts", "history"].includes(documentsView(search))) setEmbeddedTabs(<DocumentsViewTabs current={documentsView(search)} />);
     else setEmbeddedTabs(null);

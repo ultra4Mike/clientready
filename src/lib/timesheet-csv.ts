@@ -7,7 +7,6 @@ import type { TimesheetSettings } from "@/lib/timesheet";
 import type { PtoRequest } from "@/lib/pay-phase2";
 import { hhmmTz, ymdTz } from "@/lib/timesheet";
 
-const pad = (n: number) => String(n).padStart(2, "0");
 export const localYmd = (d: Date) => ymdTz(d);
 const localTime = (d: Date) => hhmmTz(d.toISOString());
 

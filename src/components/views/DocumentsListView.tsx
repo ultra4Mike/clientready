@@ -88,6 +88,7 @@ export default function DocumentsPage({ initialView = "all" }: { initialView?: "
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const query = params.get("q") || "";
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     if (query) setSearch(query);
     // Links from the dashboard cards: /documents?filter=outstanding|paid|overdue|unpaid
     const preset = params.get("filter") || "";
@@ -190,6 +191,7 @@ export default function DocumentsPage({ initialView = "all" }: { initialView?: "
   }
 
   // Option A: a version replaced by a sent revision owes 0 (never overdue); a revision owes net of chain payments.
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- memo keyed on documents on purpose; compiler skip is harmless
   const factsById = useMemo(() => new Map(documents.map((doc) => {
     const info = facts(doc);
     return [doc.id, doc.type === "invoice" ? { ...info, owed: effectiveAmounts(documents as never, doc as never).owed } : info];
