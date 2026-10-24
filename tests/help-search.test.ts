@@ -80,3 +80,19 @@ test("Deploy 8 help: overtime settings, FLSA premium formula, CO signature publi
   const ids = new Set(HELP_ARTICLES.map((a) => a.id));
   for (const a of HELP_ARTICLES) for (const r of a.related || []) assert.ok(ids.has(r), `${a.id} → ${r}`);
 });
+test("Deploy 9 help: multi-day jobs, Holiday, FLSA label, alerts wording", async () => {
+  const { UPCOMING_HELP_ARTICLES } = await import("@/lib/help/upcoming");
+  const by = Object.fromEntries(HELP_ARTICLES.map((a) => [a.id, [a.question, a.summary || "", ...a.steps, ...(a.tips || [])].join(" ")]));
+  assert.ok(by["multi-day-jobs"]); assert.ok(!UPCOMING_HELP_ARTICLES.some((a) => a.id === "multi-day-jobs"));
+  assert.match(by["multi-day-jobs"], /\+ Add day/); assert.match(by["multi-day-jobs"], /No crew yet: added days are saved with the job/); assert.match(by["multi-day-jobs"], /Day 2 of 3/);
+  assert.match(by["reschedule"], /drag Day 1/); assert.match(by["change-orders"], /every day of a multi-day job/);
+  for (const id of ["tt-owner-pto", "tt-crew-time-off", "tt-wage-law", "tt-owner-overtime"]) assert.match(by[id], /Holiday/, id);
+  assert.match(by["tt-owner-pto"], /Add time off \(PTO \/ Sick \/ Holiday\)/); assert.match(by["tt-owner-pto"], /never comes out of the PTO balance/);
+  assert.match(by["tt-owner-pto"], /Count holiday hours toward overtime/);
+  assert.match(by["tt-owner-flsa-nonhourly"], /\(multiplier - 1\) x regular rate after N h/); assert.doesNotMatch(by["tt-owner-flsa-nonhourly"], /still says/);
+  assert.match(by["tt-owner-alerts"], /No tap recorded/); assert.match(by["tt-owner-alerts"], /unapprove or reopen/); assert.doesNotMatch(by["tt-owner-alerts"], /Resolved/);
+  for (const a of HELP_ARTICLES) assert.doesNotMatch(JSON.stringify(a), /\[TODO/, a.id);
+  const ids = new Set(HELP_ARTICLES.map((a) => a.id)); assert.equal(ids.size, HELP_ARTICLES.length);
+  for (const a of HELP_ARTICLES) for (const r of a.related || []) assert.ok(ids.has(r), `${a.id} → ${r}`);
+  assert.ok(hay("add day").includes("multi-day-jobs"));
+});
