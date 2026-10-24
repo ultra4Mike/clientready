@@ -4,7 +4,11 @@ import { OLD_ROUTE_REDIRECTS } from "./src/lib/view-routes";
 const nextConfig: NextConfig = {
   // Redesign 3: old menu routes open the matching Calendar / Documents view (query strings are kept).
   async redirects() {
-    return OLD_ROUTE_REDIRECTS.map((r) => ({ ...r, permanent: false }));
+    return [
+      // The year packet moved to Reports & Taxes.
+      { source: "/calendar", has: [{ type: "query" as const, key: "view", value: "year" }], destination: "/reports?tab=taxes", permanent: false },
+      ...OLD_ROUTE_REDIRECTS.map((r) => ({ ...r, permanent: false })),
+    ];
   },
   // Universal Links: the apple-app-site-association file (added once the Apple Team ID exists) has no
   // extension, so serve it as JSON. assetlinks.json is JSON by extension. Both are plain static files,

@@ -7,6 +7,7 @@ import { isPendingRecurringDraft } from "@/lib/recurring";
 import { uniqueDocs } from "@/lib/change-orders";
 import { buildReport, MONTHS, yearMonth } from "@/lib/reports";
 import { taxCategories } from "@/lib/tax-categories";
+import type { BizOccurrence } from "@/lib/business-expenses";
 import { countedTrips, milesOf, totalMiles, type Trip } from "@/lib/mileage";
 
 /**
@@ -26,7 +27,8 @@ const day = (value: unknown) => {
 };
 const COST_FIELDS: [string, string, string][] = [["parts", "Materials / parts", "Line 22"], ["tools", "Tools / job supplies", "Line 22"], ["gas", "Gas / fuel", "Line 9"], ["labor", "Crew labor", "Line 11"], ["lunch", "Meals (lunch)", "Line 24b"]];
 
-export function accountantFiles(allDocs: Doc[], crew: CrewExpense[], trips: Trip[], year: string, business = "") {
+/** The rows behind the package (also read by Reports & Taxes so the screen and the zip match). */
+export function accountantRows(allDocs: Doc[], crew: CrewExpense[], trips: Trip[], year: string, business = "", biz: BizOccurrence[] = []) {
   const docs = uniqueDocs(allDocs).filter((doc) => doc.type === "invoice" && !isPendingRecurringDraft(doc));
   const numberOf = (doc: Doc) => String(doc.data?.invoiceNumber || doc.title || "Invoice");
   const clientOf = (doc: Doc) => String(doc.data?.clientName || doc.clientName || "");
@@ -67,6 +69,8 @@ export function accountantFiles(allDocs: Doc[], crew: CrewExpense[], trips: Trip
       if (amountOf(fee.amount) > 0) expenseRows.push([when, numberOf(doc), clientOf(doc), String(fee.name || "Other fee"), "Line 27a", r2(amountOf(fee.amount)), "Job costs"]);
     }
   }
+  // Business expenses (overhead, not on a job) join the expense list with their own Schedule C line.
+  for (const o of biz) expenseRows.push([o.date, "", o.vendor, o.categoryLabel, o.line, r2(o.amount), "Business expense"]);
   expenseRows.sort((a, b) => a[0].localeCompare(b[0]));
   const byId = new Map(docs.map((doc) => [doc.id, doc]));
   const crewRows = crew.filter((item) => yearMonth(item.created_at)?.year === year).map((item) => {
@@ -90,6 +94,7 @@ export function accountantFiles(allDocs: Doc[], crew: CrewExpense[], trips: Trip
     ["Business miles", String(totalMiles(yearTrips, year))], ["", ""],
     ["Schedule C line", "Amount"],
     ...tax.lines.map((line) => [`${line.line} ${line.label}`, r2(line.amount)]),
+    ...(biz.length ? [["", ""], ["Business expenses (not on a job), by Schedule C line", "Amount"], ...bizLines(biz).map(([line, amount]) => [`${line} business expenses`, r2(amount)]), ["Business expenses total", r2(biz.reduce((sum, o) => sum + o.amount, 0))]] : []),
     ["", ""], ["Month", "Billed / Collected / Job costs / Crew receipts"],
     ...report.months.map((row) => [MONTHS[row.month], `${r2(row.billed)} / ${r2(row.collected)} / ${r2(row.jobCosts)} / ${r2(row.crewReceipts)}`]),
     ["", ""], ["Expenses by category (owner job costs, each once; crew amounts count once you apply them)", "Amount"],
@@ -104,9 +109,16 @@ export function accountantFiles(allDocs: Doc[], crew: CrewExpense[], trips: Trip
     "expenses.csv  Owner job costs on this year's invoices, each with a suggested Schedule C line.",
     "crew-receipts.csv  Costs the crew logged from the field (not added to job costs automatically).",
     "mileage.csv   Business trips this year.",
+    ...(biz.length ? ["business-expenses.csv  Overhead not tied to a job (rent, insurance, phone…), with Schedule C line. Also in expenses.csv."] : []),
     "",
     "Schedule C lines are suggestions only. Your accountant decides the final categories.",
   ].join("\r\n");
+  const bizRows = biz.map((o) => [o.date, o.vendor, o.categoryLabel, o.line, r2(o.amount), o.method, o.monthly ? "monthly" : "", o.receipt ? "yes" : "", o.note]);
+  return { invoiceRows, paymentRows, expenseRows, crewRows, yearTrips, summary, readme, bizRows };
+}
+
+export function accountantFiles(allDocs: Doc[], crew: CrewExpense[], trips: Trip[], year: string, business = "", biz: BizOccurrence[] = []) {
+  const { invoiceRows, paymentRows, expenseRows, crewRows, yearTrips, summary, readme, bizRows } = accountantRows(allDocs, crew, trips, year, business, biz);
   return [
     { name: "README.txt", text: readme },
     { name: "summary.csv", text: csvText(["Item", "Value"], summary) },
@@ -115,6 +127,7 @@ export function accountantFiles(allDocs: Doc[], crew: CrewExpense[], trips: Trip
     { name: "expenses.csv", text: csvText(["Date", "Invoice", "Client", "Category", "Schedule C line", "Amount", "Source"], expenseRows) },
     { name: "crew-receipts.csv", text: csvText(["Date", "Invoice", "Worker", "Category", "Amount", "Note"], crewRows) },
     { name: "mileage.csv", text: csvText(["Date", "Miles", "From", "To", "Purpose"], yearTrips.map((trip) => [trip.date, String(milesOf(trip)), trip.from, trip.to, trip.purpose])) },
+    ...(bizRows.length ? [{ name: "business-expenses.csv", text: csvText(["Date", "Vendor", "Category", "Schedule C line", "Amount", "Payment method", "Repeats", "Receipt photo", "Note"], bizRows) }] : []),
   ];
 }
 
@@ -123,4 +136,10 @@ export function expensesByCategory(expenseRows: string[][]) {
   const totals = new Map<string, number>();
   for (const row of expenseRows) totals.set(row[3], (totals.get(row[3]) || 0) + (Number(row[5]) || 0));
   return [...totals.entries()].sort((a, b) => b[1] - a[1]);
+}
+
+function bizLines(biz: BizOccurrence[]) {
+  const totals = new Map<string, number>();
+  for (const o of biz) totals.set(o.line, (totals.get(o.line) || 0) + o.amount);
+  return [...totals.entries()];
 }

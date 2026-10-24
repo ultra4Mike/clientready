@@ -13,7 +13,7 @@ const mainLinks = [
 const moreLinks = [
   { href: "/employees", label: "Employees" },
   { href: "/timesheet", label: "Timesheet" },
-  { href: "/reports", label: "Reports" },
+  { href: "/reports", label: "Reports & Taxes" },
   { href: "/mileage", label: "Mileage" },
   { href: "/inventory", label: "Inventory" },
   { href: "/backup", label: "Backup" },
