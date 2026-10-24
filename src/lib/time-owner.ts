@@ -10,6 +10,7 @@ import { weekOf } from "@/lib/pay-types";
 import { loadOwnerTimesheet, type DayApproval } from "@/lib/day-events";
 import { reviewCount, timeAlerts, whosOnClock, type DaySheet, type FixRequest, type OnClock, type ScheduledJob, type TapEvent, type TimeAlert, type TimesheetSettings } from "@/lib/timesheet";
 import { addDays, readDocs, scheduleFor, weekShares, weekSheets } from "@/lib/timesheet-sync";
+import { scheduleAlertLabel } from "@/lib/timesheet-alerts";
 import type { DayPay } from "@/lib/timesheet-pay";
 
 export const localYmd = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -43,15 +44,17 @@ export function timeAttention(w: TimeWeek, now = new Date().toISOString()): Time
   const name = (id: string) => w.workers.find((x) => x.id === id)?.name || "Worker";
   const approved = (id: string, date: string) => Boolean(w.approvals.find((a) => a.employeeId === id && a.date === date)?.approvedAt);
   const alerts = timeAlerts({ sheets: w.sheets, fixes: w.fixes, events: w.events, today, schedule: w.schedule, now })
-    .filter((a) => a.kind === "fix_pending" || a.kind === "late_start" || a.kind === "no_show" || !approved(a.employeeId, a.date))
-    .map((a) => ({ ...a, name: name(a.employeeId) }));
+    // pt473u: same rule as the Timesheet (splitAlerts): an approved day is resolved, so its no-show / late start /
+    // missed break leaves the card and its counts; only a pending fix request stays (it needs its own decision).
+    .filter((a) => a.kind === "fix_pending" || !approved(a.employeeId, a.date))
+    .map((a) => ({ ...a, name: name(a.employeeId), ...(a.kind === "no_show" || a.kind === "late_start" ? { text: scheduleAlertLabel(a.kind, dayMinutes(w, a.employeeId, a.date)) } : {}) }));
   return {
     onClock: whosOnClock(w.events, today).map((o) => ({ ...o, name: name(o.employeeId) })),
     alerts,
     pendingFixes: w.fixes.filter((f) => f.status === "pending").length,
     missingClockOuts: alerts.filter((a) => a.kind === "forgot_end").length,
     missedBreaks: alerts.filter((a) => a.kind === "break_rule").length,
-    noShows: alerts.filter((a) => a.kind === "no_show").length,
+    noShows: alerts.filter((a) => a.kind === "no_show" && a.text === "No-show").length,
     lateStarts: alerts.filter((a) => a.kind === "late_start").length,
     needsReview: reviewCount(w.workers.map((x) => x.id), w.days, w.sheets, w.approvals),
   };
