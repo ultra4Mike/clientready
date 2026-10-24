@@ -214,44 +214,90 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
   const [touchDrag, setTouchDrag] = useState<{ docId: string; offset: number; label: string; x: number; y: number; over: string } | null>(null);
   useEffect(() => { Promise.resolve().then(() => { try { const m = window.localStorage.getItem(MOBILE_MODE_KEY); if (m === "calendar" || m === "list") setMobileModeState(m); } catch { /* private mode */ } }); }, []);
   function setMobileMode(next: "list" | "calendar") { setMobileModeState(next); try { window.localStorage.setItem(MOBILE_MODE_KEY, next); } catch { /* private mode */ } }
-  const press = useRef<{ timer: number; x: number; y: number; started: boolean; docId: string; offset: number; label: string } | null>(null);
+  const press = useRef<{ timer: number; x: number; y: number; started: boolean; docId: string; offset: number; label: string; mouse: boolean; target: HTMLElement; pid: number } | null>(null);
   const suppressClick = useRef(false);
+  const moveJobRef = useRef(moveJob);
+  useEffect(() => { moveJobRef.current = moveJob; });
   const touchDragRef = useRef(touchDrag);
   useEffect(() => { touchDragRef.current = touchDrag; }, [touchDrag]);
-  // While a touch drag is active, stop the page from scrolling (needs a non-passive listener).
-  useEffect(() => {
-    if (!touchDrag) return;
-    const block = (event: TouchEvent) => event.preventDefault();
-    document.addEventListener("touchmove", block, { passive: false });
-    return () => document.removeEventListener("touchmove", block);
-  }, [touchDrag]);
   function dropDateAt(x: number, y: number) {
     const el = document.elementFromPoint(x, y) as HTMLElement | null;
     return el?.closest<HTMLElement>("[data-drop-date]")?.dataset.dropDate || "";
   }
-  /** Long-press (450ms without moving >8px) starts a drag; moving first is a scroll. Mouse keeps native drag. */
+  // Auto-scroll while dragging near the top/bottom edge of the screen.
+  const autoScroll = useRef<{ id: number; dy: number } | null>(null);
+  function setAutoScroll(y: number) {
+    const edge = 70, h = window.innerHeight;
+    const dy = y < edge ? -Math.ceil((edge - y) / 5) : y > h - edge ? Math.ceil((y - (h - edge)) / 5) : 0;
+    if (!dy) { stopAutoScroll(); return; }
+    if (autoScroll.current) { autoScroll.current.dy = dy; return; }
+    autoScroll.current = { dy, id: window.setInterval(() => { const a = autoScroll.current; if (a) window.scrollBy(0, a.dy); }, 16) };
+  }
+  function stopAutoScroll() { if (autoScroll.current) window.clearInterval(autoScroll.current.id); autoScroll.current = null; }
+  useEffect(() => stopAutoScroll, []);
+  // Touch drag runs on native touch events: a non-passive touchmove that cancels scrolling ONLY once the long-press
+  // has started, so the browser never claims the gesture as a pan (which fired pointercancel and killed the old drag).
+  // Before the long-press fires, moving >8px cancels it and the page scrolls normally.
+  useEffect(() => {
+    const onMove = (event: TouchEvent) => {
+      const p = press.current; if (!p || p.mouse) return;
+      const t = event.touches[0]; if (!t) return;
+      if (!p.started) { if (Math.hypot(t.clientX - p.x, t.clientY - p.y) > 8) { window.clearTimeout(p.timer); press.current = null; } return; }
+      if (event.cancelable) event.preventDefault();
+      setAutoScroll(t.clientY);
+      setTouchDrag((d) => d && { ...d, x: t.clientX, y: t.clientY, over: dropDateAt(t.clientX, t.clientY) });
+    };
+    const onEnd = (event: TouchEvent) => {
+      const p = press.current; if (!p || p.mouse) return; press.current = null;
+      window.clearTimeout(p.timer); stopAutoScroll();
+      if (!p.started) return;
+      if (event.cancelable) event.preventDefault();
+      suppressClick.current = true; window.setTimeout(() => { suppressClick.current = false; }, 400);
+      const t = event.changedTouches[0];
+      const day = event.type === "touchend" && t ? dropDateAt(t.clientX, t.clientY) : "";
+      setTouchDrag(null);
+      if (day) void moveJobRef.current(p.docId, p.offset, day);
+      else if (event.type === "touchend") setMessage("Not moved: drop the job on a day.");
+    };
+    document.addEventListener("touchmove", onMove, { passive: false });
+    document.addEventListener("touchend", onEnd, { passive: false });
+    document.addEventListener("touchcancel", onEnd);
+    return () => { document.removeEventListener("touchmove", onMove); document.removeEventListener("touchend", onEnd); document.removeEventListener("touchcancel", onEnd); };
+  }, []);
+  /** Pointer drag for the narrow layout. Mouse/pen: drag starts after moving 5px. Touch: long-press (450ms without
+   *  moving >8px) starts a drag; moving first is a scroll. Presses on the Move/Schedule buttons never drag. */
   function touchHandlers(docId: string, offset: number, label: string) {
+    const begin = (target: HTMLElement, pid: number, x: number, y: number) => {
+      if (!press.current) return;
+      press.current.started = true;
+      try { target.setPointerCapture(pid); } catch { /* released */ }
+      setTouchDrag({ docId, offset, label, x, y, over: dropDateAt(x, y) });
+    };
     return {
       onPointerDown: (event: React.PointerEvent) => {
-        if (event.pointerType === "mouse") return;
+        if (event.button !== 0 || (event.target as HTMLElement).closest("button")) return;
         const x = event.clientX, y = event.clientY;
         const target = event.currentTarget as HTMLElement; const pid = event.pointerId;
-        press.current = { x, y, started: false, docId, offset, label, timer: window.setTimeout(() => {
-          if (!press.current) return;
-          press.current.started = true;
-          try { target.setPointerCapture(pid); } catch { /* released */ }
+        const mouse = event.pointerType !== "touch";
+        press.current = { x, y, started: false, docId, offset, label, mouse, target, pid, timer: mouse ? 0 : window.setTimeout(() => {
           try { navigator.vibrate?.(15); } catch { /* unsupported */ }
-          setTouchDrag({ docId, offset, label, x, y, over: dropDateAt(x, y) });
-        }, 450) };
+          begin(target, pid, x, y);
+        }, 300) };
       },
       onPointerMove: (event: React.PointerEvent) => {
-        const p = press.current; if (!p) return;
-        if (!p.started) { if (Math.hypot(event.clientX - p.x, event.clientY - p.y) > 8) { window.clearTimeout(p.timer); press.current = null; } return; }
+        const p = press.current; if (!p || !p.mouse) return;
+        if (!p.started) {
+          const dist = Math.hypot(event.clientX - p.x, event.clientY - p.y);
+          if (p.mouse) { if (dist > 5) begin(p.target, p.pid, event.clientX, event.clientY); else return; }
+          else { if (dist > 8) { window.clearTimeout(p.timer); press.current = null; } return; }
+        }
+        event.preventDefault();
+        setAutoScroll(event.clientY);
         setTouchDrag((d) => d && { ...d, x: event.clientX, y: event.clientY, over: dropDateAt(event.clientX, event.clientY) });
       },
       onPointerUp: (event: React.PointerEvent) => {
-        const p = press.current; press.current = null; if (!p) return;
-        window.clearTimeout(p.timer);
+        const p = press.current; if (!p || !p.mouse) return; press.current = null;
+        window.clearTimeout(p.timer); stopAutoScroll();
         if (!p.started) return;
         suppressClick.current = true; window.setTimeout(() => { suppressClick.current = false; }, 400);
         const day = dropDateAt(event.clientX, event.clientY);
@@ -259,7 +305,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
         if (day) void moveJob(p.docId, p.offset, day);
         else setMessage("Not moved: drop the job on a day.");
       },
-      onPointerCancel: () => { const p = press.current; press.current = null; if (p) window.clearTimeout(p.timer); setTouchDrag(null); },
+      onPointerCancel: () => { const p = press.current; if (!p || !p.mouse) return; press.current = null; if (p) window.clearTimeout(p.timer); stopAutoScroll(); setTouchDrag(null); },
       onContextMenu: (event: React.MouseEvent) => { if (press.current) event.preventDefault(); },
     };
   }
@@ -271,20 +317,20 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
     return (
       <div
         key={`${job.doc.id}-${job.day?.index || 1}`}
-        draggable
+        draggable={!agenda}
         data-testid={later ? `${tid}job-day-${job.doc.id}-${job.day!.index}` : `${tid}job-${job.doc.id}`}
         data-day={job.day ? `${job.day.index}/${job.day.count}` : undefined}
         data-status={job.schedule.status}
         data-tentative={isTentative(job.doc, jobDocs) || undefined}
         data-state={clashing.has(job.doc.id) ? "blocked" : undefined}
         data-done={doneState(job.schedule) || undefined}
-        onDragStart={(event) => event.dataTransfer.setData("text/plain", dragPayload(job.doc.id, job.day?.offset || 0))}
+        onDragStart={agenda ? undefined : (event) => event.dataTransfer.setData("text/plain", dragPayload(job.doc.id, job.day?.offset || 0))}
         {...(agenda ? touchHandlers(job.doc.id, job.day?.offset || 0, job.doc.clientName || job.doc.title) : {})}
         role="button"
         tabIndex={0}
         onKeyDown={onActivateKey(() => setEditing({ docId: job.doc.id }))}
         onClick={(event) => { event.stopPropagation(); if (suppressClick.current) return; setEditing({ docId: job.doc.id }); }}
-        className={agenda ? `relative select-none [-webkit-touch-callout:none] flex min-h-11 pr-16 cursor-pointer flex-col justify-center rounded-lg border border-l-4 px-3 py-2 text-left text-sm font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc, jobDocs) ? " cr-tentative border-dashed opacity-60" : ""}` : `cr-chip2 cursor-grab min-w-0 break-words rounded-md border border-l-4 px-1.5 py-1 text-left text-xs font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc, jobDocs) ? " cr-tentative border-dashed opacity-60" : ""}`}
+        className={agenda ? `relative select-none [-webkit-touch-callout:none] [-webkit-user-select:none] touch-manipulation transition-transform ${touchDrag?.docId === job.doc.id ? "scale-[1.03] opacity-60 shadow-lg ring-2 ring-teal-400" : ""} flex min-h-11 pr-16 cursor-grab active:cursor-grabbing flex-col justify-center rounded-lg border border-l-4 px-3 py-2 text-left text-sm font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc, jobDocs) ? " cr-tentative border-dashed opacity-60" : ""}` : `cr-chip2 cursor-grab min-w-0 break-words rounded-md border border-l-4 px-1.5 py-1 text-left text-xs font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc, jobDocs) ? " cr-tentative border-dashed opacity-60" : ""}`}
         title={`${crossesMidnight(job.schedule.startTime, job.schedule.endTime) ? `${timeLabel(job.schedule.startTime || "")}–${timeLabel(job.schedule.endTime || "")} (next day) · ` : ""}${job.doc.title} · ${job.doc.clientName} · ${statusLabel(job.schedule)}${job.schedule.onMyWayAt && job.schedule.status !== "done" ? ` · ${job.schedule.onMyWayBy || "Crew"} on the way` : ""}${people ? ` · ${people}` : ""}`}
       >
         {agenda ? (
@@ -499,7 +545,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
                     <p className="text-xs opacity-80">Press and hold a job, then drag it onto a day. Or tap Schedule.</p>
                     {unscheduled.length === 0 && <p className="rounded-lg border border-dashed border-slate-500/40 p-3 text-center text-xs">None.</p>}
                     {unscheduled.map((doc) => (
-                      <div key={doc.id} data-testid={`m-unscheduled-${doc.id}`} {...touchHandlers(doc.id, 0, doc.clientName || doc.title)} className="flex min-h-11 select-none items-center gap-2 rounded-lg border border-slate-500/40 px-3 [-webkit-touch-callout:none]">
+                      <div key={doc.id} data-testid={`m-unscheduled-${doc.id}`} {...touchHandlers(doc.id, 0, doc.clientName || doc.title)} className={`flex min-h-11 select-none touch-manipulation items-center gap-2 rounded-lg border border-slate-500/40 px-3 transition-transform [-webkit-touch-callout:none] ${touchDrag?.docId === doc.id ? "scale-[1.03] opacity-60 shadow-lg ring-2 ring-teal-400" : ""}`}>
                         <span className="min-w-0 flex-1 truncate text-xs font-medium">{doc.title} · {doc.clientName || "No client"}</span>
                         <button type="button" data-testid={`m-schedule-${doc.id}`} onClick={() => { if (suppressClick.current) return; setEditing({ docId: doc.id, date: pickedDay || current }); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="shrink-0 rounded-md bg-teal-500 px-3 py-1.5 text-xs font-semibold text-slate-950!">Schedule</button>
                       </div>
@@ -529,9 +575,9 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
                           const n = jobs.filter((job) => job.schedule.date === day).length + continuing(day).length;
                           return (
                             <button key={day} type="button" data-testid={`mday-${day}`} data-drop-date={day} aria-label={`${day}, ${n} job${n === 1 ? "" : "s"}`} aria-pressed={day === sel} onClick={() => setPickedDay(day)}
-                              className={`flex aspect-square flex-col items-center justify-center rounded-lg border text-sm tabular-nums ${day === sel ? "border-teal-400 bg-teal-500/20 font-bold" : "border-slate-500/20"} ${touchDrag?.over === day ? "ring-2 ring-teal-400" : ""} ${day === today ? "text-teal-600 dark:text-teal-300 font-bold" : ""}`}>
+                              className={`flex h-12 flex-col items-center justify-center rounded-lg border text-sm tabular-nums ${day === sel ? "border-teal-400 bg-teal-500/20 font-bold" : "border-slate-500/20"} ${touchDrag?.over === day ? "ring-2 ring-teal-400 bg-teal-500/30" : ""} ${day === today ? "text-teal-600 dark:text-teal-300 font-bold" : ""}`}>
                               {parse(day).getDate()}
-                              {n > 0 && <span className="mt-0.5 flex items-center gap-0.5" aria-hidden="true">{n <= 3 ? Array.from({ length: n }, (_, k) => <span key={k} className="h-1.5 w-1.5 rounded-full bg-teal-500" />) : <span className="rounded bg-teal-500 px-1 text-[10px] font-semibold text-slate-950!">{n}</span>}</span>}
+                              {n > 0 && <span data-testid={`mday-count-${day}`} className="mt-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-teal-500 px-1 text-[10px] font-semibold leading-none text-slate-950!" aria-hidden="true">{n}</span>}
                             </button>
                           );
                         })}
@@ -676,7 +722,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
             </div>
           </div>
         )}
-        {touchDrag && <div aria-hidden="true" data-testid="touch-drag-ghost" className="pointer-events-none fixed z-[200] -translate-x-1/2 -translate-y-full rounded-lg border border-teal-400 bg-[var(--cr-card)] px-3 py-1.5 text-sm font-semibold shadow-lg" style={{ left: touchDrag.x, top: touchDrag.y - 12 }}>{touchDrag.label}{touchDrag.over ? ` → ${parse(touchDrag.over).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}</div>}
+        {touchDrag && <div aria-hidden="true" data-testid="touch-drag-ghost" className="pointer-events-none fixed z-[200] -translate-x-1/2 -translate-y-full rounded-lg border border-teal-400 bg-[var(--cr-card)] px-3 py-1.5 text-sm font-semibold shadow-lg" style={{ left: Math.min(Math.max(touchDrag.x, 90), (typeof window === "undefined" ? 400 : window.innerWidth) - 90), top: touchDrag.y - 12 }}>{touchDrag.label}{touchDrag.over ? ` → ${parse(touchDrag.over).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}</div>}
       </section>
     </AppShell>
   );
