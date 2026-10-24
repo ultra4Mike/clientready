@@ -79,12 +79,15 @@ export async function sendEmail(docId: string, to: string, subject: string, text
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!token) return { id: "", error: "Sign in to send email from the app, or use “Open in email app”." };
+  // QA2: one request id per Send click; the automatic retry after a lost reply reuses it (no duplicate email).
+  const requestId = crypto.randomUUID();
+  const post = () => fetch("/api/email/send", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+    body: JSON.stringify({ docId, to, subject, text, requestId }),
+  });
   try {
-    const response = await fetch("/api/email/send", {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-      body: JSON.stringify({ docId, to, subject, text }),
-    });
+    const response = await post().catch(() => post());
     const result = await response.json().catch(() => ({}));
     if (!response.ok) return { id: "", error: String(result.error || "The email was not sent.") };
     return { id: String(result.id || ""), error: "" };

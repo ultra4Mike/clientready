@@ -1,5 +1,7 @@
 import { serviceClient, stripeConfig, stripeConfigFor } from "@/lib/stripe-server";
 import { isStripeCardPayment, paymentMethods, readPayments, refundableFor } from "@/lib/payments";
+import { parseMoneyInput, toMinor } from "@/lib/stripe-money";
+import { createHash } from "node:crypto";
 import { clientIp, rateLimitedShared, tooMany } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -32,9 +34,13 @@ export async function POST(request: Request) {
   const paymentId = String(body?.paymentId || "");
   const requestId = String(body?.requestId || "");
   const via = body?.via === "stripe" ? "stripe" : "manual";
-  const amount = Math.round(Number(String(body?.amount ?? "").replace(/[^0-9.]/g, "")) * 100) / 100;
+  // QA2: strict decimal input (no minus, no exponent, proper thousands commas, no extra decimals).
+  const currency = base.currency || "usd";
+  const parsed = parseMoneyInput(body?.amount, currency);
+  const amount = parsed === null ? 0 : parsed;
   const note = String(body?.note || "").replace(/[\u0000-\u001F\u007F]/g, " ").trim().slice(0, 300);
   if (!UUID.test(docId) || !paymentId || !UUID.test(requestId)) return fail(400, "Save the invoice first, then refund.");
+  if (parsed === null) return fail(400, "Enter the amount as a number, like 125.50 (no minus signs).");
   if (!(amount > 0)) return fail(400, "Enter the amount to refund.");
 
   const { data: doc } = await client.from("documents").select("id, type, user_id, data").eq("id", docId).eq("user_id", owner.id).maybeSingle();
@@ -54,13 +60,24 @@ export async function POST(request: Request) {
     if (!isStripeCardPayment(payment)) return fail(400, "Only card payments taken through ClientReady can be refunded to the card. Use Record a refund instead.");
     const config = stripeConfigFor(owner.id);
     if (!config.secretKey) return fail(503, "Card payments aren't set up, so a card refund can't be sent. Refund in Stripe or record a manual refund.");
-    const form = new URLSearchParams({ payment_intent: payment.ref, amount: String(Math.round(amount * 100)), "metadata[doc_id]": docId, "metadata[owner_id]": owner.id, "metadata[payment_id]": paymentId, reason: "requested_by_customer" });
+    // QA2: minor units for the charge currency (JPY/KRW have no cents).
+    const minor = toMinor(amount, config.currency || currency);
+    if (!(minor > 0)) return fail(400, "Enter the amount to refund.");
+    // QA2: the idempotency key is the payment plus how much of it is already refunded, not the request id, so two
+    // refunds started at the same moment share one key: Stripe runs only one, and the other gets an error below.
+    const already = toMinor(Math.max(0, (Number(String(payment.amount).replace(/[^0-9.]/g, "")) || 0) - left), config.currency || currency);
+    const key = createHash("sha256").update(`${owner.id}|${docId}|${paymentId}|${already}`).digest("hex").slice(0, 48);
+    const form = new URLSearchParams({ payment_intent: payment.ref, amount: String(minor), "metadata[request_id]": requestId, "metadata[doc_id]": docId, "metadata[owner_id]": owner.id, "metadata[payment_id]": paymentId, reason: "requested_by_customer" });
     const response = await fetch(`${config.apiBase}/v1/refunds`, {
       method: "POST",
-      headers: { authorization: `Bearer ${config.secretKey}`, "content-type": "application/x-www-form-urlencoded", "idempotency-key": `cr-refund-${requestId}` },
+      headers: { authorization: `Bearer ${config.secretKey}`, "content-type": "application/x-www-form-urlencoded", "idempotency-key": `cr-refund-${key}` },
       body: form,
     }).catch(() => null);
-    const refund = (response ? await response.json().catch(() => null) : null) as { id?: string; status?: string; error?: { message?: string } } | null;
+    const refund = (response ? await response.json().catch(() => null) : null) as { id?: string; status?: string; error?: { message?: string; type?: string } } | null;
+    // Another refund on this payment is running or just ran (same key, different request): only one goes through.
+    if (response && (response.status === 409 || refund?.error?.type === "idempotency_error")) {
+      return fail(409, "Another refund on this payment was just started. Nothing more was refunded. Reload the invoice to see it.");
+    }
     if (!response?.ok || !refund?.id) return fail(502, `Stripe did not refund it${refund?.error?.message ? `: ${refund.error.message}` : "."} Nothing was changed.`);
     if (refund.status !== "succeeded") return Response.json({ result: "pending", message: "Stripe accepted the refund. It will show here once Stripe confirms it." });
     refundId = String(refund.id);

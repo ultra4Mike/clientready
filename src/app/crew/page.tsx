@@ -185,6 +185,7 @@ export default function CrewPage() {
   // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
   useEffect(() => setMounted(true), []);
   const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [resync, setResync] = useState(0);
   const [name, setName] = useState("");
   const [ownerId, setOwnerId] = useState("");
   const [employeeId, setEmployeeId] = useState("");
@@ -287,7 +288,9 @@ export default function CrewPage() {
       drafts: ((draftRows.data || []) as Draft[]).filter(ownRow),
     };
     refreshQueue(user.id);
-    if (navigator.onLine) void flushQueue(user.id, sendQueued).then((sent) => { refreshQueue(user.id); if (sent) setMessage(`Sent ${sent} saved upload${sent === 1 ? "" : "s"}.`); }).catch(() => undefined);
+    // QA2 (R54): after saved taps (e.g. an offline clock-out) send, read the server again so the page shows the
+    // synced state instead of the copy read before they went out. Stops once nothing more is sent.
+    if (navigator.onLine) void flushQueue(user.id, sendQueued).then((sent) => { refreshQueue(user.id); if (sent) { setMessage(`Sent ${sent} saved upload${sent === 1 ? "" : "s"}.`); setResync((n) => n + 1); } }).catch(() => undefined);
     setName(next.name); setJobs(next.jobs); setClock(next.clock); setExpenses(next.expenses); setDrafts(next.drafts);
     setClients((clientRows.data || []) as Client[]);
     try {
@@ -318,6 +321,14 @@ export default function CrewPage() {
     window.addEventListener("offline", gone);
     return () => { window.clearInterval(timer); window.clearTimeout(first); window.clearTimeout(start); window.removeEventListener("online", back); window.removeEventListener("offline", gone); document.removeEventListener("visibilitychange", seen); window.clearInterval(poll); };
   }, []);
+
+  // QA2 (R54): saved taps just sent from load(): read again so the synced state shows.
+  useEffect(() => {
+    if (resync === 0) return;
+    const again = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(again);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resync]);
 
   function switchTheme() {
     const next = theme === "dark" ? "light" : "dark";
@@ -385,9 +396,13 @@ export default function CrewPage() {
   const cards = useMemo(() => buildCards(withQueuedTicks(jobs, queue, name)), [jobs, queue, name]);
   // Clock taps saved offline show right away (the phone's tap time is sent when back online).
   const clock = useMemo(() => withQueuedClock(loadedClock, queue), [loadedClock, queue]);
-  const open = clock.find((entry) => !entry.ended_at);
-  const openCard = open ? cards.find((card) => card.doc_id === open.doc_id) : undefined;
-  const openLabel = open ? `${openCard ? [openCard.invoice_number, openCard.client_name].filter(Boolean).join(" · ") || "another job" : "another job"} since ${clockTime(open.started_at)}` : "";
+  // QA2 (R54): every open entry, not only the first (a missed clock-out can leave more than one).
+  const openEntries = clock.filter((entry) => !entry.ended_at);
+  const open = openEntries[0];
+  const openLabelFor = (entry: ClockEntry) => {
+    const openCard = cards.find((card) => card.doc_id === entry.doc_id);
+    return `${openCard ? [openCard.invoice_number, openCard.client_name].filter(Boolean).join(" · ") || "another job" : "another job"} since ${clockTime(entry.started_at)}`;
+  };
   const weekStart = today ? addDays(today, -((new Date(`${today}T00:00:00`).getDay() + 6) % 7)) : "";
   const weekDays = weekStart ? Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)) : [];
   const todayCards = cards.filter((card) => card.job_date === today);
@@ -679,10 +694,14 @@ export default function CrewPage() {
               <button type="button" disabled={busy !== ""} data-testid={`clock-out-${card.doc_id}`} onClick={() => clockTap("clock-out", card.doc_id)} className="min-h-11 shrink-0 rounded-xl bg-amber-500 px-4 py-2 font-semibold text-slate-950!">Clock out</button>
             ) : past ? (
               <p data-testid={`past-state-${card.doc_id}`} data-completed={status === "done" ? "true" : "false"} className="shrink-0 rounded-full border border-slate-400/40 px-3 py-1.5 text-xs font-semibold text-[var(--cr-muted)]"><span className="inline-flex items-center gap-1">{status === "done" ? <><Icon name="check" className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />Completed</> : "Past job"}</span></p>
-            ) : open && open.doc_id !== card.doc_id ? (
+            ) : openEntries.some((entry) => entry.doc_id !== card.doc_id) ? (
               <div className="shrink-0 text-right" data-testid={`on-other-job-${card.doc_id}`}>
-                <p className="text-xs text-[var(--cr-muted)]" data-testid="on-other-job-label">On another job: {openLabel}</p>
-                <button type="button" disabled={busy !== ""} data-testid={`clock-out-there-${open.doc_id}`} onClick={() => clockTap("clock-out", open.doc_id)} className="mt-1 min-h-11 rounded-xl border border-amber-500 px-3 py-2 text-sm font-semibold">Clock out there</button>
+                {openEntries.filter((entry) => entry.doc_id !== card.doc_id).map((entry) => (
+                  <div key={entry.id} className="mb-1">
+                    <p className="text-xs text-[var(--cr-muted)]" data-testid="on-other-job-label">On another job: {openLabelFor(entry)}</p>
+                    <button type="button" disabled={busy !== ""} data-testid={`clock-out-there-${entry.doc_id}`} onClick={() => clockTap("clock-out", entry.doc_id)} className="mt-1 min-h-11 rounded-xl border border-amber-500 px-3 py-2 text-sm font-semibold">Clock out there</button>
+                  </div>
+                ))}
               </div>
             ) : (
               <a href="/crew?tab=today" data-testid={`clock-use-myday-${card.doc_id}`} className="cr-btn cr-btn-secondary min-h-11 shrink-0">Use My day</a>

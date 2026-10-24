@@ -22,20 +22,27 @@ export function depositInvoice(docs: Doc[], proposalId: string): Doc | null {
 }
 
 /**
- * Proposal payments the invoice doesn't have yet. Matched by id first; then (older copies, or a server
- * convert that gave new ids) by amount + calendar day, counted one-for-one so a deposit already on the
- * invoice with another id / a full timestamp is never added again, while two real $100 payments stay two.
+ * Proposal payments the invoice doesn't have yet. Matched by id first. QA2 (R21): the fallback for older
+ * copies / a server convert that gave new ids is stricter than amount + day: a candidate must also agree on
+ * the reference (Stripe pi_/cs_ id, check number...) and the method whenever both sides have one, so a
+ * different real payment of the same amount on the same day can no longer hide a deposit. Counted one-for-one.
  */
 export function missingDeposits(proposalPayments: Payment[], invoicePayments: Payment[]) {
   const ids = new Set(invoicePayments.map((payment) => payment.id).filter(Boolean));
-  const key = (payment: Payment) => `${Math.round((Number(payment.amount) || 0) * 100)}|${String(payment.date || "").slice(0, 10)}`;
-  const left = new Map<string, number>();
   const proposalIds = new Set(proposalPayments.map((p) => p.id));
-  for (const payment of invoicePayments) if (!proposalIds.has(payment.id)) left.set(key(payment), (left.get(key(payment)) || 0) + 1);
+  const cents = (payment: Payment) => Math.round((Number(payment.amount) || 0) * 100);
+  const day = (payment: Payment) => String(payment.date || "").slice(0, 10);
+  const norm = (v: unknown) => String(v || "").trim().toLowerCase();
+  const agree = (a: unknown, b: unknown) => !norm(a) || !norm(b) || norm(a) === norm(b);
+  const pool = invoicePayments.filter((payment) => !proposalIds.has(payment.id));
+  const used = new Set<number>();
+  const matches = (dep: Payment, inv: Payment) => cents(dep) === cents(inv) && day(dep) === day(inv) && agree(dep.ref, inv.ref) && agree(dep.method, inv.method);
   return proposalPayments.filter((payment) => {
     if ((Number(payment.amount) || 0) <= 0 || ids.has(payment.id)) return false;
-    const n = left.get(key(payment)) || 0;
-    if (n > 0) { left.set(key(payment), n - 1); return false; }
+    // Prefer an exact reference match, then any compatible one.
+    let at = pool.findIndex((inv, i) => !used.has(i) && matches(payment, inv) && norm(payment.ref) && norm(payment.ref) === norm(inv.ref));
+    if (at < 0) at = pool.findIndex((inv, i) => !used.has(i) && matches(payment, inv));
+    if (at >= 0) { used.add(at); return false; }
     return true;
   });
 }

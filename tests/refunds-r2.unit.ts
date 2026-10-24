@@ -26,7 +26,7 @@ assert.ok(readPayments(merged as never).some((row) => row.id === partial.id), "r
 // Route: owner only, idempotent Stripe call, recorded via the service-role RPC, history logged in SQL.
 const route = readFileSync("src/app/api/pay/refund/route.ts", "utf8");
 assert.match(route, /eq\("user_id", owner\.id\)/);
-assert.match(route, /"idempotency-key": `cr-refund-\$\{requestId\}`/);
+assert.match(route, /"idempotency-key": `cr-refund-\$\{key\}`/); // QA2: deterministic per payment state
 assert.match(route, /rpc\("record_owner_refund"/);
 const sql = readFileSync("supabase/migrations/20261024200000_owner_refunds.sql", "utf8");
 assert.match(sql, /'history', v_history/);

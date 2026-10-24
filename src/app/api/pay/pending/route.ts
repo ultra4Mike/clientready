@@ -36,10 +36,19 @@ async function pendingFor(ownerId: string): Promise<Pending[]> {
   const hasOwnerColumn = !mine.error || !/owner_id/.test(mine.error.message || "");
   if (mine.error && hasOwnerColumn) return [];
   let rows = (mine.data || []) as Pending[];
-  // Unstamped rows: only those pointing at an invoice id; ownership checked below.
-  const loose = hasOwnerColumn
-    ? await table().select("*").is("owner_id", null).is("resolved_at", null).not("doc_id", "is", null).order("created_at", { ascending: true }).limit(200)
-    : await table().select("*").is("resolved_at", null).not("doc_id", "is", null).order("created_at", { ascending: true }).limit(200);
+  // Unstamped rows: only those pointing at this owner's invoices. QA2 (R11): filtered by this owner's own invoice
+  // ids in the query, so other accounts' old unstamped rows can't fill a shared 200-row cap and hide this owner's.
+  const looseRows: Pending[] = [];
+  const myDocs = await serviceClient().from("documents").select("id").eq("user_id", ownerId).eq("type", "invoice").limit(10000);
+  const myIds = ((myDocs.data || []) as { id: string }[]).map((doc) => doc.id);
+  for (let at = 0; at < myIds.length && looseRows.length < 200; at += 150) {
+    const chunk = myIds.slice(at, at + 150);
+    const part = hasOwnerColumn
+      ? await table().select("*").is("owner_id", null).is("resolved_at", null).in("doc_id", chunk).order("created_at", { ascending: true }).limit(200)
+      : await table().select("*").is("resolved_at", null).in("doc_id", chunk).order("created_at", { ascending: true }).limit(200);
+    looseRows.push(...((part.data || []) as Pending[]));
+  }
+  const loose = { data: looseRows.slice(0, 200) };
   const owners = await docOwners([...rows, ...((loose.data || []) as Pending[])].map((row) => row.doc_id || ""));
   rows = rows.filter((row) => !owners.has(row.doc_id || "") || owners.get(row.doc_id || "") === ownerId);
   const extra = ((loose.data || []) as Pending[]).filter((row) => owners.get(row.doc_id || "") === ownerId);

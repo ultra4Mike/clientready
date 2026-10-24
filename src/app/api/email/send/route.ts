@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { emailConfig } from "@/lib/email-server";
 import { planOne, readAutomations, type AutoDoc } from "@/lib/automation-email";
 import { clientIp, rateLimitedShared, tooMany } from "@/lib/rate-limit";
@@ -19,11 +20,16 @@ const fail = (status: number, error: string) => Response.json({ error }, { statu
  */
 export async function POST(request: Request) {
   const config = emailConfig();
-  if (!config.enabled) return fail(503, "Email sending is not set up. Use “Open in email app”.");
+  // QA2: sign-in is checked before "not set up", so the route says nothing about setup to signed-out callers.
   const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   if (!token) return fail(401, "Sign in first.");
   if (await rateLimitedShared(`email:${clientIp(request)}`, 20, 60_000)) return tooMany();
-  const body = (await request.json().catch(() => null)) as { docId?: unknown; to?: unknown; subject?: unknown; text?: unknown; automation?: { kind?: unknown; period?: unknown }; today?: unknown } | null;
+  if (config.supabaseUrl && config.anonKey) {
+    const who = await fetch(`${config.supabaseUrl}/auth/v1/user`, { headers: { apikey: config.anonKey, authorization: `Bearer ${token}` } }).catch(() => null);
+    if (!who?.ok) return fail(401, "Sign in again, then send.");
+  } else return fail(401, "Sign in again, then send.");
+  if (!config.enabled) return fail(503, "Email sending is not set up. Use “Open in email app”.");
+  const body = (await request.json().catch(() => null)) as { requestId?: unknown; docId?: unknown; to?: unknown; subject?: unknown; text?: unknown; automation?: { kind?: unknown; period?: unknown }; today?: unknown } | null;
   const docId = String(body?.docId || "");
   if (!UUID.test(docId)) return fail(400, "Save this document to your account first.");
   const auto = body?.automation && typeof body.automation === "object" ? { kind: String(body.automation.kind || ""), period: String(body.automation.period || "") } : null;
@@ -85,12 +91,24 @@ export async function POST(request: Request) {
     return fail(429, quota === "day" ? "Daily email limit reached (100). Try again tomorrow." : "Too many emails at once. Wait a minute and try again.");
   }
 
+  // QA2: an idempotency key, so a retry after a lost reply (the provider already accepted it) never sends twice.
+  // Automated: one per (doc, kind, period). Manual: the app's request id, else the exact message within the hour.
+  const requestId = UUID.test(String(body?.requestId || "")) ? String(body?.requestId) : "";
+  const idem = createHash("sha256").update(auto ? `auto|${user.id}|${docId}|${auto.kind}|${auto.period}`
+    : requestId ? `req|${user.id}|${requestId}` : `msg|${user.id}|${docId}|${to}|${subject}|${text}|${new Date().toISOString().slice(0, 13)}`).digest("hex").slice(0, 64);
   const sendResponse = await fetch(`${config.apiBase}/emails`, {
     method: "POST",
-    headers: { authorization: `Bearer ${config.apiKey}`, "content-type": "application/json" },
+    headers: { authorization: `Bearer ${config.apiKey}`, "content-type": "application/json", "idempotency-key": `cr-email-${idem}` },
     body: JSON.stringify({ from: config.from, to: [to], subject, text, ...(user.email ? { reply_to: user.email } : {}) }),
   }).catch(() => null);
-  if (!sendResponse?.ok) {
+  if (!sendResponse) {
+    // QA2: no reply at all — the provider may have accepted it. Keep the claim and the counted slot (so an
+    // automated send can't go twice); a manual retry reuses the same idempotency key, so it can't duplicate.
+    return fail(504, "Could not confirm the email was sent. Check your sent log before sending again; sending again with the same text won't send it twice.");
+  }
+  if (!sendResponse.ok) {
+    // QA2: the provider refused it, so nothing went out: give the quota slot back and release the claim.
+    await rpc("email_quota_give_back", {});
     if (claim) await rpc("release_automation_send", claim);
     return fail(502, "The email provider did not accept the email. It was not sent.");
   }

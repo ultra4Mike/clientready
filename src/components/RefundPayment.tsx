@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { parseMoneyInput } from "@/lib/stripe-money";
 import { isStripeCardPayment, paymentMethods, readPayments, refundableFor, type Payment } from "@/lib/payments";
 
 const DOCS_KEY = "clientready-documents";
@@ -26,7 +27,10 @@ export function RefundPayment({ docId, payment, payments, onDone }: { docId: str
 
   const start = () => { setOpen(true); setAmount(left.toFixed(2)); setError(""); setRequestId(crypto.randomUUID()); };
   const submit = async () => {
-    const value = Number(amount.replace(/[^0-9.]/g, ""));
+    // QA2: strict input — "5e2", "-5" or "1,23" are refused instead of being read as another number.
+    const parsed = parseMoneyInput(amount);
+    if (parsed === null) { setError("Enter the amount as a number, like 125.50 (no minus signs)."); return; }
+    const value = parsed;
     if (!(value > 0) || value > left + 0.004) { setError(`Enter an amount up to $${left.toFixed(2)}.`); return; }
     if (via === "manual" && !method) { setError("Choose how the money was given back."); return; }
     const words = via === "stripe" ? `Refund $${value.toFixed(2)} to the client's card through Stripe?` : `Record a $${value.toFixed(2)} refund (${method})? This doesn't move any money.`;

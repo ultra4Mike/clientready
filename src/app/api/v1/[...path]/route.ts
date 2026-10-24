@@ -10,6 +10,8 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+import { itemsError, validSince } from "@/lib/api-validate";
+
 const fail = (status: number, error: string) => Response.json({ error }, { status, headers: { "cache-control": "no-store" } });
 const RESOURCES = new Set(["clients", "jobs", "invoices", "events"]);
 
@@ -42,8 +44,11 @@ async function handle(request: Request, path: string[], method: "GET" | "POST" |
     if (text.length > 100000) return fail(413, "Body too large.");
     try { body = text ? JSON.parse(text) : {}; } catch { return fail(400, "Body must be JSON."); }
     if (!body || typeof body !== "object" || Array.isArray(body)) return fail(400, "Body must be a JSON object.");
+    const bad = resource === "invoices" ? itemsError(body.items) : "";
+    if (bad) return fail(400, bad);
   } else if (resource === "events") {
     const since = new URL(request.url).searchParams.get("since") || "";
+    if (since && !validSince(since)) return fail(400, "since must be an ISO date or time, like 2026-10-24T08:00:00Z.");
     if (since) body = { since };
   }
   const response = await fetch(`${supabaseUrl}/rest/v1/rpc/api_call`, {
