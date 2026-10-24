@@ -9,7 +9,8 @@ import { loadAccountIntoCache } from "@/lib/account-cache";
 import { uniqueDocs } from "@/lib/change-orders";
 import { readWorkers, STATUS_LABEL, type Worker } from "@/lib/schedule";
 import { addDaysYmd, localYmd, niceYmd, timeLabel } from "@/lib/scheduled-jobs";
-import { dayRoute } from "@/lib/route";
+import { dayRoute, embedPartial } from "@/lib/route";
+import { authedFetch } from "@/lib/authed-fetch";
 
 type Doc = { id: string; type: string; title: string; clientName: string; data: Record<string, unknown> };
 
@@ -34,6 +35,27 @@ export default function RoutePage() {
   }, []);
 
   const route = useMemo(() => (date ? dayRoute(docs, date, worker) : null), [docs, date, worker]);
+  // Drive time between stops (Google Distance Matrix via /api/drive-time; needs GOOGLE_MAPS_API_KEY on the server).
+  const [drive, setDrive] = useState<{ key: string; minutes: number | null; legs: number; known: number } | null>(null);
+  const legKey = route ? route.routed.map((stop) => stop.address).join("|") : "";
+  useEffect(() => {
+    if (!route || route.routed.length < 2) return;
+    let stop = false;
+    const addresses = route.routed.map((s) => s.address);
+    (async () => {
+      let minutes = 0, known = 0;
+      for (let i = 1; i < addresses.length; i++) {
+        try {
+          const res = await authedFetch(`/api/drive-time?from=${encodeURIComponent(addresses[i - 1])}&to=${encodeURIComponent(addresses[i])}`);
+          const data = (await res.json()) as { minutes?: number | null };
+          if (typeof data.minutes === "number") { minutes += data.minutes; known++; }
+        } catch { /* offline */ }
+      }
+      if (!stop) setDrive({ key: legKey, minutes: known ? minutes : null, legs: addresses.length - 1, known });
+    })();
+    return () => { stop = true; };
+  }, [legKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const driveNow = drive && drive.key === legKey ? drive : null;
   const names = new Map(workers.map((person) => [person.id, person.name]));
   const button = "inline-flex min-h-11 items-center rounded-xl border border-teal-500/30 px-3 text-sm font-medium";
 
@@ -61,6 +83,8 @@ export default function RoutePage() {
               {route.directionsUrl && <a href={route.directionsUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-teal-500 px-4 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 sm:flex-none" data-testid="route-open">Open route in Maps ({route.routed.length} stop{route.routed.length === 1 ? "" : "s"})</a>}
               {route.embedUrl && <button type="button" className={`${button} gap-1.5 ${showMap ? "border-teal-400 bg-teal-500/15 text-teal-700 dark:text-teal-300" : ""}`} data-testid="route-map-toggle" aria-pressed={showMap} onClick={() => setShowMap(!showMap)}>{showMap ? "Hide map" : "Show map"}</button>}
             </div>
+            {route.routed.length > 1 && <p className="text-sm" data-testid="route-drive">{!driveNow ? "Drive time: checking…" : driveNow.minutes === null ? "Drive time isn't available right now." : `Drive time: about ${driveNow.minutes >= 60 ? `${Math.floor(driveNow.minutes / 60)} h ${driveNow.minutes % 60} min` : `${driveNow.minutes} min`}${driveNow.known < driveNow.legs ? ` (${driveNow.known} of ${driveNow.legs} legs)` : ""}`}</p>}
+            {showMap && embedPartial(route.routed.length) && <p className="text-xs text-slate-500" data-testid="route-map-partial">The map shows the first and last stop. Open route in Maps for every stop.</p>}
             {showMap && route.embedUrl && <iframe title="Route map" src={route.embedUrl} data-testid="route-map" className="aspect-[4/3] w-full rounded-2xl border border-teal-500/20 shadow-sm sm:aspect-auto sm:h-96" loading="lazy" referrerPolicy="no-referrer" />}
             <ol className="space-y-2" data-testid="route-stops">
               {route.stops.map((stop) => {

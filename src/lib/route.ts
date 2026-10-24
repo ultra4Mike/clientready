@@ -30,10 +30,25 @@ export function directionsUrl(addresses: string[]) {
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}${waypoints ? `&waypoints=${encodeURIComponent(waypoints)}` : ""}`;
 }
 
-/** Keyless Google Maps embed of the stops (single place, or a route through them). Loaded only when the owner taps "Show map". */
-export function embedUrl(addresses: string[]) {
+/**
+ * Google Maps embed of the stops, loaded only when the owner taps "Show map".
+ * With NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY (Maps Embed API, free; restrict it to the site's referrers) it is a real
+ * driving route through every stop. Help retest: the old keyless "saddr/daddr …+to:…" form no longer draws
+ * multi-stop routes (Google shows the whole world), so without a key a keyless map pins one stop (1 stop) or
+ * draws the first → last stop (2+), and "Open route in Maps" still has every stop.
+ */
+export function embedUrl(addresses: string[], key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY || "") {
   if (!addresses.length) return "";
-  if (addresses.length === 1) return `https://maps.google.com/maps?q=${encodeURIComponent(addresses[0])}&output=embed`;
-  const [first, ...rest] = addresses;
-  return `https://maps.google.com/maps?saddr=${encodeURIComponent(first)}&daddr=${rest.map(encodeURIComponent).join("+to:")}&output=embed`;
+  const enc = encodeURIComponent;
+  if (key) {
+    if (addresses.length === 1) return `https://www.google.com/maps/embed/v1/place?key=${enc(key)}&q=${enc(addresses[0])}`;
+    const middle = addresses.slice(1, -1).slice(0, 20);
+    return `https://www.google.com/maps/embed/v1/directions?key=${enc(key)}&origin=${enc(addresses[0])}&destination=${enc(addresses[addresses.length - 1])}${middle.length ? `&waypoints=${middle.map(enc).join("|")}` : ""}&mode=driving`;
+  }
+  if (addresses.length === 1) return `https://maps.google.com/maps?q=${enc(addresses[0])}&output=embed`;
+  return `https://maps.google.com/maps?saddr=${enc(addresses[0])}&daddr=${enc(addresses[addresses.length - 1])}&output=embed`;
+}
+/** True when the keyless map can't show every stop (3+ stops and no embed key). */
+export function embedPartial(count: number, key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY || "") {
+  return !key && count > 2;
 }
