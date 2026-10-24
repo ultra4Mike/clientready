@@ -64,7 +64,10 @@ export async function registerPasskey(name: string) {
 
 export async function listPasskeys() {
   const { data, error } = await supabase.auth.passkey.list();
-  return { items: data || [], message: error ? passkeyErrorMessage(error) : "" };
+  // Loading the device list is not a sign-in attempt: never show the generic "didn't work" line for it (it appeared
+  // in Settings before any try, e.g. while the session was still loading). Only "not switched on" is worth saying.
+  const msg = error ? passkeyErrorMessage(error) : "";
+  return { items: data || [], message: /switched on/.test(msg) ? msg : "" };
 }
 
 export async function removePasskey(id: string) {

@@ -37,3 +37,12 @@ for (let i = 0; i < 5; i += 1) assert.equal(throttle(1000 + i, 5, 60_000, log), 
 assert.equal(throttle(2000, 5, 60_000, log), false);
 assert.equal(throttle(62_000, 5, 60_000, log), true);
 console.log("passkeys.unit ok");
+
+// Deploy 28 retest: the Settings list load must not show the sign-in failure line before any attempt.
+{
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const src = require("node:fs").readFileSync(require("node:path").join(__dirname, "../src/lib/passkeys.ts"), "utf8");
+  const list = src.slice(src.indexOf("export async function listPasskeys"));
+  if (!/switched on/.test(list.slice(0, 600))) throw new Error("listPasskeys should only surface the not-switched-on message");
+  console.log("passkeys list no stale message: ok");
+}

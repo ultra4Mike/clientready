@@ -12,7 +12,7 @@ export default function PasskeySettings() {
   const [items, setItems] = useState<Item[] | null>(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
-  async function refresh() { const r = await listPasskeys(); setItems(r.items); if (r.message) setNote(r.message); }
+  async function refresh() { const r = await listPasskeys(); setItems(r.items); setNote((prev) => r.message || (/didn.t work/.test(prev) ? "" : prev)); }
   useEffect(() => { setSupported(passkeysSupported(window)); void refresh(); }, []);
   async function add() {
     setBusy(true); setNote("");
