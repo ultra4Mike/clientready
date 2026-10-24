@@ -132,8 +132,18 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
       // A later day's chip carries its offset: dropping day 2 on a date puts day 1 that many days earlier.
       const { docId, offset } = readDragPayload(event.dataTransfer.getData("text/plain"));
       const date = offset ? addDays(dropDate, -offset) : dropDate;
+      // Item 2 (repeat drags): decide on the list as stored NOW, not the copy loaded with the page. A background
+      // sync or the previous move's cloud save can rewrite/re-key the job after render; the stale copy made the
+      // drop return silently (cell highlighted, nothing saved, no prompt).
+      const stored = readDocs();
+      const docs = stored.length ? stored : state.docs;
       const doc = docs.find((item) => item.id === docId);
-      if (!doc) return;
+      if (!doc) {
+        setState((prev) => ({ ...prev, docs }));
+        setMessage("Not moved: this job changed since the calendar loaded. Try the drag again.");
+        return;
+      }
+      if (docs !== state.docs) setState((prev) => ({ ...prev, docs }));
       const existing = readSchedule(doc.data);
       const next = existing
         ? moveSchedule(existing, date, startTime)

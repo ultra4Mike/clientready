@@ -67,6 +67,19 @@ export async function loadCloudDocuments() {
   return (await fetchCloudDocuments()) || [];
 }
 
+type CrewDates = { id?: string; workDate?: string; startTime?: string; endTime?: string };
+/** This copy's schedule is newer than the cloud's: keep it, and its crew rows' day/times (pay fields stay merged). */
+export function keepNewerSchedule(mine: { schedule?: unknown; crew?: unknown }, merged: Record<string, unknown>, cloudSchedule?: { updatedAt?: string }) {
+  const my = mine.schedule as { updatedAt?: string } | undefined;
+  if (!my || (cloudSchedule && Date.parse(cloudSchedule.updatedAt || "") > Date.parse(my.updatedAt || ""))) return {};
+  const out: Record<string, unknown> = { schedule: my };
+  if (Array.isArray(mine.crew) && Array.isArray(merged.crew)) {
+    const byId = new Map((mine.crew as CrewDates[]).filter((r) => r && r.id).map((r) => [r.id, r]));
+    out.crew = (merged.crew as CrewDates[]).map((r) => { const m = r && byId.get(r.id); return m ? { ...r, workDate: m.workDate, startTime: m.startTime, endTime: m.endTime } : r; });
+  }
+  return out;
+}
+
 export async function saveCloudDocument(doc: CloudDoc) {
   // Every save records when it happened, so cloud/local merges can keep the newer copy.
   // (Mutates doc.data so callers that store the same object locally keep the same stamp.)
@@ -110,6 +123,10 @@ export async function saveCloudDocument(doc: CloudDoc) {
       // Without that version on this device the newer cloud save wins field by field (the schedule block still
       // merges on its own stamp below), never the stale copy.
       const base = stale ? readAncestor(doc.id, readStamp) || { ...doc.data } : readBase(doc.id);
+      // The schedule block (and the crew rows' dates that follow it) is decided on its own stamp, never by the
+      // field merge: else a move made from a stale base (drag a multi-day job back to a date it held before)
+      // merged as "unchanged" and the cloud's older position won, so the drop did nothing.
+      const mineBefore = { schedule: doc.data.schedule, crew: doc.data.crew };
       if (base && current.data) {
         const stamp = doc.data.updatedAt;
         const { data: mergedData } = mergeData(base, doc.data, current.data as Record<string, unknown>);
@@ -121,6 +138,7 @@ export async function saveCloudDocument(doc: CloudDoc) {
       else delete doc.data.approval;
       // A crew member may have updated the job status in the cloud since this copy was loaded.
       const cloudSchedule = (current.data as Record<string, unknown> | null)?.schedule as { updatedAt?: string } | undefined;
+      Object.assign(doc.data, keepNewerSchedule(mineBefore, doc.data, cloudSchedule));
       const mine = doc.data.schedule as { updatedAt?: string } | undefined;
       if (cloudSchedule && (!mine || Date.parse(cloudSchedule.updatedAt || "") > Date.parse(mine.updatedAt || ""))) doc.data.schedule = cloudSchedule;
       // Hours approvals: newer decision per worker wins; an older offline copy can't undo one (Help R27).
