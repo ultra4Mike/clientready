@@ -4,7 +4,9 @@ import { friendlyError } from "@/lib/net-error";
 import { linkOrigin } from "@/lib/site";
 import Link from "next/link";
 import LegalLinks from "@/components/LegalLinks";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState, useSyncExternalStore } from "react";
+
+const noSubscribe = () => () => {};
 import { supabase } from "@/lib/supabase";
 import { loadAccountIntoCache } from "@/lib/account-cache";
 import { afterAuthPath, pendingPlan, usePlanFromUrl } from "@/lib/pending-plan";
@@ -31,8 +33,7 @@ export default function LoginPage() {
     setReasonNote(loginReasonMessage(new URLSearchParams(window.location.search).get("reason")));
   }, []);
   const [busy, setBusy] = useState(false);
-  const [canPasskey, setCanPasskey] = useState(false);
-  useEffect(() => { setCanPasskey(passkeysSupported(window)); }, []);
+  const canPasskey = useSyncExternalStore(noSubscribe, () => passkeysSupported(window), () => false);
   async function passkeyLogin() {
     setBusy(true); setMessage("");
     const r = await signInWithPasskey();

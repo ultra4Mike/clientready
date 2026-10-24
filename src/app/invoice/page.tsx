@@ -322,8 +322,9 @@ export default function NewInvoicePage() {
     return () => window.removeEventListener("clientready-renumbered", onRenumber);
   }, []);
   // R83: photos the crew took when marking the job done.
-  const [crewPhotos, setCrewPhotos] = useState<Awaited<ReturnType<typeof jobDonePhotos>>>([]);
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
+  // Crew photos are kept with the doc they belong to, so a different (or no) doc shows none without a reset in an effect.
+  const [crewPhotoState, setCrewPhotoState] = useState<{ docId: string; rows: Awaited<ReturnType<typeof jobDonePhotos>> }>({ docId: "", rows: [] });
+  const crewPhotos = docId && crewPhotoState.docId === docId ? crewPhotoState.rows : [];
   // D30: ?focus=checklist (from the calendar badge) opens and scrolls to the checklist; photo items highlight the photos area.
   const [checklistFocus] = useState(() => typeof window !== "undefined" && wantsChecklistFocus(window.location.search));
   const photoNeeded = checklistMissing(schedule?.checklist || []).some(checklistNeedsPhoto);
@@ -333,7 +334,7 @@ export default function NewInvoicePage() {
     checklistScrolled.current = true;
     window.setTimeout(() => document.getElementById("checklist")?.scrollIntoView({ block: "center", behavior: "smooth" }), 250);
   }, [checklistFocus, schedule]);
-  useEffect(() => { let live = true; if (docId) jobDonePhotos(docId).then((rows) => live && setCrewPhotos(rows)).catch(() => {}); else setCrewPhotos([]); return () => { live = false; }; }, [docId]);
+  useEffect(() => { let live = true; if (docId) jobDonePhotos(docId).then((rows) => live && setCrewPhotoState({ docId, rows })).catch(() => {}); return () => { live = false; }; }, [docId]);
   // R81: always re-read the team from the cloud once, so "+ Add crew" sees everyone Active.
   useEffect(() => { refreshEmployeesCache().then((ok) => { if (ok) setWorkers(readWorkers()); }).catch(() => {}); }, []);
   const [clockEntries, setClockEntries] = useState<ClockEntry[]>([]);

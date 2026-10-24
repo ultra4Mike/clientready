@@ -7,6 +7,11 @@ import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import IdleGuard from "@/components/IdleGuard";
 import { PENDING_KEY } from "@/lib/session-policy";
+
+const noSubscribe = () => () => {};
+let startReasonCache: string | undefined;
+/** The pending policy sign-out reason as it was when this page loaded (stable for useSyncExternalStore). */
+const readStartReason = () => (startReasonCache ??= window.localStorage.getItem(PENDING_KEY) || "");
 import { clearLocalBusiness } from "@/lib/account-cache";
 import { disablePush } from "@/lib/push";
 import { isCrewUser } from "@/lib/crew";
@@ -61,10 +66,12 @@ export default function AppShell({
   const theme = useSyncExternalStore(subscribeTheme, readTheme, () => "dark");
   // Part 3 (no-flash): page content mounts only after the session check. A session dropped at startup
   // (browser closed without "Keep me signed in", or idle) clears this device's business copy first.
-  const [gate, setGate] = useState<"checking" | "ok">("checking");
+  // Read once per page load (no setState in an effect): "" = nothing pending, null = server render (still checking).
+  const startReason = useSyncExternalStore(noSubscribe, readStartReason, () => null);
+  const gate: "checking" | "ok" = startReason === "" ? "ok" : "checking";
   useEffect(() => {
     const reason = window.localStorage.getItem(PENDING_KEY);
-    if (!reason) { setGate("ok"); return; }
+    if (!reason) return;
     clearLocalBusiness();
     window.localStorage.removeItem(PENDING_KEY);
     void supabase.auth.signOut({ scope: "local" }).catch(() => undefined).finally(() => window.location.replace(`/login?reason=${encodeURIComponent(reason)}`));

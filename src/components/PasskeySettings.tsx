@@ -1,19 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { deviceName, listPasskeys, passkeysSupported, registerPasskey, removePasskey } from "@/lib/passkeys";
 
+const noSubscribe = () => () => {};
 type Item = { id: string; friendly_name?: string; created_at: string; last_used_at?: string };
 const when = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "never");
 
 /** Settings > Security: set up / list / remove fingerprint & face sign-in devices. */
 export default function PasskeySettings() {
-  const [supported, setSupported] = useState<boolean | null>(null);
+  const supported = useSyncExternalStore(noSubscribe, () => passkeysSupported(window), () => null);
   const [items, setItems] = useState<Item[] | null>(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   async function refresh() { const r = await listPasskeys(); setItems(r.items); setNote((prev) => r.message || (/didn.t work/.test(prev) ? "" : prev)); }
-  useEffect(() => { setSupported(passkeysSupported(window)); void refresh(); }, []);
+  // First load: state is only set after the list arrives (same as refresh()).
+  useEffect(() => { void listPasskeys().then((r) => { setItems(r.items); setNote((prev) => r.message || (/didn.t work/.test(prev) ? "" : prev)); }); }, []);
   async function add() {
     setBusy(true); setNote("");
     const r = await registerPasskey(deviceName(navigator.userAgent));
