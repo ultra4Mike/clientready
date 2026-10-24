@@ -348,11 +348,13 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
         ) : (
           <>
             {job.schedule.startTime && <span data-testid={`${tid}chip-time`} className="block text-[11px] font-semibold tabular-nums">{chipTimeRange(job.schedule.startTime, job.schedule.endTime)}{crossesMidnight(job.schedule.startTime, job.schedule.endTime) ? " ☾" : ""}</span>}
+            {!job.day && crossesMidnight(job.schedule.startTime, job.schedule.endTime) && <span data-testid={`${tid}overnight-day-label`} className="mr-1 inline-block rounded bg-black/10 px-1 text-[10px] font-semibold uppercase tracking-wide dark:bg-white/10">Day 1 of 2</span>}
             {job.day && <span data-testid={`${tid}day-label`} className="mr-1 inline-block rounded bg-black/10 px-1 text-[10px] font-semibold uppercase tracking-wide dark:bg-white/10">Day {job.day.index} of {job.day.count}</span>}
             {job.doc.clientName || job.doc.title}
           </>
         )}
         {agenda && <button type="button" data-testid={`move-${job.doc.id}${later ? `-${job.day!.index}` : ""}`} aria-label={`Move ${job.doc.title || job.doc.clientName || "job"} to another day`} onClick={(event) => { event.stopPropagation(); setMoving({ docId: job.doc.id, offset: job.day?.offset || 0, date: job.schedule.date, title: job.doc.clientName || job.doc.title, start: job.schedule.startTime || "", end: job.schedule.endTime || "", dayCount: job.day?.count || 1, workerIds: job.schedule.workerIds }); }} onKeyDown={(event) => event.stopPropagation()} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md border border-current/30 bg-[var(--cr-card)]/70 px-2.5 py-1.5 text-xs font-semibold">Move</button>}
+        {agenda && !job.day && crossesMidnight(job.schedule.startTime, job.schedule.endTime) && <span data-testid={`${tid}overnight-day-label`} className="mt-0.5 block w-fit rounded bg-black/10 px-1 text-[10px] font-semibold uppercase tracking-wide dark:bg-white/10">Day 1 of 2 · until {timeLabel(job.schedule.endTime || "")}</span>}
         {agenda && job.day && <span data-testid={`${tid}day-label`} className="mt-0.5 block w-fit rounded bg-black/10 px-1 text-[10px] font-semibold uppercase tracking-wide dark:bg-white/10">Day {job.day.index} of {job.day.count}</span>}
         {isTentative(job.doc, jobDocs) && <span data-testid="not-approved-tag" className="mt-0.5 inline-block rounded border border-dashed border-current px-1 text-[10px] font-semibold uppercase tracking-wide">Not approved</span>}
         {!compact && people && <span className="block truncate opacity-80">{people}</span>}
@@ -382,8 +384,8 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
         aria-label={`Until ${timeLabel(job.schedule.endTime || "")} · ${job.doc.clientName || job.doc.title} · continues from the night before`}
         className={`cr-chip2 cr-chip-cont cursor-pointer min-w-0 break-words rounded-md border border-dashed border-l-4 px-1.5 py-1 text-left font-medium leading-snug opacity-90 ${agenda ? "min-h-11 text-sm" : "text-xs"} ${statusClass(job.schedule)}`}
       >
-        <span className="font-semibold">↳ until {timeLabel(job.schedule.endTime || "")} </span>{job.doc.clientName || job.doc.title}
-        <span className="block text-[10px] opacity-80">Continues from {parse(job.schedule.date).toLocaleDateString("en-US", { weekday: "short" })} night</span>
+        <span data-testid="overnight-day-label" className="mr-1 inline-block rounded bg-black/10 px-1 text-[10px] font-semibold uppercase tracking-wide dark:bg-white/10">Day 2 of 2</span>{job.doc.clientName || job.doc.title}
+        <span className="block text-[10px] opacity-80">until {timeLabel(job.schedule.endTime || "")} · started {parse(job.schedule.date).toLocaleDateString("en-US", { weekday: "short" })} night</span>
       </div>
     );
   }

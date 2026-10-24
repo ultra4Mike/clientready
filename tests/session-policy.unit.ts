@@ -52,3 +52,14 @@ assert.equal(lastBeat(JSON.stringify({ a: 5, b: 9 })), 9, "newest tab beat");
 assert.equal(lastBeat("123"), 123, "older single-number format");
 assert.equal(lastBeat("{}"), 0, "every tab removed its beat on close");
 console.log("session-policy beats: ok");
+
+// Deploy 29 retest: a restored tab after closing the browser (keep unticked) says "closed", not "idle".
+{
+  const b = { hasSession: true, keep: "0", liveCookie: true, now: t, lastActivity: t - 120 * 60_000, idleLimit: 30 };
+  assert.equal(startupDropReason({ ...b, lastBeat: t - 90 * 60_000 }), "closed", "restored tab, browser was closed");
+  assert.equal(startupDropReason({ ...b, lastBeat: t - 5_000 }), "idle", "open tab went idle");
+  assert.equal(startupDropReason({ ...b, keep: "1", lastBeat: 0 }), "idle", "kept login still says idle");
+  assert.equal(loginReasonMessage("closed"), "You were signed out because you closed the browser. Tick \u201cKeep me signed in\u201d to stay signed in on this device.");
+  assert.equal(loginReasonMessage("session_ended"), loginReasonMessage("closed"));
+  console.log("session-policy d30 ok");
+}

@@ -66,10 +66,16 @@ export function liveSession(input: { tabMark: boolean; lastBeat: number; now: nu
   return input.tabMark || (input.lastBeat > 0 && input.now - input.lastBeat < BEAT_STALE_MS);
 }
 
-export function startupDropReason(input: { hasSession: boolean; keep: string | null; liveCookie: boolean; now: number; lastActivity: number; idleLimit: number }): "" | "closed" | "idle" {
+export function startupDropReason(input: { hasSession: boolean; keep: string | null; liveCookie: boolean; now: number; lastActivity: number; idleLimit: number; lastBeat?: number }): "" | "closed" | "idle" {
   if (!input.hasSession) return "";
   if (input.keep === "0" && !input.liveCookie) return "closed";
-  if (idleState(input.now, input.lastActivity, input.idleLimit).state === "expired") return "idle";
+  if (idleState(input.now, input.lastActivity, input.idleLimit).state === "expired") {
+    // Deploy 29 retest: a restored tab (Chrome brings back sessionStorage) after the browser was closed with
+    // "Keep me signed in" unticked reads as idle. No tab has been alive recently, so tell the truth: it was closed.
+    const beatStale = !(input.lastBeat && input.lastBeat > 0 && input.now - input.lastBeat < BEAT_STALE_MS);
+    if (input.keep === "0" && input.lastBeat !== undefined && beatStale) return "closed";
+    return "idle";
+  }
   return "";
 }
 
@@ -109,6 +115,7 @@ export function applySessionPolicyEarly() {
       now: Date.now(),
       lastActivity: Number(ls.getItem(ACTIVITY_KEY) || 0),
       idleLimit: idleMinutes(ls.getItem(IDLE_KEY), ls.getItem(ROLE_KEY)),
+      lastBeat: lastBeat(ls.getItem(BEAT_KEY)),
     });
     if (reason) dropStoredSession(reason);
     else if (authKeys(ls).length) startBeat();
@@ -168,6 +175,6 @@ export function touchActivity(now = Date.now()) {
 
 export function loginReasonMessage(reason: string | null) {
   if (reason === "idle") return "You were signed out after a while with no activity, to keep your business data safe. Log in again to pick up where you left off.";
-  if (reason === "closed") return "You were signed out when the browser closed. Tick \u201cKeep me signed in\u201d to stay signed in on this device.";
+  if (reason === "closed" || reason === "session_ended") return "You were signed out because you closed the browser. Tick \u201cKeep me signed in\u201d to stay signed in on this device.";
   return "";
 }
