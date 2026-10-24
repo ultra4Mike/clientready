@@ -10,3 +10,14 @@ export function scheduleAlertLabel(kind: string, paidMinutes: number) {
   if (kind === "no_show") return paidMinutes > 0 ? "No tap recorded" : "No-show";
   return "Late start";
 }
+
+type ApprovalLike = { employeeId: string; date: string };
+/** A server read that started before an approve/unapprove finished must not undo it: rows saved in this session win. */
+export function mergeApprovals<T extends ApprovalLike>(loaded: T[], savedThisSession: T[]) {
+  const keys = new Set(savedThisSession.map((a) => `${a.employeeId}|${a.date}`));
+  return [...loaded.filter((a) => !keys.has(`${a.employeeId}|${a.date}`)), ...savedThisSession];
+}
+/** Resolved list: only alerts inside the current pay period (older ones auto-hide). */
+export function resolvedInPeriod<T extends { date?: string }>(list: T[], period: { from: string; to: string }) {
+  return list.filter((a) => !a.date || (a.date >= period.from && a.date <= period.to));
+}

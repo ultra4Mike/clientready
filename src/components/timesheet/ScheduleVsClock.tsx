@@ -1,5 +1,6 @@
 "use client";
 /** Calendar day view: each scheduled worker's scheduled hours vs clocked (timesheet) hours, late start / no-show. */
+import { scheduleAlertLabel } from "@/lib/timesheet-alerts";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { dayMinutes, loadTimeWeek, timeAttention, type TimeWeek } from "@/lib/time-owner";
@@ -24,7 +25,7 @@ export default function ScheduleVsClock({ date }: { date: string }) {
             <td><Link className="underline" href={`/timesheet?date=${date}`}>{r.wk.name}</Link></td>
             <td className="text-right tabular-nums">{(r.schedMin / 60).toFixed(2)} h</td>
             <td className="text-right tabular-nums" data-testid={`svc-clocked-${r.wk.id}`}>{(r.clocked / 60).toFixed(2)} h</td>
-            <td className="text-right">{a && <span className={`cr-chip2 ${a.kind === "no_show" ? "cr-tone-bad" : "cr-tone-warn"}`} data-testid={`svc-${a.kind}`}>{a.kind === "no_show" ? "No-show" : "Late start"}</span>}</td>
+            <td className="text-right">{a && <span className={`cr-chip2 ${a.kind === "no_show" ? "cr-tone-bad" : "cr-tone-warn"}`} data-testid={`svc-${a.kind}`}>{scheduleAlertLabel(a.kind, r.clocked)}</span>}</td>
           </tr>); })}</tbody></table>
     </section>
   );

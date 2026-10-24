@@ -108,7 +108,7 @@ export type TimesheetSettings = {
   // Phase 2 pay rules
   /** Minimum wage per hour (0 = off). A week whose straight pay / hours is under it gets a top-up. */
   minWage: number;
-  /** FLSA overtime for day-rate, piece, commission and set-amount pay: regular rate = week pay / hours, 0.5x for hours over 40. */
+  /** FLSA overtime for day-rate, piece, commission and set-amount pay: regular rate = week pay / hours; each hour over the weekly overtime threshold (40 unless changed) earns (multiplier - 1) x that rate on top (0.5x at the default 1.5x). */
   flsaNonHourly: boolean;
   /** Task rates (prevailing wage / job rates): task name -> hourly rate that replaces the base wage on jobs of that task. */
   taskRates: Record<string, number>;
