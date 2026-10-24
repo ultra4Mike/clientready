@@ -15,7 +15,7 @@ export default function DevelopersPage() {
       </header>
       <section data-testid="api-docs" className="mx-4 my-6 max-w-3xl rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] px-5 py-8 leading-7 sm:mx-auto">
         <h1 className="text-2xl font-bold tracking-tight">ClientReady API</h1>
-        <p className="mt-3">Optional. Connect ClientReady to Zapier, Make, or your own scripts. It is <strong>off</strong> until you turn it on in Profile &gt; More settings &gt; Integrations and create a key.</p>
+        <p className="mt-3">Optional. Connect ClientReady to Zapier, Make, or your own scripts. API keys and integrations are <strong>coming soon</strong>: they aren&apos;t available in the app yet. This page describes how the API will work once they are.</p>
         <h2 className={h2}>Keys and scopes</h2>
         <ul className="mt-2 list-disc pl-5">
           <li>Keys start with <code>cr_</code> and are shown once. Store them like a password; revoke any key in Integrations.</li>

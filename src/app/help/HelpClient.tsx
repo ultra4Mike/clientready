@@ -5,11 +5,12 @@ import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import LegalLinks from "@/components/LegalLinks";
 import { HELP_ARTICLES, HELP_CATEGORIES, SUPPORT_EMAIL, type HelpArticle } from "@/lib/help/articles";
-import { helpMatches } from "@/lib/help/search";
+import { helpMatches, helpSnippet } from "@/lib/help/search";
 
 const byId = new Map(HELP_ARTICLES.map((a) => [a.id, a]));
 const haystack = (a: HelpArticle) =>
   [a.question, a.category, a.summary || "", ...a.steps, ...(a.tips || []), ...(a.keywords || [])].join(" ").toLowerCase();
+const bodyText = (a: HelpArticle) => [a.summary || "", ...a.steps, ...(a.tips || [])].join(" ");
 
 export function HelpClient() {
   const [query, setQuery] = useState("");
@@ -27,16 +28,26 @@ export function HelpClient() {
     requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
 
-  // Deep link: /help?a=<article id> opens that article.
+  // Deep link: /help?a=<article id> opens that article; /help?q=<words> pre-fills search.
   useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get("a");
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("q");
+    if (q) setQuery(q);
+    const id = params.get("a");
     if (id && byId.has(id)) { const t = setTimeout(() => jump(id), 0); return () => clearTimeout(t); }
   }, []);
+
+  // Keep ?q= in the URL so a search can be shared or bookmarked.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (query.trim()) url.searchParams.set("q", query.trim()); else url.searchParams.delete("q");
+    window.history.replaceState(null, "", url.toString());
+  }, [query]);
 
   return (
     <AppShell title="Help">
       <PageHeader title="Help Center" subtitle={`${HELP_ARTICLES.length} answers, how-tos and fixes. Search or pick a topic.`} />
-      <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search help (e.g. pay, offline, crew, email)" aria-label="Search help"
+      <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setQuery(""); }} enterKeyHint="search" placeholder="Search help (e.g. pay, offline, crew, email)" aria-label="Search help"
         className="mb-3 w-full rounded-lg border border-slate-300 bg-[var(--cr-panel)] px-3 py-2.5 text-sm dark:border-teal-500/30" />
       <div className="mb-5 flex flex-wrap gap-2">
         {categories.map((c) => (
@@ -44,13 +55,14 @@ export function HelpClient() {
             className={`rounded-full px-3 py-1 text-xs font-medium transition ${c === category ? "bg-teal-500 text-slate-950!" : "border border-teal-500/30 hover:bg-teal-500/10"}`}>{c}</button>
         ))}
       </div>
-      <p className="mb-2 text-xs text-[var(--cr-muted)]">{results.length} result{results.length === 1 ? "" : "s"}</p>
+      <p className="mb-2 text-xs text-[var(--cr-muted)]" aria-live="polite">{results.length} result{results.length === 1 ? "" : "s"}</p>
       <div className="space-y-2">
         {results.map((a) => (
           <details key={a.id} id={a.id} open={open === a.id || undefined}
             onToggle={(e) => { if ((e.currentTarget as HTMLDetailsElement).open) setOpen(a.id); }}
             className="scroll-mt-24 rounded-xl border border-slate-200 bg-[var(--cr-panel)] p-4 dark:border-teal-500/20">
-            <summary className="cursor-pointer font-medium">{a.question}<span className="ml-2 text-xs text-[var(--cr-muted)]">{a.category}</span></summary>
+            <summary className="cursor-pointer font-medium">{a.question}<span className="ml-2 text-xs text-[var(--cr-muted)]">{a.category}</span>
+              {query.trim() && open !== a.id && !helpMatches(a.question, query) && helpSnippet(bodyText(a), query) ? <span className="mt-1 block text-xs font-normal text-[var(--cr-muted)]">{helpSnippet(bodyText(a), query)}</span> : null}</summary>
             {a.summary && <p className="mt-3 text-sm">{a.summary}</p>}
             <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-[var(--cr-muted)]">{a.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
             {a.tips?.length ? (
@@ -69,7 +81,7 @@ export function HelpClient() {
             ) : null}
           </details>
         ))}
-        {!results.length && <p className="text-sm text-[var(--cr-muted)]">No answers match. Try another word, or email support below.</p>}
+        {!results.length && <p className="text-sm text-[var(--cr-muted)]">No articles match — try fewer words, or email support below.</p>}
       </div>
       <div className="mt-8 rounded-xl border border-teal-500/20 p-4 text-sm">
         Still need help? <a className="font-semibold text-teal-600 dark:text-teal-300" href={`mailto:${SUPPORT_EMAIL}?subject=ClientReady%20help`}>Email support</a>

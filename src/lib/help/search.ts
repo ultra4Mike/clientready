@@ -26,3 +26,14 @@ export function helpMatches(text: string, query: string) {
     return tokens.some((t) => withinOneEdit(w, t) || (t.length > w.length && withinOneEdit(w, t.slice(0, w.length))));
   });
 }
+
+/** Short excerpt around the first query word found in `text` (case-insensitive). Empty when no exact word appears. */
+export function helpSnippet(text: string, query: string, radius = 60) {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const low = text.toLowerCase();
+  let at = -1, len = 0;
+  for (const w of words) { const i = low.indexOf(w); if (i >= 0 && (at < 0 || i < at)) { at = i; len = w.length; } }
+  if (at < 0) return "";
+  const start = Math.max(0, at - radius), end = Math.min(text.length, at + len + radius);
+  return (start > 0 ? "…" : "") + text.slice(start, end).trim() + (end < text.length ? "…" : "");
+}
