@@ -20,6 +20,11 @@ export type HistoryEntry = { at: string; by: string; byId?: string; action: stri
 export function readHistory(value: unknown): HistoryEntry[] {
   return Array.isArray(value) ? value.filter((e) => e && typeof e === "object" && typeof (e as HistoryEntry).at === "string" && typeof (e as HistoryEntry).action === "string") as HistoryEntry[] : [];
 }
+/** Owner's phone-approval / undo note: kept whole (no word or " - " splitting), trimmed, control chars removed, max 500. */
+export const APPROVAL_NOTE_MAX = 500;
+export function cleanApprovalNote(value: unknown) {
+  return String(value ?? "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim().slice(0, APPROVAL_NOTE_MAX);
+}
 /** "Oct 23, 2026 10:29 PM CT" style (the viewer's zone, short label). */
 export function historyTime(iso: string) {
   const d = new Date(iso);
@@ -157,7 +162,7 @@ export async function ownerMarkApproved(docId: string, ownerName: string, option
   const at = new Date().toISOString();
   const by = ownerName.trim() || "Owner";
   const byId = (await getUserId()) as string;
-  const note = (options.note || "").trim().slice(0, 200);
+  const note = cleanApprovalNote(options.note);
   let approval: Approval | null;
   let entry: HistoryEntry;
   if (options.undo) {

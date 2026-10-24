@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { approvalLine, historyTime, canOwnerMarkApproved, ownerMarkApproved, type Approval } from "@/lib/approval";
+import { useRef, useState } from "react";
+import { approvalLine, historyTime, canOwnerMarkApproved, ownerMarkApproved, cleanApprovalNote, APPROVAL_NOTE_MAX, type Approval } from "@/lib/approval";
 
 /**
  * Owner-only "Approved by phone" control (calendar job popover + document page). Drafts must be sent first, so a
@@ -12,13 +12,16 @@ export default function PhoneApproval({ docId, status, approval, ownerName, onCh
   onChange: (approval: Approval | null) => void; onSend: () => void; compact?: boolean;
 }) {
   const [asking, setAsking] = useState<"" | "approve" | "undo">("");
-  const [note, setNote] = useState("");
+  const [note, setNoteState] = useState("");
+  // The latest typed text, read at confirm time so a re-render mid-typing can never save a partial note.
+  const noteRef = useRef("");
+  const setNote = (value: string) => { noteRef.current = value; setNoteState(value); };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const btn = "min-h-11 rounded-lg px-4 text-sm font-semibold transition";
   const run = async (undo: boolean) => {
     setBusy(true); setError("");
-    const r = await ownerMarkApproved(docId, ownerName, { method: "phone", note, undo });
+    const r = await ownerMarkApproved(docId, ownerName, { method: "phone", note: cleanApprovalNote(noteRef.current || note), undo });
     setBusy(false);
     if (r.error) { setError(r.error); return; }
     setAsking(""); setNote(""); onChange(r.approval);
@@ -46,13 +49,13 @@ export default function PhoneApproval({ docId, status, approval, ownerName, onCh
         <div role="dialog" aria-modal="true" aria-label={asking === "undo" ? "Undo approval" : "Approved by phone"} data-testid="phone-approval-dialog" className="rounded-xl border border-teal-500/40 bg-[var(--cr-card)] p-3 shadow-lg">
           <p className="text-sm font-semibold">{asking === "undo" ? "Undo this approval? It goes back to waiting for the client." : "Record that the client approved by phone?"}</p>
           <label className="mt-2 flex flex-col gap-1 text-sm">Note (optional)
-            <input data-testid="phone-approval-note" value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} placeholder={asking === "undo" ? "Why (optional)" : "e.g. John on phone"} className="min-h-11 rounded-lg border border-slate-300 bg-transparent px-3" />
+            <textarea data-testid="phone-approval-note" value={note} maxLength={APPROVAL_NOTE_MAX} rows={2} onChange={(e) => setNote(e.target.value)} onKeyDown={(e) => e.stopPropagation()} placeholder={asking === "undo" ? "Why (optional)" : "e.g. John on phone"} className="min-h-11 rounded-lg border border-slate-300 bg-transparent px-3 py-2" />
           </label>
           <p className="mt-1 text-xs text-[var(--cr-muted)]">Your name and the time are added to the document history. History entries can&apos;t be edited.</p>
           {error && <p className="mt-1 text-sm text-red-700 dark:text-red-300" role="alert">{error}</p>}
           <div className="mt-2 flex gap-2">
             <button type="button" disabled={busy} data-testid="phone-approval-confirm" onClick={() => run(asking === "undo")} className={`${btn} bg-teal-500 text-slate-950! hover:bg-teal-400 disabled:opacity-50`}>{busy ? "Saving…" : asking === "undo" ? "Undo approval" : "Confirm approved"}</button>
-            <button type="button" onClick={() => { setAsking(""); setError(""); }} className={`${btn} border border-slate-300`}>Cancel</button>
+            <button type="button" onClick={() => { setAsking(""); setError(""); setNote(""); }} className={`${btn} border border-slate-300`}>Cancel</button>
           </div>
         </div>
       )}
