@@ -71,10 +71,15 @@ export function approvalUrl(token: string) {
 }
 
 /** Help retest: "Awaiting approval" only on proposals and change orders; a plain invoice never needs approval. */
-export function approvalBadgeApplies(doc: { type?: string; data?: Record<string, unknown> | null }, approval: Approval | null) {
+export function approvalBadgeApplies(doc: { id?: string; type?: string; data?: Record<string, unknown> | null }, approval: Approval | null, allDocs: { type?: string; data?: Record<string, unknown> | null }[] = []) {
   if (!approval) return false;
   if (["void", "voided"].includes(String(doc.data?.status || ""))) return false;
-  if (doc.type !== "invoice") return true;
+  if (doc.type !== "invoice") {
+    // QA2: a proposal already turned into an invoice is settled: never "Awaiting approval" (same rule as effectiveDocStatus).
+    const converted = String(doc.data?.status || "") === "invoiced" || Boolean((doc.data?.invoicedAs as { id?: string } | undefined)?.id)
+      || (Boolean(doc.id) && allDocs.some((other) => other.type === "invoice" && !["void", "voided"].includes(String(other.data?.status || "")) && !other.data?.deleted && (other.data?.fromProposal as { id?: string } | undefined)?.id === doc.id));
+    return approval.status === "approved" || !converted;
+  }
   // Help live check: a plain invoice (even one made from an approved proposal) shows no approval badge.
   const of = doc.data?.changeOrderOf as { id?: string; number?: string } | undefined;
   return Boolean(of?.id || of?.number);

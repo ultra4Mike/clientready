@@ -21,6 +21,9 @@ const SETTING_LABEL: Record<string, string> = {
   autoMealAfterHours: "Auto meal break after (h)", caPremiumPay: "California premium pay", longDriveBreakMinutes: "Long drive limit (min)", transitTimeoutMinutes: "\u201cStill driving?\u201d after (min)",
   halfDayHours: "Half day (h)", hireDate: "Hire date",
 };
+/** QA2: saving a manual time entry on an approved day takes the week out of Approved; ask first. */
+export const UNAPPROVE_WARNING = "This week is already approved. Saving this manual time entry will un-approve it, and you'll need to approve the hours again. Continue?";
+
 export const settingLabel = (k: string) => SETTING_LABEL[k] || k.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()).trim();
 const settingValue = (x: unknown) => (x === true ? "on" : x === false ? "off" : x == null || x === "" ? "—" : typeof x === "object" ? JSON.stringify(x) : String(x));
 const settingDiff = (o: Record<string, unknown>, v: Record<string, unknown>) => Object.keys(v).map((k) => `${settingLabel(k)} ${settingValue(o[k])} → ${settingValue(v[k])}`).join("; ");
@@ -168,7 +171,7 @@ export default function DayDetail(props: {
             ))}
             <label className="flex items-center gap-2">Paid hours<input aria-label="Paid hours" name="ts-edit-hours" data-testid="ts-edit-hours" className="min-h-11 w-24 rounded border bg-transparent px-2" inputMode="decimal" value={hours} onChange={(e) => setHours(e.target.value)} /></label>
             <div className="flex gap-2">
-              <button className="min-h-11 rounded-lg bg-teal-600 px-4 font-semibold text-white" data-testid="ts-edit-save" onClick={() => { props.onSetMinutes(Math.max(0, Number(hours) * 60 || 0), false, spans.filter((x) => x.start || x.end).map((x) => `${x.label || "Job"} ${x.start || "?"}–${x.end || "?"}`).join(", ")); setEditing(false); }}>Save</button>
+              <button className="min-h-11 rounded-lg bg-teal-600 px-4 font-semibold text-white" data-testid="ts-edit-save" onClick={() => { if (approved && !window.confirm(UNAPPROVE_WARNING)) return; props.onSetMinutes(Math.max(0, Number(hours) * 60 || 0), false, spans.filter((x) => x.start || x.end).map((x) => `${x.label || "Job"} ${x.start || "?"}–${x.end || "?"}`).join(", ")); setEditing(false); }}>Save</button>
               <button className={btn} onClick={() => setEditing(false)}>Cancel</button>
             </div>
           </div>

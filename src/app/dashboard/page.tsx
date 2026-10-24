@@ -12,8 +12,8 @@ import EmptyState from "@/components/EmptyState";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { loadAccountIntoCache } from "@/lib/account-cache";
-import { amountOf, documentTotals } from "@/lib/discount";
-import { documentStage, STAGE_LABEL } from "@/lib/doc-stage";
+import { docAmounts } from "@/lib/doc-stage";
+import { displayStatus } from "@/lib/doc-status";
 import { billedOutstanding, cashCollected } from "@/lib/money";
 import { effectiveAmounts } from "@/lib/change-order-revision";
 import { invoicePastDue, owedAfterRefunds, readPayments } from "@/lib/payments";
@@ -56,12 +56,9 @@ type SavedDocument = {
   };
 };
 
+/** QA2: the shared document total (all lines, tax and discount), same as the editor and Documents. */
 function invoiceTotal(doc: SavedDocument) {
-  const items = doc.data?.items || [];
-  const subtotal = items.reduce((sum, item) => {
-    return sum + amountOf(item.qty) * amountOf(item.rate);
-  }, 0);
-  return documentTotals(subtotal, doc.data?.taxPercent, doc.data?.discountType, doc.data?.discountValue).total;
+  return docAmounts(doc as never).total;
 }
 
 /** Names of the people scheduled on a job (saved employees), from data.schedule.workerIds. */
@@ -437,7 +434,7 @@ export default function DashboardPage() {
                     const first = (doc.data?.items || []).find((item) => String(item.description || "").trim()) || (doc.data?.items || [])[0];
                     const crew = crewNames(doc);
                     return (<>
-                      {first && <span className="block truncate text-xs tabular-nums text-slate-700 dark:text-slate-200" data-testid="recent-line">{String(first.description || "Item")}{first.rate ? ` · $${amountOf(first.rate).toFixed(2)}${amountOf(first.qty) !== 1 ? ` × ${first.qty}` : ""}` : ""}</span>}
+                      {first && <span className="block truncate text-xs tabular-nums text-slate-700 dark:text-slate-200" data-testid="recent-line">{String(first.description || "Item")}{(doc.data?.items || []).length > 1 ? ` +${(doc.data?.items || []).length - 1} more` : ""} · <span data-testid="recent-total">${invoiceTotal(doc).toFixed(2)}</span></span>}
                       <span className={`block truncate text-xs ${crew.length ? "text-teal-700 dark:text-teal-300" : "italic text-[var(--cr-muted)]"}`} data-testid="recent-crew" data-crew-count={crew.length}>{crew.length ? `Crew: ${crew.join(", ")}` : "No employees scheduled"}</span>
                     </>);
                   })()}
@@ -447,7 +444,7 @@ export default function DashboardPage() {
                   })()}
                   <span className="block text-xs capitalize text-[var(--cr-muted)]">{doc.type} · {doc.createdAt}</span>
                 </span>
-                <span className="shrink-0 rounded-full border border-teal-500/30 px-2.5 py-0.5 text-xs font-semibold capitalize" data-testid="recent-status">{STAGE_LABEL[documentStage(doc as never, documents as never).stage]}</span>
+                <span className="shrink-0 rounded-full border border-teal-500/30 px-2.5 py-0.5 text-xs font-semibold capitalize" data-testid="recent-status">{displayStatus(doc as never, documents as never).label}</span>
               </a>
             ))}
           </div>

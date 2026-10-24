@@ -2031,7 +2031,7 @@ export default function NewInvoicePage() {
                 <p>{[ownerName, businessEmail, businessPhone].filter(Boolean).join(" · ")}</p>
               </div>
               <div className="sm:shrink-0 sm:text-right">
-                {approval && approvalBadgeApplies({ type: isProposal ? "proposal" : "invoice", data: { status, ...(changeOrderOf ? { changeOrderOf } : {}) } }, approval) && <div className="mb-1"><ApprovalBadge approval={approval} /></div>}
+                {approval && approvalBadgeApplies({ type: isProposal ? "proposal" : "invoice", data: { status: effStatus, ...(changeOrderOf ? { changeOrderOf } : {}) } }, approval) && <div className="mb-1"><ApprovalBadge approval={approval} /></div>}
                 {recurringFrom && !isProposal && <p className="change-order-badge mb-1 mr-1 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide" data-testid="recurring-badge">Recurring</p>}
                 {changeOrderOf && !isProposal && <p className="change-order-badge mb-1 inline-block rounded border border-current px-2 py-0.5 text-xs font-semibold uppercase tracking-wide" data-testid="change-order-badge">{revision ? "Change order" : "Add-on change order"}</p>}
                 {revision && !isProposal && <p className="mb-1 text-xs" data-testid="preview-revises">Updated version of {String(revision.revises.number || "")}: was ${Number(revision.revises.total || 0).toFixed(2)} → now ${totals.total.toFixed(2)} ({totals.total - Number(revision.revises.total || 0) < 0 ? "−" : "+"}${Math.abs(totals.total - Number(revision.revises.total || 0)).toFixed(2)})</p>}

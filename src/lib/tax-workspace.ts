@@ -120,10 +120,11 @@ export function quarterPeriods(year: string) {
 
 type LogRow = { kind: "in" | "out" | "pay"; date: string; amount: number };
 /** Per period: the Sales and expense log's profit and its set-aside rule (profit > 0 × set-aside %). */
-export function quarterlyEstimates(rows: LogRow[], year: string, setAsidePercent: number) {
+/** QA2: pass `collectedFor` (cashCollected) so Taxes and Overview share one collected number, dates and refund rules. */
+export function quarterlyEstimates(rows: LogRow[], year: string, setAsidePercent: number, collectedFor?: (from: string, to: string) => number) {
   return quarterPeriods(year).map((p) => {
     const inP = rows.filter((r) => String(r.date).slice(0, 10) >= p.from && String(r.date).slice(0, 10) <= p.to);
-    const collected = inP.filter((r) => r.kind === "in").reduce((s, r) => s + r.amount, 0);
+    const collected = collectedFor ? collectedFor(p.from, p.to) : inP.filter((r) => r.kind === "in").reduce((s, r) => s + r.amount, 0);
     const spent = inP.filter((r) => r.kind !== "in").reduce((s, r) => s + r.amount, 0);
     const profit = collected - spent;
     return { ...p, collected: r2(collected), spent: r2(spent), profit: r2(profit), setAside: r2(profit > 0 ? profit * (setAsidePercent / 100) : 0) };

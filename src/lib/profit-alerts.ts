@@ -96,3 +96,11 @@ export function profitAlertsForDoc(doc: Doc | null | undefined, minMargin: numbe
 export function cachedMinMargin() {
   try { return readMinMargin(JSON.parse(window.localStorage.getItem("clientready-profile") || "{}")); } catch { return 20; }
 }
+
+/** QA2: the Settings line under Set aside % always matches the number in the box (30% is only the starting value). */
+export function setAsideCopy(value: unknown) {
+  const raw = String(value ?? "").trim();
+  const n = Number(raw);
+  const shown = raw !== "" && Number.isFinite(n) && n >= 0 && n <= 100 ? n : 30;
+  return `Reports and job math set aside ${shown}% of profit${shown === 30 ? " (the default)" : "; new accounts start at 30%"}. This is a cushion for taxes. It is not a tax return.`;
+}

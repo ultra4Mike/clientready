@@ -122,7 +122,14 @@ export function effectiveDocStatus(doc: AnyDoc, allDocs: AnyDoc[] = [], today?: 
   if (isVoidDoc(doc)) return raw;
   if (doc.type === "proposal") return isConvertedProposal(doc, allDocs) ? "invoiced" : raw;
   if (doc.type === "invoice" && ["draft", "sent", "overdue", ""].includes(raw) && (displayStatus(doc as Doc, allDocs as Doc[], today).key === "paid" || fullyPaidNow(doc, allDocs))) return "paid";
+  // QA2 (INV-1019): a "paid" box with money still owed is not Paid. Same math as the balance line.
+  if (doc.type === "invoice" && raw === "paid" && stillOwes(doc, allDocs)) return "sent";
   return raw;
+}
+function stillOwes(doc: AnyDoc, allDocs: AnyDoc[]) {
+  if (replacedBy(allDocs as never, doc as never)) return false;
+  const { total, owed } = effectiveAmounts(allDocs as never, doc as never);
+  return total > 0 && owed > 0.004;
 }
 function fullyPaidNow(doc: AnyDoc, allDocs: AnyDoc[]) {
   if (replacedBy(allDocs as never, doc as never)) return false;

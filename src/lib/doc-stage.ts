@@ -48,7 +48,9 @@ export function documentStage(doc: Doc, allDocs: Doc[] = []): { stage: DocStage;
     return { stage: "sent", next: "await-approval" };
   }
   const { total, owed } = docAmounts(doc);
-  if (status === "paid" || (total > 0 && owed <= 0.004)) return { stage: "paid", next: "none" };
+  // QA2: Paid comes from the same math as the balance (total incl. tax/discount minus payments and refunds).
+  // A "paid" status box with money still owed is not Paid; an old "paid" with no payment amounts still is (balanceDue).
+  if (total > 0 ? owed <= 0.004 : status === "paid") return { stage: "paid", next: "none" };
   // R58: a client who approved through the link moves an invoice past Draft/Sent to Approved.
   const approved = approval?.status === "approved";
   if (status === "draft" && !approved) return { stage: "draft", next: "send" };

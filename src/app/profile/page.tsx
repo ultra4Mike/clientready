@@ -1,4 +1,5 @@
 "use client";
+import { setAsideCopy } from "@/lib/profit-alerts";
 
 import SecuritySettings from "@/components/SecuritySettings";
 import PasskeySettings from "@/components/PasskeySettings";
@@ -286,7 +287,7 @@ export default function ProfilePage() {
           <input name="setAsidePercent" data-testid="set-aside-percent" type="number" min={0} max={100} step="any" inputMode="decimal" className="mt-1.5 block min-h-11 w-full max-w-[10rem] tabular-nums rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="30 (default)" aria-describedby="set-aside-range" value={profile.setAsidePercent} onChange={(event) => update("setAsidePercent", event.target.value)} onBlur={(event) => { const v = clampPercentText(event.currentTarget.value); if (v !== event.currentTarget.value) update("setAsidePercent", v); }} />
           <span id="set-aside-range" className="sr-only">0 to 100</span>
         </label>
-        <p className="-mt-1 text-xs text-[var(--cr-muted)]">Default is 30%. This is a cushion for taxes. It is not a tax return.</p>
+        <p className="-mt-1 text-xs text-[var(--cr-muted)]" data-testid="set-aside-copy">{setAsideCopy(profile.setAsidePercent)}</p>
         <fieldset className="cr-panel space-y-1 rounded-xl border border-teal-500/25 p-3 sm:p-4" data-testid="automations">
           <legend className="px-1.5 text-sm font-semibold">Automations (optional, all off by default)</legend>
           <p className="pb-2 text-xs leading-relaxed text-[var(--cr-muted)]">These send real emails to your clients from your email setup when you open the app. Each email is checked with your account right before it goes out, so the same one isn&apos;t sent twice (even from two devices), and it&apos;s logged on the invoice. Turn on only what you want.</p>

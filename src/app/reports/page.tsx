@@ -18,7 +18,7 @@ import YearView, { type YearData } from "@/components/views/YearView";
 import DataTable, { usd } from "@/components/reports/DataTable";
 import BusinessExpenses from "@/components/reports/BusinessExpenses";
 import { bizByLine, bizExpenses, bizOccurrences, type BizExpense } from "@/lib/business-expenses";
-import { billedOutstanding } from "@/lib/money";
+import { billedOutstanding, cashCollected } from "@/lib/money";
 import { DISCLAIMER, incomeSplit, mileageDeduction, NOT_TRACKED, payrollSummary, quarterlyEstimates, salesTaxReport, scheduleC, uncategorized, yearEndChecklist } from "@/lib/tax-workspace";
 import { REPORT_TABS, reportsParams, type ReportTab } from "@/lib/view-routes";
 
@@ -94,10 +94,10 @@ export default function ReportsPage() {
     return [...map.values()].filter((r) => r.amount);
   }, [tax, bizOcc]);
   const clientsAll = useMemo(() => bestCustomers(documents, year, "collected"), [documents, year]);
-  const unpaid = useMemo(() => { const b = billedOutstanding(documents as never, `${year}-01-01`, `${year}-12-31`); const count = (documents as Doc[]).filter((d) => d.type === "invoice" && String(d.createdAt || "").startsWith(year) && ["sent", "partial", "overdue"].includes(String(d.data?.status || ""))).length; return { total: b.outstanding, count }; }, [documents, year]);
+  const unpaid = useMemo(() => { const b = billedOutstanding(documents as never, `${year}-01-01`, `${year}-12-31`); return { total: b.outstanding, count: b.owedCount }; /* QA2: total and count from the one shared loop */ }, [documents, year]);
   const uncat = useMemo(() => uncategorized(acct.expenseRows, acct.crewRows), [acct]);
   const payroll = useMemo(() => (yearData ? payrollSummary(yearData.rows, yearData.employees) : null), [yearData]);
-  const quarters = useMemo(() => (yearData ? quarterlyEstimates(yearData.rows, year, yearData.setAsidePercent) : null), [yearData, year]);
+  const quarters = useMemo(() => (yearData ? quarterlyEstimates(yearData.rows, year, yearData.setAsidePercent, (from, to) => cashCollected(documents as never, from, to)) : null), [yearData, year, documents]);
   const crewYear = crewExpenses.filter((c) => String(c.created_at || "").startsWith(year));
   const checklist = yearData && payroll ? yearEndChecklist({ businessName: yearData.businessName, taxId: yearData.taxId, uncategorized: uncat.length, crewReceipts: crewYear.length, crewMissingPhoto: crewYear.filter((c) => !c.receipt).length, miles: miles.miles, nec: payroll.nec.length, unpaid: unpaid.count, unpaidTotal: unpaid.total }) : null;
   const cell = "px-2 py-1.5 text-right tabular-nums";

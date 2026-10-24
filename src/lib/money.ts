@@ -65,7 +65,7 @@ export function cashCollected(docs: Doc[], from = "", to = "") {
  * or pending recurring drafts. Outstanding is refund-aware (docAmounts). Optional invoice-date range.
  */
 export function billedOutstanding(allDocs: Doc[], from = "", to = "") {
-  let count = 0, billed = 0, outstanding = 0;
+  let count = 0, billed = 0, outstanding = 0, owedCount = 0;
   const docs = dedupeCopies(allDocs);
   for (const doc of docs) {
     if (doc.type !== "invoice" || voided(doc) || String(doc.data?.status || "draft") === "draft") continue;
@@ -76,7 +76,8 @@ export function billedOutstanding(allDocs: Doc[], from = "", to = "") {
     const { total, owed, replaced } = effectiveAmounts(docs as never, doc as never);
     if (replaced) continue;
     count += 1; billed += total; outstanding += owed;
+    if (owed > 0.004) owedCount += 1; // QA2: the "N invoice(s)" next to Still owed comes from this same loop
   }
   const r = (n: number) => Math.round(n * 100) / 100;
-  return { count, billed: r(billed), outstanding: r(outstanding) };
+  return { count, billed: r(billed), outstanding: r(outstanding), owedCount };
 }

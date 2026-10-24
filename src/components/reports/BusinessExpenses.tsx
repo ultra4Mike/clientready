@@ -26,12 +26,20 @@ export default function BusinessExpenses({ list, occurrences, year, onChange }: 
   const [draft, setDraft] = useState(blank());
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
+  const [editingId, setEditingId] = useState("");
+  // QA2: edit a saved expense in the same form (same id, so it replaces the entry instead of adding one).
+  const edit = (entryId: string) => {
+    const found = list.find((e) => e.id === entryId);
+    if (!found) return;
+    const { updatedAt: _skip, ...rest } = found; void _skip;
+    setDraft({ ...blank(), ...rest, amount: String(rest.amount ?? "") }); setEditingId(entryId); setError(""); setOpen(true);
+  };
   const field = "min-h-11 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 text-sm";
   const save = () => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.date) || !(Number(draft.amount) > 0) || !draft.vendor.trim()) return setError("Add a date, a vendor and an amount above $0.");
     setError("");
     onChange(bizExpenses.upsert({ ...draft, vendor: draft.vendor.trim(), amount: Number(draft.amount).toFixed(2) }));
-    setDraft(blank()); setOpen(false);
+    setDraft(blank()); setOpen(false); setEditingId("");
   };
   const cat = categoryOf(draft.category);
   return (
@@ -41,7 +49,7 @@ export default function BusinessExpenses({ list, occurrences, year, onChange }: 
           <h2 className="text-base font-semibold">Business expenses (not on a job)</h2>
           <p className="text-xs text-slate-500">Rent, insurance, phone, software, vehicle, equipment, office, advertising, professional fees… Synced to your account.</p>
         </div>
-        <button type="button" data-testid="biz-add" onClick={() => setOpen(!open)} className="min-h-11 rounded-lg bg-teal-500 px-4 text-sm font-semibold text-slate-950!">{open ? "Close" : "Add expense"}</button>
+        <button type="button" data-testid="biz-add" onClick={() => { if (open) { setDraft(blank()); setEditingId(""); } setOpen(!open); }} className="min-h-11 rounded-lg bg-teal-500 px-4 text-sm font-semibold text-slate-950!">{open ? "Close" : "Add expense"}</button>
       </div>
       {open && (
         <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4" data-testid="biz-form">
@@ -56,7 +64,7 @@ export default function BusinessExpenses({ list, occurrences, year, onChange }: 
           {draft.monthly && <label className="text-xs text-slate-500">Ends (optional)<input type="date" className={field} value={draft.until || ""} onChange={(e) => setDraft({ ...draft, until: e.target.value })} /></label>}
           {cat.unsure && <p className="text-xs text-amber-700 sm:col-span-2 lg:col-span-4">{cat.line}: {cat.unsure}</p>}
           {error && <p role="alert" className="text-sm text-rose-700 sm:col-span-2 lg:col-span-4">{error}</p>}
-          <div className="sm:col-span-2 lg:col-span-4"><button type="button" data-testid="biz-save" onClick={save} className="min-h-11 rounded-lg bg-teal-500 px-4 text-sm font-semibold text-slate-950!">Save expense</button></div>
+          <div className="sm:col-span-2 lg:col-span-4"><button type="button" data-testid="biz-save" onClick={save} className="min-h-11 rounded-lg bg-teal-500 px-4 text-sm font-semibold text-slate-950!">{editingId ? "Save changes" : "Save expense"}</button></div>
         </div>
       )}
       <div className="mt-3">
@@ -68,7 +76,7 @@ export default function BusinessExpenses({ list, occurrences, year, onChange }: 
             { key: "line", label: "Schedule C line", value: (o) => o.line, filter: true },
             { key: "method", label: "Payment method", value: (o) => o.method, filter: true },
             { key: "amount", label: "Amount", type: "money", value: (o) => o.amount },
-            { key: "more", label: "Notes", value: (o) => [o.monthly ? "monthly" : "", o.receipt ? "receipt" : "", o.note].filter(Boolean).join(" · "), render: (o) => <span className="text-xs text-slate-500">{o.monthly && "🔁 monthly "}{o.receipt && "📎 receipt "}{o.note}<button type="button" className="ml-2 text-rose-700 underline print:hidden" onClick={() => { if (window.confirm(o.monthly ? "Delete this monthly expense (every month)?" : "Delete this expense?")) onChange(bizExpenses.remove(o.entryId)); }}>Delete</button></span> },
+            { key: "more", label: "Notes", value: (o) => [o.monthly ? "monthly" : "", o.receipt ? "receipt" : "", o.note].filter(Boolean).join(" · "), render: (o) => <span className="text-xs text-slate-500">{o.monthly && "🔁 monthly "}{o.receipt && "📎 receipt "}{o.note}<button type="button" data-testid="biz-edit" className="ml-2 text-teal-700 underline print:hidden" onClick={() => edit(o.entryId)}>Edit</button><button type="button" className="ml-2 text-rose-700 underline print:hidden" onClick={() => { if (window.confirm(o.monthly ? "Delete this monthly expense (every month)?" : "Delete this expense?")) onChange(bizExpenses.remove(o.entryId)); }}>Delete</button></span> },
           ]}
           footer={(shown) => <tr className="border-t border-slate-300 font-semibold"><td className="px-2 py-1.5" colSpan={5}>Total shown</td><td className="px-2 py-1.5 text-right tabular-nums">${shown.reduce((s, o) => s + o.amount, 0).toFixed(2)}</td><td /></tr>} />
       </div>
