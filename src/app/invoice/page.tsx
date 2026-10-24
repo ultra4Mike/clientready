@@ -2,18 +2,17 @@
 
 import { CONTACT_METHODS, contactMethodLabel, readContactMethod } from "@/lib/contact-method";
 import Link from "next/link";
-import PortalShare from "@/components/PortalShare";
+import dynamic from "next/dynamic";
 import Section, { SectionDefaults, useOpenedExisting } from "@/components/Section";
-import EmailComposer from "@/components/EmailComposer";
 import StageBar from "@/components/StageBar";
 import { applyCrewAmount, applyFeeAmount, customCostLineNames, customFeeEstimates, isCostKey, isFeeKind, type CostKey, CREW_KINDS, CREW_TYPE_CHOICES, crewApplySnapshot, crewTypeLabel, crewTypeMismatch, estimateByKind, extraName, isExtraItem, isCrewKind, readCostLines, readCrewUndo, undoCrewApply, type CostFields, type CostLine, type CrewApplyUndo, type CrewKind } from "@/lib/cost-categories";
 import { docAmounts, NEXT_LABEL, STAGE_LABEL, STAGES } from "@/lib/doc-stage";
 import { readEmailLog, type EmailLogEntry } from "@/lib/email";
 import { clientIdFor } from "@/lib/portal";
-import JobDonePanel from "@/components/JobDonePanel";
 import { StageEditor, StageSchedule } from "@/components/StageSchedule";
 import { balanceLabel, readStages, type Stage } from "@/lib/stages";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
+import { liveItems, type ItemTextField } from "@/lib/live-items";
 import { deleteCloudDocument, isUuid, saveCloudDocument } from "@/lib/cloud-docs";
 import { unsyncedIds } from "@/lib/sync-status";
 import { displayStatus, jobMessageKind, rowStage } from "@/lib/doc-status";
@@ -50,7 +49,6 @@ import { completeMessage, mailHref, scheduledMessage } from "@/lib/job-messages"
 import { clientFromRow, readCachedClients } from "@/lib/client-rows";
 import { ownerRating, starsText, type Rating } from "@/lib/ratings";
 import { applyPackage, deletePackage, readPackages, savePackage, syncPackages, type JobPackage } from "@/lib/packages";
-import ReminderPanel from "@/components/ReminderPanel";
 import { normalizeCategory, type LineCategory } from "@/lib/line-split";
 import { chainCredits, childRevision, creditLabel, newestDescendant, parentOf, revisionOwed } from "@/lib/change-order-revision";
 import { appendChangeOrderNote, changeOrdersFor, crewHandoff, revisionData, mergeChangeOrderNotes, readChangeOrderNotes, readChangeOrderOf, type ChangeOrderNote, type ChangeOrderOf } from "@/lib/change-orders";
@@ -72,7 +70,6 @@ import RestoreDraftBanner from "@/components/RestoreDraftBanner";
 import FormDraft from "@/components/FormDraft";
 import ScheduleEditor from "@/components/ScheduleEditor";
 import { entryHours, fmtHours, hoursByWorker, ownerEditClock, fixTimeProblem, crewFixReason, refreshOwnerClock, type ClockEntry } from "@/lib/clock";
-import MultiDayEditor from "@/components/MultiDayEditor";
 import { allDayWorkerIds, jobDays } from "@/lib/job-days";
 import { confirmRemoval, jobDonePhotos, crewForWorkers, followSchedule, jobScheduleFromForm, crewIds, workLogged, clockHoursFor, dedupeWorkerIds, readSchedule, readScheduleDays, readWorkers, shiftScheduleDays, saveAssignment, saveSchedule, syncScheduleCrewJobs, STATUS_LABEL, type Schedule, type Worker } from "@/lib/schedule";
 import { createClientFromInvoice } from "@/lib/client-create";
@@ -92,9 +89,16 @@ import SignaturePad, { SignatureBlock } from "@/components/SignaturePad";
 import { readSignature, type Signature } from "@/lib/signature";
 import { amountOf, documentTotals, discountLabel, normalizeDiscountType, type DiscountType } from "@/lib/discount";
 import DocTrail from "@/components/DocTrail";
-import RevisionPanel from "@/components/RevisionPanel";
-import ChangeOrderPanel from "@/components/ChangeOrderPanel";
 import { isEmptyDraftChangeOrder } from "@/lib/change-order-summary";
+
+// R64: heavy, rarely opened panels load on demand (same props, same testids; they render once their chunk arrives).
+const EmailComposer = dynamic(() => import("@/components/EmailComposer"));
+const PortalShare = dynamic(() => import("@/components/PortalShare"));
+const ReminderPanel = dynamic(() => import("@/components/ReminderPanel"));
+const RevisionPanel = dynamic(() => import("@/components/RevisionPanel"));
+const ChangeOrderPanel = dynamic(() => import("@/components/ChangeOrderPanel"));
+const MultiDayEditor = dynamic(() => import("@/components/MultiDayEditor"));
+const JobDonePanel = dynamic(() => import("@/components/JobDonePanel"));
 
 type LineItem = { description: string; qty: string; rate: string; category?: LineCategory };
 type SavedClient = { id: string; name: string; company: string; email: string; phone: string; address: string; preferences?: string; contactMethod?: string };
@@ -312,12 +316,14 @@ export default function NewInvoicePage() {
   }, []);
   // R83: photos the crew took when marking the job done.
   const [crewPhotos, setCrewPhotos] = useState<Awaited<ReturnType<typeof jobDonePhotos>>>([]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
   useEffect(() => { let live = true; if (docId) jobDonePhotos(docId).then((rows) => live && setCrewPhotos(rows)).catch(() => {}); else setCrewPhotos([]); return () => { live = false; }; }, [docId]);
   // R81: always re-read the team from the cloud once, so "+ Add crew" sees everyone Active.
   useEffect(() => { refreshEmployeesCache().then((ok) => { if (ok) setWorkers(readWorkers()); }).catch(() => {}); }, []);
   const [clockEntries, setClockEntries] = useState<ClockEntry[]>([]);
   const [clockFix, setClockFix] = useState<{ id: string; start: string; end: string } | null>(null);
   const [items, setItems] = useState<LineItem[]>([{ ...emptyItem }]);
+  const itemsState = items;
   const [packages, setPackages] = useState<JobPackage[]>([]);
   const [packageName, setPackageName] = useState("");
   const [rating, setRating] = useState<Rating | null>(null);
@@ -402,6 +408,7 @@ export default function NewInvoicePage() {
     const raw = window.localStorage.getItem("clientready-profile");
     if (!raw) return;
     const profile = JSON.parse(raw);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     setBusinessName(profile.businessName || "Your business");
     setOwnerName(profile.ownerName || "");
     setBusinessEmail(profile.email || "");
@@ -416,6 +423,7 @@ export default function NewInvoicePage() {
 
   useEffect(() => {
     const raw = window.localStorage.getItem("clientready-employees");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     if (raw) setEmployees(JSON.parse(raw));
   }, []);
 
@@ -470,6 +478,7 @@ export default function NewInvoicePage() {
           const clients = JSON.parse(window.localStorage.getItem("clientready-clients") || "[]") as SavedClient[];
           const client = clients.find((item) => item.id === forClient);
           if (client) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
             setClientName(client.name || "");
             setClientId(client.id);
             setClientCompany(client.company || "");
@@ -671,6 +680,7 @@ export default function NewInvoicePage() {
   useEffect(() => {
     if (!crew.length) return;
     const labor = crew.reduce((sum, row) => sum + rowPay(row), 0);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     setCosts((current) => ({ ...current, labor: labor.toFixed(2) }));
   }, [crew]);
 
@@ -978,6 +988,9 @@ export default function NewInvoicePage() {
 
   /** `cash` (from "Mark paid in cash") saves with that payment list and status instead of the form's. */
   async function saveDocumentInner(cash?: unknown) {
+    // Save what is on screen: a Rate filled/pasted and blurred in the same tick may not be in state yet.
+    const items = liveItems(itemsState, typeof document === "undefined" ? [] : [...document.querySelectorAll<HTMLInputElement>("input[data-item-field][data-item-index]")]);
+    if (items !== itemsState) setItems(items);
     const over = cash && typeof cash === "object" && Array.isArray((cash as { payments?: unknown }).payments) ? (cash as { payments: Payment[]; status: string }) : null;
     const savePayments = over ? over.payments : payments;
     const saveStatus = over ? over.status : status;
@@ -1330,7 +1343,17 @@ export default function NewInvoicePage() {
   }
 
   function updateItem(index: number, field: keyof LineItem, value: string) {
-    setItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
+    setItems((current) => current.map((item, itemIndex) => itemIndex === index && item[field] !== value ? { ...item, [field]: value } : item));
+  }
+  /** Line-item text fields commit on input, change, paste and blur (a fill() or paste then an instant blur + Save never leaves $0). */
+  function commitHandlers(index: number, field: ItemTextField) {
+    const commit = (event: { currentTarget: HTMLInputElement }) => updateItem(index, field, event.currentTarget.value);
+    return {
+      onChange: commit,
+      onInput: commit,
+      onBlur: commit,
+      onPaste: (event: ClipboardEvent<HTMLInputElement>) => { const el = event.currentTarget; commit(event); window.setTimeout(() => updateItem(index, field, el.value), 0); },
+    };
   }
 
   const jobMath = useMemo(() => {
@@ -1509,9 +1532,9 @@ export default function NewInvoicePage() {
               {items.map((item, index) => (
                 <div key={index} className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-2 sm:grid-cols-[minmax(0,1fr)_4.5rem_6rem_8.5rem] sm:border-0 sm:p-0">
                   {revision && <span data-testid="line-version-chip" className="col-span-full -mb-1 text-xs font-semibold text-amber-700 dark:text-amber-300">{(item as { fromVersion?: string }).fromVersion ? `From ${(item as { fromVersion?: string }).fromVersion}` : "Added"}</span>}
-                  <input className="col-span-2 sm:col-span-1 rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Description" value={item.description} onChange={(event) => updateItem(index, "description", event.target.value)} />
-                  <input className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Qty" value={item.qty} onChange={(event) => updateItem(index, "qty", event.target.value)} />
-                  <input className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Rate" value={item.rate} onChange={(event) => updateItem(index, "rate", event.target.value)} />
+                  <input className="col-span-2 sm:col-span-1 rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Description" data-item-field="description" data-item-index={index} value={item.description} {...commitHandlers(index, "description")} />
+                  <input className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Qty" data-item-field="qty" data-item-index={index} value={item.qty} {...commitHandlers(index, "qty")} />
+                  <input className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Rate" data-item-field="rate" data-item-index={index} value={item.rate} {...commitHandlers(index, "rate")} />
                   <select aria-label="Item type" data-testid="item-category" className="col-span-2 w-full min-w-0 sm:col-span-1 rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" value={item.category || ""} onChange={(event) => setItems((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, category: normalizeCategory(event.target.value) } : row))}>
                     <option value="">Unmarked</option>
                     <option value="labor">Labor</option>
@@ -1814,7 +1837,7 @@ export default function NewInvoicePage() {
               )}
               {!locked && <button type="button" onClick={clearForm} className="cr-btn cr-btn-text">Clear form</button>}
             </div>
-            {saveMessage && saveToast && <p role="status" aria-live="polite" onClick={() => setSaveToast(false)} className="print-hide fixed bottom-24 left-1/2 z-50 w-[min(92vw,32rem)] -translate-x-1/2 cursor-pointer rounded-lg border border-teal-500/40 bg-[var(--cr-card)] px-4 py-3 text-sm font-medium shadow-lg" data-testid="save-toast" data-kind={paymentProblem && saveMessage === paymentProblem ? "payment-required" : undefined}>{saveMessage}</p>}
+            {saveMessage && saveToast && <p role="status" aria-live="polite" title="Click to dismiss" onClick={() => setSaveToast(false)} onKeyDown={(event) => { if (event.key === "Escape" || event.key === "Enter") setSaveToast(false); }} className="print-hide fixed bottom-24 left-1/2 z-50 w-[min(92vw,32rem)] -translate-x-1/2 cursor-pointer rounded-lg border border-teal-500/40 bg-[var(--cr-card)] px-4 py-3 text-sm font-medium shadow-lg" data-testid="save-toast" data-kind={paymentProblem && saveMessage === paymentProblem ? "payment-required" : undefined}>{saveMessage}</p>}
             {changeOrderBlock && <a data-testid="co-open-latest" className="block rounded-lg border border-amber-500/40 px-3 py-2 text-sm font-semibold underline" href={`/invoice?id=${encodeURIComponent(changeOrderBlock.id)}`}>Open {changeOrderBlock.number}, the latest version</a>}
             {saveMessage && <p className="rounded-lg border border-teal-500/30 px-3 py-2 text-sm text-slate-600" data-testid="save-message" data-kind={paymentProblem && saveMessage === paymentProblem ? "payment-required" : undefined}>{saveMessage}</p>}
           </fieldset>

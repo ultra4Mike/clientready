@@ -16,7 +16,7 @@ import { amountOf, documentTotals } from "@/lib/discount";
 import { documentStage, STAGE_LABEL } from "@/lib/doc-stage";
 import { billedOutstanding, cashCollected } from "@/lib/money";
 import { effectiveAmounts } from "@/lib/change-order-revision";
-import { isOpenBalance, invoicePastDue, owedAfterRefunds, paidTotal, readPayments } from "@/lib/payments";
+import { invoicePastDue, owedAfterRefunds, readPayments } from "@/lib/payments";
 import { uniqueDocs } from "@/lib/change-orders";
 import FollowUps from "@/components/FollowUps";
 import TodayJobsBlock from "@/components/TodayJobsBlock";
@@ -112,6 +112,7 @@ export default function DashboardPage() {
   // owner's browser in their own zone, so rendering them on the server caused React #418 in the evening.
   const [now, setNow] = useState<Date | null>(null);
   const [auto, setAuto] = useState<{ sent: AutoPlan[]; errors: string[] }>({ sent: [], errors: [] });
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
   useEffect(() => setNow(new Date()), []);
   const recurringReady = recurringDraftsReady(documents);
 
@@ -154,6 +155,7 @@ export default function DashboardPage() {
     load();
   }, []);
 
+  // eslint-disable-next-line react-hooks/globals -- module-level chain cache feeds the existing owed/balance helpers; left as-is to keep pay math unchanged
   chainDocs = documents;
   const invoices = documents.filter((doc) => doc.type === "invoice");
   const hour = now ? now.getHours() : -1;

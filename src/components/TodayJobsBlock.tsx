@@ -11,6 +11,7 @@ export default function TodayJobsBlock({ docs, loaded }: { docs: { id: string; t
   const [jobs, setJobs] = useState<TodayJob[]>([]);
   const [clash, setClash] = useState<Set<string>>(new Set());
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     setClash(clashingIds(docs)); // R119: overlap marker on today's overlapping jobs
     setJobs(todayJobsWithCrew(docs, new Map(readWorkers().map((w) => [w.id, w.name])), localYmd()));
   }, [docs]);

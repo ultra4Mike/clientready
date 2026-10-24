@@ -222,7 +222,6 @@ export default function ApprovePage() {
 
   // R128: an approved proposal always leads to its invoice (also when the page is opened again later).
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- async server call, sets state when it answers
     if (doc?.type === "proposal" && approval?.status === "approved" && !invoiceLink) void convertToInvoice();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per approved proposal
   }, [doc?.type, approval?.status]);

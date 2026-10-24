@@ -17,7 +17,6 @@ export function ownerOvertimeHours() {
   try { return readOvertimeHours(JSON.parse(window.localStorage.getItem("clientready-profile") || "{}")?.overtimeHours); } catch { return 40; }
 }
 
-const toMin = (time: string) => { const [h, m] = String(time || "").split(":").map(Number); return (h || 0) * 60 + (m || 0); };
 
 /** Hours a job's schedule takes (end - start; a start with no end counts 1 hour). */
 export function scheduledHours(schedule: { startTime?: string; endTime?: string } | null) {

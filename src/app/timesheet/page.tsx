@@ -64,6 +64,7 @@ export default function TimesheetPage() {
     // Render this device's copy right away; the zone, cutover and server reads fill in alongside (never one after another).
     const q = new URLSearchParams(window.location.search).get("date");
     const pickWeek = () => weekOf(q && /^\d{4}-\d{2}-\d{2}$/.test(q) ? q : localYmd(new Date().toISOString()));
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     if (new URLSearchParams(window.location.search).get("filter") === "review") setFilter("review");
     const first = pickWeek();
     setWeek(first); setWorkers(readWorkers()); setDocs(readDocs()); setSettings(readLocalTimesheetSettings()); setNow(new Date().toISOString());
@@ -82,6 +83,7 @@ export default function TimesheetPage() {
   }, []);
   useEffect(() => {
     if (!week) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     let live = true; setWeekLoading(true); setApprovals(mergeApprovals(readLocalApprovals(week, addDays(week, 6)), [...savedApprovals.current.values()].filter((a) => a.date >= week && a.date <= addDays(week, 6))));
     void loadOwnerTimesheet(week, addDays(week, 6)).then((data) => { if (!live) return; setWeekLoading(false); setCloud(data.cloud); setCloudError(data.cloudError || ""); setEvents(data.events); setFixes(data.fixes); setApprovals(mergeApprovals(data.approvals, [...savedApprovals.current.values()].filter((a) => a.date >= week && a.date <= addDays(week, 6)))); setSettings(data.settings); }).catch(() => { if (live) { setWeekLoading(false); setCloud(false); } });
     void loadPtoForRange(week, addDays(week, 6)).then((r) => { if (live) setWeekPto(r); }).catch(() => {});

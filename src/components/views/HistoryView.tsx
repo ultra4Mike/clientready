@@ -32,6 +32,7 @@ export default function HistoryPage() {
   useEffect(() => {
     const clientsRaw = window.localStorage.getItem("clientready-clients");
     const docsRaw = window.localStorage.getItem("clientready-documents");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     if (clientsRaw) setClients(JSON.parse(clientsRaw));
     if (docsRaw) setDocuments(JSON.parse(docsRaw));
   }, []);
@@ -53,9 +54,9 @@ export default function HistoryPage() {
 
   function openDocument(doc: SavedDocument) {
     window.localStorage.setItem("clientready-open-document", doc.id);
-    if (doc.type === "invoice" || doc.type === "proposal") window.location.href = `/invoice?id=${encodeURIComponent(doc.id)}`;
-    else if (doc.type === "email") window.location.href = "/email";
-    else window.location.href = "/report";
+    if (doc.type === "invoice" || doc.type === "proposal") window.location.assign(`/invoice?id=${encodeURIComponent(doc.id)}`);
+    else if (doc.type === "email") window.location.assign("/email");
+    else window.location.assign("/report");
   }
 
   return (

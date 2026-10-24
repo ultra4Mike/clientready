@@ -9,9 +9,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { billedOutstanding, cashCollected } from "@/lib/money";
 import { buildReport } from "@/lib/reports";
-import { docAmounts } from "@/lib/doc-stage";
-import { balanceDue, isOpenBalance, paidTotal, readPayments } from "@/lib/payments";
-import { documentTotals } from "@/lib/discount";
 
 type Doc = { id: string; type: string; title?: string; clientName?: string; createdAt: string; data: Record<string, unknown> };
 const YEAR = "2026";

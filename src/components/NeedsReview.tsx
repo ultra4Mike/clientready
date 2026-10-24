@@ -14,7 +14,7 @@ type Doc = { id: string; type: string; title: string; clientName?: string; data?
 /** Owner dashboard list. Workers never reach the dashboard (AppShell sends them to /crew). */
 export default function NeedsReview({ documents, onDocuments, loading = false, onCount }: { documents: Doc[]; onDocuments: (docs: Doc[]) => void; loading?: boolean; onCount?: (count: number) => void }) {
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
-  const [busy, setBusy] = useState("");
+  const [busy] = useState("");
 
   useEffect(() => {
     supabase.from("crew_expenses").select("id, doc_id, worker_name, kind, amount, note, created_at").order("created_at", { ascending: false })

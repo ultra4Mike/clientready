@@ -1,7 +1,7 @@
 "use client";
 
 import { nativePhotoClick } from "@/lib/native-camera";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import PhotoAnnotator from "@/components/PhotoAnnotator";
 import { compressPhoto, dataUrlBytes, MAX_PHOTOS, orderByTag, PHOTO_TAG_LABEL, type JobPhoto, type PhotoTag } from "@/lib/photos";
 
@@ -25,6 +25,7 @@ export function JobPhotosEditor({ photos, onChange, showOnCopy = false, onShowOn
     for (const file of files) {
       try {
         const dataUrl = await compressPhoto(file);
+        // eslint-disable-next-line react-hooks/purity -- runs inside an async upload handler, not during render
         added.push({ id: `${Date.now()}-${added.length}`, dataUrl, caption: "", addedAt: new Date().toISOString() });
       } catch (error) {
         notes.push(error instanceof Error ? error.message : `${file.name}: could not add this photo.`);
@@ -107,6 +108,12 @@ export function JobPhotosEditor({ photos, onChange, showOnCopy = false, onShowOn
 /** Small thumbnail row for the customer copy. Click to enlarge on screen. */
 export function JobPhotoStrip({ photos, muted = "text-slate-600" }: { photos: JobPhoto[]; muted?: string }) {
   const [open, setOpen] = useState<JobPhoto | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
   if (!photos.length) return null;
   return (
     <div className="print-keep mt-3" data-testid="photo-strip">
@@ -123,7 +130,7 @@ export function JobPhotoStrip({ photos, muted = "text-slate-600" }: { photos: Jo
         ))}
       </div>
       {open && (
-        <div className="print-hide fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setOpen(null)} role="dialog" aria-label="Photo">
+        <div className="print-hide fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setOpen(null)} onKeyDown={(event) => { if (event.key === "Escape") setOpen(null); }} role="dialog" aria-modal="true" aria-label="Photo">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={open.dataUrl} alt={open.caption || "Job photo"} className="max-h-[85vh] max-w-full rounded-lg" />
           {(open.tag || open.caption) && <p className="absolute bottom-6 left-0 right-0 text-center text-white">{[open.tag ? PHOTO_TAG_LABEL[open.tag] : "", open.caption].filter(Boolean).join(": ")}</p>}

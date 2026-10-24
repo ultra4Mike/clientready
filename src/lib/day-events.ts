@@ -160,12 +160,14 @@ export async function loadOwnerTimesheet(from: string, to: string): Promise<Owne
   const localApprovals = readLocal<DayApproval[]>(KEY_APPROVALS, []);
   const localSettings = readTimesheetSettings(readLocal(KEY_SETTINGS, {}));
   const evQuery = () => selectEvents((cols) => supabase.from("crew_day_events").select(cols).gte("work_date", from).lte("work_date", to).order("at"));
-  let [ev, fx, ap, st] = await Promise.all([
+  const loaded = await Promise.all([
     selectEvents((cols) => supabase.from("crew_day_events").select(cols).gte("work_date", from).lte("work_date", to).order("at")),
     supabase.from("crew_time_fixes").select("*").gte("work_date", from).lte("work_date", to).order("created_at"),
     supabase.from("crew_day_approvals").select("*").gte("work_date", from).lte("work_date", to),
     supabase.from("crew_timesheet_settings").select("*").maybeSingle(),
   ]);
+  const [, fx, , st] = loaded;
+  let [ev, , ap] = loaded;
   // Signed out / expired session: RLS returns empty lists with no error. Never show that as "No hours";
   // fall back to this device's copy and report cloud=false so the page can say so.
   const { data: auth } = await supabase.auth.getSession();

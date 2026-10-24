@@ -56,12 +56,12 @@ export default function DraftsPage() {
   function openAsInvoice(draft: Draft) {
     // R82: never a second invoice from the same report.
     const existing = existingInvoice(draft);
-    if (existing?.id) { window.location.href = `/invoice?id=${encodeURIComponent(existing.id)}`; return; }
+    if (existing?.id) { window.location.assign(`/invoice?id=${encodeURIComponent(existing.id)}`); return; }
     // Receipts stay on the report (too big to hand over); the invoice only notes that one exists.
     const lines = readCostLines(draft).map(({ receipt, ...line }) => ({ ...line, ...(receipt ? { receipt: "1" } : {}) }));
     window.localStorage.setItem("clientready-open-draft", JSON.stringify({ ...draft, costs: lines }));
     // Explicit handoff flag: a plain /invoice ("New invoice") never picks up a left-over crew draft.
-    window.location.href = "/invoice?draft=1";
+    window.location.assign("/invoice?draft=1");
   }
 
   return (

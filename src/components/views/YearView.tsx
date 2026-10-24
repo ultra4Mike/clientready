@@ -5,7 +5,7 @@ import { readSetAside } from "@/lib/profit-alerts";
 import { buildReport } from "@/lib/reports";
 
 import { crewKindLabel } from "@/lib/cost-categories";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { documentTotals } from "@/lib/discount";
@@ -82,6 +82,9 @@ type SavedDocument = {
   };
 };
 
+export type YearRow = Row;
+export type YearData = { rows: Row[]; summary: { collected: number; spent: number; wages: number; profit: number; setAside: number; yours: number }; setAsidePercent: number; workers: { name: string; total: number; hours: number }[]; deposits: number; employees: Employee[]; businessName: string; taxId: string };
+
 type Row = {
   id: string;
   docId: string;
@@ -124,13 +127,15 @@ function crewPay(row: CrewRow) {
   return rowPayMoney(row);
 }
 
-export default function YearPage() {
+/** Also embedded as the Taxes tab of /reports (shared year picker; year comes from the page). */
+export default function YearPage({ embedded = false, year: yearProp, onData, cover }: { embedded?: boolean; year?: string; onData?: (data: YearData) => void; cover?: ReactNode } = {}) {
   const [documents, setDocuments] = useState<SavedDocument[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [businessName, setBusinessName] = useState("Your business");
   const [taxId, setTaxId] = useState("");
   const [setAsidePercent, setSetAsidePercent] = useState(30);
-  const [year, setYear] = useState(String(new Date().getFullYear()));
+  const [yearOwn, setYear] = useState(String(new Date().getFullYear()));
+  const year = yearProp ?? yearOwn;
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [crewType, setCrewType] = useState("all");
@@ -144,6 +149,7 @@ export default function YearPage() {
     const profileRaw = window.localStorage.getItem("clientready-profile");
     if (profileRaw) {
       const profile = JSON.parse(profileRaw);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
       setBusinessName(profile.businessName || "Your business");
       setTaxId(profile.taxId || "");
       setSetAsidePercent(readSetAside(profile.setAsidePercent));
@@ -421,17 +427,23 @@ export default function YearPage() {
     });
   }, [rows]);
 
+  // Reports & Taxes reads the same rows and totals (no second copy of the math).
+  useEffect(() => {
+    onData?.({ rows, summary, setAsidePercent, workers, deposits: extras.deposits.reduce((sum, item) => sum + money(item.payment.amount), 0), employees, businessName, taxId });
+  }, [onData, rows, summary, setAsidePercent, workers, extras, employees, businessName, taxId]);
+
   function openRow(row: Row) {
     if (!row.docId) return; // overtime premium rows span several jobs
     window.localStorage.setItem("clientready-open-document", row.docId);
-    window.location.href = `/invoice?id=${encodeURIComponent(row.docId)}`;
+    window.location.assign(`/invoice?id=${encodeURIComponent(row.docId)}`);
   }
 
   return (
-    <AppShell title="Sales and expense log">
-      <PageHeader title="Sales and expense log" subtitle="Filter the year, open any row, then print or save the packet." actions={<button type="button" onClick={() => window.print()} className="w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 sm:w-auto">Print / Save PDF</button>} />
+    <Shell embedded={embedded}>
+      {cover}
+      <PageHeader title="Sales and expense log" subtitle="Filter the year, open any row, then print or save the packet." actions={<button type="button" data-testid="year-print" onClick={() => window.print()} className="w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400 sm:w-auto">Print / Save PDF</button>} />
       <div className="mb-4 grid gap-3 rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 sm:grid-cols-2 md:grid-cols-4 print:hidden">
-        <input className="min-h-11 rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-base sm:text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={year} onChange={(event) => setYear(event.target.value)} />
+        {!embedded && <input aria-label="Year" className="min-h-11 rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-base sm:text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={year} onChange={(event) => setYear(event.target.value)} />}
         <input className="min-h-11 rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-base sm:text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="Search client, invoice, worker" value={search} onChange={(event) => setSearch(event.target.value)} />
         <select className="min-h-11 rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-base sm:text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" value={filter} onChange={(event) => { setFilter(event.target.value); setCrewType("all"); setWorker("all"); }}>
           <option value="all">All rows</option>
@@ -581,6 +593,9 @@ export default function YearPage() {
           Crew pay uses the rate saved on each job. Drive time is not added as a cost.
         </p>
       </div>
-    </AppShell>
+    </Shell>
   );
+}
+function Shell({ embedded, children }: { embedded: boolean; children: ReactNode }) {
+  return embedded ? <div data-testid="year-packet">{children}</div> : <AppShell title="Sales and expense log">{children}</AppShell>;
 }

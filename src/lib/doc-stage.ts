@@ -1,5 +1,5 @@
 import { amountOf, documentTotals } from "@/lib/discount";
-import { owedAfterRefunds, balanceDue, paidTotal, readPayments } from "@/lib/payments";
+import { owedAfterRefunds, paidTotal, readPayments } from "@/lib/payments";
 import { readApproval } from "@/lib/approval";
 import { readSchedule } from "@/lib/schedule";
 

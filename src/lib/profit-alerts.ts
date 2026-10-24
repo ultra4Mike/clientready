@@ -16,6 +16,14 @@ const num = (value: unknown) => Number(String(value ?? "").replace(/[^0-9.-]/g, 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /** Set-aside percent: a number 0-100 as saved (0 means 0); blank or invalid uses 30. */
+/** Set-aside box text clamped to 0–100; blank or non-numbers are left for the form's own message. */
+export function clampPercentText(raw: string) {
+  const text = raw.trim();
+  if (text === "" || !/^-?\d+(\.\d+)?$/.test(text)) return text;
+  const n = Number(text);
+  return n < 0 ? "0" : n > 100 ? "100" : text;
+}
+
 export function readSetAside(raw: unknown) {
   const text = String(raw ?? "").trim();
   const value = Number(text);

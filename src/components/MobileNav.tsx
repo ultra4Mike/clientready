@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const mainLinks = [
   { href: "/dashboard", label: "Dashboard" },
@@ -13,7 +13,7 @@ const mainLinks = [
 const moreLinks = [
   { href: "/employees", label: "Employees" },
   { href: "/timesheet", label: "Timesheet" },
-  { href: "/reports", label: "Reports" },
+  { href: "/reports", label: "Reports & Taxes" },
   { href: "/mileage", label: "Mileage" },
   { href: "/inventory", label: "Inventory" },
   { href: "/backup", label: "Backup" },
@@ -64,14 +64,19 @@ function TabIcon({ name }: { name: string }) {
 export default function MobileNav({ onLogOut }: { onLogOut?: () => void }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  useEffect(() => {
+    if (!moreOpen && !createOpen) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { setMoreOpen(false); setCreateOpen(false); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [moreOpen, createOpen]);
   return (
       <div className="min-[900px]:hidden print:hidden">
           {moreOpen && (
-            <div className="fixed inset-0 z-40 print:hidden" onClick={() => setMoreOpen(false)}>
-              <div className="absolute inset-0 bg-slate-950/60" />
+            <div className="fixed inset-0 z-40 print:hidden" role="dialog" aria-modal="true" aria-label="More">
+              <button type="button" aria-label="Close menu" data-testid="more-backdrop" className="absolute inset-0 h-full w-full cursor-default bg-slate-950/60" onClick={() => setMoreOpen(false)} />
               <div
                 className="absolute inset-x-0 bottom-0 rounded-t-3xl border-t border-teal-500/20 bg-[var(--cr-panel)] px-4 pt-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] shadow-2xl"
-                onClick={(event) => event.stopPropagation()}
               >
                 <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-slate-500/40" />
                 <div className="max-h-[60vh] space-y-4 overflow-y-auto">
@@ -101,7 +106,7 @@ export default function MobileNav({ onLogOut }: { onLogOut?: () => void }) {
               </div>
             </div>
           )}
-          {createOpen && !moreOpen && <div className="fixed inset-0 z-40 bg-slate-950/50 print:hidden" onClick={() => setCreateOpen(false)} />}
+          {createOpen && !moreOpen && <button type="button" aria-label="Close create menu" data-testid="create-backdrop" className="fixed inset-0 z-40 h-full w-full cursor-default bg-slate-950/50 print:hidden" onClick={() => setCreateOpen(false)} />}
           <div className={`quick-create-fab fixed right-4 ${moreOpen || !createOpen ? "hidden" : ""} bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 flex flex-col items-end gap-2 print:hidden`}>
             {createOpen && (
               <div className="w-48 overflow-hidden rounded-2xl border border-teal-500/20 bg-[var(--cr-panel)] py-1 shadow-2xl">

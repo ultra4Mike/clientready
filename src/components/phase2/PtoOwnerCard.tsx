@@ -42,7 +42,6 @@ export default function PtoOwnerCard({ workers, settings, today, onAdded, only }
     return true;
   }
   const name = (id: string) => workers.find((w) => w.id === id)?.name || "Worker";
-  const input = "min-h-11 rounded-lg border bg-transparent px-2";
   return (
     <section id={only ? `pto-${only}` : "pto"} className="cr-panel mt-4 rounded-xl border p-3 text-sm" data-testid={only ? "emp-pto-card" : "pto-card"}>
       <h2 className="font-semibold">{only ? "Add time off" : `Time off & sick (${year})`}</h2>

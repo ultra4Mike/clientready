@@ -47,6 +47,7 @@ export default function EmailPage() {
     const raw = window.localStorage.getItem("clientready-profile");
     if (raw) {
       const profile = JSON.parse(raw);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
       setYourName(profile.ownerName || "");
     }
     const clientsRaw = window.localStorage.getItem("clientready-clients");
@@ -75,6 +76,7 @@ export default function EmailPage() {
       tone?: string;
       yourName?: string;
     };
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     setDocId(doc.id);
     setEmailType(data.emailType || "follow-up");
     setClientName(data.clientName || "");

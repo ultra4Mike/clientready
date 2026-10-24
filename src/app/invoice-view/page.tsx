@@ -9,7 +9,7 @@ import { viewStatusLabel } from "@/lib/portal-chain";
 import { chainCredits, creditLabel, isRevision, replacedBy, revisionOwed } from "@/lib/change-order-revision";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
-import { balanceDue, owedAfterRefunds, paidTotal, readPayments, tipTotal, type Payment } from "@/lib/payments";
+import { owedAfterRefunds, paidTotal, readPayments, tipTotal, type Payment } from "@/lib/payments";
 import { JobPhotoStrip } from "@/components/JobPhotos";
 import { readPhotos, type JobPhoto } from "@/lib/photos";
 import LineSplit from "@/components/LineSplit";

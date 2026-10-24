@@ -74,7 +74,7 @@ export default function UpcomingPage() {
 
   function openView(id: string) {
     window.localStorage.setItem("clientready-open-document", id);
-    window.location.href = "/invoice-view";
+    window.location.assign("/invoice-view");
   }
 
   return (

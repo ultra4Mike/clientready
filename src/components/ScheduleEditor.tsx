@@ -125,6 +125,7 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
   useEffect(() => {
     if (!autoSave || fingerprint === first.current) return;
     // R123: a start with no end gets the default length before it saves (no end-less autosave).
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     if (startTime && !endTime && /^\d\d:\d\d$/.test(startTime)) { setEndTime(toHhmm(toMin(startTime) + DEFAULT_JOB_MINUTES)); return; }
     const blocked = Boolean(problem());
     const mark = window.setTimeout(() => setAutoState(blocked ? "unsaved" : "waiting"), 0);
@@ -223,7 +224,7 @@ export default function ScheduleEditor({ value, workers, defaults, onSave, onCan
         )}
         {conflicts.length === 0 && softConflicts.length > 0 && (
           <div role="status" data-testid="booking-soft" data-state="warn" className="mt-2 space-y-2 rounded-xl border border-dashed border-amber-400 px-3 py-3 text-sm text-amber-900 dark:text-amber-200">
-            <p>Tentative booking here (not confirmed yet): {softConflicts.map((c) => `${names.get(c.workerId) || "Worker"} on ${c.title} ${clockText(c.start)}–${clockText(c.end)}`).join("; ")}. It's an unapproved proposal, pending change order or unsent draft. You can still save.</p>
+            <p>Tentative booking here (not confirmed yet): {softConflicts.map((c) => `${names.get(c.workerId) || "Worker"} on ${c.title} ${clockText(c.start)}–${clockText(c.end)}`).join("; ")}. It&apos;s an unapproved proposal, pending change order or unsent draft. You can still save.</p>
             {suggestion && <button type="button" data-testid="soft-next-open" data-time={suggestion} onClick={() => applySlot(suggestion)} className="cr-btn cr-btn-secondary">Move to next open time: {clockText(toMin(suggestion))}</button>}
           </div>
         )}
