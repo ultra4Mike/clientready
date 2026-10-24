@@ -4,6 +4,7 @@ import { useState } from "react";
 import { BIZ_CATEGORIES, bizExpenses, categoryOf, type BizExpense, type BizOccurrence } from "@/lib/business-expenses";
 import { paymentMethods } from "@/lib/payments";
 import { newId } from "@/lib/synced-list";
+import { localYmd } from "@/lib/scheduled-jobs";
 import DataTable from "@/components/reports/DataTable";
 
 /** Shrinks a receipt photo to a small JPEG so it fits in the synced list. */
@@ -19,7 +20,7 @@ async function smallPhoto(file: File): Promise<string> {
   } finally { URL.revokeObjectURL(url); }
 }
 
-const blank = (): Omit<BizExpense, "updatedAt"> => ({ id: newId("bx"), date: new Date().toISOString().slice(0, 10), vendor: "", amount: "", category: "office", method: "Card", note: "", monthly: false });
+const blank = (): Omit<BizExpense, "updatedAt"> => ({ id: newId("bx"), date: localYmd(), vendor: "", amount: "", category: "office", method: "Card", note: "", monthly: false });
 
 export default function BusinessExpenses({ list, occurrences, year, onChange }: { list: BizExpense[]; occurrences: BizOccurrence[]; year: string; onChange: (list: BizExpense[]) => void }) {
   const [draft, setDraft] = useState(blank());

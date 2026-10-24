@@ -29,6 +29,7 @@ type CrewExpense = { id?: string; receipt?: string; amount?: unknown; created_at
 /** Owner-only (AppShell sends crew accounts to /crew). Reads the local cache; never changes anything. */
 export default function ReportsPage() {
   const [documents, setDocuments] = useState<Doc[]>([]);
+  const [docsLoaded, setDocsLoaded] = useState(false);
   const [crewExpenses, setCrewExpenses] = useState<CrewExpense[]>([]);
   const [year, setYearState] = useState(String(new Date().getFullYear()));
   // No flash: the tab comes from the URL before anything renders (null until read after mount).
@@ -50,6 +51,7 @@ export default function ReportsPage() {
       } catch {
         setDocuments([]);
       }
+      setDocsLoaded(true);
     });
     // R120: crew receipts show "…" until they load (not $0).
     supabase.auth.getSession().then(({ data }) => {
@@ -107,8 +109,9 @@ export default function ReportsPage() {
         <div className="flex flex-wrap items-center gap-3 print:hidden">
         <label className="flex items-center gap-2 text-sm">
               Year
-              <select data-testid="report-year" value={year} onChange={(event) => setYear(event.target.value)} className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2 text-sm">
-                {years.map((option) => <option key={option} value={option}>{option}</option>)}
+              <select data-testid="report-year" data-loaded={docsLoaded} disabled={!docsLoaded} aria-busy={!docsLoaded} value={docsLoaded ? year : ""} onChange={(event) => setYear(event.target.value)} className="rounded-lg border border-teal-500/30 bg-transparent px-3 py-2 text-sm">
+                {/* No flash: the year list is built only after the saved documents load (never "this year only" first). */}
+                {docsLoaded ? years.map((option) => <option key={option} value={option}>{option}</option>) : <option value="">Loading…</option>}
               </select>
             </label>
           <div role="tablist" aria-label="Reports & Taxes" className="flex flex-wrap gap-1 rounded-xl border border-teal-500/20 p-1">

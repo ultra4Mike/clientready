@@ -40,7 +40,9 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 export type BizOccurrence = { id: string; entryId: string; date: string; vendor: string; amount: number; category: string; categoryLabel: string; line: string; method: string; note: string; receipt: boolean; monthly: boolean };
 
 /** Every dated amount in the year (monthly entries repeat until their end date, the year end, or `today`). */
-export function bizOccurrences(list: BizExpense[], year: string, today = new Date().toISOString().slice(0, 10)): BizOccurrence[] {
+/** Local (device) calendar day, not UTC: in the evening UTC is already tomorrow. */
+function localToday(d = new Date()) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
+export function bizOccurrences(list: BizExpense[], year: string, today = localToday()): BizOccurrence[] {
   const out: BizOccurrence[] = [];
   for (const e of list) {
     if (e.deleted || !/^\d{4}-\d{2}-\d{2}/.test(e.date || "") || !(num(e.amount) > 0)) continue;
