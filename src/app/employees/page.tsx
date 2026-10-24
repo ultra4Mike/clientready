@@ -1,5 +1,6 @@
 "use client";
 
+import { hourlyRateOrNull } from "@/lib/crew-tools";
 import { inviteText } from "@/lib/crew-invite";
 import { mailtoHref } from "@/lib/reminders";
 
@@ -14,6 +15,8 @@ import { FormEvent, useEffect, useState } from "react";
 import FormDraft from "@/components/FormDraft";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
+import TimeOffRequests from "@/components/TimeOffRequests";
+import DonePhotoSetting from "@/components/DonePhotoSetting";
 import ScheduleReconcile from "@/components/ScheduleReconcile";
 import { supabase } from "@/lib/supabase";
 import { readWorkerOverrides, timeOverridesRow, type WorkerTimeOverrides } from "@/lib/timesheet";
@@ -149,8 +152,13 @@ export default function EmployeesPage() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!form.name.trim() || !form.rate.trim()) {
-      setMessage("Name and hourly rate are required.");
+    if (!form.name.trim()) {
+      setMessage("Name is required.");
+      return;
+    }
+    // Hourly rate is optional (salary, per-job or not set yet); a typed rate must be a real number.
+    if (form.rate.trim() && hourlyRateOrNull(form.rate) === null) {
+      setMessage("Hourly rate must be a number (or leave it blank).");
       return;
     }
     const payError = payProblem(form.paySettings, form.rate);
@@ -253,6 +261,7 @@ export default function EmployeesPage() {
     <AppShell title="Team">
       <PageHeader title="Team" subtitle="Add the email they will use to log in. That email opens the crew page, not the owner books." />
       <p className="-mt-2 mb-4 text-sm"><a href="/crew?preview=sample" data-testid="crew-preview-sample" className="font-medium text-teal-700 underline dark:text-teal-300">Preview the crew page with a sample worker</a> (nothing is saved or sent).</p>
+      <div className="mb-4 grid gap-3 md:grid-cols-2"><TimeOffRequests /><DonePhotoSetting /></div>
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(340px,400px)_minmax(0,1fr)] xl:grid-cols-[minmax(360px,420px)_minmax(0,1fr)]">
       <div className="order-2 min-w-0 lg:order-none lg:sticky lg:top-20">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">Add or edit a person</h2>
@@ -272,8 +281,8 @@ export default function EmployeesPage() {
         <div className="grid min-w-0 grid-cols-1 gap-3 rounded-xl border border-teal-500/20 p-4 min-[360px]:grid-cols-2 [&>*]:min-w-0">
           <h2 className="col-span-full text-xs font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-300">Pay & start date</h2>
         <label className="block min-w-0 text-sm font-medium">
-          Hourly rate
-          <input name="rate" autoComplete="off" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="e.g. 24" data-testid="emp-rate" value={form.rate} onChange={(event) => setForm({ ...form, rate: event.target.value })} />
+          Hourly rate <span className="font-normal text-[var(--cr-muted)]">(optional)</span>
+          <input name="rate" autoComplete="off" className="mt-1.5 w-full rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="e.g. 24, or blank for salary / per job" data-testid="emp-rate" value={form.rate} onChange={(event) => setForm({ ...form, rate: event.target.value })} />
         </label>
         <label className="block min-w-0 text-sm font-medium">
           Hire date

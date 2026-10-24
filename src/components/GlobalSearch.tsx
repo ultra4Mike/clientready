@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { searchAll, type SearchHit } from "@/lib/search";
+import { searchAll, serverSearchRows, type SearchHit } from "@/lib/search";
 
 const KIND: Record<SearchHit["kind"], string> = { document: "Doc", client: "Client", part: "Part" };
 const KIND_ICON: Record<SearchHit["kind"], string> = { document: "📄", client: "👤", part: "🔧" };
@@ -9,7 +9,7 @@ const KIND_ICON: Record<SearchHit["kind"], string> = { document: "📄", client:
 const noop = () => () => {};
 const isMac = () => /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
-/** Search button in the top bar + Ctrl/Cmd+K or "/" to open. Searches this device's cache; nothing is changed. */
+/** Search button in the top bar + Ctrl/Cmd+K or "/" to open. Searches this device first, then the server; nothing is changed. */
 export default function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -29,7 +29,15 @@ export default function GlobalSearch() {
   }, []);
   useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 0); }, [open]);
   const mac = useSyncExternalStore(noop, isMac, () => false);
-  const hits = open ? searchAll(query) : [];
+  const [server, setServer] = useState<{ q: string; rows: Awaited<ReturnType<typeof serverSearchRows>> } | null>(null);
+  // QA3: after a short pause, also search the server so records not on this device are found.
+  useEffect(() => {
+    if (!open || query.trim().length < 2) return;
+    let live = true;
+    const timer = window.setTimeout(() => { void serverSearchRows(query).then((rows) => { if (live) setServer({ q: query, rows }); }); }, 300);
+    return () => { live = false; window.clearTimeout(timer); };
+  }, [open, query]);
+  const hits = open ? searchAll(query, 20, server?.q === query ? server.rows : {}) : [];
   const go = (hit: SearchHit | undefined) => { if (hit) window.location.assign(hit.href); };
 
   return (

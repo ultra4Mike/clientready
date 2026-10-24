@@ -1,7 +1,8 @@
 "use client";
 
-import { CLIENT_CSV_HEADER, clientsFromCsv } from "@/lib/client-csv";
+import { clientsFromCsv } from "@/lib/client-csv";
 import { csvText, downloadCsv } from "@/lib/csv";
+import { CLIENT_EXPORT_HEADER, clientChanges, clientExportRow, clientMatches, logClientEdit, mergeClients, possibleDuplicates } from "@/lib/client-tools";
 
 import { CONTACT_METHODS, contactMethodLabel, readContactMethod, type ContactMethod } from "@/lib/contact-method";
 import { clientFromRow, readCachedClients } from "@/lib/client-rows";
@@ -114,20 +115,26 @@ export default function ClientsPage() {
   }
 
   const visible = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return clients;
-    return clients.filter((client) =>
-      `${client.name} ${client.company} ${client.email} ${client.phone} ${client.address} ${client.notes}`
-        .toLowerCase()
-        .includes(query)
-    );
+    if (!search.trim()) return clients;
+    return clients.filter((client) => clientMatches(client, search));
   }, [clients, search]);
+  // QA3: possible duplicates of what is in the form, and which saved clients look like each other.
+  const formDuplicates = useMemo(() => (showForm ? possibleDuplicates(form, clients, editingId) : []), [showForm, form, clients, editingId]);
+  const duplicateIds = useMemo(() => new Set(clients.filter((client) => possibleDuplicates(client, clients, client.id).length > 0).map((client) => client.id)), [clients]);
+  function mergeIntoExisting(existing: Client) {
+    const merged = mergeClients(existing, { id: "", ...form });
+    setEditingId(existing.id);
+    setForm({ ...emptyClient, ...merged, contactMethod: readContactMethod(merged.contactMethod), preferences: merged.preferences || "" } as typeof emptyClient);
+    setMessage(`Merged into ${existing.name}. Check the details and tap Save.`);
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!form.name.trim()) { setMessage("Add the client's name before saving."); return; } // R107
 
     if (editingId) {
+      const before0 = clients.find((client) => client.id === editingId);
+      if (before0) logClientEdit(editingId, clientChanges(before0, form));
       const next = clients.map((client) =>
         client.id === editingId ? { ...client, ...form } : client
       );
@@ -284,7 +291,7 @@ export default function ClientsPage() {
         />
 
         <div className="mb-3 flex flex-wrap gap-2" data-testid="clients-csv">
-          <button type="button" data-testid="clients-export" onClick={() => downloadCsv("clients.csv", csvText(CLIENT_CSV_HEADER, clients.map((c) => [c.name || "", c.company || "", c.email || "", c.phone || "", c.address || "", c.notes || "", c.preferences || ""])))} className="inline-flex min-h-11 items-center rounded-lg border border-teal-500/50 px-4 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">Export CSV</button>
+          <button type="button" data-testid="clients-export" onClick={() => downloadCsv("clients.csv", csvText(CLIENT_EXPORT_HEADER, clients.map(clientExportRow)))} className="inline-flex min-h-11 items-center rounded-lg border border-teal-500/50 px-4 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 dark:text-teal-300">Export CSV</button>
           <label className="inline-flex min-h-11 cursor-pointer items-center rounded-lg border border-teal-500/50 px-4 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 focus-within:ring-2 focus-within:ring-teal-400 dark:text-teal-300">Import CSV
             <input type="file" accept=".csv,text/csv" className="sr-only" data-testid="clients-import" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void importClients(file); }} />
           </label>
@@ -304,6 +311,19 @@ export default function ClientsPage() {
             className="mb-8 max-w-2xl space-y-4 rounded-2xl border border-teal-500/30 bg-white p-4 shadow-md sm:p-6"
           >
             <h2 className="text-lg font-bold tracking-tight">{editingId ? "Edit client" : "Add a client"}</h2>
+            {formDuplicates.length > 0 && (
+              <div role="status" data-testid="client-duplicate-warning" className="rounded-xl border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">
+                <p className="font-semibold">Possible duplicate</p>
+                <ul className="mt-1 space-y-1">
+                  {formDuplicates.slice(0, 3).map(({ client: hit, reasons }) => (
+                    <li key={hit.id} className="flex flex-wrap items-center gap-2">
+                      <span>{hit.name} (same {reasons.join(", ")})</span>
+                      {!editingId && <button type="button" data-testid="client-merge" onClick={() => mergeIntoExisting(clients.find((c) => c.id === hit.id)!)} className="min-h-11 rounded-lg border border-amber-500 px-3 font-medium">Merge into this client</button>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <div className="grid gap-3 rounded-xl border border-slate-200 p-4 sm:grid-cols-2 sm:p-5">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-600 sm:col-span-2">Contact & next visit</h2>
             <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30" placeholder="Client name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
@@ -359,6 +379,7 @@ export default function ClientsPage() {
                 <div className="min-w-0">
                   <p className="truncate font-semibold"><Link href={`/clients/${encodeURIComponent(client.id)}`} data-testid="client-open" className="hover:underline">{client.name}</Link></p>
                   {client.company && <p className="truncate text-sm text-slate-600">{client.company}</p>}
+                  {duplicateIds.has(client.id) && <p className="text-xs font-medium text-amber-700" data-testid="client-duplicate-flag">Possible duplicate</p>}
                 </div>
               </div>
               <div className="flex min-w-0 flex-wrap gap-2 text-sm text-slate-600 md:block md:space-y-0.5">

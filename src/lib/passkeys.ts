@@ -47,16 +47,30 @@ export function throttle(now = Date.now(), limit = 5, windowMs = 60_000, log = r
   return true;
 }
 
+/** QA3: the browser prompt can hang (no authenticator, dismissed sheet). Give up after ~60s with a retryable message. */
+export const PASSKEY_TIMEOUT_MS = 60_000;
+export const PASSKEY_TIMEOUT_MESSAGE = "The fingerprint / face prompt timed out. Tap the button to try again, or use your password.";
+export function withTimeout<T>(work: Promise<T>, ms = PASSKEY_TIMEOUT_MS): Promise<T | "timeout"> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => resolve("timeout"), ms);
+    work.then((value) => { clearTimeout(timer); resolve(value); }, (err) => { clearTimeout(timer); reject(err); });
+  });
+}
+
 export async function signInWithPasskey() {
   if (!throttle()) return { ok: false as const, message: passkeyErrorMessage({ status: 429 }) };
-  const { data, error } = await supabase.auth.signInWithPasskey();
+  const result = await withTimeout(supabase.auth.signInWithPasskey());
+  if (result === "timeout") return { ok: false as const, message: PASSKEY_TIMEOUT_MESSAGE, timedOut: true };
+  const { data, error } = result;
   if (error || !data?.session) return { ok: false as const, message: passkeyErrorMessage(error || { message: "no session" }) };
   return { ok: true as const, message: "" };
 }
 
 export async function registerPasskey(name: string) {
   if (!throttle()) return { ok: false as const, message: passkeyErrorMessage({ status: 429 }) };
-  const { data, error } = await supabase.auth.registerPasskey();
+  const result = await withTimeout(supabase.auth.registerPasskey());
+  if (result === "timeout") return { ok: false as const, message: PASSKEY_TIMEOUT_MESSAGE };
+  const { data, error } = result;
   if (error || !data) return { ok: false as const, message: passkeyErrorMessage(error) };
   if (name) await supabase.auth.passkey.update({ passkeyId: data.id, friendlyName: name.slice(0, 60) });
   return { ok: true as const, message: "" };

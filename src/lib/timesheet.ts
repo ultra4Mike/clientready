@@ -745,7 +745,7 @@ export type NextAction = { kind: Exclude<TapKind, "end_shift">; primary: boolean
 /** Valid taps for a state, the main next step first. End day is marked destructive (keep it away from the main button). */
 export function nextActions(state: DayStateName, opts: { hasNextJob?: boolean; tapsToday?: number } = {}): NextAction[] {
   const order: Record<DayStateName, Exclude<TapKind, "end_shift">[]> = {
-    OFF_DUTY: opts.tapsToday ? [] : ["start_day", "start_job", "start_transit"],
+    OFF_DUTY: opts.tapsToday ? ["start_day"] : ["start_day", "start_job", "start_transit"], // after End day: Start day re-opens the day
     ON_DUTY_IDLE: opts.hasNextJob === false ? ["start_job", "arrive", "break_start", "start_transit", "end_day"] : ["start_transit", "start_job", "arrive", "break_start", "end_day"],
     IN_TRANSIT: ["arrive", "start_job", "break_start", "end_day"],
     WORKING: opts.hasNextJob ? ["start_transit", "break_start", "start_job", "end_day"] : ["break_start", "start_transit", "start_job", "end_day"],

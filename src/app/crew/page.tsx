@@ -1,5 +1,7 @@
 "use client";
 
+import { crewStatusLabel, doneBlockedReason, inheritJobStatus } from "@/lib/crew-tools";
+import CrewTimeOff from "@/components/crew/CrewTimeOff";
 import { checklistProgress, readChecklist, type ChecklistItem } from "@/lib/checklist";
 import { nativePhotoClick } from "@/lib/native-camera";
 import { confirmLogoutWithQueue, enqueue, flushQueue, isNetworkError, newUploadKey, queued, removeQueued, retryQueued, type QueueItem, type QueueKind } from "@/lib/photo-queue";
@@ -17,7 +19,7 @@ import { ymdTz } from "@/lib/timesheet";
 import { clearDraft } from "@/lib/drafts";
 import { loadBusinessTz } from "@/lib/day-events";
 import { supabase } from "@/lib/supabase";
-import { crewMarkDone, crewCheckItem, crewOnMyWay, omwTime, crewSetJobStatus, onMyWaySmsHref, STATUS_CLASS, STATUS_LABEL, type JobStatus } from "@/lib/schedule";
+import { crewDonePhotoOptional, crewMarkDone, crewCheckItem, crewOnMyWay, omwTime, crewSetJobStatus, onMyWaySmsHref, STATUS_CLASS, STATUS_LABEL, type JobStatus } from "@/lib/schedule";
 import { compressPhoto } from "@/lib/photos";
 import CrewVisitNote from "@/components/CrewVisitNote";
 import { compressImage, crewClockIn, crewClockOut, crewEditClock, fixTimeProblem, entryHours, withQueuedClock, fmtHours, fmtTimer, type ClockEntry } from "@/lib/clock";
@@ -47,6 +49,9 @@ type Job = {
   checklist?: unknown;
   /** The owner's own cost-line names for this job (no prices). */
   cost_lines?: string[] | null;
+  /** Job title and line descriptions (scope of work): names only, never prices (migration 20261024130000). */
+  job_title?: string | null;
+  line_names?: string[] | null;
 };
 type Card = Job & { scheduled: boolean; crewNote: string; payRow?: Job; items: ChecklistItem[] };
 type Expense = { id: string; doc_id: string; kind: string; amount: string; note: string; receipt?: string; created_at?: string };
@@ -168,11 +173,12 @@ function buildCards(jobs: Job[]): Card[] {
       scheduled: true, schedule_status: sched.schedule_status, done_confirmed: Boolean(sched.done_confirmed), job_date: sched.job_date || "", start_time: sched.start_time,
       end_time: sched.end_time, client_email: sched.client_email, crewNote: sched.note || "", on_my_way_at: sched.on_my_way_at || "",
       items: readChecklist(sched.checklist),
+      job_title: sched.job_title || "", line_names: sched.line_names || [],
     };
     if (index >= 0) cards[index] = { ...cards[index], ...merged, job_date: sched.job_date || cards[index].job_date };
     else cards.push({ ...sched, ...merged });
   }
-  return cards.sort((a, b) => `${a.job_date || "9"}${a.start_time}`.localeCompare(`${b.job_date || "9"}${b.start_time}`));
+  return inheritJobStatus(cards).sort((a, b) => `${a.job_date || "9"}${a.start_time}`.localeCompare(`${b.job_date || "9"}${b.start_time}`));
 }
 
 export default function CrewPage() {
@@ -217,6 +223,7 @@ export default function CrewPage() {
   const [spendOpen, setSpendOpen] = useState<string>("");
   const [doneFor, setDoneFor] = useState("");
   const [donePhotos, setDonePhotos] = useState<string[]>([]);
+  const [photoOptional, setPhotoOptional] = useState(false);
   const [spend, setSpend] = useState<{ kind: string; amount: string; note: string; receipt: string }>({ kind: "parts", amount: "", note: "", receipt: "" });
   const [spendExtra, setSpendExtra] = useState(false); // "Extra item (not in estimate)": sent as a note prefix, the owner decides
   const [fixing, setFixingRaw] = useState<{ id: string; start: string; end: string; reason: string } | null>(null);
@@ -652,7 +659,7 @@ export default function CrewPage() {
             <h3 className="mt-0.5 truncate text-lg font-bold tracking-tight">{card.client_name || card.invoice_number || "Job"}</h3>
             {!detail && <a href={`/crew?job=${encodeURIComponent(card.doc_id)}`} data-testid={`crew-open-detail-${card.doc_id}`} className="cr-btn cr-btn-text -ml-2">Job details</a>}
           </div>
-          {card.scheduled && <span data-testid={`job-state-${card.doc_id}`} className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${STATUS_CLASS[status]}`}>{status === "done" ? (card.done_confirmed ? "Done · confirmed" : "Done · awaiting confirmation") : STATUS_LABEL[status]}</span>}
+          {card.scheduled && <span data-testid={`job-state-${card.doc_id}`} className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${STATUS_CLASS[status]}`}>{crewStatusLabel(status, card.done_confirmed)}</span>}
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-2 text-sm [&>*]:min-w-0 [&>*]:break-words">
@@ -663,7 +670,22 @@ export default function CrewPage() {
             ? <a href={mapUrl} target="_blank" rel="noreferrer" className="flex min-h-11 items-center justify-center rounded-xl border border-teal-500/30 px-3 py-2 text-center font-medium transition hover:border-teal-400 hover:bg-teal-500/10" data-testid={`map-${card.doc_id}`} data-action="map"><span className="inline-flex items-center gap-1.5"><Icon name="pin" />Map</span></a>
             : <span className="flex min-h-11 items-center justify-center rounded-xl border border-dashed border-teal-500/20 px-3 py-2 text-center opacity-50">No address</span>}
         </div>
-        {card.client_address && <p className="mt-2 text-sm text-[var(--cr-muted)]">{card.client_address}</p>}
+        {(card.job_title || (card.line_names || []).length > 0) && (
+          <div className="mt-3 rounded-xl border border-teal-500/20 px-3 py-2 text-sm" data-testid={`crew-job-scope-${card.doc_id}`}>
+            {card.job_title && <p className="font-semibold" data-testid="crew-job-title">{card.job_title}</p>}
+            {(card.line_names || []).length > 0 && (
+              <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[var(--cr-muted)]" aria-label="Scope of work" data-testid="crew-job-lines">
+                {(card.line_names || []).map((line, index) => <li key={index}>{line}</li>)}
+              </ul>
+            )}
+          </div>
+        )}
+        {card.client_address && (
+          <p className="mt-2 flex flex-wrap items-center gap-x-2 text-sm text-[var(--cr-muted)]" data-testid={`crew-address-${card.doc_id}`}>
+            <span>{card.client_address}</span>
+            <a href={mapUrl} target="_blank" rel="noreferrer" className="tap font-semibold text-teal-700 underline dark:text-teal-300" data-testid={`navigate-${card.doc_id}`}>Navigate</a>
+          </p>
+        )}
         {card.client_email && !card.client_phone && <p className="text-sm"><a className="tap underline" href={`mailto:${card.client_email}`}>{card.client_email}</a></p>}
         {!preview && <CrewVisitNote docId={card.doc_id} />}
         {(card.crewNote || card.payRow?.note) && (
@@ -686,7 +708,7 @@ export default function CrewPage() {
             {(Object.keys(STATUS_LABEL) as JobStatus[]).map((key) => (
               <button key={key} type="button" aria-pressed={status === key} disabled={busy !== "" || Boolean(card.done_confirmed)} data-testid={`status-${key}-${card.doc_id}`}
                 onClick={() => key === "done"
-                  ? (setDoneFor(doneFor === card.doc_id ? "" : card.doc_id), setDonePhotos([]))
+                  ? (setDoneFor(doneFor === card.doc_id ? "" : card.doc_id), setDonePhotos([]), setPhotoOptional(false), void crewDonePhotoOptional(card.doc_id).then(setPhotoOptional))
                   : act(`status-${card.doc_id}`, () => crewSetJobStatus(card.doc_id, key), `Marked ${STATUS_LABEL[key].toLowerCase()}.`)}
                 className={`min-h-11 rounded-xl border px-2 py-2 text-sm font-semibold transition ${status === key ? `${STATUS_CLASS[key]} ring-2 ring-teal-400/60` : "border-teal-500/30 bg-[var(--cr-bg)] hover:border-teal-400 hover:bg-teal-500/10"} disabled:opacity-60`}>
                 {STATUS_LABEL[key]}
@@ -706,7 +728,7 @@ export default function CrewPage() {
         )}
         {card.scheduled && doneFor === card.doc_id && !card.done_confirmed && (
           <div className="mt-3 space-y-2 rounded-xl border border-teal-500/30 p-3 text-sm" data-testid={`done-panel-${card.doc_id}`}>
-            <p className="font-semibold">Photo of the finished job (required)</p>
+            <p className="font-semibold">Photo of the finished job {photoOptional ? "(optional)" : "(required)"}</p>
             <label className="flex min-h-11 cursor-pointer items-center justify-center rounded-xl border border-dashed border-teal-500/40 px-3 py-2 font-medium">
               <Icon name="camera" />{donePhotos.length ? "Add another photo" : "Take or choose photo"}
               <input type="file" accept="image/*" capture="environment" multiple className="sr-only" data-testid={`done-photo-input-${card.doc_id}`} onClick={nativePhotoClick((files) => pickDonePhotos(files))} onChange={(event) => { pickDonePhotos(event.target.files); event.target.value = ""; }} />
@@ -717,11 +739,13 @@ export default function CrewPage() {
                 {donePhotos.map((photo, index) => <img key={index} src={photo} alt={`Finished job photo ${index + 1}`} className="h-16 w-16 rounded-lg object-cover" />)}
               </div>
             )}
-            <button type="button" disabled={busy !== "" || donePhotos.length === 0 || !checklistProgress(card.items).complete} onClick={() => markDone(card)} data-testid={`done-submit-${card.doc_id}`} className="min-h-11 w-full rounded-xl bg-teal-500 px-4 py-2.5 font-semibold text-slate-950 disabled:opacity-50">
+            <button type="button" disabled={busy !== "" || Boolean(doneBlockedReason({ photos: donePhotos.length, photoOptional, checklistLeft: card.items.length - checklistProgress(card.items).done }))} aria-describedby={`done-blocked-${card.doc_id}`} onClick={() => markDone(card)} data-testid={`done-submit-${card.doc_id}`} className="min-h-11 w-full rounded-xl bg-teal-500 px-4 py-2.5 font-semibold text-slate-950 disabled:opacity-50">
               Mark done
             </button>
             {!checklistProgress(card.items).complete && <p className="cr-tone-warn inline-flex rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900" data-testid="checklist-remaining">Tick every checklist item first ({card.items.length - checklistProgress(card.items).done} left).</p>}
-            {donePhotos.length === 0 && <p className="text-xs text-[var(--cr-muted)]">Add at least one photo to mark the job done.</p>}
+            {doneBlockedReason({ photos: donePhotos.length, photoOptional, checklistLeft: card.items.length - checklistProgress(card.items).done })
+              ? <p id={`done-blocked-${card.doc_id}`} role="status" className="text-xs font-medium text-amber-800 dark:text-amber-200" data-testid={`done-blocked-${card.doc_id}`}>Can&apos;t mark done yet: {doneBlockedReason({ photos: donePhotos.length, photoOptional, checklistLeft: card.items.length - checklistProgress(card.items).done })}</p>
+              : null}
           </div>
         )}
 
@@ -947,6 +971,7 @@ export default function CrewPage() {
           <section className="space-y-3">
             <h2 className="text-xl font-bold tracking-tight">{today ? dayLabel(today) : "Today"}</h2>
             {email && !preview && <MyDay email={email} employeeId={employeeId} jobs={todayCards.map((card) => ({ docId: card.doc_id, label: [card.client_name, card.invoice_number].filter(Boolean).join(" · ") || "Job", address: card.client_address || "", date: card.job_date, startTime: card.start_time || "", endTime: card.end_time || "" }))} />}
+            {email && !preview && <CrewTimeOff />}
             {email && !preview && <LeadPanel />}
             {todayCards.length === 0 && <EmptyState icon={<Icon name="sun" className="h-6 w-6" />} title="Nothing scheduled for you today." className={`${cardClass} border-dashed`} />}
             {(() => {
@@ -1023,7 +1048,7 @@ export default function CrewPage() {
                       <span className="block font-medium">{dayLabel(card.job_date)}{card.start_time ? ` · ${card.start_time}` : ""}</span>
                       <span className="block truncate text-[var(--cr-muted)]">{card.client_name || "Job"}{card.invoice_number ? ` · ${card.invoice_number}` : ""}{card.client_address ? ` · ${card.client_address}` : ""}</span>
                     </span>
-                    <span className="shrink-0 rounded-full border border-teal-500/30 px-2 py-0.5 text-xs" data-testid="crew-recent-status">{card.schedule_status === "done" ? "Done" : card.schedule_status === "in_progress" ? "In progress" : "Scheduled"}</span>
+                    <span className="shrink-0 rounded-full border border-teal-500/30 px-2 py-0.5 text-xs" data-testid="crew-recent-status">{crewStatusLabel(card.schedule_status, card.done_confirmed)}</span>
                   </li>
                 ))}
               </ul>

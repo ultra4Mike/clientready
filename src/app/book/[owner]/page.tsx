@@ -54,7 +54,7 @@ export default function BookPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const problem = bookingError(form);
+    const problem = bookingError(form, page && page !== "missing" ? page.services : []);
     setError(problem);
     if (problem) return;
     setSending(true);
@@ -82,7 +82,7 @@ export default function BookPage() {
         <label className="block">Phone<input data-testid="book-phone" className={field} value={form.phone} onChange={set("phone")} type="tel" autoComplete="tel" maxLength={40} /></label>
         <label className="block">Email<input data-testid="book-email" className={field} value={form.email} onChange={set("email")} type="email" autoComplete="email" maxLength={200} /></label>
         <label className="block">Service address<input data-testid="book-address" className={field} value={form.address} onChange={set("address")} autoComplete="street-address" maxLength={300} /></label>
-        <label className="block">Service
+        <label className="block">Service{page.services.length ? " *" : ""}
           <select data-testid="book-service" className={field} value={form.service} onChange={set("service")}>
             <option value="">Choose a service</option>
             {page.services.map((s) => <option key={s} value={s}>{s}</option>)}

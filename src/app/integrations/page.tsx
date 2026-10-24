@@ -50,7 +50,15 @@ export default function IntegrationsPage() {
     void load();
   }
 
-  if (!INTEGRATIONS) return <AppShell title="Integrations"><p className="text-sm" data-testid="integrations-off">Integrations aren&apos;t available yet.</p></AppShell>;
+  if (!INTEGRATIONS) return (
+    <AppShell title="Integrations">
+      <PageHeader title="Integrations" subtitle="Connect your own tools with the API." />
+      <div className="space-y-4">
+        <p className="text-sm" data-testid="integrations-off">QuickBooks and Xero connections aren&apos;t offered right now. To get your numbers to your accountant, use the accountant export on <a className="underline" href="/reports">Reports</a>. You can also connect Zapier, Make or your own tools with the API below.</p>
+        <section className="space-y-2 rounded-2xl border border-teal-500/20 p-4" data-testid="integration-api"><h2 className="font-semibold">API (Zapier, Make, your own tools)</h2><ApiSettings /></section>
+      </div>
+    </AppShell>
+  );
   return (
     <AppShell title="Integrations">
       <PageHeader title="Integrations" subtitle="Optional. Nothing is shared until you connect it." />
@@ -64,7 +72,7 @@ export default function IntegrationsPage() {
               <h2 className="font-semibold">{PROVIDER_LABEL[provider]}</h2>
               <p className="text-sm text-[var(--cr-muted)]">Sends your clients, sent/paid invoices and payments to {PROVIDER_LABEL[provider]}. One way, and nothing is sent twice. Edits made later stay in ClientReady.</p>
               <p className="text-sm" data-testid={`integration-${provider}-status`}>
-                {connection ? `Connected${connection.external_name ? ` to ${connection.external_name}` : ""}${connection.last_sync_at ? ` · last sent ${new Date(connection.last_sync_at).toLocaleString()}` : " · not sent yet"}` : ready[provider] ? "Not connected." : "Not available yet (needs the app keys)."}
+                {connection ? `Connected${connection.external_name ? ` to ${connection.external_name}` : ""}${connection.last_sync_at ? ` · last sent ${new Date(connection.last_sync_at).toLocaleString()}` : " · not sent yet"}` : ready[provider] ? "Not connected." : "Not set up on this app yet. Contact ClientReady support to turn it on."}
               </p>
               {r && <p className="text-xs text-[var(--cr-muted)]" data-testid={`integration-${provider}-result`}>Last run: {r.clients || 0} clients, {r.invoices || 0} invoices, {r.payments || 0} payments{r.errors?.length ? ` · ${r.errors.length} problem(s)` : ""}</p>}
               <div className="flex flex-wrap gap-2">

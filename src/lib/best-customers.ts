@@ -4,7 +4,7 @@ import { isPendingRecurringDraft } from "@/lib/recurring";
 import { uniqueDocs } from "@/lib/change-orders";
 import { clientKey } from "@/lib/portal";
 import { ownerJobCost, yearMonth } from "@/lib/reports";
-import { cashEntries } from "@/lib/money";
+import { cashEntries, draftMoneyTaken } from "@/lib/money";
 import { isVoidStatus } from "@/lib/payments";
 
 /**
@@ -51,7 +51,7 @@ export function bestCustomers(allDocs: Doc[], year: string, sort: CustomerSort =
     const row = rowFor(doc);
     const { total, owed } = docAmounts(doc);
     const payments = readPayments(data).filter((payment) => num(payment.amount) > 0);
-    if (String(data.status || "draft") === "draft") continue;
+    if (String(data.status || "draft") === "draft" && !draftMoneyTaken(doc as never)) continue;
     row.owed += owed;
     const date = ymd(data.invoiceDate || doc.createdAt);
     if (yearMonth(date)?.year !== year) continue;

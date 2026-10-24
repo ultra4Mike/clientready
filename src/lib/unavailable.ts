@@ -34,8 +34,35 @@ export function readOwnerUnavailable(): Unavailable[] {
 export async function refreshOwnerUnavailable(): Promise<Unavailable[]> {
   const { data, error } = await supabase.from("crew_unavailable").select("employee_id, day, note");
   if (error || !data) return readOwnerUnavailable();
-  window.localStorage.setItem(OWNER_CACHE, JSON.stringify(data));
-  return data as Unavailable[];
+  // QA3c: approved time-off requests are days they can't work too (needs deploy34; skipped when missing).
+  const off = await supabase.from("crew_time_off").select("employee_id, start_date, end_date, note, status").eq("status", "approved").then((r) => (r.error ? [] : r.data || []), () => []);
+  const rows = mergeUnavailable(data as Unavailable[], off as TimeOffRange[]);
+  window.localStorage.setItem(OWNER_CACHE, JSON.stringify(rows));
+  return rows;
+}
+
+export type TimeOffRange = { employee_id: string; start_date: string; end_date: string; note?: string };
+const nextDay = (d: string) => { const t = new Date(`${d}T12:00:00Z`); t.setUTCDate(t.getUTCDate() + 1); return t.toISOString().slice(0, 10); };
+/** Day rows plus each day of approved time-off ranges, one row per worker per day. */
+export function mergeUnavailable(days: Unavailable[], ranges: TimeOffRange[] = []): Unavailable[] {
+  const out = new Map<string, Unavailable>();
+  for (const row of days) out.set(`${row.employee_id}|${row.day}`, row);
+  for (const r of ranges) {
+    if (!r.employee_id || !/^\d{4}-\d{2}-\d{2}$/.test(String(r.start_date))) continue;
+    const end = String(r.end_date || r.start_date).slice(0, 10);
+    for (let d = String(r.start_date).slice(0, 10), n = 0; d <= end && n < 62; d = nextDay(d), n++) {
+      const k = `${r.employee_id}|${d}`;
+      if (!out.has(k)) out.set(k, { employee_id: r.employee_id, day: d, note: r.note ? `Time off: ${r.note}` : "Time off" });
+    }
+  }
+  return [...out.values()].sort((a, b) => a.day.localeCompare(b.day));
+}
+
+/** Names of the given workers who can't work on `day` ("" when everyone can). */
+export function unavailableWarning(rows: Unavailable[], day: string, workerIds: string[], names: Map<string, string>) {
+  const off = unavailableOn(rows, day);
+  const who = workerIds.filter((id) => off.has(id)).map((id) => `${names.get(id) || "Worker"}${off.get(id) ? ` (${off.get(id)})` : ""}`);
+  return who.length ? `Marked can't work on ${day}: ${who.join(", ")}.` : "";
 }
 
 /** employee id → note for people unavailable on `day`. */

@@ -20,7 +20,7 @@ import { splitAlerts, mergeApprovals, stampSaved, resolvedInPeriod, scheduleAler
 import { timesheetEmptyKind, type CrewLoad } from "@/lib/timesheet-crew-state";
 import DayDetail from "@/components/timesheet/DayDetail";
 import PtoOwnerCard from "@/components/phase2/PtoOwnerCard";
-import { loadPtoForRange, loadPtoRequests } from "@/lib/phase2-data";
+import { loadPtoForRange } from "@/lib/phase2-data";
 import { ptoDays, ptoKindLabel, type PtoRequest } from "@/lib/pay-phase2";
 import { loadBusinessTz, loadAttestations, decideFix, loadOwnerTimesheet, readLocalTimesheetSettings, readLocalApprovals, saveApprovals, DAY_APPROVALS_KEY, type DayApproval } from "@/lib/day-events";
 import { dayState, DEFAULT_TIMESHEET_SETTINGS, reviewDayInfo, weekStatus, type DayStateName, type DaySheet, type FixRequest, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
@@ -207,7 +207,9 @@ export default function TimesheetPage() {
     const cents = wkDays.reduce((sum, d) => sum + d.cents, 0);
     const total = info.reduce((sum, d) => sum + d.mins, 0);
     const estimated = wkDays.some((d) => !d.approved && d.cents);
-    return { w, info, status, cents, total, estimated, unallocated: wkDays.some((d) => d.unallocated) };
+    // Approved PTO / sick / holiday: same hours + pay as the labour report and payroll export (ptoDays).
+    const off = days.reduce((acc, date) => { const o = offDays.get(`${w.id}|${date}`) as { hours: number; cents?: number } | undefined; return o ? { hours: acc.hours + o.hours, cents: acc.cents + (o.cents || 0) } : acc; }, { hours: 0, cents: 0 });
+    return { w, info, status, cents: cents + off.cents, total: total + Math.round(off.hours * 60), offHours: off.hours, offCents: off.cents, estimated, unallocated: wkDays.some((d) => d.unallocated) };
   });
   // Saved taps/approvals whose worker id is not on the Team list: never hidden silently.
   const known = new Set(workers.map((w) => w.id));
@@ -253,7 +255,7 @@ export default function TimesheetPage() {
     // Pay period: weekly = this week; biweekly = this + next week; semi-monthly = 1st–15th or 16th–end of the month of this week.
     const { from, to } = payPeriodOf(week, period, period === settings.payPeriod ? settings.payPeriodAnchor : "");
     const lines = ["Worker,Date,Paid hours,Drive min,Unpaid break min,Rounding min,OT hours,DT hours,Break premium hours,Units,Commission,Min-wage top-up,Prevailing-wage top-up,PTO hours,Holiday hours,PTO pay,Approved,Flags"];
-    const ptoReqs = (await Promise.all([...new Set([from.slice(0, 4), to.slice(0, 4)])].map((y) => loadPtoRequests(y).catch(() => [])))).flat();
+    const ptoReqs = await loadPtoForRange(from, to).catch(() => [] as PtoRequest[]);
     const pto = ptoDays(ptoReqs, workers as never, from, to);
     const crewOn = (id: string, date: string) => docs.flatMap((d) => ((d.data as { crew?: { employeeId?: string; workDate?: string; units?: string; commissionPct?: string; commissionBase?: string }[] } | undefined)?.crew || []).filter((c) => c.employeeId === id && c.workDate === date));
     for (let wk = weekOf(from); wk <= to; wk = addDays(wk, 7)) {
@@ -306,6 +308,7 @@ export default function TimesheetPage() {
     <div className="space-y-1 text-right" data-testid={`ts-week-${r.w.id}`}>
       <div className="font-semibold tabular-nums">{h(r.total)} h</div>
       <div className="text-xs tabular-nums" data-testid={`ts-week-pay-${r.w.id}`}>${(r.cents / 100).toFixed(2)}{r.estimated ? " estimated" : ""}</div>
+      {r.offHours > 0 && <div className="text-xs text-[var(--cr-muted)]" data-testid={`ts-week-off-${r.w.id}`}>incl. {r.offHours} h time off (${(r.offCents / 100).toFixed(2)})</div>}
       {r.unallocated && <div className="text-xs" data-testid={`ts-unallocated-${r.w.id}`}>Salary, no jobs this week (unallocated labor)</div>}
       <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${badgeClass(statusChip(gate.loading, r.status).kind)}`} data-testid={`ts-status-${r.w.id}`} data-loading={gate.loading || undefined}>{statusChip(gate.loading, r.status).label}</span>
       <div>

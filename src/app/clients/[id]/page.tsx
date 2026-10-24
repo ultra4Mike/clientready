@@ -14,8 +14,9 @@ import { loadAccountIntoCache } from "@/lib/account-cache";
 import { uniqueDocs } from "@/lib/change-orders";
 import { clientTimeline, type TimelineClient } from "@/lib/client-timeline";
 import { niceYmd } from "@/lib/scheduled-jobs";
+import { readClientEdits, telHref, type ClientEdit } from "@/lib/client-tools";
 
-type Client = TimelineClient & { company?: string; email?: string; phone?: string; address?: string };
+type Client = TimelineClient & { company?: string; email?: string; phone?: string; address?: string; nextVisit?: string; visitTime?: string; reviewOptOut?: boolean; autoEmailOptOut?: boolean };
 type Doc = { id: string; type: string; title: string; clientName: string; createdAt: string; data: Record<string, unknown> };
 
 /** Owner: one client's record with a single timeline and billed / paid / owed totals. Read-only. */
@@ -25,6 +26,7 @@ export default function ClientRecordPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [docs, setDocs] = useState<Doc[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [edits, setEdits] = useState<ClientEdit[]>([]);
 
   useEffect(() => {
     const read = () => {
@@ -32,6 +34,7 @@ export default function ClientRecordPage() {
       setClients(rawClients ? (JSON.parse(rawClients) as Client[]) : []);
       const rawDocs = window.localStorage.getItem("clientready-documents");
       setDocs(rawDocs ? uniqueDocs(JSON.parse(rawDocs) as Doc[]) : []);
+      setEdits(readClientEdits(id));
     };
     read();
     // R102: a bad id says "not found" right away (one small lookup) instead of after the full account load.
@@ -92,13 +95,18 @@ export default function ClientRecordPage() {
                   <div className="min-w-0 [&>[data-page-header]]:mb-1 [&>[data-page-header]]:border-0 [&>[data-page-header]]:pb-0 [&_h2]:break-words">
                     <PageHeader title={client.name} subtitle={<span className="flex flex-wrap gap-x-1.5 gap-y-0.5">{[client.company, client.email, client.phone].filter(Boolean).map((part, index, all) => <span key={index} className="inline-block max-w-full truncate whitespace-nowrap">{part}{index < all.length - 1 && <span aria-hidden="true" className="ml-1.5">·</span>}</span>)}</span>} />
                     {client.address && <p className="text-sm text-[var(--cr-muted)]" data-testid="client-address">{client.address}</p>}
+                    <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm" data-testid="client-details">
+                      <dt className="text-[var(--cr-muted)]">Next visit</dt><dd data-testid="client-next-visit">{client.nextVisit ? `${niceYmd(client.nextVisit)}${client.visitTime ? ` · ${client.visitTime}` : ""}` : "None set"}</dd>
+                      <dt className="text-[var(--cr-muted)]">Preferred contact</dt><dd data-testid="client-preferred-contact">{contactMethodLabel(readContactMethod((client as { contactMethod?: string }).contactMethod)) || "No preference"}</dd>
+                      <dt className="text-[var(--cr-muted)]">Opt-outs</dt><dd data-testid="client-optouts">{[client.reviewOptOut && "No review requests", client.autoEmailOptOut && "No automatic emails"].filter(Boolean).join(" · ") || "None"}</dd>
+                    </dl>
                     <a href={`/clients?edit=${encodeURIComponent(client.id)}`} data-testid="client-edit" className="mt-2 inline-flex min-h-11 items-center rounded-lg border border-teal-500/30 px-3 text-sm font-medium">Edit client &amp; notes</a>
                     {readContactMethod((client as { contactMethod?: string }).contactMethod) && <p className="mt-2 mr-2 inline-flex items-center gap-1.5 rounded-lg bg-teal-500/10 px-3 py-1.5 text-sm" data-testid="client-contact-method" data-method={(client as { contactMethod?: string }).contactMethod}><span aria-hidden="true">{CONTACT_METHODS.find((item) => item.value === (client as { contactMethod?: string }).contactMethod)?.icon}</span><span className="font-semibold text-teal-700 dark:text-teal-300">Best by:</span> {contactMethodLabel((client as { contactMethod?: string }).contactMethod)}</p>}
                     {(client as { preferences?: string }).preferences && <p className="mt-2 inline-flex max-w-full items-start gap-1.5 rounded-lg bg-teal-500/10 px-3 py-1.5 text-sm" data-testid="client-preferences"><span aria-hidden="true">⭐</span><span className="font-semibold text-teal-700 dark:text-teal-300">Prefers:</span> {(client as { preferences?: string }).preferences}</p>}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0 sm:flex-wrap sm:justify-end">
-                  {client.phone && <a href={`tel:${client.phone}`} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-teal-500/30 gap-1.5 px-4 text-sm font-medium transition hover:border-teal-400 sm:min-h-10"><span aria-hidden="true">📞</span>Call</a>}
+                  {telHref(client.phone) && <a href={telHref(client.phone)} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-teal-500/30 gap-1.5 px-4 text-sm font-medium transition hover:border-teal-400 sm:min-h-10"><span aria-hidden="true">📞</span>Call</a>}
                   {client.email && <a href={`mailto:${client.email}`} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-teal-500/30 gap-1.5 px-4 text-sm font-medium transition hover:border-teal-400 sm:min-h-10"><span aria-hidden="true">✉️</span>Email</a>}
                   {String(client.phone || "").replace(/[^\d]/g, "") && <a href={`sms:${String(client.phone).replace(/[^\d+]/g, "")}`} data-testid="client-text" className="inline-flex min-h-11 items-center justify-center rounded-lg border border-teal-500/30 gap-1.5 px-4 text-sm font-medium transition hover:border-teal-400 sm:min-h-10"><span aria-hidden="true">💬</span>Text</a>}
                   {String(client.address || "").trim() && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(String(client.address).trim())}`} target="_blank" rel="noopener noreferrer" data-testid="client-map" className="inline-flex min-h-11 items-center justify-center rounded-lg border border-teal-500/30 gap-1.5 px-4 text-sm font-medium transition hover:border-teal-400 sm:min-h-10"><span aria-hidden="true">📍</span>Map</a>}
@@ -117,7 +125,7 @@ export default function ClientRecordPage() {
             <div className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-3 shadow-sm sm:p-5" data-testid="client-timeline" data-count={view.items.length}>
               <Timeline
                 emptyText="No activity yet."
-                items={view.items.map((item) => ({
+                items={(edits.length ? [...view.items, ...edits.map((edit) => ({ date: edit.at.slice(0, 10), type: "edit", title: `Client details edited: ${edit.fields.join(", ")}`, amount: undefined, status: "", href: "" }))].sort((a, b) => String(b.date || "").localeCompare(String(a.date || ""))) : view.items).map((item) => ({
                   date: item.date ? niceYmd(item.date) : "Notes",
                   type: item.type,
                   title: item.title,

@@ -51,11 +51,11 @@ function read<T>(key: string): T[] {
   }
 }
 
-export function searchAll(query: string, limit = 20): SearchHit[] {
+export function searchAll(query: string, limit = 20, extra: { docs?: Doc[]; clients?: Client[] } = {}): SearchHit[] {
   if (query.trim().length < 2) return [];
   const hits: SearchHit[] = [];
   const seen = new Set<string>();
-  for (const doc of read<Doc>("clientready-documents")) {
+  for (const doc of [...read<Doc>("clientready-documents"), ...(extra.docs || [])]) {
     if (!doc || seen.has(doc.id)) continue;
     seen.add(doc.id);
     const data = doc.data || {};
@@ -65,8 +65,10 @@ export function searchAll(query: string, limit = 20): SearchHit[] {
     const n = score(query, `${number} ${client}`, [s(data.clientEmail), s(data.clientPhone), s(data.clientAddress), s(data.notes), ...items]);
     if (n) hits.push({ kind: "document", id: doc.id, title: `${doc.type === "proposal" ? "Proposal" : "Invoice"} ${number}`.trim(), detail: [client, s(data.status)].filter(Boolean).join(" · "), href: `/invoice?id=${encodeURIComponent(doc.id)}`, score: n });
   }
-  for (const client of read<Client>("clientready-clients")) {
-    if (!client?.id) continue;
+  const seenClients = new Set<string>();
+  for (const client of [...read<Client>("clientready-clients"), ...(extra.clients || [])]) {
+    if (!client?.id || seenClients.has(client.id)) continue;
+    seenClients.add(client.id);
     const n = score(query, s(client.name), [s(client.company), s(client.email), s(client.phone), s(client.address), s(client.notes)]);
     if (n) hits.push({ kind: "client", id: client.id, title: s(client.name), detail: [s(client.company), s(client.phone), s(client.email)].filter(Boolean).join(" · "), href: `/clients/${encodeURIComponent(client.id)}`, score: n + 1 });
   }
@@ -76,4 +78,26 @@ export function searchAll(query: string, limit = 20): SearchHit[] {
     if (n) hits.push({ kind: "part", id: part.id, title: s(part.name), detail: "Inventory", href: "/inventory", score: n });
   }
   return hits.sort((a, b) => b.score - a.score || a.title.localeCompare(b.title)).slice(0, limit);
+}
+
+/** QA3: also look on the server (records not cached on this device). Signed-out or offline returns empty lists. */
+export async function serverSearchRows(query: string): Promise<{ docs: Doc[]; clients: Client[] }> {
+  const q = query.trim().replace(/[%,()]/g, " ").trim();
+  if (q.length < 2) return { docs: [], clients: [] };
+  try {
+    const { supabase } = await import("@/lib/supabase");
+    const like = `%${q}%`;
+    const d = digits(q);
+    const clientFilter = [`name.ilike.${like}`, `email.ilike.${like}`, `company.ilike.${like}`, ...(d.length >= 3 ? [`phone.ilike.%${d.split("").join("%")}%`] : [])].join(",");
+    const [docs, clients] = await Promise.all([
+      supabase.from("documents").select("id, type, title, client_name, data").or(`title.ilike.${like},client_name.ilike.${like}`).limit(30),
+      supabase.from("clients").select("id, name, company, email, phone, address, notes").or(clientFilter).limit(30),
+    ]);
+    return {
+      docs: ((docs.data || []) as { id: string; type: string; title?: string; client_name?: string; data?: Record<string, unknown> }[]).map((row) => ({ id: row.id, type: row.type, title: row.title, clientName: row.client_name, data: row.data || {} })),
+      clients: (clients.data || []) as Client[],
+    };
+  } catch {
+    return { docs: [], clients: [] };
+  }
 }

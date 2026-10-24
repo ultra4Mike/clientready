@@ -164,3 +164,9 @@ export function mergePtoRequests(cloud: PtoRequest[], local: PtoRequest[]): PtoR
   const ids = new Set(cloud.map((r) => r.id));
   return [...cloud, ...local.filter((r) => !ids.has(r.id))];
 }
+
+/** Owner approving a pending request: "" when it fits the available balance (holiday never counts), else the warning. */
+export function ptoApproveWarning(req: { hours: number; kind?: string }, available: number) {
+  if (req.kind === "holiday" || !(req.hours > available + 1e-9)) return "";
+  return `This is ${req.hours} h but only ${available} h is available. Press “Approve anyway” to go over the balance.`;
+}

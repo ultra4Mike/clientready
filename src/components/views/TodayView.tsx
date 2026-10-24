@@ -10,6 +10,7 @@ import FollowUps from "@/components/FollowUps";
 import { loadAccountIntoCache } from "@/lib/account-cache";
 import { clientOptedOut, reviewAskedAt } from "@/lib/review-request";
 import { uniqueDocs } from "@/lib/change-orders";
+import { donePromptFor, type DonePrompt } from "@/lib/done-prompt";
 import { confirmJobDone, doneState, omwTime, onMyWaySmsHref, readWorkers, saveSchedule, statusLabel, type Schedule } from "@/lib/schedule";
 import { localYmd, niceYmd, scheduledJobs, timeLabel } from "@/lib/scheduled-jobs";
 import CalendarFilterBar from "@/components/CalendarFilterBar";
@@ -30,6 +31,7 @@ export default function TodayPage() {
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
+  const [nextStep, setNextStep] = useState<DonePrompt>(null);
   // R127: same approval filter as the calendar (shared per-user setting).
   const [filter, setFilterState] = useState<CalendarFilter>(PRESETS.all);
   function setFilter(next: CalendarFilter) { setFilterState(next); saveCalendarFilter(next); }
@@ -78,6 +80,7 @@ export default function TodayPage() {
     setMessage("Job confirmed done."); // R110: say it now; correct it if the save fails
     const saved = await confirmJobDone(docId).catch(() => null);
     if (!saved) setMessage("Could not confirm. Try again.");
+    else { const next = donePromptFor(docId); setNextStep(next); }
     read();
     setBusy("");
   }
@@ -88,7 +91,7 @@ export default function TodayPage() {
       <section className="py-2 sm:py-4" data-testid="today" data-state={state}>
         <PageHeader title="Today" subtitle={today ? niceYmd(today) : "Loading…"} actions={<span className="flex gap-2"><a href="/route" data-testid="today-route" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-teal-500 px-4 text-sm font-semibold text-slate-950! shadow-sm transition hover:bg-teal-400"><span aria-hidden="true">🗺️</span>Route</a><a href="/calendar" className="inline-flex min-h-11 items-center rounded-lg border border-teal-500/30 px-4 text-sm font-medium transition hover:border-teal-400 sm:min-h-10">Calendar</a></span>} />
         <div className="mb-3"><CalendarFilterBar filter={filter} onChange={setFilter} /></div>
-        {message && <p className="mb-3 rounded-lg border border-teal-500/30 bg-teal-500/10 px-3 py-2 text-sm" role="status" data-testid="today-message">{message}</p>}
+        {message && <p className="mb-3 rounded-lg border border-teal-500/30 bg-teal-500/10 px-3 py-2 text-sm" role="status" data-testid="today-message">{message}{nextStep && <> {nextStep.text} <a href={nextStep.href} className="font-semibold underline" data-testid="today-next-link">{nextStep.label}</a></>}</p>}
         {today && <ScheduleVsClock date={today} />}
         {state === "loading" && <div className="space-y-3" aria-hidden="true">{[0, 1, 2].map((n) => <div key={n} className="h-28 animate-pulse rounded-2xl bg-teal-500/10" />)}<p className="sr-only">Loading…</p></div>}
         {state === "empty" && (

@@ -74,12 +74,18 @@ export function wasActuallySent(doc: Doc) {
   return (Array.isArray(data.emailLog) && data.emailLog.length > 0) || Boolean(data.sentAt);
 }
 
+/** A draft invoice paid directly (Mark paid, Stripe, a payment row) counts as billed everywhere. */
+export function draftMoneyTaken(doc: Doc) {
+  const data = doc.data || {};
+  return data.status === "paid" || readPayments(data).some((p) => !(p as { voided?: unknown }).voided && !isRefundRow(p) && num(p.amount) > 0.004);
+}
+
 export function billedOutstanding(allDocs: Doc[], from = "", to = "") {
   let sentCount = 0;
   let count = 0, billed = 0, outstanding = 0, owedCount = 0;
   const docs = dedupeCopies(allDocs);
   for (const doc of docs) {
-    if (doc.type !== "invoice" || voided(doc) || String(doc.data?.status || "draft") === "draft") continue;
+    if (doc.type !== "invoice" || voided(doc) || (String(doc.data?.status || "draft") === "draft" && !draftMoneyTaken(doc))) continue;
     const date = ymd(doc.data?.invoiceDate) || ymd(doc.createdAt);
     if ((from && date < from) || (to && date > to)) continue;
     // Option A (owner-approved): a version replaced by a SENT revision change order is not billed or owed

@@ -4,12 +4,25 @@ import { useEffect, useState } from "react";
 import { readWorkers } from "@/lib/schedule";
 import { clashingIds } from "@/lib/conflicts";
 import { localYmd } from "@/lib/scheduled-jobs";
+import { readOwnerUnavailable, refreshOwnerUnavailable, unavailableOn } from "@/lib/unavailable";
 import { todayJobsWithCrew, type TodayJob } from "@/lib/today-jobs";
 
 /** Redesign 1: today's jobs and who is on each, from the one schedule. Links to the job page. */
 export default function TodayJobsBlock({ docs, loaded }: { docs: { id: string; type: string; title: string; clientName?: string; data?: Record<string, unknown> }[]; loaded: boolean }) {
   const [jobs, setJobs] = useState<TodayJob[]>([]);
   const [clash, setClash] = useState<Set<string>>(new Set());
+  const [offToday, setOffToday] = useState<{ id: string; name: string; note: string }[]>([]);
+  useEffect(() => {
+    let live = true;
+    const show = (rows: ReturnType<typeof readOwnerUnavailable>) => {
+      const names = new Map(readWorkers().map((w) => [w.id, w.name]));
+      const off = unavailableOn(rows, localYmd());
+      if (live) setOffToday([...off.entries()].map(([id, note]) => ({ id, name: names.get(id) || "Worker", note })));
+    };
+    window.setTimeout(() => show(readOwnerUnavailable()), 0);
+    refreshOwnerUnavailable().then(show).catch(() => {});
+    return () => { live = false; };
+  }, []);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     setClash(clashingIds(docs)); // R119: overlap marker on today's overlapping jobs
@@ -21,6 +34,7 @@ export default function TodayJobsBlock({ docs, loaded }: { docs: { id: string; t
         <h2 className="font-semibold">Today</h2>
         <a href="/calendar?view=day" data-testid="dash-today-all" className="cr-btn cr-btn-text">Open day view</a>
       </div>
+      {offToday.length > 0 && <p data-testid="dash-today-off" className="mt-2 rounded-lg bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-800 dark:text-amber-200">Can&apos;t work today: {offToday.map((p) => `${p.name}${p.note ? ` (${p.note})` : ""}`).join(", ")}{jobs.some((j) => j.crew.some((c) => offToday.some((o) => o.id === c.id))) ? " · assigned to a job today" : ""}</p>}
       {!loaded ? <p className="mt-2 text-[var(--cr-muted)]">…</p> : jobs.length === 0 ? <p data-testid="dash-today-empty" className="mt-2 text-[var(--cr-muted)]">No jobs scheduled today.</p> : (
         <ul className="mt-2 divide-y divide-teal-500/10">
           {jobs.map((job) => (

@@ -45,10 +45,10 @@ export default function StripeSetup() {
   const rows: [string, boolean, string][] =
     state && state !== "error"
       ? [
-          ["STRIPE_SECRET_KEY", state.secretKey, "Stripe secret key"],
-          ["STRIPE_WEBHOOK_SECRET", state.webhookSecret, "Webhook signing secret"],
-          ["SUPABASE_SERVICE_ROLE_KEY", state.serviceRoleKey, "Supabase service role key (server only)"],
-          ["SUPABASE_URL", state.supabaseUrl, "Supabase project URL"],
+          ["secret", state.secretKey, "Stripe secret key"],
+          ["webhook", state.webhookSecret, "Webhook signing secret"],
+          ["service", state.serviceRoleKey, "Supabase service role key (server only)"],
+          ["url", state.supabaseUrl, "Supabase project URL"],
         ]
       : [];
 
@@ -78,17 +78,16 @@ export default function StripeSetup() {
         <ul className="space-y-1 text-xs" data-testid="stripe-checks">
           {rows.map(([name, ok, label]) => (
             <li key={name} data-ok={ok}>
-              <span aria-hidden>{ok ? "✓" : "○"}</span> {label} <code className="opacity-70">{name}</code> {ok ? "set" : "missing"}
+              <span aria-hidden>{ok ? "✓" : "○"}</span> {label} {ok ? "set" : "missing"}
             </li>
           ))}
         </ul>
       )}
       {status !== "ready" && (
         <ol className="list-decimal space-y-1 pl-5 text-xs text-[var(--cr-muted)]" data-testid="stripe-steps">
-          <li>In Supabase, run the migration <code>20261015030000_stripe_payments.sql</code> (SQL editor).</li>
-          <li>Stripe Dashboard → Developers → API keys: copy the secret key (<code>sk_test_…</code> to try it, <code>sk_live_…</code> for real payments).</li>
+                    <li>Stripe Dashboard → Developers → API keys: copy the secret key (<code>sk_test_…</code> to try it, <code>sk_live_…</code> for real payments).</li>
           <li>Stripe Dashboard → Developers → Webhooks → Add endpoint with the URL below and the events <code>checkout.session.completed</code> and <code>checkout.session.async_payment_succeeded</code>. Copy its signing secret (<code>whsec_…</code>).</li>
-          <li>On your host (e.g. Vercel → Settings → Environment Variables) set <code>STRIPE_SECRET_KEY</code>, <code>STRIPE_WEBHOOK_SECRET</code> and <code>SUPABASE_SERVICE_ROLE_KEY</code>, then redeploy. Never paste keys into this app.</li>
+          <li>Give the secret key and signing secret to whoever hosts your app (your developer or ClientReady support) so they can add them on the server and redeploy. Never paste keys into this app.</li>
         </ol>
       )}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">

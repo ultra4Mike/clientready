@@ -13,7 +13,7 @@ import PaymentMethodsSettings from "@/components/PaymentMethodsSettings";
 import TimezoneCombobox from "@/components/TimezoneCombobox";
 import LegalLinks from "@/components/LegalLinks";
 import { FormEvent, useEffect, useState } from "react";
-import { clampPercentText } from "@/lib/profit-alerts";
+import { setAsideError } from "@/lib/profit-alerts";
 import { AUTOMATIONS_OFF, readAutomations, type Automations } from "@/lib/automations";
 import { INTEGRATIONS } from "@/lib/flags";
 import { supabase } from "@/lib/supabase";
@@ -128,9 +128,8 @@ export default function ProfilePage() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    const pct = clampPercentText(String(profile.setAsidePercent ?? ""));
-    if (pct !== profile.setAsidePercent) setProfile((prev) => ({ ...prev, setAsidePercent: pct }));
-    if (!(/^\d+(\.\d+)?$/.test(pct) && Number(pct) <= 100)) {
+    const pct = String(profile.setAsidePercent ?? "").trim();
+    if (setAsideError(pct)) {
       setMessage("Set aside must be a number from 0 to 100 (it can't be blank).");
       const more = document.querySelector<HTMLDetailsElement>('[data-testid="more-settings"]'); if (more) more.open = true;
       document.querySelector<HTMLInputElement>('[data-testid="set-aside-percent"]')?.focus();
@@ -284,8 +283,9 @@ export default function ProfilePage() {
         </label>
         <label className="block text-sm font-medium text-[var(--cr-muted)]">
           Set aside % of profit
-          <input name="setAsidePercent" data-testid="set-aside-percent" type="number" min={0} max={100} step="any" inputMode="decimal" className="mt-1.5 block min-h-11 w-full max-w-[10rem] tabular-nums rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="30 (default)" aria-describedby="set-aside-range" value={profile.setAsidePercent} onChange={(event) => update("setAsidePercent", event.target.value)} onBlur={(event) => { const v = clampPercentText(event.currentTarget.value); if (v !== event.currentTarget.value) update("setAsidePercent", v); }} />
+          <input name="setAsidePercent" data-testid="set-aside-percent" type="number" min={0} max={100} step="any" inputMode="decimal" className="mt-1.5 block min-h-11 w-full max-w-[10rem] tabular-nums rounded-lg border border-teal-500/30 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" placeholder="30 (default)" aria-describedby="set-aside-range" value={profile.setAsidePercent} onChange={(event) => update("setAsidePercent", event.target.value)} aria-invalid={Boolean(setAsideError(profile.setAsidePercent))} />
           <span id="set-aside-range" className="sr-only">0 to 100</span>
+          {setAsideError(profile.setAsidePercent) && <span role="alert" data-testid="set-aside-error" className="mt-1 block text-xs font-medium text-red-600">{setAsideError(profile.setAsidePercent)}</span>}
         </label>
         <p className="-mt-1 text-xs text-[var(--cr-muted)]" data-testid="set-aside-copy">{setAsideCopy(profile.setAsidePercent)}</p>
         <fieldset className="cr-panel space-y-1 rounded-xl border border-teal-500/25 p-3 sm:p-4" data-testid="automations">

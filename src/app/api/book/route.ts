@@ -1,6 +1,6 @@
 import { serviceClient } from "@/lib/stripe-server";
 import { clientIp, rateLimitedShared, tooMany } from "@/lib/rate-limit";
-import { BOOKING_RPC_ERRORS, servicesFrom, validOwnerKey } from "@/lib/booking";
+import { BOOKING_RPC_ERRORS, bookingError, servicesFrom, validOwnerKey } from "@/lib/booking";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +32,9 @@ export async function POST(request: Request) {
     name: s("name"), phone: s("phone"), email: s("email"), address: s("address"), service: s("service"),
     preferred: s("preferred"), note: s("note"), photos: Array.isArray(body.photos) ? body.photos.slice(0, 3).map(String) : [],
   };
+  // QA3: same checks as the form, so an empty or hand-made POST can't create a blank request.
+  const problem = bookingError({ ...payload, website: "" } as never);
+  if (problem) return Response.json({ error: problem }, { status: 400 });
   const { data, error } = await serviceClient().rpc("submit_booking_request", { p_owner: owner, p: payload });
   if (error) return Response.json({ error: "Could not send your request. Please try again." }, { status: 500 });
   const result = (data || {}) as { ok?: boolean; error?: string };

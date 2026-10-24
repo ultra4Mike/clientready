@@ -104,3 +104,11 @@ export function setAsideCopy(value: unknown) {
   const shown = raw !== "" && Number.isFinite(n) && n >= 0 && n <= 100 ? n : 30;
   return `Reports and job math set aside ${shown}% of profit${shown === 30 ? " (the default)" : "; new accounts start at 30%"}. This is a cushion for taxes. It is not a tax return.`;
 }
+
+/** QA3: visible validation instead of a silent clamp. Empty string means valid. */
+export function setAsideError(raw: unknown) {
+  const text = String(raw ?? "").trim();
+  if (text === "") return "Enter a number from 0 to 100.";
+  if (!/^\d+(\.\d+)?$/.test(text) || Number(text) > 100) return "Set aside must be a number from 0 to 100.";
+  return "";
+}

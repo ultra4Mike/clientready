@@ -55,6 +55,7 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
   const [events, setEvents] = useState<TapEvent[]>([]);
   const [fixes, setFixes] = useState<FixRequest[]>([]);
   const [rules, setRules] = useState<TimesheetSettings>(DEFAULT_TIMESHEET_SETTINGS);
+  const [locating, setLocating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
   const [now, setNow] = useState(() => new Date().toISOString());
@@ -162,11 +163,17 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
     if (!confirmed && !isAllowed(state, kind)) { setConfirmTap({ kind, job }); return; }
     setBusy(true); setNote(""); setConfirmTap(null); setGeoSheet(null);
     const at = new Date().toISOString();
+    setLocating(true);
     const pos = await currentPosition();
-    setLocDenied(pos ? false : (await locationPermission()) === "denied");
+    setLocating(false);
+    const denied = pos ? false : (await locationPermission()) === "denied";
+    setLocDenied(denied);
+    // GPS too slow (~10 s): save the tap without location and flag it for the boss.
+    const noFix = !pos && !denied && (kind === "start_day" || kind === "start_job" || kind === "arrive");
     if (pos) setLoc((l) => ({ ...l, on: true }));
     let notAtSite = false;
-    if (kind === "start_job" || kind === "arrive") {
+    if (noFix) notAtSite = true;
+    else if (kind === "start_job" || kind === "arrive") {
       if (!pos) notAtSite = geofenceRadius(rules, job?.docId, worker) > 0;
       else { const pin = job ? await jobPin(job.address) : null; const radius = geofenceRadius(rules, job?.docId, worker); if (pin && radius > 0 && metersBetween(pos, pin) > radius) notAtSite = true; }
     }
@@ -177,7 +184,7 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
     // Show the time the server saved (the same one in the list and on the owner's timesheet).
     let shown = at;
     if (!local) { const fresh = await loadMyTaps(email); setEvents(fresh); shown = fresh.find((e) => e.id === event.id)?.at || at; }
-    setNote(saved !== "ok" ? `Saved on this phone, will send when online: ${saved}` : `${KIND_LABEL[kind]} at ${time(shown)}.${notAtSite ? " Marked “not at job site” for your boss to check. That's okay." : ""}${confirmed ? " Flagged for your boss to check." : ""}${local ? " Saved on this phone, will send when online." : ""}`);
+    setNote(saved !== "ok" ? `Saved on this phone, will send when online: ${saved}` : `${KIND_LABEL[kind]} at ${time(shown)}.${noFix ? " Couldn't get your location in time, so it was saved without it and flagged for your boss." : notAtSite ? " Marked “not at job site” for your boss to check. That's okay." : ""}${confirmed ? " Flagged for your boss to check." : ""}${local ? " Saved on this phone, will send when online." : ""}`);
     setBusy(false);
   }
 
@@ -219,6 +226,7 @@ export default function MyDay({ email, employeeId, jobs }: { email: string; empl
       {askStillDriving && <p data-testid="still-driving" className="cr-panel cr-tone-warn text-sm font-semibold">Still driving? Tap “Arrived” when you get there, or “End day”. If not, your day ends at your last stop.</p>}
       {!locDenied && <p data-testid="location-status" data-state={loc.on ? loc.pin || "on" : "unknown"} className="text-xs text-[var(--cr-muted)]">{loc.on === null ? "Location: checking… (allow it when asked)" : `Location on${loc.pin === "none" || (!loc.pin && !plan.length) ? " · No job location saved" : loc.pin === "far" ? " · not at the job site" : loc.pin === "near" ? " · at the job site" : ""}`}</p>}
       {locDenied && <p data-testid="location-denied" data-state="denied" className="cr-panel cr-tone-warn text-sm">Location is off. Your taps still save; they are marked for your boss to check. Turn on location for this site to skip that.</p>}
+      {locating && <p role="status" data-testid="gps-locating" className="flex items-center gap-2 text-sm text-[var(--cr-muted)]"><span aria-hidden="true" className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />Getting your location (up to 10 seconds)…</p>}
       {primary && (
         <button data-testid="tap-primary" data-kind={primary.kind} disabled={busy} className="cr-btn cr-btn-primary min-h-14! w-full text-lg font-bold" onClick={() => tap(primary.kind, primary.job)}>{primary.label}</button>
       )}

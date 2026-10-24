@@ -21,7 +21,7 @@ import { saveCloudDocument, type CloudDoc } from "@/lib/cloud-docs";
 const recentCutoff = (today: string) => { const d = new Date(`${today}T12:00:00`); if (Number.isNaN(d.getTime())) return ""; d.setDate(d.getDate() - 14); return d.toISOString().slice(0, 10); };
 
 export type ReviewKind = "expense" | "done" | "balance" | "approval" | "recurring" | "change" | "missing" | "conflict";
-export type ReviewItem = { key: string; version: string; kind: ReviewKind; docId: string; title: string; detail: string; href: string };
+export type ReviewItem = { key: string; version: string; kind: ReviewKind; docId: string; title: string; detail: string; href: string; amount?: number; costLabel?: string };
 export type ExpenseRow = { id: string; doc_id: string; worker_name?: string; kind?: string; amount?: string; note?: string; created_at?: string };
 
 type Doc = { id: string; type: string; title: string; clientName?: string; data?: Record<string, unknown> };
@@ -91,6 +91,7 @@ export function reviewItems(docs: Doc[], expenses: ExpenseRow[], today = ymd(new
       key: `expense:${row.id}`, version: `${amount.toFixed(2)}|${row.kind || ""}`, kind: "expense", docId: doc.id,
       title: `${row.worker_name || "Crew"} spent ${money(amount)} (${crewKindLabel(row.kind)})`,
       detail: `${numberOf(doc)}${who(doc)}${row.note ? ` · ${row.note}` : ""}`, href: `${open(doc)}#crew-spend`,
+      amount, costLabel: `${row.worker_name || "Crew"}: ${crewKindLabel(row.kind)}${row.note ? ` (${String(row.note).slice(0, 60)})` : ""}`,
     });
   }
 
@@ -163,13 +164,25 @@ export function reviewItems(docs: Doc[], expenses: ExpenseRow[], today = ymd(new
   });
 }
 
-/** Stores the reviewed version on the document (local + cloud). Only data.reviews changes. */
+/**
+ * QA3c: approving a crew expense adds it to the job's costs (Other fees, tagged with the expense id so it is
+ * never added twice; an edited amount replaces the earlier line). Profit by job and the invoice pick it up.
+ */
+export function withCrewExpenseCost(data: Record<string, unknown>, item: Pick<ReviewItem, "key" | "amount" | "costLabel">) {
+  const costs = { ...((data.jobCosts || {}) as Record<string, unknown>) };
+  const fees = (Array.isArray(costs.otherFees) ? (costs.otherFees as { crewExpenseId?: string }[]) : []).filter((f) => f.crewExpenseId !== item.key);
+  if ((item.amount || 0) > 0) fees.push({ label: item.costLabel || "Crew expense", amount: String(item.amount), crewExpenseId: item.key } as never);
+  return { ...data, jobCosts: { ...costs, otherFees: fees } };
+}
+
+/** Stores the reviewed version on the document (local + cloud). Only data.reviews changes (plus job costs for an approved crew expense). */
 export async function markReviewed(item: ReviewItem) {
   const raw = window.localStorage.getItem("clientready-documents");
   const docs = (raw ? JSON.parse(raw) : []) as CloudDoc[];
   const doc = docs.find((entry) => entry.id === item.docId);
   if (!doc) return docs;
-  const data = { ...(doc.data || {}), reviews: { ...readReviews(doc.data), [item.key]: item.version } };
+  const base = item.kind === "expense" ? withCrewExpenseCost(doc.data || {}, item) : doc.data || {};
+  const data = { ...base, reviews: { ...readReviews(doc.data), [item.key]: item.version } };
   const updated = { ...doc, data };
   const cloudId = await saveCloudDocument(updated); // stamps data.updatedAt
   const fresh = JSON.parse(window.localStorage.getItem("clientready-documents") || "[]") as CloudDoc[];

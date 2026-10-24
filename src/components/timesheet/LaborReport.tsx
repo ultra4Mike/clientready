@@ -6,7 +6,7 @@ import { addDays } from "@/lib/timesheet-sync";
 import { laborRows, loadTimeWeek, localYmd, type LaborRow } from "@/lib/time-owner";
 import { weekOf } from "@/lib/pay-types";
 import { csvText, downloadCsv } from "@/lib/csv";
-import { loadPtoRequests } from "@/lib/phase2-data";
+import { loadPtoForRange } from "@/lib/phase2-data";
 import { ptoDays } from "@/lib/pay-phase2";
 import { readLocalTimesheetSettings } from "@/lib/day-events";
 import { otSummary } from "@/lib/overtime-rules";
@@ -26,8 +26,8 @@ export default function LaborReport({ docs }: { docs: { id: string; title?: stri
       const out = list.flatMap(laborRows);
       // Approved PTO / sick: paid hours with no job (never changes recorded pay).
       const from = addDays(start, -7 * (weeks - 1)), to = addDays(start, 6), workers = list[0]?.workers || [];
-      const years = [...new Set([from.slice(0, 4), to.slice(0, 4)])];
-      const reqs = (await Promise.all(years.map((y) => loadPtoRequests(y).catch(() => [])))).flat();
+      // Same PTO source as the timesheet week and the payroll export, so hours and pay agree.
+      const reqs = await loadPtoForRange(from, to).catch(() => []);
       for (const [k, v] of ptoDays(reqs, workers as never, from, to)) {
         const [employeeId, date] = k.split("|");
         out.push({ employeeId, name: workers.find((x) => x.id === employeeId)?.name || "Worker", date, week: weekOf(date), docId: "pto", minutes: 0, cents: v.cents, otHours: 0, dtHours: 0, premiumCents: 0, approved: true, ptoHours: r2h(v.hours - v.holidayHours), holidayHours: v.holidayHours });

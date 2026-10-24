@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { donePromptFor, type DonePrompt } from "@/lib/done-prompt";
 import { confirmJobDone, jobDonePhotos, readSchedule, type Schedule } from "@/lib/schedule";
 
 const when = (value?: string) => {
@@ -13,17 +14,20 @@ export default function JobDonePanel({ docId, schedule, onConfirmed }: { docId: 
   const [photos, setPhotos] = useState<{ id: string; worker_name: string; photo: string; created_at: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [prompt, setPrompt] = useState<DonePrompt>(null);
   const done = schedule?.status === "done";
 
   useEffect(() => {
     let live = true;
     if (done) jobDonePhotos(docId).then((rows) => live && setPhotos(rows));
+    window.setTimeout(() => { if (live) setPrompt(donePromptFor(docId)); }, 0);
     return () => {
       live = false;
     };
   }, [docId, done, schedule?.doneAt]);
 
   if (!done || !schedule) return null;
+  const next: DonePrompt = schedule.confirmedAt ? prompt : null;
 
   async function confirm() {
     setBusy(true);
@@ -31,6 +35,7 @@ export default function JobDonePanel({ docId, schedule, onConfirmed }: { docId: 
     setBusy(false);
     if (!saved) return setMessage("Could not confirm. Check your connection and try again.");
     onConfirmed(readSchedule(saved.data));
+    setPrompt(donePromptFor(docId));
     setMessage("Job confirmed.");
   }
 
@@ -57,6 +62,7 @@ export default function JobDonePanel({ docId, schedule, onConfirmed }: { docId: 
           {busy ? "Confirming…" : "Confirm job done"}
         </button>
       )}
+      {next && <p className="flex flex-wrap items-center gap-2" data-testid="job-done-next">{next.text} <a href={next.href} className="tap rounded-lg border border-emerald-500/50 px-3 py-1.5 font-semibold" data-testid="job-done-next-link">{next.label}</a></p>}
       {message && <p className="text-xs text-slate-500">{message}</p>}
     </div>
   );

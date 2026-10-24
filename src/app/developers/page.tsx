@@ -9,7 +9,7 @@ export default function DevelopersPage() {
     <main className="min-h-screen bg-[var(--cr-bg)] text-[var(--cr-text)]">
       <header className="border-b border-teal-500/20 bg-[var(--cr-panel)]">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4 sm:px-6">
-          <Link href="/" className="-ml-2 inline-flex min-h-11 items-center px-2 text-sm font-medium text-[var(--cr-muted)] transition hover:text-teal-600">Back home</Link>
+          <Link href="/integrations" data-testid="developers-back" className="-ml-2 inline-flex min-h-11 items-center px-2 text-sm font-medium text-[var(--cr-muted)] transition hover:text-teal-600">Back to Integrations</Link>
           <div className="font-semibold">API</div>
         </div>
       </header>

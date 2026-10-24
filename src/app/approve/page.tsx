@@ -288,7 +288,7 @@ export default function ApprovePage() {
             <p className="text-xs font-semibold uppercase tracking-wide">Payment receipt</p>
             <p className="mt-1 text-2xl font-bold tabular-nums">${amountOf(receipt.amount).toFixed(2)} paid</p>
             <p className="mt-1">Receipt <span className="font-semibold" data-testid="receipt-number">{receiptNumber(receipt.id)}</span> · {number} · {receipt.date ? niceDate(receipt.date) : ""} · Card</p>
-            <p className="mt-1">{totals.balance > 0.004 ? `Remaining balance: $${totals.balance.toFixed(2)}` : "Paid in full. Thank you!"}</p>
+            <p className="mt-1">{totals.balance > 0.004 ? `Remaining balance: $${totals.balance.toFixed(2)}` : refundText ? `${refundText}. No balance due.` : "Paid in full. Thank you!"}</p>
             <div className="print-hide mt-3 flex flex-wrap gap-2">
               <button type="button" onClick={() => printPage()} className="min-h-11 rounded-lg bg-emerald-700 px-4 font-semibold text-white">Print / save receipt</button>
               <a href={`#receipt-${receipt.id}`} data-testid="receipt-link" className="inline-flex min-h-11 items-center rounded-lg border border-emerald-400 px-4 font-medium">Link to this receipt</a>
@@ -372,7 +372,7 @@ export default function ApprovePage() {
               )}
               {!isProposal && !replaced && (
                 <div className="mt-2 flex items-baseline justify-between gap-3 cr-tone-teal rounded-xl border border-teal-500/30 bg-teal-50 px-4 py-3 text-xl font-bold tabular-nums text-teal-900 print:bg-transparent print:px-0" data-testid="approve-owed">
-                  <span>{paidInFull ? "Paid in full" : totals.paid > 0.004 ? "Remaining balance" : "Amount due"}</span><span>${totals.balance.toFixed(2)}</span>
+                  <span>{paidInFull ? (refundText ? "Balance after refund" : "Paid in full") : totals.paid > 0.004 ? "Remaining balance" : "Amount due"}</span><span>${totals.balance.toFixed(2)}</span>
                 </div>
               )}
             </div>

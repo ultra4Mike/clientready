@@ -4,7 +4,7 @@
  * billed and job costs by invoice date, cash by payment date, business expenses by their own date.
  */
 import { documentTotals, amountOf } from "./discount";
-import { cashEntries } from "./money";
+import { cashEntries, draftMoneyTaken } from "./money";
 import { effectiveAmounts } from "./change-order-revision";
 import { dedupeCopies } from "./doc-dedupe";
 import { isPendingRecurringDraft } from "./recurring";
@@ -28,8 +28,13 @@ export const isVoidOrDeleted = (doc: Doc) => ["void", "voided", "deleted"].inclu
 export function isBilledInvoice(doc: Doc, allDocs: Doc[]) {
   if (doc.type !== "invoice" || isVoidOrDeleted(doc) || isPendingRecurringDraft(doc as never)) return false;
   // A draft is not billed, unless money was already taken on it (it reads Paid everywhere else).
-  const pays = Array.isArray(doc.data?.payments) ? (doc.data?.payments as { amount?: unknown }[]) : [];
-  if (String(doc.data?.status || "draft") === "draft" && !pays.some((p) => amountOf(p.amount) > 0.004)) return false;
+  if (String(doc.data?.status || "draft") === "draft" && !draftMoneyTaken(doc as never)) return false;
+  return !effectiveAmounts(allDocs as never, doc as never).replaced;
+}
+
+/** QA3c: an invoice whose job counts for costs / Profit by job: any invoice (draft, unsent, sent or paid) not void, pending recurring or replaced. */
+export function isCostedJob(doc: Doc, allDocs: Doc[]) {
+  if (doc.type !== "invoice" || isVoidOrDeleted(doc) || isPendingRecurringDraft(doc as never)) return false;
   return !effectiveAmounts(allDocs as never, doc as never).replaced;
 }
 
@@ -55,7 +60,9 @@ export function billedTotal(allDocs: Doc[], from = "", to = "") {
 }
 
 export function jobCostsTotal(allDocs: Doc[], from = "", to = "") {
-  return r2(billedInvoices(allDocs, from, to).reduce((sum, doc) => sum + jobCostOf(doc), 0));
+  // QA3c: costs of every real job (draft / unsent / sent / paid), the same set as Profit by job.
+  const docs = dedupeCopies(allDocs);
+  return r2(docs.filter((doc) => isCostedJob(doc, docs) && inRange(invoiceDay(doc), from, to)).reduce((sum, doc) => sum + jobCostOf(doc), 0));
 }
 
 /** Cash in by payment date: gross (refunds negative), the sales-tax share of it, and income = gross − sales tax. */

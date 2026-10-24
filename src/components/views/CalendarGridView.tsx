@@ -15,6 +15,7 @@ import { expandJobDays, dragPayload, readDragPayload } from "@/lib/job-days";
 import { chipTimeRange } from "@/lib/chip-time";
 import { allConflicts, bookingConflicts, clashPrompts, clockText, nextOpenSlot, readOverrides, splitConflicts } from "@/lib/conflicts";
 import { ignoresTentative, isTentative, PRESETS, readCalendarFilter, saveCalendarFilter, visibleOnCalendar, type CalendarFilter } from "@/lib/calendar-filter";
+import { readOwnerUnavailable, refreshOwnerUnavailable, unavailableOn, unavailableWarning, type Unavailable } from "@/lib/unavailable";
 import { belongsInUnscheduled, effectiveDocStatus, isDueInvoice, isSettledStatus } from "@/lib/doc-status";
 import CalendarFilterBar from "@/components/CalendarFilterBar";
 import { applySchedule, confirmRemovalFor, moveSchedule, omwTime, readSchedule, readWorkers, saveSchedule, DONE_CLASS, DONE_LABEL, doneState, STATUS_CLASS, STATUS_LABEL, statusClass, statusLabel, type DoneState, type JobStatus, type Schedule, type Worker } from "@/lib/schedule";
@@ -80,6 +81,14 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
   const [editing, setEditing] = useState<Editing>(null);
   const [workerId, setWorkerId] = useState("");
   const [message, setMessage] = useState("");
+  // QA3c: crew "Days I can't work" (and approved time off) on the calendar, the By-worker view and moves.
+  const [daysOff, setDaysOff] = useState<Unavailable[]>([]);
+  useEffect(() => {
+    let live = true;
+    window.setTimeout(() => { if (live) setDaysOff(readOwnerUnavailable()); }, 0);
+    refreshOwnerUnavailable().then((rows) => { if (live) setDaysOff(rows); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
 
   // R127: approval filter, remembered per user on this device.
   const [filter, setFilterState] = useState<CalendarFilter>(PRESETS.all);
@@ -168,6 +177,8 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
       }
       if (docs !== state.docs) setState((prev) => ({ ...prev, docs }));
       const existing = readSchedule(doc.data);
+      const offWarn = unavailableWarning(daysOff, date, existing?.workerIds || [], workerName);
+      if (offWarn && !window.confirm(`${offWarn}\n\nMove the job there anyway?`)) { setMessage("Not moved."); return; }
       const moved = existing
         ? moveSchedule(existing, date, startTime)
         : unscheduledDrop(doc.data, date, startTime);
@@ -432,6 +443,12 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
   const heading = view === "month" && monthFirst
     ? parse(monthFirst).toLocaleString("en-US", { month: "long", year: "numeric" })
     : weekDays.length ? `Week of ${parse(weekDays[0]).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : "";
+  const offChips = (day: string) => {
+    const off = unavailableOn(daysOff, day);
+    if (!off.size) return null;
+    return <span className="mt-1 flex flex-wrap justify-center gap-1" data-testid={`cal-off-${day}`}>{[...off.keys()].map((id) => <span key={id} className="rounded-full bg-amber-500/15 px-1.5 text-[10px] font-medium text-amber-700 dark:text-amber-300" title={off.get(id) || "Can't work"} data-testid={`cal-off-${day}-${id}`}>{workerName.get(id) || "Worker"} off</span>)}</span>;
+  };
+  const workerOff = workerId ? daysOff.filter((row) => row.employee_id === workerId && row.day >= (today || "")) : [];
   const workerJobs = jobs
     .filter((job) => job.schedule.workerIds.includes(workerId))
     .sort((a, b) => `${a.schedule.date}${a.schedule.startTime}`.localeCompare(`${b.schedule.date}${b.schedule.startTime}`));
@@ -507,6 +524,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
                   {weekDays.map((day) => (
                     <div key={day} className={`border-b border-slate-500/30 px-2 py-2.5 text-center text-sm font-semibold ${day === today ? "rounded-t-lg bg-teal-500/15 text-teal-600 dark:text-teal-300" : ""}`}>
                       {DAY_NAMES[parse(day).getDay()]} {parse(day).getDate()}
+                      {offChips(day)}
                     </div>
                   ))}
                   <div className="p-1.5 pr-2 text-right text-[11px] font-medium uppercase tracking-wide opacity-70">Any</div>
@@ -624,7 +642,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
                     return (
                       <section key={day} data-testid={`agenda-day-${day}`} data-drop-date={day} className={touchDrag?.over === day ? "rounded-xl ring-2 ring-teal-400" : ""}>
                         <h2 className={`sticky top-[env(safe-area-inset-top)] z-10 -mx-2 mb-1.5 max-sm:mx-0 max-sm:rounded-lg max-sm:border max-sm:border-teal-500/15 flex items-center gap-2 px-3 py-2 text-sm font-semibold backdrop-blur sm:-mx-3 ${day === today ? "bg-teal-500/15 text-teal-700 dark:text-teal-300" : "bg-[var(--cr-card)]/95"}`}>
-                          <span className={`inline-flex h-7 min-w-7 items-center justify-center rounded-full px-1.5 text-xs tabular-nums ${day === today ? "bg-teal-500 text-slate-950!" : "bg-slate-500/10"}`}>{parse(day).getDate()}</span>
+                          <span className={`inline-flex h-7 min-w-7 items-center justify-center rounded-full px-1.5 text-xs tabular-nums ${day === today ? "bg-teal-500 text-slate-950!" : "bg-slate-500/10"}`}>{parse(day).getDate()}</span> {offChips(day)}
                           {parse(day).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
                           {day === today && <span className="ml-auto text-xs font-semibold uppercase tracking-wide">Today</span>}
                         </h2>
@@ -659,7 +677,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
                       onClick={() => day && unscheduled.length && setEditing({ docId: unscheduled[0].id, date: day })}
                       className={`min-h-28 rounded-xl border p-1.5 text-xs transition hover:bg-teal-500/5 ${day ? "border-slate-500/25 bg-[var(--cr-bg)]" : "border-transparent"} ${day === today ? "ring-2 ring-teal-400" : ""}`}
                     >
-                      {day && <div className={`mb-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${day === today ? "bg-teal-500 text-slate-950!" : ""}`}>{parse(day).getDate()}</div>}
+                      {day && <div className={`mb-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${day === today ? "bg-teal-500 text-slate-950!" : ""}`}>{parse(day).getDate()}</div>} {day && offChips(day)}
                       <div className="space-y-0.5">
                         {day && continuing(day).map((job) => contChip(job))}
                         {day && jobs.filter((job) => job.schedule.date === day).sort((a, b) => a.schedule.startTime.localeCompare(b.schedule.startTime)).map((job) => chip(job, true))}
@@ -681,6 +699,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
                     {workers.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
                   </select>
                 </label>
+                {workerOff.length > 0 && <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm" data-testid="worker-days-off"><p className="font-semibold">Days they can&apos;t work</p><ul className="mt-1 space-y-0.5">{workerOff.slice(0, 30).map((row) => <li key={row.day} data-testid={`worker-off-${row.day}`}>{parse(row.day).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}{row.note ? ` · ${row.note}` : ""}{workerJobs.some((job) => job.schedule.date === row.day) ? <span className="ml-1 font-semibold text-amber-700 dark:text-amber-300"> · has a job that day</span> : null}</li>)}</ul></div>}
                 {workerId && workerJobs.length === 0 && <p className="rounded-xl border border-dashed border-slate-500/40 p-6 text-center text-sm opacity-70">No jobs assigned.</p>}
                 {workerJobs.map((job) => (
                   <div key={job.doc.id} className="space-y-1 rounded-xl border border-slate-500/30 bg-[var(--cr-card)] p-4 text-sm shadow-sm" data-testid={`worker-job-${job.doc.id}`}>

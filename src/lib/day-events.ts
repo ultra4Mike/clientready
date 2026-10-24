@@ -40,15 +40,18 @@ async function selectEvents(build: (cols: string) => PromiseLike<{ data: unknown
   return bad(second) ? build(EVENT_COLS) : second;
 }
 
-/** Best-effort GPS (never blocks: 6 s timeout, denied = undefined). */
-export function currentPosition(): Promise<{ lat: number; lng: number } | undefined> {
+/** How long a tap waits for a GPS fix before it saves without location (and flags it). */
+export const GPS_TIMEOUT_MS = 10000;
+
+/** Best-effort GPS (never blocks: ~10 s timeout, denied/slow = undefined). */
+export function currentPosition(ms = GPS_TIMEOUT_MS): Promise<{ lat: number; lng: number } | undefined> {
   return new Promise((resolve) => {
     if (typeof navigator === "undefined" || !navigator.geolocation) return resolve(undefined);
-    const timer = window.setTimeout(() => resolve(undefined), 6000);
+    const timer = setTimeout(() => resolve(undefined), ms);
     navigator.geolocation.getCurrentPosition(
-      (pos) => { window.clearTimeout(timer); resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
-      () => { window.clearTimeout(timer); resolve(undefined); },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
+      (pos) => { clearTimeout(timer); resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
+      () => { clearTimeout(timer); resolve(undefined); },
+      { enableHighAccuracy: true, timeout: Math.max(1000, ms - 1000), maximumAge: 60000 }
     );
   });
 }

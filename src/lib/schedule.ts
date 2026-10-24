@@ -1,4 +1,5 @@
 import { customCostLineNames } from "@/lib/cost-categories";
+import { crewJobDetails } from "@/lib/crew-tools";
 import { greetingName } from "@/lib/reminders";
 import { paySnapshot, readPaySettings } from "@/lib/pay-types";
 import { derivedWhen, isoDate } from "@/lib/job-when";
@@ -94,6 +95,13 @@ export function statusClass(schedule: Pick<Schedule, "status" | "confirmedAt">) 
 const DOCS_KEY = "clientready-documents";
 const isDate = (value: unknown) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
 const isTime = (value: unknown) => typeof value === "string" && /^\d{2}:\d{2}$/.test(value);
+/** QA3c: a saved time in another shape ("9:00", "09:00:00", "9am") still lands on the time grid, not "Any time". */
+export function normTime(value: unknown): string {
+  if (isTime(value)) return String(value);
+  const raw = String(value ?? "").trim();
+  if (!/^\d{1,2}(:\d{2}(:\d{2})?)?\s*([ap]\.?m\.?)?$/i.test(raw) || (!raw.includes(":") && !/[ap]/i.test(raw))) return "";
+  return parseLegacyTime(raw);
+}
 
 /** Pulls an HH:MM out of the old free-text jobTime ("9:30", "9am", "2:15 PM"). */
 export function parseLegacyTime(value: unknown) {
@@ -118,8 +126,8 @@ export function readSchedule(data: Record<string, unknown> | undefined): Schedul
     const status = raw.status === "in_progress" || raw.status === "done" ? raw.status : "scheduled";
     return {
       date: String(raw.date),
-      startTime: isTime(raw.startTime) ? String(raw.startTime) : "",
-      ...(isTime(raw.endTime) ? { endTime: String(raw.endTime) } : {}),
+      startTime: normTime(raw.startTime) || normTime(data?.jobStart),
+      ...(normTime(raw.endTime) || (!normTime(raw.startTime) && normTime(data?.jobEnd)) ? { endTime: normTime(raw.endTime) || normTime(data?.jobEnd) } : {}),
       workerIds: Array.isArray(raw.workerIds) ? raw.workerIds.map(String) : [],
       status,
       updatedAt: String(raw.updatedAt || ""),
@@ -419,7 +427,11 @@ export function applySchedule<T extends CloudDoc>(docs: T[], docId: string, sche
     data.schedule = { ...rest, ...(days.length ? { days } : {}), workerIds: ids, updatedAt: new Date().toISOString() };
     data.crew = crewForWorkers(shiftCrewDays(crew, prev, schedule.date), ids, schedule);
   } else {
+    // QA3c: Unschedule clears the date, time and crew, so the job does not come back from the old
+    // Job start / crew work date. Rows with hours or pay recorded stay (history; pay unchanged).
     delete data.schedule;
+    delete data.jobStart; delete data.jobEnd; delete data.jobTime;
+    data.crew = crew.filter((row) => row.paidToWorker || Number(String(row.hours ?? "").replace(/[^0-9.]/g, "")) > 0);
   }
   const updated = { ...doc, data } as T;
   guardDroppedRows(crew, (updated.data.crew || []) as CrewRow[], confirmed);
@@ -608,8 +620,15 @@ async function syncScheduleCrewJobsInner(doc: CloudDoc) {
       done_confirmed: schedule.status === "done" && Boolean(schedule.confirmedAt),
       on_my_way_at: schedule.onMyWayAt || "",
       checklist: schedule.checklist || [],
+      // Job title + line descriptions for the crew: names only, never prices.
+      ...crewJobDetails(doc),
     }));
   let { error } = await supabase.from("crew_jobs").upsert(rows, { onConflict: "id" });
+  // Before migration 20261024130000 runs, crew_jobs has no job_title / line_names columns.
+  if (error && /job_title|line_names/.test(error.message || "")) {
+    for (const row of rows as Record<string, unknown>[]) { delete row.job_title; delete row.line_names; }
+    ({ error } = await supabase.from("crew_jobs").upsert(rows, { onConflict: "id" }));
+  }
   // Before the checklist migration (20261016110000) runs, crew_jobs has no checklist column.
   if (error && /checklist/.test(error.message || "")) {
     ({ error } = await supabase.from("crew_jobs").upsert(rows.map(({ checklist: _skip, ...row }) => { void _skip; return row; }), { onConflict: "id" }));
@@ -651,9 +670,8 @@ export function omwTime(iso: string) {
   return Number.isNaN(time.getTime()) ? "" : time.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
-/** Crew: mark an assigned job done; at least one photo (compressed JPEG data URL) is required. */
+/** Crew: mark an assigned job done. A photo is required unless the owner made it optional (the server checks). */
 export async function crewMarkDone(docId: string, photos: string[], clientKey = "") {
-  if (!photos.length) return "Add at least one photo of the finished job.";
   // With a client key the server skips an upload it already has (retry after a lost reply).
   let { data, error } = await supabase.rpc("crew_mark_done", clientKey ? { p_doc_id: docId, p_photos: photos, p_client_key: clientKey } : { p_doc_id: docId, p_photos: photos });
   if (error && clientKey && /could not find the function|PGRST202/i.test(`${error.message} ${(error as { code?: string }).code || ""}`)) {
@@ -745,4 +763,25 @@ export async function crewSaveVisitNote(docId: string, note: string) {
 export async function jobVisitNotes(docId: string) {
   const { data } = await supabase.from("crew_visit_notes").select("worker_email, worker_name, note, updated_at").eq("doc_id", docId).order("updated_at", { ascending: false });
   return ((data || []) as { worker_email: string; worker_name: string; note: string; updated_at: string }[]).filter((row) => row.note.trim());
+}
+
+/** Crew: is the finished-job photo optional for this job's owner? false (required) until migration 20261024130000 runs. */
+export async function crewDonePhotoOptional(docId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("crew_done_photo_optional", { p_doc_id: docId });
+  return !error && data === true;
+}
+
+/** Owner: the "finished-job photo optional" setting (profiles.done_photo_optional). Default false = required. */
+export async function loadDonePhotoOptional(): Promise<{ value: boolean; ready: boolean }> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return { value: false, ready: false };
+  const { data, error } = await supabase.from("profiles").select("done_photo_optional").eq("id", auth.user.id).maybeSingle();
+  if (error) return { value: false, ready: false };
+  return { value: Boolean((data as { done_photo_optional?: boolean } | null)?.done_photo_optional), ready: true };
+}
+export async function saveDonePhotoOptional(value: boolean): Promise<string> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return "Sign in first.";
+  const { error } = await supabase.from("profiles").update({ done_photo_optional: value }).eq("id", auth.user.id);
+  return error ? (/done_photo_optional/.test(error.message) ? "This setting needs the latest database update first." : error.message) : "";
 }

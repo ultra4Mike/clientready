@@ -13,6 +13,8 @@ export default function BookingSettings() {
   const [services, setServices] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [saved, setSaved] = useState({ slug: "", services: "" });
 
   useEffect(() => {
     (async () => {
@@ -26,6 +28,7 @@ export default function BookingSettings() {
       setEnabled(Boolean(r.booking_enabled));
       setSlug(r.booking_slug || slugify(r.business_name || ""));
       setServices(servicesFrom(r.booking_services).join("\n"));
+      setSaved({ slug: r.booking_slug || slugify(r.business_name || ""), services: servicesFrom(r.booking_services).join("\n") });
       setReady("ok");
     })().catch(() => setReady("unavailable"));
   }, []);
@@ -40,7 +43,7 @@ export default function BookingSettings() {
     if (clean && clean.length < 3) { setMessage("The link name needs at least 3 letters or numbers."); setBusy(false); return; }
     const { error } = await supabase.from("profiles").update({ booking_enabled: nextEnabled, booking_slug: clean || null, booking_services: parseServices(services) }).eq("id", uid);
     if (error) setMessage(/unique|duplicate/i.test(error.message) ? "That link name is taken. Try another." : "Could not save. Try again.");
-    else { setEnabled(nextEnabled); setSlug(clean); setMessage("Saved."); }
+    else { setEnabled(nextEnabled); setSlug(clean); setSaved({ slug: clean, services }); setMessage("Saved."); }
     setBusy(false);
   }
 
@@ -57,13 +60,13 @@ export default function BookingSettings() {
             Let customers request a job from a public page
           </label>
           <label className="mt-3 block text-sm">Link name
-            <input data-testid="booking-slug" className="mt-1 block w-full min-h-11 rounded border border-slate-300 px-3" value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase())} maxLength={40} placeholder="your-business" />
+            <input data-testid="booking-slug" className="mt-1 block w-full min-h-11 rounded border border-slate-300 px-3" value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase())} onBlur={() => { if (slug !== saved.slug) void save(); }} maxLength={40} placeholder="your-business" />
           </label>
           {/* QA2: the public /book link only shows (and copies) while booking is on. */}
           {enabled ? (
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
             <code data-testid="booking-link" className="break-all">{link}</code>
-            <button type="button" data-testid="booking-copy" className="min-h-11 rounded border px-3" onClick={() => navigator.clipboard?.writeText(link).then(() => setMessage("Link copied."), () => setMessage("Copy failed; select the link and copy it."))}>Copy link</button>
+            <button type="button" data-testid="booking-copy" className="min-h-11 rounded border px-3" onClick={() => navigator.clipboard?.writeText(link).then(() => { setCopied(true); setMessage("Link copied."); window.setTimeout(() => setCopied(false), 2000); }, () => setMessage("Copy failed; select the link and copy it."))}>{copied ? "Copied ✓" : "Copy link"}</button>
           </div>
           ) : (
           <p className="mt-2 flex flex-wrap items-center gap-2 text-sm" data-testid="booking-off">
@@ -71,11 +74,10 @@ export default function BookingSettings() {
           </p>
           )}
           <label className="mt-3 block text-sm">Services customers can choose (one per line)
-            <textarea data-testid="booking-services" className="mt-1 block w-full rounded border border-slate-300 px-3 py-2" rows={4} value={services} onChange={(e) => setServices(e.target.value)} />
+            <textarea data-testid="booking-services" className="mt-1 block w-full rounded border border-slate-300 px-3 py-2" rows={4} value={services} onChange={(e) => setServices(e.target.value)} onBlur={() => { if (services !== saved.services) void save(); }} />
           </label>
-          <button type="button" data-testid="booking-save" disabled={busy} onClick={() => save()} className="mt-3 min-h-11 rounded bg-teal-700 px-4 font-semibold text-white disabled:opacity-60">Save booking settings</button>
           {message && <p className="mt-2 text-sm" data-testid="booking-message">{message}</p>}
-          <p className="mt-2 text-xs text-[var(--cr-muted)]">New requests show on your dashboard. No emails are sent.</p>
+          <p className="mt-2 text-xs text-[var(--cr-muted)]" data-testid="booking-autosave">Changes save automatically when you leave a field. New requests show on your dashboard. No emails are sent.</p>
         </>
       )}
     </section>

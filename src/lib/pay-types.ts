@@ -266,6 +266,7 @@ export function payLabel(pay: PaySettings, rate: string) {
   if (pay.type === "piece") return `$${num(pay.pieceRate).toFixed(2)}/${pay.pieceUnit || "unit"}`;
   if (pay.type === "commission") return `${num(pay.commissionPct)}% commission`;
   if (pay.type === "hybrid") return `$${num(rate).toFixed(2)}/hr + $${num(pay.pieceRate).toFixed(2)}/${pay.pieceUnit || "unit"}${num(pay.jobAmount) > 0 ? ` + $${num(pay.jobAmount).toFixed(2)}/job` : ""}`;
+  if (!String(rate ?? "").trim()) return "No hourly rate set";
   return `$${num(rate).toFixed(2)}/hr`;
 }
 

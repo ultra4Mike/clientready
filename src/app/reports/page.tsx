@@ -287,7 +287,7 @@ export default function ReportsPage() {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Stat testid="exp-job" label="Job costs" value={usd(jobCostsYear)} sub="On sent invoices" />
               <Stat testid="exp-biz" label="Business expenses" value={usd(bizTotal)} sub="Overhead, not on a job" />
-              <Stat testid="exp-crew" label="Crew receipts" value={crewLoaded ? usd(report.totals.crewReceipts) : LOADING} sub="Logged by crew; apply on the invoice" />
+              <Stat testid="exp-crew" label="Crew receipts" value={crewLoaded ? usd(report.totals.crewReceipts) : LOADING} sub="Logged by crew; approve in Needs review to add to job costs" />
               <Stat testid="exp-miles" label="Mileage (standard rate)" value={usd(miles.amount)} sub={`${miles.miles} business mi × IRS rate`} />
             </div>
             <section className={CARD}>
