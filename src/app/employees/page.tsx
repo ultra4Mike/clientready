@@ -22,7 +22,7 @@ import { supabase } from "@/lib/supabase";
 import { readWorkerOverrides, timeOverridesRow, type WorkerTimeOverrides } from "@/lib/timesheet";
 import { DEFAULT_PAY, payLabel, payProblem, readPaySettings, type PaySettings } from "@/lib/pay-types";
 
-type RateChange = { rate: string; effectiveDate: string };
+import { addRaise, type RateChange } from "@/lib/rate-history";
 
 type Employee = {
   id: string;
@@ -37,6 +37,7 @@ type Employee = {
   rateHistory: RateChange[];
   paySettings?: PaySettings;
   timeOverrides?: WorkerTimeOverrides;
+  removedAt?: string;
 };
 
 const emptyForm = {
@@ -222,17 +223,14 @@ export default function EmployeesPage() {
       setMessage("A raise needs a new rate and the date it starts.");
       return;
     }
-    const nextPerson: Employee = {
-      ...person,
-      rate: raiseRate,
-      rateHistory: [...person.rateHistory, { rate: raiseRate, effectiveDate: raiseDate }],
-    };
+    const today = new Date().toLocaleDateString("en-CA");
+    const nextPerson: Employee = addRaise(person, raiseRate, raiseDate, today);
     const next = employees.map((item) => (item.id === person.id ? nextPerson : item));
     saveLocal(next);
     await saveCloud(nextPerson);
     setRaiseRate("");
     setRaiseDate("");
-    setMessage("Raise saved for new jobs only. Older invoices stay at the old rate.");
+    setMessage(raiseDate > new Date().toLocaleDateString("en-CA") ? `Raise saved. It starts ${raiseDate}; hours before then stay at the current rate.` : `Raise saved from ${raiseDate}. Hours before then and approved weeks keep the old rate.`);
   }
 
   async function setActive(person: Employee, active: boolean) {
@@ -241,26 +239,21 @@ export default function EmployeesPage() {
     await saveCloud(nextPerson);
   }
 
+  /** QA4: removing is a soft deactivate. Timesheets, labour costs, PTO and payroll history keep his name. */
   async function remove(person: Employee) {
-    const raw = window.localStorage.getItem("clientready-documents");
-    const docs = raw ? JSON.parse(raw) : [];
-    const used = docs.some((doc: { data?: { crew?: { employeeId?: string }[] } }) =>
-      (doc.data?.crew || []).some((row) => row.employeeId === person.id)
-    );
-    if (used) {
-      setMessage("This person is on a saved job. Mark them inactive instead.");
-      return;
-    }
-    const ok = window.confirm("Are you sure you want to delete this employee?");
+    const ok = window.confirm(`Remove ${person.name || "this employee"}? Past hours, pay and time off stay in reports and payroll; he can't clock in.`);
     if (!ok) return;
-    saveLocal(employees.filter((item) => item.id !== person.id));
-    if (userId) await supabase.from("employees").delete().eq("user_id", userId).eq("id", person.id);
+    const nextPerson = { ...person, active: false, removedAt: new Date().toISOString() };
+    saveLocal(employees.map((item) => (item.id === person.id ? nextPerson : item)));
+    await saveCloud(nextPerson);
+    setMessage(`${person.name || "Employee"} removed. History is kept.`);
   }
 
   return (
     <AppShell title="Team">
       <PageHeader title="Team" subtitle="Add the email they will use to log in. That email opens the crew page, not the owner books." />
       <p className="-mt-2 mb-4 text-sm"><a href="/crew?preview=sample" data-testid="crew-preview-sample" className="font-medium text-teal-700 underline dark:text-teal-300">Preview the crew page with a sample worker</a> (nothing is saved or sent).</p>
+      <p className="-mt-2 mb-4 text-sm"><button type="button" data-testid="pto-orphan-cleanup" className="underline" onClick={() => void import("@/lib/phase2-data").then((m) => m.cleanupOrphanPto(new Set(employees.map((e) => e.id)))).then((p) => setMessage(`Removed ${p.remove.length} pending/denied time-off records with no worker.${p.keptApproved ? ` Kept ${p.keptApproved} approved (paid history, shown as Former worker).` : ""}`))}>Clean up time off with no worker</button></p>
       <div className="mb-4 grid gap-3 md:grid-cols-2"><TimeOffRequests /><DonePhotoSetting /></div>
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(340px,400px)_minmax(0,1fr)] xl:grid-cols-[minmax(360px,420px)_minmax(0,1fr)]">
       <div className="order-2 min-w-0 lg:order-none lg:sticky lg:top-20">
@@ -368,7 +361,7 @@ export default function EmployeesPage() {
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--cr-muted)]">People ({employees.length})</h2>
       <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
         {employees.length === 0 && <EmptyState icon="👥" title="No employees yet." line="Add a person with the form to track crew hours and pay." className="rounded-2xl border border-dashed border-teal-500/30 lg:col-span-2" />}
-        {employees.map((person) => (
+        {employees.filter((person) => !person.removedAt).map((person) => (
           <div key={person.id} className="rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-5 shadow-sm sm:p-6">
             <p className="text-base font-semibold">{person.name} <span className="font-medium text-teal-600 dark:text-teal-300" data-testid="pay-label">· {payLabel(readPaySettings(person.paySettings), person.rate)}{person.paySettings?.overtime?.on && !usesAccountOvertime(person.paySettings, accountRules.otPreset) ? ` · own OT ${multWords(person.paySettings.overtime.multiplier)}` : ""}</span></p>
             <p className="text-sm text-[var(--cr-muted)]">

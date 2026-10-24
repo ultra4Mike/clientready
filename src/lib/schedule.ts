@@ -56,7 +56,7 @@ export function shiftScheduleDays(days: ScheduleDay[] | undefined, from: string,
   const delta = Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86400000);
   return days.map((d) => { const x = new Date(`${d.date}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + delta); return { ...d, date: x.toISOString().slice(0, 10) }; });
 }
-export type Worker = { id: string; name: string; email?: string; phone?: string; role?: string; rate?: string; active?: boolean; paySettings?: unknown; hireDate?: string; timeOverrides?: unknown };
+export type Worker = { id: string; name: string; email?: string; phone?: string; role?: string; rate?: string; active?: boolean; paySettings?: unknown; hireDate?: string; timeOverrides?: unknown; rateHistory?: unknown; removedAt?: string };
 /** The older per-job crew/pay rows (data.crew). */
 export type CrewRow = {
   id: string; employeeId: string; name: string; rate: string; hours: string; startTime: string; endTime: string;
@@ -386,6 +386,16 @@ function readDocs(): CloudDoc[] {
   try {
     const raw = window.localStorage.getItem(DOCS_KEY);
     return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** QA4: everyone incl. inactive / removed, for payroll, reports and history (never for new scheduling). */
+export function readAllWorkers(): Worker[] {
+  try {
+    const raw = window.localStorage.getItem("clientready-employees");
+    return (raw ? (JSON.parse(raw) as Worker[]) : []).filter((person) => person && person.id);
   } catch {
     return [];
   }

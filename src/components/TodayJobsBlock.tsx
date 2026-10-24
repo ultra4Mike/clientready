@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { readWorkers } from "@/lib/schedule";
+import { readAllWorkers } from "@/lib/schedule";
 import { clashingIds } from "@/lib/conflicts";
 import { localYmd } from "@/lib/scheduled-jobs";
 import { readOwnerUnavailable, refreshOwnerUnavailable, unavailableOn } from "@/lib/unavailable";
@@ -15,7 +15,7 @@ export default function TodayJobsBlock({ docs, loaded }: { docs: { id: string; t
   useEffect(() => {
     let live = true;
     const show = (rows: ReturnType<typeof readOwnerUnavailable>) => {
-      const names = new Map(readWorkers().map((w) => [w.id, w.name]));
+      const names = new Map(readAllWorkers().map((w) => [w.id, w.name]));
       const off = unavailableOn(rows, localYmd());
       if (live) setOffToday([...off.entries()].map(([id, note]) => ({ id, name: names.get(id) || "Worker", note })));
     };
@@ -26,7 +26,7 @@ export default function TodayJobsBlock({ docs, loaded }: { docs: { id: string; t
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     setClash(clashingIds(docs)); // R119: overlap marker on today's overlapping jobs
-    setJobs(todayJobsWithCrew(docs, new Map(readWorkers().map((w) => [w.id, w.name])), localYmd()));
+    setJobs(todayJobsWithCrew(docs, new Map(readAllWorkers().map((w) => [w.id, w.name])), localYmd()));
   }, [docs]);
   return (
     <section data-testid="dash-today" data-count={jobs.length} className="cr-panel rounded-2xl border border-teal-500/20 bg-[var(--cr-card)] p-4 text-sm">

@@ -11,7 +11,7 @@ import { loadAccountIntoCache } from "@/lib/account-cache";
 import { clientOptedOut, reviewAskedAt } from "@/lib/review-request";
 import { uniqueDocs } from "@/lib/change-orders";
 import { donePromptFor, type DonePrompt } from "@/lib/done-prompt";
-import { confirmJobDone, doneState, omwTime, onMyWaySmsHref, readWorkers, saveSchedule, statusLabel, type Schedule } from "@/lib/schedule";
+import { confirmJobDone, doneState, omwTime, onMyWaySmsHref, readAllWorkers, saveSchedule, statusLabel, type Schedule } from "@/lib/schedule";
 import { localYmd, niceYmd, scheduledJobs, timeLabel } from "@/lib/scheduled-jobs";
 import CalendarFilterBar from "@/components/CalendarFilterBar";
 import { businessToday, segmentOn } from "@/lib/overnight";
@@ -40,7 +40,7 @@ export default function TodayPage() {
   const read = () => {
     const raw = window.localStorage.getItem("clientready-documents");
     setDocs(raw ? uniqueDocs(JSON.parse(raw) as Doc[]) : []);
-    setWorkers(new Map(readWorkers().map((person) => [person.id, person.name])));
+    setWorkers(new Map(readAllWorkers().map((person) => [person.id, person.name])));
   };
 
   useEffect(() => {

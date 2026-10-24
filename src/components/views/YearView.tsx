@@ -310,7 +310,8 @@ export default function YearPage({ embedded = false, year: yearProp, onData, cov
           method: "",
           ref: "",
           note: row.note || "",
-          hours: row.hours || "",
+          // QA4: timesheet-paid rows carry minutes, not typed hours (Payroll showed 0 h for them).
+          hours: fromSheet && Number((row as { timesheetMinutes?: number }).timesheetMinutes) > 0 ? String(Math.round(Number((row as { timesheetMinutes?: number }).timesheetMinutes) / 60 * 100) / 100) : row.hours || "",
           rate: row.rate || "",
           worker: name,
           workerKind: kindFor(name, row.employeeId),
@@ -344,7 +345,7 @@ export default function YearPage({ embedded = false, year: yearProp, onData, cov
     // Approved PTO / sick (paid time off, no job). Minimum-wage top-up is already inside each day's crew pay.
     for (const [k, v] of ptoDays(ptoReqs, employees as never, `${year}-01-01`, `${year}-12-31`)) {
       const [id, date] = k.split("|"); const name = employees.find((p) => p.id === id)?.name || "Worker";
-      if (v.cents) list.push({ id: `pto-${id}-${date}`, docId: "", docType: "invoice", kind: "pay", date, client: "", number: "", category: "Labor", amount: v.cents / 100, method: "", ref: "", note: `${v.holidayHours >= v.hours ? "Holiday" : v.holidayHours > 0 ? "PTO / holiday" : ptoKindLabel(v.kind)} ${v.hours.toFixed(2)} h`, hours: String(v.hours), rate: "", worker: name, workerKind: kindFor(name, id) });
+      if (v.cents) list.push({ id: `pto-${id}-${date}`, docId: "", docType: "invoice", kind: "pay", date, client: "", number: "", category: "Labor", amount: v.cents / 100, method: "", ref: "", note: `${v.holidayHours >= v.hours ? "Holiday" : v.holidayHours > 0 ? "PTO / holiday" : ptoKindLabel(v.kind)} ${v.hours.toFixed(2)} h`, hours: String(v.hours), rate: v.rate || "", worker: name, workerKind: kindFor(name, id) });
     }
     return list;
   }, [documents, employees, year, ptoReqs]);

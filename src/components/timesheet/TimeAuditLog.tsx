@@ -3,7 +3,7 @@
 import { TIMESHEET_CHANGED_EVENT } from "@/lib/timesheet-sync";
 import { useEffect, useState } from "react";
 import { actorLabel, auditCsv, AUDIT_SAVED_EVENT, loadAudit, pendingAuditCount, type AuditRow } from "@/lib/day-events";
-import { readWorkers } from "@/lib/schedule";
+import { readAllWorkers } from "@/lib/schedule";
 import { auditText } from "@/components/timesheet/DayDetail";
 
 export const AUDIT_GROUPS: Record<string, { label: string; actions: string[] }> = {
@@ -26,7 +26,7 @@ export default function TimeAuditLog() {
     let live = true; let seq = 0;
     // Reload on every change (each rule save, tap, edit), not just the first; newest request wins.
     const on = () => { const n = ++seq; void loadAudit({ limit: 1000 }).then((r) => { if (live && n === seq) { setRows(r); setPending(pendingAuditCount()); } }); };
-    const ws = readWorkers();
+    const ws = readAllWorkers();
     queueMicrotask(() => { if (live) setNames(Object.fromEntries(ws.map((w) => [w.id, w.name]))); });
     // Owner = the signed-in account; name from the saved profile (cloud row, then this device's copy).
     void (async () => {

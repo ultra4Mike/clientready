@@ -69,7 +69,7 @@ export function accountantRows(allDocs: Doc[], crew: CrewExpense[], trips: Trip[
     const when = day(data.invoiceDate || doc.createdAt);
     for (const [key, label, line] of COST_FIELDS) if (amountOf(costs[key]) > 0) expenseRows.push([when, numberOf(doc), clientOf(doc), label, line, r2(amountOf(costs[key])), "Job costs"]);
     for (const fee of Array.isArray(costs.otherFees) ? (costs.otherFees as { name?: unknown; amount?: unknown }[]) : []) {
-      if (amountOf(fee.amount) > 0) expenseRows.push([when, numberOf(doc), clientOf(doc), String(fee.name || "Other fee"), "Line 27a", r2(amountOf(fee.amount)), "Job costs"]);
+      if (amountOf(fee.amount) > 0) expenseRows.push([when, numberOf(doc), clientOf(doc), String(fee.name || "Other fee").trim().replace(/\s+/g, " ").replace(/^dump fees?$/i, "Dump fee"), "Line 27a", r2(amountOf(fee.amount)), "Job costs"]);
     }
   }
   // Business expenses (overhead, not on a job) join the expense list with their own Schedule C line.
@@ -136,9 +136,14 @@ export function accountantFiles(allDocs: Doc[], crew: CrewExpense[], trips: Trip
 
 /** Year expenses by category from the job-cost rows (owner lines incl. their own named lines). Each cost once. */
 export function expensesByCategory(expenseRows: string[][]) {
-  const totals = new Map<string, number>();
-  for (const row of expenseRows) totals.set(row[3], (totals.get(row[3]) || 0) + (Number(row[5]) || 0));
-  return [...totals.entries()].sort((a, b) => b[1] - a[1]);
+  // QA4: "Dump Fee" and "Dump fee" are one category (case/space-insensitive; first spelling seen is the label).
+  const totals = new Map<string, { label: string; amount: number }>();
+  for (const row of expenseRows) {
+    const key = String(row[3] || "").trim().replace(/\s+/g, " ").toLowerCase();
+    const cur = totals.get(key) || { label: String(row[3] || "").trim(), amount: 0 };
+    cur.amount += Number(row[5]) || 0; totals.set(key, cur);
+  }
+  return [...totals.values()].map((v) => [v.label, v.amount] as [string, number]).sort((a, b) => b[1] - a[1]);
 }
 
 function bizLines(biz: BizOccurrence[]) {

@@ -8,7 +8,7 @@ import { loadAccountIntoCache } from "@/lib/account-cache";
 import { docAmounts } from "@/lib/doc-stage";
 import { displayStatus } from "@/lib/doc-status";
 import { docHref, jobChain, type JobChain } from "@/lib/job-chain";
-import { crewIds, readWorkers, statusLabel } from "@/lib/schedule";
+import { crewIds, readAllWorkers, statusLabel } from "@/lib/schedule";
 import { niceYmd, timeLabel } from "@/lib/scheduled-jobs";
 import DocTrail from "@/components/DocTrail";
 import { cachedMinMargin, profitAlertsForDoc } from "@/lib/profit-alerts";
@@ -37,7 +37,7 @@ export default function JobPage() {
       setDocs(all);
       setMinMargin(cachedMinMargin());
       setChain(found);
-      setWorkers(new Map(readWorkers().map((w) => [w.id, w.name])));
+      setWorkers(new Map(readAllWorkers().map((w) => [w.id, w.name])));
       if (wanted && TABS.some(([k]) => k === wanted)) setTab(wanted);
     });
   }, []);

@@ -5,7 +5,7 @@
  * Read-only: never writes docs (the Timesheet / refreshTimesheetPay do that).
  */
 import { loadPtoForRange } from "@/lib/phase2-data";
-import { readWorkers, type Worker } from "@/lib/schedule";
+import { readAllWorkers, type Worker } from "@/lib/schedule";
 import { weekOf } from "@/lib/pay-types";
 import { loadOwnerTimesheet, type DayApproval } from "@/lib/day-events";
 import { reviewCount, timeAlerts, whosOnClock, type DaySheet, type FixRequest, type OnClock, type ScheduledJob, type TapEvent, type TimeAlert, type TimesheetSettings } from "@/lib/timesheet";
@@ -30,7 +30,7 @@ export function dayMinutes(w: Pick<TimeWeek, "approvals" | "sheets">, employeeId
 export async function loadTimeWeek(date: string, now = new Date().toISOString()): Promise<TimeWeek> {
   const week = weekOf(date);
   const [data, pto] = await Promise.all([loadOwnerTimesheet(week, addDays(week, 6)), loadPtoForRange(week, addDays(week, 6))]);
-  const workers = readWorkers(); const docs = readDocs();
+  const workers = readAllWorkers(); const docs = readDocs();
   const { days, sheets } = weekSheets({ workers, docs, events: data.events, fixes: data.fixes, settings: data.settings, week, now });
   const { pays } = weekShares({ workers, docs, days, sheets, approvals: data.approvals, settings: data.settings, pto });
   const schedule = new Map<string, ScheduledJob[]>();

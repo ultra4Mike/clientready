@@ -1,3 +1,4 @@
+import { rateOn } from "@/lib/rate-history";
 /**
  * Time tracking phase 2 (pure: no storage, no network).
  *  - Job / task rates (prevailing wage): a rate on the job, or a task type's rate, replaces the base hourly wage there.
@@ -114,13 +115,14 @@ export function ptoPayCents(hours: number, rate: string, paySettings?: unknown) 
 }
 
 /** Approved PTO for a set of days: employeeId|date -> { hours, cents }. Only approved, never pending. */
-export function ptoDays(requests: PtoRequest[], workers: { id: string; rate?: string; paySettings?: unknown }[], from: string, to: string) {
-  const out = new Map<string, { hours: number; cents: number; kind: PtoKind; holidayHours: number }>();
+export function ptoDays(requests: PtoRequest[], workers: { id: string; rate?: string; paySettings?: unknown; rateHistory?: unknown }[], from: string, to: string) {
+  const out = new Map<string, { hours: number; cents: number; kind: PtoKind; holidayHours: number; rate: string }>();
   for (const r of requests) {
     if (r.status !== "approved" || r.date < from || r.date > to) continue;
     const w = workers.find((x) => x.id === r.employeeId); if (!w) continue;
     const k = `${r.employeeId}|${r.date}`; const prev = out.get(k);
-    out.set(k, { hours: r2((prev?.hours || 0) + r.hours), cents: (prev?.cents || 0) + ptoPayCents(r.hours, w.rate || "", w.paySettings), kind: r.kind, holidayHours: r2((prev?.holidayHours || 0) + (r.kind === "holiday" ? r.hours : 0)) });
+    const rate = rateOn(w, r.date) || w.rate || ""; // QA4: effective-dated rate; the packet shows it (not $0.00)
+    out.set(k, { hours: r2((prev?.hours || 0) + r.hours), cents: (prev?.cents || 0) + ptoPayCents(r.hours, rate, w.paySettings), kind: r.kind, holidayHours: r2((prev?.holidayHours || 0) + (r.kind === "holiday" ? r.hours : 0)), rate });
   }
   return out;
 }

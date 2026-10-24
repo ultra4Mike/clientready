@@ -46,6 +46,32 @@ export async function savePtoRequest(req: PtoRequest): Promise<string> {
   const { error } = await supabase.from("crew_pto_requests").upsert({ id: req.id, owner_id: user.id, employee_id: req.employeeId, work_date: req.date, hours: req.hours, kind: req.kind, note: req.note || "", status: req.status, decided_at: req.decidedAt || null });
   return error ? error.message : "";
 }
+/** QA4: owner deletes a time-off record (this device + server). */
+export async function deletePtoRequest(id: string): Promise<string> {
+  writeLocal(readLocal().filter((r) => r.id !== id));
+  const { data: s } = await supabase.auth.getSession();
+  if (!s.session?.user) return "";
+  const { error } = await supabase.from("crew_pto_requests").delete().eq("id", id);
+  return error ? error.message : "";
+}
+
+/**
+ * QA4: time-off records whose worker no longer exists (old hard deletes). A record attaches to a current worker only when
+ * its id matches one (incl. inactive); pending/denied orphans are removed; approved orphans are paid history, so they stay
+ * (shown as "Former worker") and are counted, never deleted silently.
+ */
+export function orphanPtoPlan(requests: PtoRequest[], workerIds: Set<string>) {
+  const orphans = requests.filter((r) => !r.employeeId || !workerIds.has(r.employeeId));
+  return { remove: orphans.filter((r) => r.status !== "approved").map((r) => r.id), keptApproved: orphans.filter((r) => r.status === "approved").length };
+}
+export async function cleanupOrphanPto(workerIds: Set<string>) {
+  const year = String(new Date().getFullYear());
+  const all = mergePtoRequests(await loadPtoRequests(year), readLocal());
+  const plan = orphanPtoPlan(all, workerIds);
+  for (const id of plan.remove) await deletePtoRequest(id);
+  return plan;
+}
+
 export const newPtoRequest = (p: Omit<PtoRequest, "id" | "createdAt" | "status"> & { status?: PtoRequest["status"] }): PtoRequest => ({ id: newId(), createdAt: new Date().toISOString(), status: "pending", ...p });
 
 /** Owner: publish computed balances (hours only) so each worker can read his own. */
@@ -113,10 +139,10 @@ export async function loadYearWorkedHours(year: string): Promise<Map<string, num
 
 /** Owner: recompute every worker's PTO balance (account rules + per-worker blanks) and publish it (hours only). */
 export async function refreshPtoBalances(today = ymdTz(new Date())) {
-  const [{ readWorkers }, { readLocalTimesheetSettings }, { ptoBalance, ptoOn }, { readWorkerOverrides }] = await Promise.all([import("@/lib/schedule"), import("@/lib/day-events"), import("@/lib/pay-phase2"), import("@/lib/timesheet")]);
+  const [{ readAllWorkers }, { readLocalTimesheetSettings }, { ptoBalance, ptoOn }, { readWorkerOverrides }] = await Promise.all([import("@/lib/schedule"), import("@/lib/day-events"), import("@/lib/pay-phase2"), import("@/lib/timesheet")]);
   const settings = readLocalTimesheetSettings(); const year = today.slice(0, 4);
   const [requests, worked] = await Promise.all([loadPtoRequests(year), loadYearWorkedHours(year)]);
-  const rows = readWorkers().map((w) => ({ w, pto: readWorkerOverrides(w) })).filter(({ w, pto }) => ptoOn(settings, pto) || requests.some((r) => r.employeeId === w.id))
+  const rows = readAllWorkers().map((w) => ({ w, pto: readWorkerOverrides(w) })).filter(({ w, pto }) => ptoOn(settings, pto) || requests.some((r) => r.employeeId === w.id))
     .map(({ w, pto }) => { const b = ptoBalance({ policy: settings, worker: pto, workedHours: worked.get(w.id) || 0, requests, employeeId: w.id, year, hireDate: w.hireDate, today }); return { employeeId: w.id, accrued: b.accrued, taken: b.taken, available: b.available }; });
   await savePtoBalances(year, rows);
   return rows;

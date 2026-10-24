@@ -10,7 +10,7 @@ import { fmtTime, ymdTz, readWorkerOverrides, timeAlerts, payPeriodOf, type Sche
 import { useEffect, useMemo, useRef, useState } from "react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
-import { readWorkers, type Worker } from "@/lib/schedule";
+import { readAllWorkers, type Worker } from "@/lib/schedule";
 import { weekOf } from "@/lib/pay-types";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -33,7 +33,7 @@ const h = (m: number) => (m / 60).toFixed(2);
 
 export default function TimesheetPage() {
   const [week, setWeek] = useState("");
-  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [allWorkers, setWorkers] = useState<Worker[]>([]);
   const [docs, setDocs] = useState<ReturnType<typeof readDocs>>([]);
   const [events, setEvents] = useState<TapEvent[]>([]);
   const [fixes, setFixes] = useState<FixRequest[]>([]);
@@ -80,7 +80,7 @@ export default function TimesheetPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time read of browser storage/URL; must run after hydration, so it stays in the effect
     if (new URLSearchParams(window.location.search).get("filter") === "review") setFilter("review");
     const first = pickWeek();
-    setWeek(first); setWorkers(readWorkers()); setDocs(readDocs()); setSettings(readLocalTimesheetSettings()); setNow(new Date().toISOString());
+    setWeek(first); setWorkers(readAllWorkers()); setDocs(readDocs()); setSettings(readLocalTimesheetSettings()); setNow(new Date().toISOString());
     void loadBusinessTz().then(() => { if (live) { setWeek((w) => (w === first ? pickWeek() : w)); setNow(new Date().toISOString()); } });
     void syncTimesheetCutover().then((day) => { if (live) setCutover(day); });
     // The crew list is a browser cache filled by Team; a fresh browser/sign-in has none, so read it from the server here too.
@@ -89,7 +89,7 @@ export default function TimesheetPage() {
       if (!data.user) { setCrewLoad("signed_out"); return; }
       const ok = await refreshEmployeesCache(data.user.id).catch(() => false);
       if (!live) return;
-      if (ok) setWorkers(readWorkers());
+      if (ok) setWorkers(readAllWorkers());
       setCrewLoad(ok ? "ready" : "error");
     }).catch(() => { if (live) setCrewLoad("error"); });
     return () => { live = false; };
@@ -120,6 +120,8 @@ export default function TimesheetPage() {
     }).catch(() => undefined).finally(() => { refreshing.current = false; });
     void loadPtoForRange(wk, addDays(wk, 6)).then((r) => { if (weekRef.current === wk) setWeekPto(r); }).catch(() => {});
   }, { enabled: Boolean(week) && !weekLoading, storageKeys: [DAY_APPROVALS_KEY] });
+  // QA4: a removed / inactive worker still shows in a week where he has hours or approvals (pay history), never otherwise.
+  const workers = useMemo(() => allWorkers.filter((w) => w.active !== false || events.some((e) => e.employeeId === w.id) || approvals.some((a) => a.employeeId === w.id)), [allWorkers, events, approvals]);
   const { days, sheets } = useMemo(() => (week && now ? weekSheets({ workers, docs, events, fixes, settings, week, now }) : { days: [] as string[], sheets: new Map<string, DaySheet>() }), [workers, docs, events, fixes, settings, week, now]);
   const offDays = useMemo(() => (week ? ptoDays(weekPto || [], workers as never, week, addDays(week, 6)) : new Map<string, { hours: number; kind: string }>()), [weekPto, workers, week]);
   const { pays, shares } = useMemo(() => (week && days.length ? weekShares({ workers, docs, days, sheets, approvals, settings, pto: weekPto }) : { pays: new Map<string, DayPay[]>(), shares: new Map() as ReturnType<typeof weekShares>["shares"] }), [workers, docs, days, sheets, approvals, settings, weekPto, week]);

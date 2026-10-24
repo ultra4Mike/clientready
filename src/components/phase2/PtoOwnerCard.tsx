@@ -1,7 +1,8 @@
 "use client";
 // Owner: PTO/sick balances + pending requests (approve / deny) + add time off. Balances are published (hours only) for each worker.
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { loadPtoRequests, loadYearWorkedHours, newPtoRequest, savePtoBalances, savePtoRequest } from "@/lib/phase2-data";
+import { deletePtoRequest, loadPtoRequests, loadYearWorkedHours, newPtoRequest, savePtoBalances, savePtoRequest } from "@/lib/phase2-data";
+import { TIMESHEET_CHANGED_EVENT } from "@/lib/timesheet-sync";
 import { ptoApproveWarning, ptoBalance, ptoKindLabel, ptoOn, type PtoKind, type PtoOverride, type PtoRequest } from "@/lib/pay-phase2";
 import type { TimesheetSettings } from "@/lib/timesheet";
 
@@ -12,7 +13,13 @@ export default function PtoOwnerCard({ workers, settings, today, onAdded, only }
   const [requests, setRequests] = useState<PtoRequest[]>([]);
   const [worked, setWorked] = useState<Map<string, number>>(new Map());
   const [msg, setMsg] = useState(""); const [over, setOver] = useState("");
-  useEffect(() => { void loadPtoRequests(year).then(setRequests); void loadYearWorkedHours(year).then(setWorked); }, [year]);
+  useEffect(() => {
+    const load = () => { void loadPtoRequests(year).then(setRequests); void loadYearWorkedHours(year).then(setWorked); };
+    load();
+    // QA4: accrual follows approved hours without a page reload.
+    window.addEventListener(TIMESHEET_CHANGED_EVENT, load);
+    return () => window.removeEventListener(TIMESHEET_CHANGED_EVENT, load);
+  }, [year]);
   const rows = useMemo(() => workers.filter((w) => ptoOn(settings, w.pto) || requests.some((r) => r.employeeId === w.id)).map((w) => ({ w, b: ptoBalance({ policy: settings, worker: w.pto, workedHours: worked.get(w.id) || 0, requests, employeeId: w.id, year, hireDate: w.hireDate, today }) })), [workers, settings, worked, requests, year, today]);
   const publishKey = rows.map((r) => `${r.w.id}:${r.b.accrued}:${r.b.taken}:${r.b.available}`).join("|");
   useEffect(() => { if (rows.length && !only) void savePtoBalances(year, rows.map((r) => ({ employeeId: r.w.id, accrued: r.b.accrued, taken: r.b.taken, available: r.b.available }))); }, [publishKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -46,7 +53,24 @@ export default function PtoOwnerCard({ workers, settings, today, onAdded, only }
     onAdded?.(req);
     return true;
   }
-  const name = (id: string) => workers.find((w) => w.id === id)?.name || "Worker";
+  /** QA4: owner can correct (hours / date / note) or delete time off already recorded. */
+  async function editOff(r: PtoRequest) {
+    const hours = window.prompt(`Hours for ${name(r.employeeId)} on ${r.date}`, String(r.hours));
+    if (hours === null) return;
+    const h = Number(hours);
+    if (!(h > 0 && h <= 24)) { setMsg("Hours must be 0–24."); return; }
+    const date = window.prompt("Day (YYYY-MM-DD)", r.date);
+    if (date === null || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { if (date !== null) setMsg("Use a date like 2026-10-23."); return; }
+    const next = { ...r, hours: h, date };
+    const err = await savePtoRequest(next);
+    setRequests((all) => all.map((x) => (x.id === r.id ? next : x))); setMsg(err ? `Saved here only: ${err}` : "Time off updated."); onAdded?.(next);
+  }
+  async function removeOff(r: PtoRequest) {
+    if (!window.confirm(`Delete ${r.hours} h ${ptoKindLabel(r.kind, true)} for ${name(r.employeeId)} on ${r.date}?`)) return;
+    const err = await deletePtoRequest(r.id);
+    setRequests((all) => all.filter((x) => x.id !== r.id)); setMsg(err ? `Removed here only: ${err}` : "Time off deleted."); onAdded?.(r);
+  }
+  const name = (id: string) => workers.find((w) => w.id === id)?.name || "Former worker";
   return (
     <section id={only ? `pto-${only}` : "pto"} className="cr-panel mt-4 rounded-xl border p-3 text-sm" data-testid={only ? "emp-pto-card" : "pto-card"}>
       <h2 className="font-semibold">{only ? "Add time off" : `Time off & sick (${year})`}</h2>
@@ -56,7 +80,7 @@ export default function PtoOwnerCard({ workers, settings, today, onAdded, only }
         <span>{name(r.employeeId)} · {r.date} · {r.hours} h {ptoKindLabel(r.kind, true)}{r.note ? ` · “${r.note}”` : ""}</span>
         <button type="button" className="min-h-11 rounded-lg bg-teal-600 px-3 text-white" data-testid="pto-approve" onClick={() => void decide(r, "approved")}>{over === `req:${r.id}` ? "Approve anyway" : "Approve"}</button>
         <button type="button" className="min-h-11 rounded-lg border px-3" data-testid="pto-deny" onClick={() => void decide(r, "denied")}>Deny</button></li>)}</ul>}
-      {decided.length > 0 && <details className="mt-3" data-testid="pto-decided"><summary className="cursor-pointer">Approved and denied ({decided.length})</summary><ul className="mt-1 space-y-1">{decided.map((r) => <li key={r.id} data-testid={`pto-decided-${r.id}`} data-status={r.status}>{name(r.employeeId)} · {r.date} · {r.hours} h {ptoKindLabel(r.kind, true)} · <span className="cr-chip2">{r.status}</span>{r.note ? <span className="block text-xs text-[var(--cr-muted)]" data-testid="pto-decided-note">“{r.note}”</span> : null}</li>)}</ul></details>}
+      {decided.length > 0 && <details className="mt-3" data-testid="pto-decided"><summary className="cursor-pointer">Approved and denied ({decided.length})</summary><ul className="mt-1 space-y-1">{decided.map((r) => <li key={r.id} data-testid={`pto-decided-${r.id}`} data-status={r.status}>{name(r.employeeId)} · {r.date} · {r.hours} h {ptoKindLabel(r.kind, true)} · <span className="cr-chip2">{r.status}</span>{" "}<button type="button" className="min-h-9 rounded-lg border px-2 text-xs" data-testid="pto-edit" onClick={() => void editOff(r)}>Edit</button>{" "}<button type="button" className="min-h-9 rounded-lg border border-rose-500/40 px-2 text-xs text-rose-600" data-testid="pto-delete" onClick={() => void removeOff(r)}>Delete</button>{r.note ? <span className="block text-xs text-[var(--cr-muted)]" data-testid="pto-decided-note">“{r.note}”</span> : null}</li>)}</ul></details>}
       <PtoAddForm workers={only ? workers.filter((w) => w.id === only) : workers} fixed={only} dayHours={settings.ptoDayHours || 8} over={over} onAdd={addOff} />
       {msg && <p className="mt-1" role="status" data-testid="pto-message">{msg}</p>}
     </section>

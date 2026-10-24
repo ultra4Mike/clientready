@@ -10,7 +10,8 @@ import { DOCS_KEY } from "@/lib/doc-sync";
 import { readOwnerClock } from "@/lib/clock";
 import { readHoursApprovals } from "@/lib/hours-approval";
 import { holdsSchedule } from "@/lib/change-order-revision";
-import { readSchedule, readWorkers, type Worker } from "@/lib/schedule";
+import { readAllWorkers, readSchedule, type Worker } from "@/lib/schedule";
+import { rateOn } from "@/lib/rate-history";
 import { rowExtraPay, rowPayMoney, weekOf, type PayRow } from "@/lib/pay-types";
 import { loadOwnerTimesheet, type DayApproval } from "@/lib/day-events";
 import { applyFixes, buildDay, dedupeTaps, wallToIso, ymdTz, readWorkerOverrides, estimateDriveMinutes, type DaySheet, type FixRequest, type ScheduledJob, type TapEvent, type TimesheetSettings } from "@/lib/timesheet";
@@ -105,6 +106,15 @@ export function weekSheets(input: { workers: Worker[]; docs: Doc[]; events: TapE
   return { days, sheets };
 }
 
+/** One allocation per distinct rate; each day takes the result computed at its own rate. */
+export function pickByDayRate<D extends { date: string }>(list: { date: string }[], dayRate: Map<string, string>, run: (rate: string) => D[]): D[] {
+  const rates = [...new Set(list.map((d) => dayRate.get(d.date) || ""))];
+  if (rates.length <= 1) return run(rates[0] || "");
+  const byRate = new Map(rates.map((r) => [r, run(r)]));
+  const first = byRate.get(rates[0])!;
+  return first.map((d) => byRate.get(dayRate.get(d.date) || "")!.find((x) => x.date === d.date) || d);
+}
+
 /** Per worker: the week's day pay and job shares from sheets + approvals. */
 export function weekShares(input: { workers: Worker[]; docs: Doc[]; days: string[]; sheets: Map<string, DaySheet>; approvals: DayApproval[]; settings?: Partial<TimesheetSettings>; pto?: PtoRequest[] }) {
   const pays = new Map<string, DayPay[]>();
@@ -134,7 +144,10 @@ export function weekShares(input: { workers: Worker[]; docs: Doc[]; days: string
     const off = { pto: 0, sick: 0, holiday: 0 };
     for (const r of input.pto || readLocalPtoRequests()) if (r.employeeId === w.id && r.status === "approved" && input.days.includes(r.date)) off[r.kind === "sick" ? "sick" : r.kind === "holiday" ? "holiday" : "pto"] += Number(r.hours) || 0;
     const weekOff = new Map([[wk, off]]);
-    const week = allocateWeek(list, w.paySettings, w.rate || "", { halfDayHours: input.settings?.halfDayHours, settings: input.settings, weekBonus, weekExtra, weekOff, jobRates: jobRates(input.docs as never, input.settings) });
+    // QA4: effective-dated rate per day; an approved day uses the rate known at approval (frozen).
+    const dayRate = new Map(input.days.map((date) => { const a = input.approvals.find((x) => x.employeeId === w.id && x.date === date); return [date, rateOn(w, date, a?.approvedAt || undefined) || w.rate || ""]; }));
+    const opts = { halfDayHours: input.settings?.halfDayHours, settings: input.settings, weekBonus, weekExtra, weekOff, jobRates: jobRates(input.docs as never, input.settings) };
+    const week = pickByDayRate(list, dayRate, (rate) => allocateWeek(list, w.paySettings, rate, opts));
     // Unallocated salary only for weeks from the pay cutover / his pay start up to this week (same rule as Year packet).
     if (week.some((d) => d.unallocated)) {
       const owed = unallocatedSalaryWeeks({ workers: [w], docs: [], cutover: readCutover() || timesheetCutover(), today: localYmd(new Date().toISOString()) }).some((u) => u.week === weekOf(input.days[0]));
@@ -206,7 +219,7 @@ export async function refreshTimesheetPay(date: string, opts: { approvals?: DayA
 }
 async function refreshWeek(date: string, week: string, opts: { approvals?: DayApproval[]; now?: string }) {
   const [data, cutover, pto] = await Promise.all([loadOwnerTimesheet(week, addDays(week, 6)), syncTimesheetCutover(), loadPtoForRange(week, addDays(week, 6))]);
-  const workers = readWorkers();
+  const workers = readAllWorkers(); // QA4: removed workers' past weeks still reprice/keep their rows
   const docs = readDocs();
   const approvals = opts.approvals || data.approvals;
   const { days, sheets } = weekSheets({ workers, docs, events: data.events, fixes: data.fixes, settings: data.settings, week, now: opts.now || new Date().toISOString() });

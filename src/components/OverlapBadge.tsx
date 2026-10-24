@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { clockText, conflictsForDoc, moveToNextOpen } from "@/lib/conflicts";
 import { derivedWhen } from "@/lib/job-when";
-import { type Schedule, moveSchedule, readSchedule, saveSchedule, readWorkers } from "@/lib/schedule";
+import { type Schedule, moveSchedule, readSchedule, saveSchedule, readAllWorkers } from "@/lib/schedule";
 
 type Doc = { id: string; title?: string; data?: Record<string, unknown> };
 
@@ -12,7 +12,7 @@ export default function OverlapBadge({ docs, doc, onMoved }: { docs: Doc[]; doc:
   const clash = conflictsForDoc(docs, doc);
   if (!clash.length && !state) return null;
   if (!clash.length) return <span role="status" data-testid="overlap-moved" className="text-xs text-emerald-700">{state}</span>;
-  const names = new Map(readWorkers().map((w) => [w.id, w.name]));
+  const names = new Map(readAllWorkers().map((w) => [w.id, w.name]));
   const text = clash.map((c) => `${names.get(c.workerId) || "Worker"} is also on ${c.title} ${clockText(c.start)}–${clockText(c.end)}`).join("; ");
   const slot = moveToNextOpen(docs, doc);
   async function move() {

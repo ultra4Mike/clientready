@@ -3,7 +3,7 @@
 import { isRevision } from "@/lib/change-order-revision";
 import { contractSummary } from "@/lib/change-order-summary";
 import { displayStatus } from "@/lib/doc-status";
-import { readSchedule, readWorkers } from "@/lib/schedule";
+import { readSchedule, readAllWorkers } from "@/lib/schedule";
 
 type Doc = { id: string; type: string; title: string; clientName?: string; data?: Record<string, unknown> };
 const $ = (n: number) => `$${n.toFixed(2)}`;
@@ -23,7 +23,7 @@ export default function ChangeOrderPanel({ docs, currentId, onDeleteDraft }: { d
     const co = sum.changeOrders.find((c) => c.id === currentId)!;
     const o = sum.original.data || {};
     const s = readSchedule(o);
-    const names = new Map(readWorkers().map((w) => [w.id, w.name]));
+    const names = new Map(readAllWorkers().map((w) => [w.id, w.name]));
     const crew = [...new Set([...((s?.workerIds || []).map((id) => names.get(id) || "")), ...((Array.isArray(o.crew) ? o.crew : []) as { name?: string }[]).map((r) => r.name || "")].filter(Boolean))];
     return (
       <section data-testid="co-original-contract" className="print-hide mb-4 rounded-2xl border border-amber-400/40 bg-amber-500/5 p-4 text-sm">
