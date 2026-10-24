@@ -41,6 +41,7 @@ type Editing = { docId: string; date?: string; startTime?: string } | null;
 // "Show 24 hours" shows them all at once. The choice is remembered on this device.
 const HOURS = ALL_HOURS;
 const HOURS_KEY = "clientready-calendar-hours";
+const MOBILE_MODE_KEY = "clientready-calendar-mobile-mode";
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function ymd(date: Date) {
@@ -144,6 +145,13 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
       event.preventDefault();
       // A later day's chip carries its offset: dropping day 2 on a date puts day 1 that many days earlier.
       const { docId, offset } = readDragPayload(event.dataTransfer.getData("text/plain"));
+      return moveJob(docId, offset, dropDate, startTime);
+    };
+  }
+
+  /** One move path for mouse drag, touch long-press drag and the mobile Move/Schedule pickers. */
+  async function moveJob(docId: string, offset: number, dropDate: string, startTime?: string) {
+    {
       const date = offset ? addDays(dropDate, -offset) : dropDate;
       // Item 2 (repeat drags): decide on the list as stored NOW, not the copy loaded with the page. A background
       // sync or the previous move's cloud save can rewrite/re-key the job after render; the stale copy made the
@@ -195,6 +203,64 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
       }
       setConflictNote(null);
       await save(docId, next);
+    }
+  }
+
+  // ---- Mobile (<900px): List / Calendar toggle, touch long-press drag, Move picker, Unscheduled section ----
+  const [mobileMode, setMobileModeState] = useState<"list" | "calendar">("list");
+  const [pickedDay, setPickedDay] = useState("");
+  const [moving, setMoving] = useState<{ docId: string; offset: number; date: string; title: string } | null>(null);
+  const [unschedOpen, setUnschedOpen] = useState(false);
+  const [touchDrag, setTouchDrag] = useState<{ docId: string; offset: number; label: string; x: number; y: number; over: string } | null>(null);
+  useEffect(() => { Promise.resolve().then(() => { try { const m = window.localStorage.getItem(MOBILE_MODE_KEY); if (m === "calendar" || m === "list") setMobileModeState(m); } catch { /* private mode */ } }); }, []);
+  function setMobileMode(next: "list" | "calendar") { setMobileModeState(next); try { window.localStorage.setItem(MOBILE_MODE_KEY, next); } catch { /* private mode */ } }
+  const press = useRef<{ timer: number; x: number; y: number; started: boolean; docId: string; offset: number; label: string } | null>(null);
+  const suppressClick = useRef(false);
+  const touchDragRef = useRef(touchDrag);
+  useEffect(() => { touchDragRef.current = touchDrag; }, [touchDrag]);
+  // While a touch drag is active, stop the page from scrolling (needs a non-passive listener).
+  useEffect(() => {
+    if (!touchDrag) return;
+    const block = (event: TouchEvent) => event.preventDefault();
+    document.addEventListener("touchmove", block, { passive: false });
+    return () => document.removeEventListener("touchmove", block);
+  }, [touchDrag]);
+  function dropDateAt(x: number, y: number) {
+    const el = document.elementFromPoint(x, y) as HTMLElement | null;
+    return el?.closest<HTMLElement>("[data-drop-date]")?.dataset.dropDate || "";
+  }
+  /** Long-press (450ms without moving >8px) starts a drag; moving first is a scroll. Mouse keeps native drag. */
+  function touchHandlers(docId: string, offset: number, label: string) {
+    return {
+      onPointerDown: (event: React.PointerEvent) => {
+        if (event.pointerType === "mouse") return;
+        const x = event.clientX, y = event.clientY;
+        const target = event.currentTarget as HTMLElement; const pid = event.pointerId;
+        press.current = { x, y, started: false, docId, offset, label, timer: window.setTimeout(() => {
+          if (!press.current) return;
+          press.current.started = true;
+          try { target.setPointerCapture(pid); } catch { /* released */ }
+          try { navigator.vibrate?.(15); } catch { /* unsupported */ }
+          setTouchDrag({ docId, offset, label, x, y, over: dropDateAt(x, y) });
+        }, 450) };
+      },
+      onPointerMove: (event: React.PointerEvent) => {
+        const p = press.current; if (!p) return;
+        if (!p.started) { if (Math.hypot(event.clientX - p.x, event.clientY - p.y) > 8) { window.clearTimeout(p.timer); press.current = null; } return; }
+        setTouchDrag((d) => d && { ...d, x: event.clientX, y: event.clientY, over: dropDateAt(event.clientX, event.clientY) });
+      },
+      onPointerUp: (event: React.PointerEvent) => {
+        const p = press.current; press.current = null; if (!p) return;
+        window.clearTimeout(p.timer);
+        if (!p.started) return;
+        suppressClick.current = true; window.setTimeout(() => { suppressClick.current = false; }, 400);
+        const day = dropDateAt(event.clientX, event.clientY);
+        setTouchDrag(null);
+        if (day) void moveJob(p.docId, p.offset, day);
+        else setMessage("Not moved: drop the job on a day.");
+      },
+      onPointerCancel: () => { const p = press.current; press.current = null; if (p) window.clearTimeout(p.timer); setTouchDrag(null); },
+      onContextMenu: (event: React.MouseEvent) => { if (press.current) event.preventDefault(); },
     };
   }
 
@@ -213,11 +279,12 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
         data-state={clashing.has(job.doc.id) ? "blocked" : undefined}
         data-done={doneState(job.schedule) || undefined}
         onDragStart={(event) => event.dataTransfer.setData("text/plain", dragPayload(job.doc.id, job.day?.offset || 0))}
+        {...(agenda ? touchHandlers(job.doc.id, job.day?.offset || 0, job.doc.clientName || job.doc.title) : {})}
         role="button"
         tabIndex={0}
         onKeyDown={onActivateKey(() => setEditing({ docId: job.doc.id }))}
-        onClick={(event) => { event.stopPropagation(); setEditing({ docId: job.doc.id }); }}
-        className={agenda ? `flex min-h-11 cursor-pointer flex-col justify-center rounded-lg border border-l-4 px-3 py-2 text-left text-sm font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc, jobDocs) ? " cr-tentative border-dashed opacity-60" : ""}` : `cr-chip2 cursor-grab min-w-0 break-words rounded-md border border-l-4 px-1.5 py-1 text-left text-xs font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc, jobDocs) ? " cr-tentative border-dashed opacity-60" : ""}`}
+        onClick={(event) => { event.stopPropagation(); if (suppressClick.current) return; setEditing({ docId: job.doc.id }); }}
+        className={agenda ? `relative select-none [-webkit-touch-callout:none] flex min-h-11 pr-16 cursor-pointer flex-col justify-center rounded-lg border border-l-4 px-3 py-2 text-left text-sm font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc, jobDocs) ? " cr-tentative border-dashed opacity-60" : ""}` : `cr-chip2 cursor-grab min-w-0 break-words rounded-md border border-l-4 px-1.5 py-1 text-left text-xs font-medium leading-snug shadow-sm ${statusClass(job.schedule)}${isTentative(job.doc, jobDocs) ? " cr-tentative border-dashed opacity-60" : ""}`}
         title={`${crossesMidnight(job.schedule.startTime, job.schedule.endTime) ? `${timeLabel(job.schedule.startTime || "")}–${timeLabel(job.schedule.endTime || "")} (next day) · ` : ""}${job.doc.title} · ${job.doc.clientName} · ${statusLabel(job.schedule)}${job.schedule.onMyWayAt && job.schedule.status !== "done" ? ` · ${job.schedule.onMyWayBy || "Crew"} on the way` : ""}${people ? ` · ${people}` : ""}`}
       >
         {agenda ? (
@@ -232,6 +299,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
             {job.doc.clientName || job.doc.title}
           </>
         )}
+        {agenda && <button type="button" data-testid={`move-${job.doc.id}${later ? `-${job.day!.index}` : ""}`} aria-label={`Move ${job.doc.title || job.doc.clientName || "job"} to another day`} onClick={(event) => { event.stopPropagation(); setMoving({ docId: job.doc.id, offset: job.day?.offset || 0, date: job.schedule.date, title: job.doc.clientName || job.doc.title }); }} onKeyDown={(event) => event.stopPropagation()} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md border border-current/30 bg-[var(--cr-card)]/70 px-2.5 py-1.5 text-xs font-semibold">Move</button>}
         {agenda && job.day && <span data-testid={`${tid}day-label`} className="mt-0.5 block w-fit rounded bg-black/10 px-1 text-[10px] font-semibold uppercase tracking-wide dark:bg-white/10">Day {job.day.index} of {job.day.count}</span>}
         {isTentative(job.doc, jobDocs) && <span data-testid="not-approved-tag" className="mt-0.5 inline-block rounded border border-dashed border-current px-1 text-[10px] font-semibold uppercase tracking-wide">Not approved</span>}
         {!compact && people && <span className="block truncate opacity-80">{people}</span>}
@@ -418,17 +486,80 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
             )}
 
 
+            {(view === "week" || view === "month") && (
+              <div className="mb-3 space-y-3 min-[900px]:hidden" data-testid="mobile-cal-controls">
+                <div role="group" aria-label="Calendar layout" className="inline-flex rounded-lg border border-slate-500/30 p-0.5 text-sm font-medium">
+                  {(["list", "calendar"] as const).map((m) => (
+                    <button key={m} type="button" data-testid={`mobile-mode-${m}`} aria-pressed={mobileMode === m} onClick={() => setMobileMode(m)} className={`min-h-10 rounded-md px-4 ${mobileMode === m ? "bg-teal-500 text-slate-950!" : ""}`}>{m === "list" ? "List" : "Calendar"}</button>
+                  ))}
+                </div>
+                <details open={unschedOpen} onToggle={(event) => setUnschedOpen((event.currentTarget as HTMLDetailsElement).open)} className="rounded-xl border border-slate-500/30 bg-[var(--cr-card)] text-sm" data-testid="mobile-unscheduled">
+                  <summary className="flex min-h-11 cursor-pointer items-center px-3 font-semibold">Unscheduled ({unscheduled.length})</summary>
+                  <div className="space-y-1.5 px-3 pb-3">
+                    <p className="text-xs opacity-80">Press and hold a job, then drag it onto a day. Or tap Schedule.</p>
+                    {unscheduled.length === 0 && <p className="rounded-lg border border-dashed border-slate-500/40 p-3 text-center text-xs">None.</p>}
+                    {unscheduled.map((doc) => (
+                      <div key={doc.id} data-testid={`m-unscheduled-${doc.id}`} {...touchHandlers(doc.id, 0, doc.clientName || doc.title)} className="flex min-h-11 select-none items-center gap-2 rounded-lg border border-slate-500/40 px-3 [-webkit-touch-callout:none]">
+                        <span className="min-w-0 flex-1 truncate text-xs font-medium">{doc.title} · {doc.clientName || "No client"}</span>
+                        <button type="button" data-testid={`m-schedule-${doc.id}`} onClick={() => { if (suppressClick.current) return; setEditing({ docId: doc.id, date: pickedDay || current }); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="shrink-0 rounded-md bg-teal-500 px-3 py-1.5 text-xs font-semibold text-slate-950!">Schedule</button>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+                {mobileMode === "calendar" && (() => {
+                  const sel = pickedDay || current;
+                  const first = `${sel.slice(0, 8)}01`;
+                  const f = parse(first);
+                  const count = new Date(f.getFullYear(), f.getMonth() + 1, 0).getDate();
+                  const cells: (string | null)[] = Array.from({ length: f.getDay() }, () => null);
+                  for (let d = 1; d <= count; d += 1) cells.push(`${first.slice(0, 8)}${String(d).padStart(2, "0")}`);
+                  const goMonth = (n: number) => setPickedDay(ymd(new Date(f.getFullYear(), f.getMonth() + n, 1)));
+                  const selJobs = jobs.filter((job) => job.schedule.date === sel).sort((a, b) => a.schedule.startTime.localeCompare(b.schedule.startTime));
+                  return (
+                    <div data-testid="mobile-month">
+                      <div className="mb-2 flex items-center gap-2">
+                        <button type="button" aria-label="Previous month" onClick={() => goMonth(-1)} className="min-h-10 rounded-lg border border-slate-500/30 px-3">‹</button>
+                        <p className="flex-1 text-center font-semibold" data-testid="mobile-month-heading">{f.toLocaleString("en-US", { month: "long", year: "numeric" })}</p>
+                        <button type="button" aria-label="Next month" onClick={() => goMonth(1)} className="min-h-10 rounded-lg border border-slate-500/30 px-3">›</button>
+                      </div>
+                      <div className="grid grid-cols-7 text-center text-[11px] font-semibold uppercase opacity-70">{DAY_NAMES.map((n) => <div key={n}>{n[0]}</div>)}</div>
+                      <div className="mt-1 grid grid-cols-7 gap-1">
+                        {cells.map((day, i) => {
+                          if (!day) return <div key={`b-${i}`} />;
+                          const n = jobs.filter((job) => job.schedule.date === day).length + continuing(day).length;
+                          return (
+                            <button key={day} type="button" data-testid={`mday-${day}`} data-drop-date={day} aria-label={`${day}, ${n} job${n === 1 ? "" : "s"}`} aria-pressed={day === sel} onClick={() => setPickedDay(day)}
+                              className={`flex aspect-square flex-col items-center justify-center rounded-lg border text-sm tabular-nums ${day === sel ? "border-teal-400 bg-teal-500/20 font-bold" : "border-slate-500/20"} ${touchDrag?.over === day ? "ring-2 ring-teal-400" : ""} ${day === today ? "text-teal-600 dark:text-teal-300 font-bold" : ""}`}>
+                              {parse(day).getDate()}
+                              {n > 0 && <span className="mt-0.5 flex items-center gap-0.5" aria-hidden="true">{n <= 3 ? Array.from({ length: n }, (_, k) => <span key={k} className="h-1.5 w-1.5 rounded-full bg-teal-500" />) : <span className="rounded bg-teal-500 px-1 text-[10px] font-semibold text-slate-950!">{n}</span>}</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <section className="mt-3" data-testid="mobile-day-agenda" data-drop-date={sel}>
+                        <h2 className="mb-1.5 text-sm font-semibold">{parse(sel).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}</h2>
+                        <div className="space-y-1.5">
+                          {continuing(sel).map((job) => contChip(job, true))}
+                          {selJobs.map((job) => chip(job, false, true))}
+                          {selJobs.length === 0 && continuing(sel).length === 0 && <p className="px-3 py-2 text-sm text-[var(--cr-muted)]">No jobs</p>}
+                        </div>
+                      </section>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
             {(view === "week" || view === "month") && (() => {
               const days = (view === "week" ? weekDays : monthCells.filter((day): day is string => Boolean(day)))
                 .filter((day) => view === "week" || day === today || jobs.some((job) => job.schedule.date === day) || continuing(day).length > 0 || docs.some((doc) => isDueInvoice(doc) && doc.data?.dueDate === day));
               return (
-                <div className="space-y-3 min-[900px]:hidden" data-testid="agenda-list">
+                <div className={`space-y-3 min-[900px]:hidden ${mobileMode === "calendar" ? "hidden" : ""}`} data-testid="agenda-list">
                   {days.length === 0 && <p className="py-8 text-center text-sm text-[var(--cr-muted)]">No jobs this month.</p>}
                   {days.map((day) => {
                     const dayJobs = jobs.filter((job) => job.schedule.date === day).sort((a, b) => a.schedule.startTime.localeCompare(b.schedule.startTime));
                     const due = view === "month" ? docs.filter((doc) => isDueInvoice(doc) && doc.data?.dueDate === day) : [];
                     return (
-                      <section key={day} data-testid={`agenda-day-${day}`}>
+                      <section key={day} data-testid={`agenda-day-${day}`} data-drop-date={day} className={touchDrag?.over === day ? "rounded-xl ring-2 ring-teal-400" : ""}>
                         <h2 className={`sticky top-[env(safe-area-inset-top)] z-10 -mx-2 mb-1.5 max-sm:mx-0 max-sm:rounded-lg max-sm:border max-sm:border-teal-500/15 flex items-center gap-2 px-3 py-2 text-sm font-semibold backdrop-blur sm:-mx-3 ${day === today ? "bg-teal-500/15 text-teal-700 dark:text-teal-300" : "bg-[var(--cr-card)]/95"}`}>
                           <span className={`inline-flex h-7 min-w-7 items-center justify-center rounded-full px-1.5 text-xs tabular-nums ${day === today ? "bg-teal-500 text-slate-950!" : "bg-slate-500/10"}`}>{parse(day).getDate()}</span>
                           {parse(day).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
@@ -507,7 +638,7 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
             )}
           </div>
 
-          <aside className="h-fit rounded-2xl border border-slate-500/30 bg-[var(--cr-card)] p-4 text-sm shadow-sm lg:sticky lg:top-20 print:hidden" data-testid="unscheduled">
+          <aside className="h-fit rounded-2xl border border-slate-500/30 bg-[var(--cr-card)] p-4 text-sm shadow-sm lg:sticky lg:top-20 print:hidden max-[899px]:hidden" data-testid="unscheduled">
             <p className="font-semibold">Unscheduled jobs</p>
             <p className="mb-2 text-xs opacity-90">Drag onto the calendar, or click to set a time.</p>
             {unscheduled.length === 0 && <p className="rounded-lg border border-dashed border-slate-500/40 p-3 text-center text-xs opacity-90">None.</p>}
@@ -530,6 +661,22 @@ export default function CalendarPage({ initialView = "week" }: { initialView?: V
             </div>
           </aside>
         </div>
+        {moving && (
+          <div className="fixed inset-0 z-[200] flex items-end bg-black/40" role="dialog" aria-modal="true" aria-label="Move job" data-testid="move-sheet" onClick={() => setMoving(null)}>
+            <div className="w-full rounded-t-2xl bg-[var(--cr-card)] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-xl" onClick={(event) => event.stopPropagation()}>
+              <p className="font-semibold">Move {moving.title}</p>
+              <p className="mb-3 text-xs opacity-80">Keeps the time and crew. A multi-day job moves as a block.</p>
+              <label className="flex flex-col gap-1.5 text-sm font-medium">New day
+                <input type="date" data-testid="move-date" value={moving.date} onChange={(event) => setMoving({ ...moving, date: event.target.value })} className="min-h-11 rounded-lg border border-slate-500/40 bg-transparent px-3" />
+              </label>
+              <div className="mt-4 flex gap-2">
+                <button type="button" onClick={() => setMoving(null)} className="min-h-11 flex-1 rounded-lg border border-slate-500/40 font-medium">Cancel</button>
+                <button type="button" data-testid="move-save" disabled={!moving.date} onClick={() => { const m = moving; setMoving(null); void moveJob(m.docId, m.offset, m.date); }} className="min-h-11 flex-1 rounded-lg bg-teal-500 font-semibold text-slate-950! disabled:opacity-50">Move</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {touchDrag && <div aria-hidden="true" data-testid="touch-drag-ghost" className="pointer-events-none fixed z-[200] -translate-x-1/2 -translate-y-full rounded-lg border border-teal-400 bg-[var(--cr-card)] px-3 py-1.5 text-sm font-semibold shadow-lg" style={{ left: touchDrag.x, top: touchDrag.y - 12 }}>{touchDrag.label}{touchDrag.over ? ` → ${parse(touchDrag.over).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}</div>}
       </section>
     </AppShell>
   );
