@@ -23,7 +23,7 @@ const period = { from: "2026-10-19", to: "2026-10-25" };
 ok(resolvedInPeriod([{ date: "2026-10-22" }, { date: "2026-10-12" }], period).length === 1, "resolved older than the current pay period hides");
 ok(friendlyError("Failed to fetch") === OFFLINE_MESSAGE && friendlyError("TypeError: Load failed") === OFFLINE_MESSAGE && friendlyError("Invalid login credentials") === "Invalid login credentials", "network errors read plainly; real errors unchanged");
 const page = readFileSync("src/app/timesheet/page.tsx", "utf8");
-ok(/const alerts = weekLoading \? \[\]/.test(page), "alerts wait for this week's approvals");
+ok(/pendingSurfaces\(weekLoading/.test(page), "alerts wait for this week's approvals");
 ok(/readLocalApprovals\(week/.test(page) && /mergeApprovals\(data\.approvals/.test(page), "local approvals seed the week; load merges saved-this-session rows");
 ok(/key: `flag-\$\{r\.w\.id\}-\$\{d\.date\}`, employeeId: r\.w\.id, date: d\.date/.test(page), "needs-review alerts carry worker/day so approving moves them to Resolved");
 ok(!page.includes("Resolved alerts (") && page.includes("They clear at the end of the pay period."), "one 'Resolved (n)' label with its explanation");

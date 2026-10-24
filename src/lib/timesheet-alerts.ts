@@ -21,3 +21,19 @@ export function mergeApprovals<T extends ApprovalLike>(loaded: T[], savedThisSes
 export function resolvedInPeriod<T extends { date?: string }>(list: T[], period: { from: string; to: string }) {
   return list.filter((a) => !a.date || (a.date >= period.from && a.date <= period.to));
 }
+
+/**
+ * pt437u: nothing that says "pending" may show from this device's copy before the week's server read lands
+ * (taps come from the server, so a scheduled day looks like a no-show and an approved day like open work).
+ * Every pending surface on the Timesheet goes through this one gate: Alerts list/count, Resolved, Needs review
+ * filter count, Approve all ready (n), the per-worker status chips, day "!" flags and the orphan-hours notice.
+ */
+export const LOADING_LABEL = "Loading…";
+export function pendingSurfaces<A, R>(loading: boolean, v: { alerts: A[]; resolved: R[]; reviewCount: number; readyCount: number; orphans: string[] }) {
+  if (!loading) return { ...v, loading: false as const };
+  return { alerts: [] as A[], resolved: [] as R[], reviewCount: 0, readyCount: 0, orphans: [] as string[], loading: true as const };
+}
+/** Worker week chip: a neutral placeholder while loading, never "Needs review (n)" / "Ready to approve". */
+export function statusChip<S extends { kind: string; label: string }>(loading: boolean, status: S) {
+  return loading ? { kind: "loading", label: LOADING_LABEL } : status;
+}
