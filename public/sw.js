@@ -1,9 +1,9 @@
 /* ClientReady service worker: offline app shell + push display. Never caches API calls, Supabase
    responses or anything cross-origin, so business data only lives in the app's own storage. */
-const VERSION = "cr-v5";
+const VERSION = "cr-v6";
 const SHELL = `${VERSION}-shell`;
 const STATIC = `${VERSION}-static`;
-const PRECACHE = ["/offline", "/icons/icon-192.png"];
+const PRECACHE = ["/offline", "/icons/cr-2026-192.png"];
 // Every app page is kept ready for no-signal use even if never opened online on this device (best effort:
 // a failure here never blocks install). Their /_next/static scripts and styles are cached too.
 // Field pages go first. Excluded: NO_CACHE_PAGES (token pages), /auth/callback and /reset-password (one-time
@@ -94,8 +94,8 @@ self.addEventListener("push", (event) => {
   const title = String(data.title || "ClientReady").slice(0, 80);
   event.waitUntil(self.registration.showNotification(title, {
     body: String(data.body || "").slice(0, 240),
-    icon: "/icons/icon-192.png",
-    badge: "/icons/icon-192.png",
+    icon: "/icons/cr-2026-192.png",
+    badge: "/icons/cr-2026-192.png",
     tag: data.tag ? String(data.tag) : undefined,
     data: { url: typeof data.url === "string" && data.url.startsWith("/") && !data.url.startsWith("//") ? data.url : "/calendar?view=day" },
   }));

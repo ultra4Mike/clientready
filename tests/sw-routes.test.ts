@@ -24,7 +24,7 @@ test("every page in src/app is warmed or deliberately excluded", () => {
   const missing = pages("src/app").filter((p) => !warm.has(p) && !excluded.has(p) && !p.includes("["));
   assert.deepEqual(missing, []);
   for (const p of warm) assert.ok(!noCache.some((n) => p === n || p.startsWith(`${n}/`)), `${p} must not be cached`);
-  assert.match(sw, /const VERSION = "cr-v5"/);
+  assert.match(sw, /const VERSION = "cr-v6"/);
   assert.match(sw, /startsWith\("\/api\/"\)\) return;/, "API never cached");
   assert.match(sw, /url\.origin !== self\.location\.origin/, "Supabase/cross-origin never cached");
 });
