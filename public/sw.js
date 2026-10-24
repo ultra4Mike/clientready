@@ -1,6 +1,6 @@
 /* ClientReady service worker: offline app shell + push display. Never caches API calls, Supabase
    responses or anything cross-origin, so business data only lives in the app's own storage. */
-const VERSION = "cr-v4";
+const VERSION = "cr-v5";
 const SHELL = `${VERSION}-shell`;
 const STATIC = `${VERSION}-static`;
 const PRECACHE = ["/offline", "/icons/icon-192.png"];
